@@ -80,22 +80,17 @@
     background: var(--knob); color: var(--panel); border-color: var(--knob);
   }
   /* A font name is a proper noun and keeps its own case, unlike the labels
-     around it. Sized to the longest name rather than to the current one, so
-     the row beside it does not shift when the choice changes -- and capped,
-     because that makes one absurd name the width of every family's picker.
-     The cap is what the rest of the row leaves: past it the appearance switch
-     wraps to a line of its own. A name that does not fit is cut short here and
-     whole in the list, and the title carries it either way. */
+     around it. The picker takes whatever the rest of the row leaves, so it
+     reads as the control it is rather than as a word in the row -- a folder of
+     short names would otherwise leave it the smallest thing here and the
+     hardest to find. Growing from nothing rather than from the longest name is
+     what keeps that safe: a name nobody can size for cannot push the
+     appearance switch onto a line of its own, and one that does not fit is cut
+     short here and whole in the list, with the title carrying it either way. */
   #family {
-    width: auto; max-width: 11rem; padding: .2rem .35rem;
+    flex: 1 1 0; min-width: 5rem; padding: .2rem .35rem;
     font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer;
     text-overflow: ellipsis;
-  }
-  /* The picker and the four specimen letters say "font" between them, so the
-     word is for a screen reader rather than the row. */
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap;
   }
 
   /* One badge per style, each set in the style it stands for: the fastest way
