@@ -322,6 +322,37 @@ def test_every_knob_on_the_page_is_one_the_server_takes():
             f"the page posts {name!r} under {group!r}, which takes no such field"
 
 
+def test_the_page_offers_every_language_the_core_can_hyphenate():
+    """The patterns are compiled into the render core, so a language the
+    firmware carries and the page does not offer is one nobody can preview.
+
+    Which is how the list fell four short: the page was written against the
+    languages there were, and LanguageRegistry.cpp went on gaining them.
+    Reading the registry rather than a copy of it is what keeps the next
+    addition from being invisible here.
+    """
+    import re
+
+    from crossglyph import render
+    from crossglyph.preview import server
+
+    registry = (render.FIRMWARE / "lib" / "Epub" / "Epub" / "hyphenation"
+                / "LanguageRegistry.cpp")
+    if not registry.is_file():
+        pytest.skip(f"{registry} not found (no firmware checkout beside this one)")
+    carried = set(re.findall(r'\{"\w+",\s*"(\w+)",\s*&\w+Hyphenator\}',
+                             registry.read_text(encoding="utf-8")))
+    assert carried, "read no languages out of the registry"
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    picker = re.search(r'<select id="language".*?</select>', html, re.S)
+    offered = set(re.findall(r'<option value="(\w*)"', picker.group(0)))
+    assert carried <= offered, f"the page cannot preview {carried - offered}"
+    # And nothing the core would silently find no breaks for. Empty is the
+    # page's own "off", which is a choice rather than a language.
+    assert offered - carried == {""}, offered - carried
+
+
 def test_the_export_panel_posts_what_the_server_reads():
     """The same trap as the knobs, one form down: a misspelt name here saves
     nothing rather than failing."""

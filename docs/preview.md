@@ -33,8 +33,10 @@ Get-NetTCPConnection -LocalPort 8000 -State Listen |
 Font controls (`gamma`, `weight`, `line_height`, the spacings, `kerning`,
 `slant`, `thresholds`, `hinting`, `stem_darkening`, `ligatures`, `figures`)
 rebuild the `.cpfont` behind the page. Page controls (margin, alignment,
-hyphenation, line spacing, paragraph spacing, antialiasing) are the reader's
-own settings, and they only re-lay-out.
+hyphenation and the language its patterns come from, line spacing, paragraph
+spacing, antialiasing) are the reader's own settings, and they only
+re-lay-out. The language list is every one the firmware carries patterns for;
+on the device it comes from the book's own metadata instead.
 
 The export panel holds what a build needs and a page does not: the sizes, the
 coverage intervals, the fallback families. Save writes the lot back to the
