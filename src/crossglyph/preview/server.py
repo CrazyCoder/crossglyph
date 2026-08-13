@@ -841,9 +841,17 @@ def build(request: BuildRequest) -> StreamingResponse:
     return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
+#: This is a tool you edit while it is running, and the page is fourteen module
+#: files a browser is free to keep. Kept, they are served after the edit that
+#: was supposed to fix them: the page runs the old code, the change looks like
+#: it did nothing, and the next hour goes to the wrong question. Nothing here
+#: is worth a cache -- it is one process serving one reader off local disk.
+NO_STORE = {"cache-control": "no-store"}
+
+
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers=NO_STORE)
 
 
 #: What the page is allowed to ask for beside itself. A whitelist of suffixes
@@ -859,7 +867,7 @@ def asset(asset: str) -> FileResponse:
             or not path.is_file()
             or STATIC.resolve() not in path.parents):
         raise HTTPException(404, f"no such asset: {asset}")
-    return FileResponse(path)
+    return FileResponse(path, headers=NO_STORE)
 
 
 def family_config(name: str) -> Config:

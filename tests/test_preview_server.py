@@ -252,6 +252,17 @@ def test_the_page_is_served(client):
     assert "text/html" in response.headers["content-type"]
 
 
+def test_the_page_and_its_modules_are_never_cached(client):
+    """This is a tool you edit while it is running. A browser that keeps the
+    modules serves them after the edit meant to fix them: the page runs the old
+    code, the change reads as having done nothing, and the search moves to the
+    wrong question. It costs nothing to say no here."""
+    for path in ("/", "/js/app.js", "/style.css"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        assert response.headers["cache-control"] == "no-store", path
+
+
 @needs
 def test_the_sample_text_is_offered_to_the_page(client):
     """The text box starts empty and falls back to the server's sample, so the

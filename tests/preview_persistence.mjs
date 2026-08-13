@@ -522,7 +522,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     fetched: { textContent: "" },
     "have-fallbacks": { textContent: "" },
     knobs: form,
-    page: { src: "", set: null },
+    // The sheet, which is a control as well as an image: press and hold on it
+    // shows the page untuned.
+    page: {
+      src: "", set: null, on: {},
+      addEventListener(kind, fn) { this.on[kind] = fn; },
+      press(button = 0) { this.on.pointerdown({ button, preventDefault() {} }); },
+      release(how = "pointerup") { this.on[how](); },
+    },
     // The notice drawn over the sheet when a render fails, and the button on it.
     "page-error": {
       hidden: true,
@@ -688,6 +695,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            buildEls: [stubs.build, stubs["build-all"]],
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
+           sheet: stubs.page,
            refuse() { answer = false; } };
 }
 
@@ -1862,6 +1870,50 @@ for (const { name, text } of sources) {
   check("a finished build leaves the buttons saying what a press does now",
         env.buildEls.map(one => one.textContent).join() === "Build,Build all",
         env.buildEls.map(one => one.textContent).join());
+}
+
+// 45. Press and hold on the sheet, which is the gesture every photo editor
+//     uses for before and after. A look rather than a change of state.
+{
+  const env = await loaded(fakeStorage());
+  const untuned = () => env.compare.getAttribute("aria-pressed") === "true";
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+
+  env.sheet.press();
+  check("holding the page shows it untuned", untuned() === true);
+  check("and the knob is at what the converter does with no config",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+
+  env.sheet.release();
+  check("letting go puts the tuning back", untuned() === false);
+  check("and the knob with it", env.byName.gamma.value === "2.5",
+        env.byName.gamma.value);
+
+  // Dragging off the sheet gets no pointerup there, so leaving has to count as
+  // letting go -- otherwise the page stays untuned with nothing holding it.
+  env.sheet.press();
+  env.sheet.release("pointerleave");
+  check("and so does dragging off it", untuned() === false);
+
+  // A right-click is a menu, not a comparison.
+  env.sheet.press(2);
+  check("the other buttons are not this gesture", untuned() === false);
+}
+
+// 45b. Held over a page already set to untuned, the release must not leave it
+//      tuned: the toggle is somebody's state and the hold is only a look.
+{
+  const env = await loaded(fakeStorage());
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+  env.compare.fire();
+  const untuned = () => env.compare.getAttribute("aria-pressed") === "true";
+  check("the toggle is on to begin with", untuned() === true);
+
+  env.sheet.press();
+  env.sheet.release();
+  check("and a hold over it leaves it where it was", untuned() === true);
 }
 
 process.exit(failures ? 1 : 0);

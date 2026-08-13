@@ -1,4 +1,4 @@
-import {form} from "./dom.js";
+import {form, img} from "./dom.js";
 import {bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, reverts, stashed} from "./reverts.js";
 
 // --- comparing the whole tuning -------------------------------------------
@@ -46,3 +46,38 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   toggleCompare();
 });
+
+// And press and hold on the page itself, where the eye already is. The same
+// comparison as the button without leaving the thing being compared, which is
+// the gesture every photo editor uses for before and after.
+//
+// A hold is a look rather than a change of state, so whatever the toggle was
+// before the press is what comes back: releasing over a page already set to
+// untuned must not leave it tuned. Null means no press is in hand.
+let heldFrom = null;
+
+export function holdUntuned() {
+  if (heldFrom !== null) return;
+  heldFrom = comparing();
+  if (!heldFrom) toggleCompare();
+}
+
+export function releaseUntuned() {
+  if (heldFrom === null) return;
+  if (!heldFrom && comparing()) toggleCompare();
+  heldFrom = null;
+}
+
+img.addEventListener("pointerdown", (event) => {
+  // The left button only: a right-click is a menu, and a middle one is the
+  // browser's own. An image is draggable and text is selectable, either of
+  // which swallows the release and leaves the page stuck untuned.
+  if (event.button !== 0) return;
+  event.preventDefault();
+  holdUntuned();
+});
+// Leaving counts as letting go: a press dragged off the sheet gets no pointerup
+// here, and there is no state worth keeping for a gesture that has left.
+for (const kind of ["pointerup", "pointercancel", "pointerleave"]) {
+  img.addEventListener(kind, releaseUntuned);
+}

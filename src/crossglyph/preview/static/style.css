@@ -327,8 +327,12 @@
      to avoid. */
   #stage { background: var(--panel); border: 1px solid var(--line);
            border-radius: 10px; padding: .85rem; }
+  /* Press and hold shows it untuned, so the sheet must not be draggable or
+     selectable: either gesture takes the pointer and the release with it,
+     and the page stays untuned until something else is clicked. */
   #page { display: block; image-rendering: pixelated; background: var(--l0);
-          border: 1px solid var(--line); }
+          border: 1px solid var(--line);
+          user-select: none; -webkit-user-drag: none; }
 
   /* A failed render is said where the page would have been, because that is
      where the eye already is. Over the sheet rather than instead of it: the

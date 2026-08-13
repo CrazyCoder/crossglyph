@@ -36,7 +36,14 @@ rebuild the `.cpfont` behind the page. Page controls (margin, alignment,
 hyphenation and the language its patterns come from, line spacing, paragraph
 spacing, antialiasing) are the reader's own settings, and they only
 re-lay-out. The language list is every one the firmware carries patterns for;
-on the device it comes from the book's own metadata instead.
+on the device it comes from the book's own metadata instead. A control that
+cannot apply is greyed rather than hidden, so hyphenating as Russian is not
+offered while hyphenation is off.
+
+To see what your tuning is doing, take it away: `untuned` at the top, the `\`
+key, or press and hold the page itself. The size stays where it is, since that
+is which size you are working at rather than tuning. Holding is a look and not
+a change: whatever the toggle was set to is what comes back on release.
 
 The export panel holds what a build needs and a page does not: the sizes, the
 coverage intervals, the fallback families. Save writes the lot back to the
