@@ -50,6 +50,11 @@ the line under it names the family and size in hand, the count, and once there
 is enough of the run to judge by, what is left. The sentence that stays when
 it finishes says what was built, what was already current, and where it went.
 
+A build does the sizes whose inputs changed. Hold shift and it does the lot,
+current or not, which is what you want when the inputs are the same and the
+answer should not be: a converter that has moved on, or a face edited in
+place. Both buttons say `Rebuild` for as long as the key is held.
+
 A family that `all.conf` covers without naming has no file of its own. Saving
 one writes a new `<family>.conf` rather than editing `all.conf`, which would
 retune every family in the workspace.

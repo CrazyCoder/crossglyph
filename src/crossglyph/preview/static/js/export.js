@@ -183,7 +183,28 @@ export function showStep(step) {
 export const buildButtons = [document.getElementById("build"),
                      document.getElementById("build-all")];
 
-export async function buildFamilies(family) {
+// Shift is what this page already means by "more": ten at a time on a stepper,
+// and here a build that ignores what is already current. A rebuild is minutes
+// and is wanted rarely, so it is a modifier on the button that builds rather
+// than a third button, or a tick sitting in the panel saying nothing all day.
+export function forcedLabel(plain) { return plain.replace("Build", "Rebuild"); }
+
+// A modifier nobody can see is a feature nobody finds, so the buttons say what
+// they will do for as long as it is held.
+export const plainLabels = buildButtons.map(button => button.textContent);
+export function showForceState(held) {
+  buildButtons.forEach((button, at) => {
+    button.textContent = held ? forcedLabel(plainLabels[at]) : plainLabels[at];
+  });
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Shift") showForceState(true);
+});
+document.addEventListener("keyup", (event) => {
+  if (event.key === "Shift") showForceState(false);
+});
+
+export async function buildFamilies(family, force = false) {
   const label = family || "every family";
   for (const button of buildButtons) button.disabled = true;
   try {
@@ -192,7 +213,7 @@ export async function buildFamilies(family) {
     // is only on the page is therefore not in that comparison, so the build
     // finds everything current and says so -- which reads as "your change did
     // nothing" when it means "your change was never seen". Write it first.
-    startProgress(`planning ${label}…`);
+    startProgress(`${force ? "rebuilding" : "planning"} ${label}…`);
     builtNote.textContent = "";
     if (!saveButton.hidden && knobsDiffer() && !(await saveKnobs())) {
       builtNote.textContent = `not built: ${label} could not be saved`;
@@ -202,7 +223,7 @@ export async function buildFamilies(family) {
     try {
       response = await fetch("/build", {
         method: "POST", headers: {"content-type": "application/json"},
-        body: JSON.stringify({family: family})});
+        body: JSON.stringify({family: family, force: force})});
     } catch (error) {
       builtNote.textContent = String(error);
       return;
@@ -228,6 +249,9 @@ export async function buildFamilies(family) {
     // whatever fraction it had reached, saying a run is still going.
     endProgress();
     for (const button of buildButtons) button.disabled = false;
+    // The key may well have been let go while the buttons were out, and a
+    // keyup on a disabled button is one nobody hears.
+    showForceState(false);
   }
 }
 
@@ -284,10 +308,10 @@ fetchButton.addEventListener("click", async () => {
   showFallbackState(result.where);
 });
 
-document.getElementById("build").addEventListener(
-  "click", () => buildFamilies(familyPicker.value));
-document.getElementById("build-all").addEventListener(
-  "click", () => buildFamilies(""));
+buildButtons[0].addEventListener(
+  "click", (event) => buildFamilies(familyPicker.value, event.shiftKey));
+buildButtons[1].addEventListener(
+  "click", (event) => buildFamilies("", event.shiftKey));
 
 // The output folder is all.conf's, so it saves on its own rather than with a
 // family -- and on leaving the field, since there is nothing else to press.

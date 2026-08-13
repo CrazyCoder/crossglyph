@@ -43,7 +43,9 @@ export function startProgress(what) {
   startedAt = performance.now();
   progressRow.hidden = false;
   bar.classList.add("waiting");
-  barFill.style.width = "";
+  // At nothing, not at whatever the last run ended on: the first counted step
+  // has to fill from empty rather than back down from a bar already part full.
+  barFill.style.width = "0%";
   bar.removeAttribute("aria-valuenow");
   bar.setAttribute("aria-valuetext", what);
   progressWhat.textContent = what;
@@ -69,4 +71,7 @@ export function showProgress(done, total, what) {
 export function endProgress() {
   progressRow.hidden = true;
   bar.classList.remove("waiting");
+  // Emptied while it is out of the document, so the next run opens at nothing
+  // rather than animating down from the last one's finish.
+  barFill.style.width = "0%";
 }

@@ -483,8 +483,8 @@
      bar laid on top would be its loudest element and loudest for the one state
      that ends by itself. */
   #progress { margin-top: .7rem; }
-  #bar { height: 2px; background: var(--rule); border-radius: 1px;
-         overflow: hidden; }
+  #bar { position: relative; height: 2px; background: var(--rule);
+         border-radius: 1px; overflow: hidden; }
   #bar-fill { display: block; height: 100%; width: 0; background: var(--knob);
               transition: width .18s ease-out; }
   #progress-line {
@@ -496,15 +496,20 @@
                    white-space: nowrap; }
   #progress-count { flex: none; }
   /* Planning, and the save that may come before it: no total yet, so the rule
-     sweeps rather than sitting at nothing. */
-  #bar.waiting #bar-fill {
-    width: 30%; transition: none; animation: sweep 1.15s ease-in-out infinite;
+     sweeps rather than sitting at nothing.
+     Over the fill rather than in it. Sweeping the fill itself would mean the
+     first counted step transitions down from wherever the sweep had left its
+     width -- a bar that opens a third full and shrinks, which reads as
+     progress lost. The fill only ever holds the fraction the build reports. */
+  #bar.waiting::after {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 30%;
+    background: var(--knob); animation: sweep 1.15s ease-in-out infinite;
   }
   @keyframes sweep {
     from { transform: translateX(-110%); } to { transform: translateX(440%); }
   }
   @media (prefers-reduced-motion: reduce) {
-    #bar.waiting #bar-fill { animation: none; width: 100%; opacity: .4; }
+    #bar.waiting::after { animation: none; width: 100%; opacity: .4; }
     #bar-fill { transition: none; }
   }
   #fetch { padding: .3rem .6rem; }

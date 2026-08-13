@@ -474,9 +474,14 @@
     </div>
     <div class="hint" id="source-note"></div>
 
+    <!-- A build does the sizes whose inputs changed. Holding shift does the
+         lot, for the times the inputs are the same and the answer should not
+         be: a converter that has moved on, a face edited in place. -->
     <div class="actions">
-      <button type="button" id="build">Build</button>
-      <button type="button" id="build-all">Build all</button>
+      <button type="button" id="build"
+              title="Build this family. Hold shift to rebuild every size, current or not.">Build</button>
+      <button type="button" id="build-all"
+              title="Build every family in the folder. Hold shift to rebuild every size, current or not.">Build all</button>
     </div>
     <!-- Progress belongs to the press that started it, so it sits under the
          two buttons and above the sentence they leave behind. The bar says

@@ -451,12 +451,17 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // Every value `disabled` took, in order: "out while it runs, back when it
   // finishes" is a sequence, and reading the property afterwards only ever
   // shows the end of it.
-  const buildButton = id => ({
+  const buildButton = (id, label = "") => ({
     states: [],
+    textContent: label,
     _disabled: false,
     get disabled() { return this._disabled; },
     set disabled(next) { this._disabled = next; this.states.push(next); },
-    addEventListener(kind, fn) { if (kind === "click") buildButtons[id] = fn; },
+    // Wrapped so a press carries an event, as every real one does: the build
+    // buttons read shiftKey off it, and a handler called bare saw undefined.
+    addEventListener(kind, fn) {
+      if (kind === "click") buildButtons[id] = (event = {}) => fn(event);
+    },
   });
   // A text holder that remembers everything it was set to.
   const recording = () => ({
@@ -508,8 +513,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       children: [],
       replaceChildren(...kids) { this.children = kids; },
     },
-    build: buildButton("one"),
-    "build-all": buildButton("all"),
+    build: buildButton("one", "Build"),
+    "build-all": buildButton("all", "Build all"),
     // The offer itself, which is the button rather than a row around it.
     // Assigned onto rather than spread: the disabled accessor is what records
     // the sequence, and a spread would copy its value and drop it.
@@ -545,7 +550,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const cancelled = new Set();
   const prompts = [];
   let answer = true;
-  const keys = [];
+  const keys = [], keyups = [];
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
@@ -556,7 +561,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       createElement: makeElement,
       createTextNode: (text) => ({ textContent: text }),
       querySelectorAll: () => [],
-      addEventListener(kind, fn) { if (kind === "keydown") keys.push(fn); },
+      addEventListener(kind, fn) {
+        if (kind === "keydown") keys.push(fn);
+        if (kind === "keyup") keyups.push(fn);
+      },
       documentElement: {
         dataset: { appearance: "system" },
         classList: { toggle() {} },
@@ -678,7 +686,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            progressWhat: stubs["progress-what"],
            progressCount: stubs["progress-count"],
            buildEls: [stubs.build, stubs["build-all"]],
-           save: saveButton, note: stubs.saved, prompts,
+           save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            refuse() { answer = false; } };
 }
@@ -1813,6 +1821,47 @@ for (const { name, text } of sources) {
         spellDuration(130));
   check("and a round one drops the seconds", spellDuration(120) === "2m",
         spellDuration(120));
+}
+
+// 44. A rebuild. Shift is what this page already means by "more", so it is a
+//     modifier on the button that builds rather than a third button, and the
+//     buttons say what they will do for as long as it is held.
+{
+  const env = await loaded(fakeStorage());
+  const [build, buildAll] = env.buildEls;
+  check("at rest they say what they do",
+        [build.textContent, buildAll.textContent].join() === "Build,Build all",
+        [build.textContent, buildAll.textContent].join());
+
+  for (const listener of env.keys) listener({ key: "Shift" });
+  check("holding shift says what it would do instead",
+        [build.textContent, buildAll.textContent].join() === "Rebuild,Rebuild all",
+        [build.textContent, buildAll.textContent].join());
+
+  await env.builds.one({ shiftKey: true });
+  check("and the press asks for one", env.fetches.builds.at(-1).force === true,
+        JSON.stringify(env.fetches.builds.at(-1)));
+
+  for (const listener of env.keyups) listener({ key: "Shift" });
+  check("letting go puts them back",
+        [build.textContent, buildAll.textContent].join() === "Build,Build all",
+        [build.textContent, buildAll.textContent].join());
+
+  await env.builds.one();
+  check("a plain press builds only what changed",
+        env.fetches.builds.at(-1).force === false,
+        JSON.stringify(env.fetches.builds.at(-1)));
+}
+
+// 44b. A build that ends while the key is down: the buttons are out, so the
+//      keyup lands on nothing and the labels would stay saying "Rebuild".
+{
+  const env = await loaded(fakeStorage());
+  for (const listener of env.keys) listener({ key: "Shift" });
+  await env.builds.all({ shiftKey: true });
+  check("a finished build leaves the buttons saying what a press does now",
+        env.buildEls.map(one => one.textContent).join() === "Build,Build all",
+        env.buildEls.map(one => one.textContent).join());
 }
 
 process.exit(failures ? 1 : 0);
