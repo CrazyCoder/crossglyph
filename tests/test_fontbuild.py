@@ -310,4 +310,48 @@ def test_a_config_beside_the_fonts_is_not_read(tmp_path):
     fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
                        family="Probe", style="Regular")
     (tmp_path / "probe.conf").write_text("sizes = 12\n", encoding="utf-8")
-    assert fontbuild.gather(tmp_path) == ([], [])
+    configs, errors = fontbuild.gather(tmp_path)
+    assert errors == []
+    # The font is found, since a folder of fonts is a family list. The config
+    # sitting beside it rather than in conf/ is what goes unread: sizes are the
+    # shipped default and not the 12 it asks for.
+    assert [c.name for c in configs] == ["Probe"]
+    assert configs[0].sizes == fontconf.DEFAULT_SIZES
+
+
+# --- the family that ships with the tool -----------------------------------
+
+
+def test_an_empty_workspace_offers_the_bundled_family(tmp_path):
+    """Unpacking a release and being told "no fonts" is a poor first run."""
+    configs, errors = fontbuild.gather(tmp_path)
+    assert errors == []
+    assert [c.name for c in configs] == ["Literata"]
+    assert configs[0].derived is True
+    # Two variable files fill four slots, so the family it opens on has a bold
+    # and an italic to show rather than one weight repeated.
+    assert set(configs[0].styles) == {"regular", "bold", "italic", "bolditalic"}
+    assert configs[0].styles["regular"].parent == fontbuild.STARTER_DIR
+
+
+def test_the_bundled_family_steps_aside_for_a_font_of_your_own(tmp_path):
+    import fontsmith
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    configs, _ = fontbuild.gather(tmp_path)
+    assert [c.name for c in configs] == ["Probe"]
+
+
+def test_the_bundled_family_is_drawn_at_the_size_it_is_built_for(tmp_path):
+    """Its optical size axis is the reason this is the face that ships: one
+    file per posture, redrawn for each size rather than scaled to it."""
+    config = fontbuild.gather(tmp_path)[0][0]
+    assert config.coords("regular", 13) == {"opsz": 13, "wght": 400}
+    assert config.coords("bold", 18) == {"opsz": 18, "wght": 700}
+
+
+def test_the_bundled_licence_travels_with_the_faces():
+    """The OFL requires it, and a wheel carries whatever is in the package."""
+    assert sorted(p.name for p in fontbuild.STARTER_DIR.iterdir()) == [
+        "Literata-Italic[opsz,wght].ttf", "Literata[opsz,wght].ttf", "OFL.txt"]

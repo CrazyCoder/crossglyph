@@ -65,6 +65,17 @@ wrapper in the IntelliJ IDEA monorepo.
 
 Full text: https://www.apache.org/licenses/LICENSE-2.0
 
+## The bundled family
+
+`src/crossglyph/starter/` carries Literata 3.103 by TypeTogether, roman and
+italic, so the preview has something to draw before anybody has put a font in
+the workspace. It is redistributed unmodified, and `OFL.txt` sits beside the
+two files.
+
+    Copyright 2017 The Literata Project Authors
+    (https://github.com/googlefonts/literata)
+    Licensed under the SIL Open Font License, Version 1.1
+
 ## The fallback faces
 
 The twelve Noto faces and the CJK faces are downloaded at run time and are not

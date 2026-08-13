@@ -16,13 +16,18 @@ draws. Every setting is a control, and the page redraws as you move it.
 ## Quick start
 
 1. Unpack the release somewhere you can write to.
-2. Put your TTF or OTF files in the `fonts` folder beside the launcher.
-3. Run `crossglyph.cmd` on Windows, or `./crossglyph.sh` on macOS and Linux.
+2. Run `crossglyph.cmd` on Windows, or `./crossglyph.sh` on macOS and Linux.
+3. Put your TTF or OTF files in the `fonts` folder beside the launcher.
 
 The launcher fetches [uv](https://docs.astral.sh/uv/) on first use, which then
 fetches Python and the dependencies. Nothing is installed system wide, and the
 whole of it lives in a cache directory you can delete. A browser opens on the
 first family it finds.
+
+Step 3 is second on purpose: there is nothing to set up before the first run.
+An empty workspace opens on Literata, which ships with the tool, so the page
+has type on it while you decide what to tune. Add a font of your own and it
+takes over.
 
 To build every family in the workspace, with no page in between:
 
@@ -50,9 +55,11 @@ fonts/
 land in `cpfonts` unless `out` in `all.conf` says otherwise.
 
 A family needs no config at all. Drop four files in, name them the way their
-foundry did, and `all.conf` covers them. Write a `<family>.conf` when one
-family needs settings of its own. See [docs/fonts.md](docs/fonts.md) for every
-key, and for what the tuning controls actually do.
+foundry did, and they build on the next run. `all.conf` holds settings shared
+by every family and ships commented out, so it sets nothing until you edit it.
+Write a `<family>.conf` when one family needs settings of its own. See
+[docs/fonts.md](docs/fonts.md) for every key, and for what the tuning controls
+actually do.
 
 ## Getting the fonts onto the device
 

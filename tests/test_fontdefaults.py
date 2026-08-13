@@ -74,10 +74,23 @@ def test_a_family_with_its_own_config_is_not_duplicated(source):
     assert configs[0].derived is False
 
 
-def test_nothing_is_derived_without_an_all_conf(source):
+def test_a_folder_of_fonts_is_a_family_list_with_no_config_at_all(source):
+    """all.conf carries shared settings; it does not switch discovery on.
+
+    What a release ships is a workspace with no `conf` in it, and the README
+    tells its reader to drop four files in and run the launcher. Requiring an
+    empty file first would make that first run fail with "no fonts".
+    """
     (_conf(source) / "all.conf").unlink()
-    configs, _ = fontbuild.gather(source)
-    assert configs == []
+    configs, errors = fontbuild.gather(source)
+    assert errors == []
+    quill = _by_name(configs)["Quill"]
+    assert quill.derived is True
+    assert set(quill.styles) == {"regular", "bold", "italic", "bolditalic"}
+    # Nothing is inherited any more, so it falls back to the shipped defaults
+    # rather than to what the deleted all.conf used to say.
+    assert quill.sizes == fontconf.DEFAULT_SIZES
+    assert quill.intervals == fontconf.DEFAULT_INTERVALS
 
 
 # --- inheritance ----------------------------------------------------------

@@ -143,7 +143,11 @@ export function fillFamilies(d) {
     familyEntries.set("", {faces: d.faces, tuning: null, conf: null});
   }
   for (const family of d.families) {
-    familyPicker.add(new Option(family.name, family.name));
+    // The family the tool ships is offered only while the workspace is empty.
+    // Saying so on the entry is what keeps it from reading as a font you put
+    // there and forgot, and explains where it goes once you drop yours in.
+    familyPicker.add(new Option(
+      family.bundled ? `${family.name} (bundled)` : family.name, family.name));
     familyEntries.set(family.name, family);
   }
   if (!familyPicker.options.length) return;   // nothing to choose between

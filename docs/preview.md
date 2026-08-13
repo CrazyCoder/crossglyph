@@ -20,6 +20,13 @@ going back to one you were just looking at is free. Started on a bare `--font`,
 that file stays at the top of the list as a choice of its own, since it is no
 family and cannot become one.
 
+While the workspace has no fonts in it, the picker offers Literata, which ships
+with the tool and is marked `(bundled)`. Its faces are read where they are
+installed and nothing is copied into the workspace. It is there so a first run
+has type to look at, and it steps aside as soon as you add a font of your own.
+Saving it first writes a `literata.conf` naming `dir`, which is what keeps it
+in the list after that.
+
 The server runs until it is killed, and it reads the Python once at startup, so
 a change to the source needs a restart. On Windows, free the port first:
 

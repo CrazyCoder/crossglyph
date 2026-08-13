@@ -46,6 +46,14 @@ FALLBACK_LICENCE = "OFL.txt"
 #: A release keeps one beside the launcher, which is what a tester fills in.
 SOURCE_DIR = pathlib.Path(os.environ.get("CROSSGLYPH_FONTS") or ROOT / "fonts")
 
+#: The family that ships with the tool, inside the package rather than in the
+#: workspace, which belongs to whoever unpacked it. An empty folder and an
+#: error is a poor first five minutes, so this stands in until there is a font
+#: to prefer. Literata is OFL, and one variable file per posture fills all four
+#: style slots with its opsz axis following the size being built -- so the
+#: family it opens on exercises the knobs rather than just filling the picker.
+STARTER_DIR = pathlib.Path(__file__).resolve().parent / "starter"
+
 #: Where built families go when nothing says otherwise: beside their sources,
 #: so a family's files, its config and its builds sit in one place. That also
 #: gives a copy of this tool somewhere to write that it certainly owns.
@@ -589,21 +597,55 @@ def derived_configs(source: pathlib.Path, defaults: dict[str, str],
     return configs, errors
 
 
+def starter_configs(source: pathlib.Path,
+                    defaults: dict[str, str]) -> tuple[list[Config], list[str]]:
+    """The bundled family, for a workspace that has nothing of its own yet.
+
+    Read where it is installed rather than copied into the workspace: that
+    folder is the reader's, and a tool that drops files in it unasked is one
+    you have to clean up after. `dir` is what a Save writes so the config goes
+    on resolving once the folder has a font of its own and this steps aside.
+    """
+    if not STARTER_DIR.is_dir():
+        return [], []                   # an install missing its own faces
+    path = conf_dir(source) / DEFAULTS_NAME
+    values = {**defaults, "dir": str(STARTER_DIR)}
+    configs, errors = [], []
+    for family in fontconf.discover_families(STARTER_DIR):
+        try:
+            configs.append(parse_config(path, values=values, family=family,
+                                        derived=True, root=source))
+        except FontConfigError as exc:
+            errors.append(str(exc))
+    return configs, errors
+
+
 def gather(source: pathlib.Path,
            tokens: list[str] | None = None) -> tuple[list[Config], list[str]]:
-    """Everything to build: per-font configs first, then all.conf's families.
+    """Everything to build: per-font configs first, then the folder's families.
 
     Selection by token matches a config filename, a family name or an output
-    name, so a family that only all.conf covers is still addressable by name.
+    name, so a family no config names is still addressable by name.
+
+    A folder with fonts in it and no config at all is a family list, which is
+    what `fonts/README.md` promises and what somebody who has just unpacked a
+    release has. all.conf carries shared settings; it is not the switch that
+    turns discovery on.
     """
     defaults = load_defaults(source)
     configs, errors = load(discover_configs(source), defaults, root=source)
     covered = {c.family.casefold() for c in configs}
     covered |= {c.name.casefold() for c in configs}
 
-    if (conf_dir(source) / DEFAULTS_NAME).is_file():
-        more, more_errors = derived_configs(source, defaults, covered)
-        configs += sorted(more, key=lambda c: c.name.casefold())
+    more, more_errors = derived_configs(source, defaults, covered)
+    configs += sorted(more, key=lambda c: c.name.casefold())
+    errors += more_errors
+
+    # Last, and only when the folder came up empty, so a workspace with fonts
+    # in it never has the bundled family competing with them.
+    if not configs:
+        more, more_errors = starter_configs(source, defaults)
+        configs += more
         errors += more_errors
 
     if not tokens:

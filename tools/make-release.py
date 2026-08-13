@@ -21,11 +21,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 REQUIRED = [
     "pyproject.toml", "uv.lock", "LICENSE", "README.md",
     "THIRD-PARTY-NOTICES.md", "crossglyph.sh", "crossglyph.cmd",
-    "fonts/README.md",
+    "fonts/README.md", "fonts/conf/all.conf",
     "src/crossglyph/cli.py",
     "src/crossglyph/render/render.wasm",
     "src/crossglyph/render/render.built-from.json",
     "src/crossglyph/preview/static/index.html",
+    # The family the preview opens on before anybody has filled the workspace
+    # in, and the licence the OFL requires travel with it.
+    "src/crossglyph/starter/Literata[opsz,wght].ttf",
+    "src/crossglyph/starter/Literata-Italic[opsz,wght].ttf",
+    "src/crossglyph/starter/OFL.txt",
     "tools/uv.cmd", "tools/tool-wrapper.sh", "tools/tool-wrapper.cmd",
     "tools/tool-wrapper.ps1",
 ]

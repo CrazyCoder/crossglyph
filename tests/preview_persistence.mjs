@@ -1109,6 +1109,34 @@ for (const { name, text } of sources) {
         env.family.options.length === 4, String(env.family.options.length));
 }
 
+// 21b. The family the tool ships is offered only while the workspace is empty.
+//      The entry says so, or it reads as a font you put there and forgot --
+//      and its disappearance, once you add one of your own, reads as a bug.
+{
+  const shipped = { ...DEFAULTS, family: "Literata", font: null, families: [
+    { name: "Literata", faces: ["bold", "bold italic", "italic", "regular"],
+      conf: "literata.conf", derived: true, bundled: true,
+      tuning: { gamma: 1, weight: 0, hinting: "normal",
+                thresholds: [4, 8, 12], line_height: null },
+      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+                intervals: "reading", ranges: "",
+                fallbacks: true, fallback1: "", fallback2: "" } }] };
+  const env = await loaded(fakeStorage(), shipped);
+  check("the bundled family says so on its entry",
+        env.family.options[0].textContent === "Literata (bundled)",
+        env.family.options[0].textContent);
+  check("and is still addressed by its own name",
+        env.family.value === "Literata", env.family.value);
+}
+
+// 21c. A font of your own is named and nothing else.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS);
+  check("a font of your own carries no marker",
+        [...env.family.options].every(o => !o.textContent.includes("bundled")),
+        env.family.options.map(o => o.textContent).join(", "));
+}
+
 // 22. The knobs open at what the family's .conf says, not at the converter's
 //     defaults -- that config is the build the card would get.
 {

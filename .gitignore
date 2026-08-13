@@ -9,3 +9,10 @@ dist/
 # never ignored, only its contents.
 fonts/*
 !fonts/README.md
+# The commented template, which is documentation rather than settings: it sets
+# nothing, and a workspace works without it. Same rule as above, one level
+# deeper, so conf/ is unignored and then emptied again -- the configs somebody
+# writes in there are theirs and stay out.
+!fonts/conf/
+fonts/conf/*
+!fonts/conf/all.conf

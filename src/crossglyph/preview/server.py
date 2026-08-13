@@ -274,6 +274,12 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             "conf": (config.path.name if not config.derived
                      else f"{config.name.lower()}.conf"),
             "derived": config.derived,
+            # Whether this is the family that ships with the tool rather than
+            # one of yours. It is offered only while the workspace is empty, so
+            # saying so is what stops it looking like a font you forgot about
+            # -- and explains where it went once you drop your own in.
+            "bundled": (config.styles.get("regular", config.path).parent
+                        == fontbuild.STARTER_DIR),
             # What the family builds as, which is the export panel's half of
             # the same file. `sizes` is what the reader's Font Size setting
             # lists, one entry each, not the size on screen.
@@ -694,6 +700,13 @@ def save(request: SaveRequest) -> dict:
             path = fontbuild.conf_dir() / f"{config.name.lower()}.conf"
             path.parent.mkdir(parents=True, exist_ok=True)
             changes = {"family": config.family, **changes}
+            # The bundled family's faces are in the package, not the folder,
+            # and it is only offered while the folder is empty. Saying where
+            # they are is what keeps this config resolving after the first
+            # font of your own arrives and the bundled one steps aside.
+            folder = config.styles["regular"].parent
+            if folder != fontbuild.SOURCE_DIR:
+                changes = {"dir": str(folder), **changes}
         if request.export is not None:
             changes.update(export_changes(
                 request.export, config,
@@ -971,7 +984,10 @@ def main(argv=None) -> int:
     if not opts.font and not opts.family:
         opts.family = _first_family()
         if opts.family is None:
-            print(f"no fonts in {fontbuild.SOURCE_DIR}\n"
+            # The bundled family answers an empty workspace, so getting here
+            # means this copy of the tool has lost its own faces too.
+            print(f"no fonts in {fontbuild.SOURCE_DIR}, and none bundled in "
+                  f"{fontbuild.STARTER_DIR}\n"
                   f"Drop TTF or OTF files in, or pass --font or --family.",
                   file=sys.stderr)
             return 2

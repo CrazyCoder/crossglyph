@@ -1235,15 +1235,32 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
     assert server._family in {"Probe", "Filler"}
 
 
-def test_an_empty_workspace_says_what_to_put_in_it(tmp_path, monkeypatch,
-                                                   capsys):
+def test_an_empty_workspace_opens_on_the_bundled_family(tmp_path, monkeypatch):
+    """There is always a family to draw, so a first run draws one instead of
+    stopping to say what to put in the folder."""
     from crossglyph import fontbuild
     from crossglyph.preview import server
 
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
     server.forget_families()
+    assert server._first_family() == "Literata"
+
+
+def test_an_install_missing_its_own_faces_says_both_places(tmp_path,
+                                                           monkeypatch, capsys):
+    """The one way to have nothing to draw is a copy of the tool that lost the
+    family it ships, so the message names that folder as well as yours."""
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    empty = tmp_path / "no-starter"
+    empty.mkdir()
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    monkeypatch.setattr(fontbuild, "STARTER_DIR", empty)
+    server.forget_families()
     assert server.main(["--no-open"]) == 2
-    assert str(tmp_path) in capsys.readouterr().err
+    said = capsys.readouterr().err
+    assert str(tmp_path) in said and str(empty) in said
 
 
 @needs_core
@@ -1264,3 +1281,55 @@ def test_a_render_draws_without_the_fallbacks_that_are_not_there(two_families):
     assert asked.status_code == 200, asked.text
     assert asked.content == unasked.content, \
         "the page differs, so something was found to fall back to"
+
+
+# --- the family that ships with the tool -----------------------------------
+
+
+def test_an_empty_workspace_still_has_a_family_to_show(tmp_path, monkeypatch):
+    """Unpack, run, see type. Nothing to install and nothing to find first."""
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    entries = server.families()
+
+    assert [entry["name"] for entry in entries] == ["Literata"]
+    assert entries[0]["bundled"] is True
+    # Two variable files behind four badges, so the page opens with a bold and
+    # an italic to look at rather than one weight shown four times.
+    assert entries[0]["faces"] == ["bold", "bold italic", "italic", "regular"]
+    assert entries[0]["variable"], "the axis controls have nothing to show"
+
+
+def test_a_font_of_your_own_is_never_marked_bundled(two_families):
+    from crossglyph.preview import server
+
+    assert [entry["bundled"] for entry in server.families()] == [False, False]
+
+
+def test_saving_the_bundled_family_records_where_its_faces_are(tmp_path,
+                                                               monkeypatch):
+    """It is offered only while the workspace is empty, so a config that did
+    not say `dir` would stop resolving the moment a font of your own landed."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild, fontconf
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    assert _save(None, "Literata", gamma=1.4).status_code == 200
+
+    written = fontconf.read_values(fontbuild.conf_dir(tmp_path) / "literata.conf")
+    assert written["dir"] == str(fontbuild.STARTER_DIR)
+    assert written["family"] == "Literata"
+
+    # And it goes on resolving once there is a font to prefer.
+    box_font(tmp_path / "Probe-Regular.ttf", [ord("A")], family="Probe")
+    server.forget_families()
+    configs, errors = fontbuild.gather(tmp_path)
+    assert errors == []
+    assert {c.name for c in configs} == {"Literata", "Probe"}
+    assert next(c for c in configs if c.name == "Literata").tuning.gamma == 1.4

@@ -13,12 +13,16 @@ optional, and the shortest useful config is empty.
 
 ## all.conf, the shared defaults
 
-A file named `all.conf` in `conf` is not a family. It does two things.
+A file named `all.conf` in `conf` is not a family, and is not required.
 
-Per-family configs inherit from it, so a `<family>.conf` states only what it
-does differently. And families with no config at all are built from it: drop
-four files in the workspace and they build on the next run, taking their name
-from the filenames.
+It holds settings shared by every family in the workspace: a `<family>.conf`
+inherits from it and states only what it does differently, and a family with no
+config at all is built from it. The workspace ships one with every line
+commented out, so it sets nothing until you edit it. Delete it and nothing
+changes.
+
+Discovery does not depend on it either. Drop four files in the workspace and
+they build on the next run, taking their name from the filenames.
 
 It cannot set `name`, `family`, or the explicit style and fallback file keys.
 Those name one specific family or file, so they are rejected there.
