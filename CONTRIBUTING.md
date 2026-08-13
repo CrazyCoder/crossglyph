@@ -36,6 +36,11 @@ they run:
 A firmware checkout beside this one supplies NotoSans, which a few metrics
 tests read directly.
 
+Name one before believing a green run. A third of the suite is behind these,
+and the synthesized faces differ from a real one in ways tests can rest on
+without saying so: they are narrow, so words fit in columns a real face
+overflows.
+
 ## The git hook
 
 ```sh

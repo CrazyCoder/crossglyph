@@ -471,6 +471,17 @@ def test_the_image_is_the_logical_page_the_right_way_up(tmp_path):
 
 # --- paragraph layout -----------------------------------------------------
 
+#: A column no word of PARAGRAPH overflows on its own.
+#:
+#: A word too wide for the column is split wherever it can be and hyphened,
+#: with no patterns, no language and whatever the hyphenation setting says
+#: (ParsedText.cpp:869-873, Hyphenator.cpp:245) -- the alternative is a word
+#: running off the screen. So "no language" and "hyphenation off" only mean
+#: "no hyphens" in a column every word fits, and 200 is not one. The fixture
+#: faces are narrow enough to fit anyway and a real one is not, which is a
+#: difference that shows only when CROSSGLYPH_TEST_FONT is set.
+UNCRAMPED = 320
+
 PARAGRAPH = (
     "Съешь ещё этих мягких французских булок, да выпей же чаю. "
     "Широкая электрификация южных губерний даст мощный толчок "
@@ -525,7 +536,17 @@ def test_hyphenation_needs_a_language(tmp_path):
     module = _loaded(tmp_path, intervals="cyrillic")
     _spec(module, hyphenation=1)
     module.call("rc_page_set_language", module.write(b"\x00"))
-    assert not any(line.endswith("-") for line in _lines(module, PARAGRAPH, 200))
+    assert not any(line.endswith("-")
+                   for line in _lines(module, PARAGRAPH, UNCRAMPED))
+
+    # The other half, and what keeps the first from passing for the wrong
+    # reason: in a column wide enough that nothing hyphenates at all, the
+    # assertion above would hold with the patterns working perfectly.
+    module.call("rc_page_set_language", module.write(b"ru\x00"))
+    assert any(line.endswith("-")
+               for line in _lines(module, PARAGRAPH, UNCRAMPED)), \
+        "this column hyphenates nothing in Russian either, so the check " \
+        "above proves nothing"
 
 
 @needs_wasm
@@ -883,7 +904,8 @@ def test_the_defaults_are_the_ones_the_device_ships(tmp_path):
 
     # No hyphens, because hyphenation is off however good the patterns are.
     module.call("rc_page_set_language", module.write(b"ru\x00"))
-    assert not any(line.endswith("-") for line in _lines(module, PARAGRAPH, 200))
+    assert not any(line.endswith("-")
+                   for line in _lines(module, PARAGRAPH, UNCRAMPED))
 
     # No first-line indent, because the paragraph spacing that replaces it is on.
     _drawn(module, PARAGRAPH)
