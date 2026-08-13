@@ -168,12 +168,16 @@ export function onInput(event) {
   if (name) stashed.delete(name);
   knobChanged(event.target);
 }
-form.addEventListener("input", onInput);
-// The text box is a control of this form by `form="knobs"` rather than by
-// containment -- it sits under the specimen, in the middle column. An event
-// bubbles up the DOM and not to the form a control belongs to, so without this
-// line the form's listener never hears it and typing draws nothing.
-form.elements.text.addEventListener("input", onInput);
+//: Wired by the entry point rather than on import: `form` belongs to dom.js,
+//: and a module body can run while a module it imports is still evaluating.
+export function wireRender() {
+  form.addEventListener("input", onInput);
+  // The text box is a control of this form by `form="knobs"` rather than by
+  // containment -- it sits under the specimen, in the middle column. An event
+  // bubbles up the DOM and not to the form a control belongs to, so without
+  // this line the form's listener never hears it and typing draws nothing.
+  form.elements.text.addEventListener("input", onInput);
+}
 
 // Two resets rather than one. The page knobs are the reader's device settings,
 // which you keep while turning font knobs -- resetting both together is almost

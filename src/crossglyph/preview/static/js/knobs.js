@@ -1,6 +1,6 @@
 import {form} from "./dom.js";
-import {body, knobChanged} from "./render.js";
-import {bypassKnob, restoreKnob, stashed} from "./reverts.js";
+import {knobChanged} from "./render.js";
+import {stashed} from "./reverts.js";
 
 // --- numeric fields -------------------------------------------------------
 // Steppers rather than sliders. Gamma alone is 74 steps across its range, so a
@@ -77,9 +77,24 @@ export function wireStepper(button, field, direction) {
   }
 }
 
-for (const button of form.querySelectorAll("button.step")) {
-  wireStepper(button, form.elements[button.dataset.for],
-              Number(button.dataset.dir));
+//: Wired by the entry point rather than on import: `form` belongs to dom.js,
+//: and a module body can run while a module it imports is still evaluating.
+export function wireKnobs() {
+  for (const button of form.querySelectorAll("button.step")) {
+    wireStepper(button, form.elements[button.dataset.for],
+                Number(button.dataset.dir));
+  }
+  // The slider beside each field covers distance; the field lands on the
+  // value. They are one control in two halves, so every path that moves one
+  // moves both.
+  for (const slider of form.querySelectorAll("[data-slider-for]")) {
+    pairSlider(form.elements[slider.dataset.sliderFor], slider);
+  }
+  form.addEventListener("change", (event) => {
+    if (event.target.type === "number") {
+      setField(event.target, numberOf(event.target));
+    }
+  });
 }
 
 // The slider and the field are one control in two halves, and pairing them is
@@ -145,14 +160,6 @@ export function numericRow({label, min, max, step, value, title = "", id = ""}) 
   return {row, field, slider};
 }
 
-// The slider beside each field covers distance; the field lands on the value.
-// They are one control in two halves, so every path that moves one moves both.
-for (const slider of form.querySelectorAll("[data-slider-for]")) {
-  const field = form.elements[slider.dataset.sliderFor];
-  sliders.set(field, slider);
-  slider.addEventListener("input", () => setField(field, Number(slider.value)));
-}
-
 export function syncSliders() {
   for (const field of sliders.keys()) showSlider(field);
 }
@@ -163,10 +170,6 @@ export function numberOf(el) {
   const value = Number(el.value);
   return el.value === "" || !Number.isFinite(value) ? Number(el.defaultValue) : value;
 }
-
-form.addEventListener("change", (event) => {
-  if (event.target.type === "number") setField(event.target, numberOf(event.target));
-});
 
 // Split the controls the way /render wants them: page knobs under "page",
 // size and text at the root, everything else under "tuning".

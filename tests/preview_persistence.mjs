@@ -781,6 +781,40 @@ for (const { name, text } of sources) {
         missing.map(word => `${word} (from ${exported.get(word)})`).join(", "));
 }
 
+// 0b. And nothing reaches for an imported name while the modules are still
+//     coming up. The import graph has cycles, so a module body runs while a
+//     module it imports may still be evaluating, and a binding read there is
+//     in its dead zone -- a crash on load that no behaviour test can reach,
+//     because the page never gets far enough to have behaviour. Wiring that
+//     crosses modules belongs in start.js; a handle a module owns itself
+//     cannot be in a dead zone and stays where it is.
+for (const { name, text } of sources) {
+  if (name === "app.js" || name === "start.js") continue;
+  const taken = new Set();
+  for (const [, names] of text.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+    for (const piece of names.split(",")) {
+      if (piece.trim()) taken.add(piece.trim());
+    }
+  }
+  // Statements at column zero that are not a declaration are work done on
+  // import. Only those, since anything indented is inside something that runs
+  // later, by which time every module is up.
+  const reaching = [];
+  let depth = 0;
+  for (const line of text.split("\n")) {
+    const bare = line.replace(/\/\/.*/, "").trim();
+    if (depth === 0 && bare
+        && !/^(export|import|const|let|function|class|async|\*|\/\*)/.test(bare)) {
+      for (const word of taken) {
+        if (new RegExp(`\\b${word}\\b`).test(bare)) reaching.push(`${word}: ${bare}`);
+      }
+    }
+    depth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+  }
+  check(`${name} touches no imported name while loading`, reaching.length === 0,
+        reaching.join(" | "));
+}
+
 // 1. Changing a page knob writes it.
 {
   const store = fakeStorage();
@@ -968,10 +1002,18 @@ for (const { name, text } of sources) {
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
 
-  env.keys[0]({ key: "\\", target: { tagName: "BODY" }, preventDefault() {} });
+  // Every listener, as the document would: more than one module watches for a
+  // key, and which of them registered first is not something to depend on.
+  const press = (target) => {
+    for (const listener of env.keys) {
+      listener({ key: "\\", target, preventDefault() {} });
+    }
+  };
+
+  press({ tagName: "BODY" });
   check("backslash compares", env.byName.gamma.value === "1", env.byName.gamma.value);
 
-  env.keys[0]({ key: "\\", target: { tagName: "TEXTAREA" }, preventDefault() {} });
+  press({ tagName: "TEXTAREA" });
   check("but not while typing, where it is a character",
         env.byName.gamma.value === "1", env.byName.gamma.value);
 }

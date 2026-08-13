@@ -1,5 +1,5 @@
 import {familyEntries, familyPicker} from "./family.js";
-import {body, scheduleRender} from "./render.js";
+import {scheduleRender} from "./render.js";
 import {endProgress, showProgress, startProgress} from "./progress.js";
 import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
 
@@ -308,10 +308,16 @@ fetchButton.addEventListener("click", async () => {
   showFallbackState(result.where);
 });
 
-buildButtons[0].addEventListener(
-  "click", (event) => buildFamilies(familyPicker.value, event.shiftKey));
-buildButtons[1].addEventListener(
-  "click", (event) => buildFamilies("", event.shiftKey));
+//: Wired by the entry point rather than on import: familyPicker belongs to
+//: family.js, and a module body can run while a module it imports is still
+//: evaluating. Build takes what the picker is on; Build all takes nothing and
+//: means every family in the workspace.
+export function wireBuildButtons() {
+  buildButtons[0].addEventListener(
+    "click", (event) => buildFamilies(familyPicker.value, event.shiftKey));
+  buildButtons[1].addEventListener(
+    "click", (event) => buildFamilies("", event.shiftKey));
+}
 
 // The output folder is all.conf's, so it saves on its own rather than with a
 // family -- and on leaving the field, since there is nothing else to press.

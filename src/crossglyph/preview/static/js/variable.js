@@ -1,12 +1,11 @@
 import {form, syncLineHeight} from "./dom.js";
 import {fillFallbackPickers, showExport} from "./export.js";
 import {FAMILY, familyEntries, familyPicker, offerSavedThresholds, showFaces, shownFamily, rememberShown} from "./family.js";
-import {numericRow, sliders} from "./knobs.js";
+import {numericRow} from "./knobs.js";
 import {attempt} from "./remember.js";
-import {knobChanged, renderNow, scheduleRender} from "./render.js";
-import {KNOB_KEYS, baseState, putKnob, refreshReverts, savedTuning, rememberSaved, stashed} from "./reverts.js";
+import {renderNow, scheduleRender} from "./render.js";
+import {KNOB_KEYS, baseState, putKnob, refreshReverts, rememberSaved, stashed} from "./reverts.js";
 import {savedNote, showSaveState, unsavedWork} from "./save.js";
-import {compare} from "./untuned.js";
 
 // --- variable fonts -------------------------------------------------------
 // A variable font is several faces in one file, so which face a slot is drawn

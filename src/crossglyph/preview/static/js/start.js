@@ -1,13 +1,26 @@
 import {familyPicker} from "./family.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
-import {fillPresets, outField, showFallbackState} from "./export.js";
-import {syncSliders} from "./knobs.js";
+import {fillPresets, outField, showFallbackState,
+        wireBuildButtons} from "./export.js";
+import {syncSliders, wireKnobs} from "./knobs.js";
 import {declareLanguage, loadPage, preferredLanguage} from "./remember.js";
-import {renderNow, scheduleRender} from "./render.js";
+import {renderNow, scheduleRender, wireRender} from "./render.js";
+import {wireResets} from "./resets.js";
 import {refreshReverts} from "./reverts.js";
 import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
+import {wireUntuned} from "./untuned.js";
 import {fillFamilies, onFamilyChange} from "./variable.js";
 
+// Every listener that reaches across modules, in one place and after all of
+// them have finished evaluating. The import graph has cycles, so a module body
+// runs while a module it imports may still be on its way up, and a binding
+// read there is in its dead zone. A module still wires handles of its own,
+// which cannot be.
+wireKnobs();
+wireRender();
+wireResets();
+wireUntuned();
+wireBuildButtons();
 familyPicker.addEventListener("change", onFamilyChange);
 samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender(); });
 

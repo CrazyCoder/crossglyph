@@ -2,7 +2,6 @@ import {form, lineHeightAuto, syncLineHeight} from "./dom.js";
 import {showSlider} from "./knobs.js";
 import {knobChanged} from "./render.js";
 import {showSaveState} from "./save.js";
-import {compare} from "./untuned.js";
 
 // --- per-knob compare -----------------------------------------------------
 // Reset and bypass are different things, and editing tools have always kept

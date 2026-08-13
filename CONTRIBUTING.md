@@ -17,6 +17,15 @@ scope, so a module that reads a name it never imported fails here rather than
 on the first click. That needs `--experimental-vm-modules`, which is why the
 line above carries it.
 
+Two static checks run before any of that, because what they catch is a page
+that never loads, and a page that never loads has no behaviour to test. One is
+the missing import above. The other is the reason `start.js` exists: the import
+graph has cycles, so a module body runs while a module it imports may still be
+evaluating, and a binding read there is in its dead zone. Wiring that crosses
+modules goes in `start.js`, and each module exports a `wire...` function for it
+to call. A handle a module owns itself cannot be in a dead zone, so those
+listeners stay in the module.
+
 ## Fonts the tests need
 
 Almost every test builds its own faces with `tests/fontsmith.py`, which

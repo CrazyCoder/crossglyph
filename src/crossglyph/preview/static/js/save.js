@@ -2,8 +2,8 @@ import {form} from "./dom.js";
 import {exportForm, exportSettings} from "./export.js";
 import {familyEntries, familyPicker, shownFamily} from "./family.js";
 import {body} from "./render.js";
-import {KNOB_KEYS, knobModified, refreshReverts, savedTuning, rememberSaved, stashed} from "./reverts.js";
-import {compare, comparing} from "./untuned.js";
+import {KNOB_KEYS, knobModified, refreshReverts, rememberSaved, stashed} from "./reverts.js";
+import {compare} from "./untuned.js";
 import {WEIGHT_SLOTS, axesDiffer, axisSettings, variableSpec, rememberVariable} from "./variable.js";
 
 // --- saving to the family's own config ------------------------------------

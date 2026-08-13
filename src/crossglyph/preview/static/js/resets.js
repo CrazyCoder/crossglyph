@@ -22,34 +22,42 @@ export function afterReset() {
   scheduleRender();
 }
 
-// Directly rather than through scheduleRender: this is a deliberate press, and
-// waiting out the coalescing delay would read as the button not working.
-document.getElementById("retry").addEventListener("click", renderNow);
+//: Wired by the entry point rather than on import: renderNow comes from
+//: render.js, and a module body can run while a module it imports is still
+//: evaluating. The other two are here for company, so one file's buttons are
+//: wired in one place.
+export function wireResets() {
+  // Directly rather than through scheduleRender: this is a deliberate press,
+  // and waiting out the coalescing delay would read as the button not working.
+  document.getElementById("retry").addEventListener("click", renderNow);
 
-document.getElementById("reset-font").addEventListener("click", () => {
-  // Everything in the Font section: the tuning knobs plus `size`, which posts
-  // at the root. The text box is content rather than a knob, so neither button
-  // touches it -- an empty box already means "use the shipped sample".
-  //
-  // The axis controls are not knobs either. They say which face each slot is,
-  // and a variable font's own named instances are the only answer to that --
-  // there is no factory value to go back to. Left in, this would reset them to
-  // the first option in each picker, which is the lightest weight the font has.
-  for (const el of form.elements) {
-    if (el.name && el.dataset.group !== "page" && el.dataset.group !== "axes"
-        && el.name !== "text") {
-      resetControl(el);
+  document.getElementById("reset-font").addEventListener("click", () => {
+    // Everything in the Font section: the tuning knobs plus `size`, which
+    // posts at the root. The text box is content rather than a knob, so
+    // neither button touches it -- an empty box already means "use the
+    // shipped sample".
+    //
+    // The axis controls are not knobs either. They say which face each slot
+    // is, and a variable font's own named instances are the only answer to
+    // that -- there is no factory value to go back to. Left in, this would
+    // reset them to the first option in each picker, which is the lightest
+    // weight the font has.
+    for (const el of form.elements) {
+      if (el.name && el.dataset.group !== "page" && el.dataset.group !== "axes"
+          && el.name !== "text") {
+        resetControl(el);
+      }
     }
-  }
-  lineHeightAuto.checked = lineHeightAuto.defaultChecked;
-  afterReset();
-});
+    lineHeightAuto.checked = lineHeightAuto.defaultChecked;
+    afterReset();
+  });
 
-document.getElementById("reset-page").addEventListener("click", () => {
-  for (const el of pageControls()) resetControl(el);
-  // Forget rather than save today's defaults: "no preference" has to stay
-  // distinct from "chose these", or a later change to what the device ships
-  // would never reach anyone who had pressed this once.
-  attempt(() => localStorage.removeItem(STORE));
-  afterReset();
-});
+  document.getElementById("reset-page").addEventListener("click", () => {
+    for (const el of pageControls()) resetControl(el);
+    // Forget rather than save today's defaults: "no preference" has to stay
+    // distinct from "chose these", or a later change to what the device ships
+    // would never reach anyone who had pressed this once.
+    attempt(() => localStorage.removeItem(STORE));
+    afterReset();
+  });
+}

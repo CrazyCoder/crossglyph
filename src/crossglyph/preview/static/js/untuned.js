@@ -35,18 +35,6 @@ export function toggleCompare() {
   refreshReverts();
 }
 
-compare.addEventListener("click", toggleCompare);
-
-// Backslash is what Lightroom has used for before/after for twenty years. Not
-// while typing in a field, where it is a character.
-document.addEventListener("keydown", (event) => {
-  if (event.key !== "\\" || event.ctrlKey || event.metaKey || event.altKey) return;
-  const tag = event.target && event.target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  event.preventDefault();
-  toggleCompare();
-});
-
 // And press and hold on the page itself, where the eye already is. The same
 // comparison as the button without leaving the thing being compared, which is
 // the gesture every photo editor uses for before and after.
@@ -68,16 +56,35 @@ export function releaseUntuned() {
   heldFrom = null;
 }
 
-img.addEventListener("pointerdown", (event) => {
-  // The left button only: a right-click is a menu, and a middle one is the
-  // browser's own. An image is draggable and text is selectable, either of
-  // which swallows the release and leaves the page stuck untuned.
-  if (event.button !== 0) return;
-  event.preventDefault();
-  holdUntuned();
-});
-// Leaving counts as letting go: a press dragged off the sheet gets no pointerup
-// here, and there is no state worth keeping for a gesture that has left.
-for (const kind of ["pointerup", "pointercancel", "pointerleave"]) {
-  img.addEventListener(kind, releaseUntuned);
+//: Wired by the entry point rather than on import: `img` belongs to dom.js,
+//: and a module body can run while a module it imports is still evaluating.
+export function wireUntuned() {
+  compare.addEventListener("click", toggleCompare);
+
+  // Backslash is what Lightroom has used for before/after for twenty years.
+  // Not while typing in a field, where it is a character.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "\\" || event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+    const tag = event.target && event.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    event.preventDefault();
+    toggleCompare();
+  });
+
+  img.addEventListener("pointerdown", (event) => {
+    // The left button only: a right-click is a menu, and a middle one is the
+    // browser's own. An image is draggable and text is selectable, either of
+    // which swallows the release and leaves the page stuck untuned.
+    if (event.button !== 0) return;
+    event.preventDefault();
+    holdUntuned();
+  });
+  // Leaving counts as letting go: a press dragged off the sheet gets no
+  // pointerup here, and there is no state worth keeping for a gesture that
+  // has left.
+  for (const kind of ["pointerup", "pointercancel", "pointerleave"]) {
+    img.addEventListener(kind, releaseUntuned);
+  }
 }
