@@ -4,15 +4,18 @@
 uv sync
 uv run pytest -q          # while iterating: name the file you touched
 uv run pytest -n 8 -q     # the whole suite, before pushing
-node tests/preview_persistence.mjs
+node --experimental-vm-modules tests/preview_persistence.mjs
 ```
 
 `-n 8` is pytest-xdist and belongs on the full run only. Each worker costs about
 two seconds to start, which is more than a scoped run takes at all.
 
-The page has no browser test. `tests/preview_persistence.mjs` runs its
-JavaScript against a stub DOM in Node, which is enough to cover what the page
-remembers, what it sends and when it redraws.
+The page has no browser test. `tests/preview_persistence.mjs` runs its modules
+against a stub DOM in Node, which is enough to cover what the page remembers,
+what it sends and when it redraws. It links them as modules, each in its own
+scope, so a module that reads a name it never imported fails here rather than
+on the first click. That needs `--experimental-vm-modules`, which is why the
+line above carries it.
 
 ## Fonts the tests need
 

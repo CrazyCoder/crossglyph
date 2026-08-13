@@ -562,7 +562,11 @@ def test_the_page_remembers_the_readers_own_settings():
     silent -- a knob quietly stops being remembered, a stale stored value
     blanks a select, storage throws in a private window. The page has no build
     step and no test framework, so the assertions live in a node script that
-    runs the real source out of index.html rather than a copy of it.
+    runs the real modules against a stub DOM rather than a copy of them.
+
+    `--experimental-vm-modules` is what lets that script link them as modules,
+    each in its own scope, which is the only way a name a module borrowed
+    without importing shows up here rather than on the first click.
     """
     import shutil
     import subprocess
@@ -571,5 +575,7 @@ def test_the_page_remembers_the_readers_own_settings():
     if node is None:
         pytest.skip("needs node to exercise the page's own script")
     script = pathlib.Path(__file__).with_name("preview_persistence.mjs")
-    done = subprocess.run([node, str(script)], capture_output=True, text=True)
+    done = subprocess.run(
+        [node, "--experimental-vm-modules", "--no-warnings", str(script)],
+        capture_output=True, text=True)
     assert done.returncode == 0, done.stdout + done.stderr

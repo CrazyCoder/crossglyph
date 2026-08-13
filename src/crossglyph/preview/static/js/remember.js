@@ -1,3 +1,5 @@
+import {form} from "./dom.js";
+
 // --- remembering the reader's own settings --------------------------------
 // The Page knobs are the ones each person has already set on their device, so
 // re-entering them every visit is friction with nothing to show for it. Font

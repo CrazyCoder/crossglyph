@@ -9,27 +9,137 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// The order app.js imports them in, which is the order they ran in when they
-// were one file. A module missing from here is a module this never sees.
-const MODULES = ["dom.js", "remember.js", "knobs.js", "render.js", "resets.js",
-                 "reverts.js", "save.js", "untuned.js", "text.js", "family.js",
-                 "variable.js", "export.js", "theme.js", "start.js"];
 const STATIC = join(here, "..", "src", "crossglyph", "preview", "static");
+const JS = join(STATIC, "js");
 
-// Concatenated rather than imported. Every block below wants the page's state
-// fresh, and an import is cached for the life of the process; running the
-// source again in a new sandbox is what gives each one a clean page. So the
-// module syntax comes off: the names all land in one scope, which is the scope
-// they shared before they were split.
-const source = MODULES
-  .map(name => readFileSync(join(STATIC, "js", name), "utf8")
-    .replace(/^import \{[^}]*\} from "\.\/[\w.-]+";$/gm, "")
-    .replace(/^import "\.\/[\w.-]+";$/gm, "")
-    .replace(/^export (?=async function |function |const |let |class )/gm, ""))
-  .join("\n");
+// The entry, and the modules it pulls in. Each block below wants a page whose
+// state is fresh, and an import is cached for the life of the process, so the
+// graph is built again per block inside a context of its own -- as modules,
+// linked and evaluated the way the browser does it. Running them concatenated
+// into one scope would be simpler and would test the wrong thing: every name
+// resolves in one scope, so a module reading a name it never imported passes
+// here and throws on the first click over there.
+const ENTRY = "app.js";
+const files = new Map();
+function fileFor(name) {
+  if (!files.has(name)) files.set(name, readFileSync(join(JS, name), "utf8"));
+  return files.get(name);
+}
+const sources = [...fileFor(ENTRY).matchAll(/^import "\.\/([\w.-]+)";$/gm)]
+  .map(([, name]) => ({ name, text: fileFor(name) }));
+
+// Node's own globals, which a fresh context does not have. The stubs a block
+// wants to look at afterwards go in beside these, in makeEnv.
+const HOST = { setTimeout, clearTimeout, setInterval, clearInterval, console,
+               performance, URL, AbortController, TextDecoder };
+
+async function evaluatePage(sandbox) {
+  const context = vm.createContext(sandbox);
+  const built = new Map();
+  const moduleFor = (name) => {
+    if (!built.has(name)) {
+      built.set(name, new vm.SourceTextModule(fileFor(name),
+                                              { identifier: name, context }));
+    }
+    return built.get(name);
+  };
+  const entry = moduleFor(ENTRY);
+  await entry.link(specifier => moduleFor(specifier.replace("./", "")));
+  await entry.evaluate();
+}
+
+// --- the split itself ------------------------------------------------------
+// Linking catches a borrowed name on the line that runs it, which leaves the
+// lines no block reaches. Those are a text question rather than a run-time one,
+// so they are read: a name another module owns, used without importing it.
+const WORD = /[A-Za-z_$][\w$]*/g;
+
+// Comments and string bodies are not code -- a name in prose, or in a CSS
+// selector, is not a use of it. A template's ${...} is code and stays.
+function code(text) {
+  let out = "", at = 0;
+  const upTo = (end) => { const from = at; at = end; return text.slice(from, at); };
+  while (at < text.length) {
+    const two = text.slice(at, at + 2);
+    if (two === "//") { while (at < text.length && text[at] !== "\n") at++; continue; }
+    if (two === "/*") {
+      at = text.indexOf("*/", at + 2);
+      at = at < 0 ? text.length : at + 2;
+      continue;
+    }
+    const quote = text[at];
+    if (quote === '"' || quote === "'") {
+      at++;
+      while (at < text.length && text[at] !== quote) at += text[at] === "\\" ? 2 : 1;
+      at++;
+      out += " ";
+      continue;
+    }
+    if (quote === "`") {
+      at++;
+      while (at < text.length && text[at] !== "`") {
+        if (text[at] === "\\") { at += 2; continue; }
+        if (text.slice(at, at + 2) === "${") {
+          at += 2;
+          let depth = 1, from = at;
+          while (at < text.length && depth) {
+            if (text[at] === "{") depth++;
+            else if (text[at] === "}" && !--depth) break;
+            at++;
+          }
+          out += " " + text.slice(from, at) + " ";
+          at++;
+          continue;
+        }
+        at++;
+      }
+      at++;
+      out += " ";
+      continue;
+    }
+    out += upTo(at + 1);
+  }
+  return out;
+}
+
+// Every name a file binds for itself: declarations, parameters, catch and
+// import lists. Deliberately generous -- a name it binds anywhere is a name it
+// is not borrowing, and erring that way costs a miss rather than a false alarm.
+function bound(text) {
+  const names = new Set();
+  const all = (list) => { for (const word of list.match(WORD) || []) names.add(word); };
+  for (const [, one] of text.matchAll(
+      /(?:const|let|var|function|class)\s+([\w$]+)/g)) names.add(one);
+  for (const [, one] of text.matchAll(/(?:^|[^\w$.])([\w$]+)\s*=>/g)) names.add(one);
+  for (const [, list] of text.matchAll(
+      /(?:const|let|var)\s*(\{[^}]*\}|\[[^\]]*\])/g)) all(list);
+  for (const [, list] of text.matchAll(/\(([^()]*)\)\s*(?:=>|\{)/g)) all(list);
+  for (const [, list] of text.matchAll(/import\s*\{([^}]*)\}/g)) all(list);
+  return names;
+}
+
+// And every name it reads. Property reads and object keys are not free names:
+// `el.form` and `{form: x}` say nothing about what the file imported. A dot
+// after a dot is a spread rather than a property, and `...form` is a use.
+function borrowed(text) {
+  return new Set(code(text)
+    .replace(/(?<!\.)\.\s*[\w$]+/g, " ")
+    .replace(/(^|[{,])\s*[\w$]+\s*:/gm, "$1 ")
+    .match(WORD) || []);
+}
+
+// What each name belongs to, so a complaint can name the file to import from.
+const exported = new Map();
+for (const { name, text } of sources) {
+  for (const [, one] of text.matchAll(
+      /^export\s+(?:async\s+)?(?:function|const|let|class)\s+([\w$]+)/gm)) {
+    exported.set(one, name);
+  }
+}
 
 // defaultValue / defaultChecked / defaultSelected are what the two reset
 // buttons restore from, so the stub has to carry them the way a real control
@@ -417,6 +527,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
   const sandbox = {
+    ...HOST,
     document: {
       getElementById: id => stubs[id],
       createElement: makeElement,
@@ -545,10 +656,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            refuse() { answer = false; } };
 }
 
-function run(storage, defaults, opts) {
+async function run(storage, defaults, opts) {
   const env = makeEnv(storage, defaults, opts);
-  const keys = Object.keys(env.sandbox);
-  new Function(...keys, source)(...keys.map(k => env.sandbox[k]));
+  await evaluatePage(env.sandbox);
   return env;
 }
 
@@ -557,7 +667,7 @@ function run(storage, defaults, opts) {
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 async function loaded(storage, defaults, opts) {
-  const env = run(storage, defaults, opts);
+  const env = await run(storage, defaults, opts);
   await settle();
   return env;
 }
@@ -578,10 +688,20 @@ function check(label, cond, detail = "") {
   if (!cond) failures++;
 }
 
+// 0. Before any behaviour: the page loads at all. A module that reads a name
+//    another module owns without importing it works here and throws there.
+for (const { name, text } of sources) {
+  const own = bound(text);
+  const missing = [...borrowed(text)].filter(
+    word => exported.has(word) && exported.get(word) !== name && !own.has(word));
+  check(`${name} imports every name it borrows`, missing.length === 0,
+        missing.map(word => `${word} (from ${exported.get(word)})`).join(", "));
+}
+
 // 1. Changing a page knob writes it.
 {
   const store = fakeStorage();
-  const env = run(store);
+  const env = await run(store);
   env.byName.margin.value = "22";
   env.byName.hyphenation.checked = true;
   env.listeners.input({ target: env.byName.margin });
@@ -598,7 +718,7 @@ function check(label, cond, detail = "") {
     "crossglyph.page": JSON.stringify(
       { margin: "22", alignment: "left", language: "en", hyphenation: true, antialiased: false }),
   });
-  const env = run(store);
+  const env = await run(store);
   check("margin restored", env.byName.margin.value === "22", env.byName.margin.value);
   check("select restored", env.byName.alignment.value === "left", env.byName.alignment.value);
   check("checkbox on restored", env.byName.hyphenation.checked === true);
@@ -610,7 +730,7 @@ function check(label, cond, detail = "") {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify({ margin: "22", hyphenation: true }),
   });
-  const env = run(store);
+  const env = await run(store);
   check("the stored values were applied first", env.byName.margin.value === "22");
   env.clicks.page();
   check("page reset restores the shipped defaults",
@@ -623,7 +743,7 @@ function check(label, cond, detail = "") {
 // 4. The whole point of splitting them: each reset leaves the other alone.
 {
   const store = fakeStorage();
-  const env = run(store);
+  const env = await run(store);
   env.byName.margin.value = "30";
   env.byName.hyphenation.checked = true;
   env.listeners.input({ target: env.byName.margin });
@@ -649,7 +769,7 @@ function check(label, cond, detail = "") {
 // 5. The slider and the field are one value in two controls.
 {
   const store = fakeStorage();
-  const env = run(store);
+  const env = await run(store);
   const slider = env.sliderList.find(s => s.dataset.sliderFor === "gamma");
 
   slider.value = "2.5";
@@ -675,7 +795,7 @@ function check(label, cond, detail = "") {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify({ margin: "31" }),
   });
-  const env = run(store);
+  const env = await run(store);
   const slider = env.sliderList.find(s => s.dataset.sliderFor === "margin");
   check("a restored value reaches its slider",
         slider.value === "31", `${slider.value} vs field ${env.byName.margin.value}`);
@@ -686,7 +806,7 @@ function check(label, cond, detail = "") {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify({ alignment: "diagonal" }),
   });
-  const env = run(store);
+  const env = await run(store);
   check("an unknown select value is ignored, not applied",
         env.byName.alignment.value === "justify", env.byName.alignment.value);
 }
@@ -694,7 +814,7 @@ function check(label, cond, detail = "") {
 // 8. The arrow marks only what has actually been changed, which is what makes
 //    the column readable as "here is what I have touched".
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   const arrow = name => env.revertList.find(r => r.dataset.reset === name);
   check("nothing is marked at rest",
         env.revertList.every(r => r.hidden === true));
@@ -708,14 +828,14 @@ function check(label, cond, detail = "") {
 // 9. The arrow is a bypass toggle, not a one-way reset: click to see the
 //    default, click again to get your value back, as often as you like.
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   const arrow = name => env.revertList.find(r => r.dataset.reset === name);
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
 
   arrow("gamma").click();
-  check("one click shows the shipped default",
-        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("one click shows what the config has",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
   check("the arrow stays, marked as set aside",
         arrow("gamma").hidden === false && arrow("gamma").dataset.state === "on");
 
@@ -730,12 +850,12 @@ function check(label, cond, detail = "") {
   env.listeners.input({ target: env.byName.gamma });
   arrow("gamma").click();
   check("editing a bypassed knob drops what was set aside",
-        env.byName.gamma.value === "1", env.byName.gamma.value);
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
 }
 
 // 10. Comparing the whole tuning at once, with size held.
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
   env.byName.size.value = "18";
@@ -761,7 +881,7 @@ function check(label, cond, detail = "") {
 
 // 11. Backslash drives the same toggle, except while typing.
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
 
@@ -778,33 +898,33 @@ function check(label, cond, detail = "") {
 //     itself -- without it the arrow jumps back to the value from before the
 //     comparison rather than the one you just dialled in.
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   const arrow = env.revertList.find(r => r.dataset.reset === "gamma");
   const plus = env.stepList.find(s => s.dataset.for === "gamma" && s.dataset.dir === "1");
 
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
   arrow.click();
-  check("set aside, so the knob is at its default",
-        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("set aside, so the knob is at what the config has",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
 
   plus.press();
-  check("stepping moves it off the default",
-        env.byName.gamma.value === "1.05", env.byName.gamma.value);
+  check("stepping moves it off that",
+        env.byName.gamma.value === "1.25", env.byName.gamma.value);
   check("and it is no longer marked set aside", arrow.dataset.state === "off");
 
   arrow.click();
-  check("so the arrow now compares against the default, not the old value",
-        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("so the arrow now compares against the config, not the old value",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
   arrow.click();
   check("and puts back what was actually dialled in",
-        env.byName.gamma.value === "1.05", env.byName.gamma.value);
+        env.byName.gamma.value === "1.25", env.byName.gamma.value);
 }
 
 // 13. Typing a value moves its slider. Only setField did that, so a typed
 //     number left the slider parked until the field lost focus.
 {
-  const env = run(fakeStorage());
+  const env = await run(fakeStorage());
   const slider = env.sliderList.find(s => s.dataset.sliderFor === "margin");
   env.byName.margin.value = "18";
   env.listeners.input({ target: env.byName.margin });
@@ -817,7 +937,7 @@ function check(label, cond, detail = "") {
 //     reaches a form the control is not inside.
 {
   const store = fakeStorage();
-  const env = run(store);
+  const env = await run(store);
   check("the text box is listened to directly, wherever the page puts it",
         typeof env.byName.text.on.input === "function");
   env.byName.text.value = "Пример текста 12345";
@@ -826,7 +946,7 @@ function check(label, cond, detail = "") {
         store.data["crossglyph.text"] === "Пример текста 12345",
         store.data["crossglyph.text"]);
 
-  const back = run(store);
+  const back = await run(store);
   check("and comes back on the next load",
         back.byName.text.value === "Пример текста 12345", back.byName.text.value);
 
@@ -860,7 +980,7 @@ function check(label, cond, detail = "") {
   };
   let threw = null;
   try {
-    const env = run(hostile);
+    const env = await run(hostile);
     env.listeners.input({ target: env.byName.margin });
     env.clicks.page();
     env.clicks.font();
@@ -872,7 +992,7 @@ function check(label, cond, detail = "") {
 {
   const store = fakeStorage({ "crossglyph.page": "{not json" });
   let threw = null;
-  try { run(store); } catch (error) { threw = error; }
+  try { await run(store); } catch (error) { threw = error; }
   check("corrupt stored data is ignored", threw === null, String(threw));
 }
 
