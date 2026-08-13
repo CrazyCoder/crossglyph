@@ -1,0 +1,152 @@
+"""Build a font, so a test that needs one does not need someone's font folder.
+
+The suite already leans on `D:\\shared\\Xteink\\fontsrc` for the real thing --
+tuning, hinting and kerning against actual outlines is the whole point of this
+tool, and a synthetic face cannot stand in for that. What it can stand in for
+is everything *structural*: which codepoints a face carries, whether it has a
+GPOS kern pair, whether a fallback fills a hole. Those tests were reading
+whatever fonts happened to be in that folder, which made them slow, and made
+what they asserted depend on what had been dropped in there since.
+
+A glyph here is a filled box, so a page drawn with one has ink on it and two
+different builds differ. Everything is written to `tmp_path`; nothing is
+committed, and nothing is read from outside the repo.
+"""
+from __future__ import annotations
+
+import pathlib
+
+# One em, and a box that sits on the baseline and fills most of it: real
+# outlines, so FreeType rasterizes something and the page is not blank.
+UPEM = 1000
+BOX = ((80, 0), (520, 0), (520, 700), (80, 700))
+ADVANCE = 600
+
+
+def _glyph_name(codepoint: int) -> str:
+    return f"u{codepoint:04X}"
+
+
+def box_font(path: pathlib.Path, codepoints, *, kern=None,
+             family: str = "Probe", style: str = "Regular") -> pathlib.Path:
+    """A TTF carrying exactly `codepoints`, each drawn as the same box.
+
+    `kern` is an optional {(left_codepoint, right_codepoint): units} mapping,
+    written as a real GPOS `kern` feature -- which is the table the converter
+    walks and the one this suite has to be able to produce without asking the
+    machine for a font that happens to have one.
+    """
+    from fontTools.feaLib.builder import addOpenTypeFeatures
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
+
+    codepoints = sorted(set(codepoints))
+    names = [_glyph_name(code) for code in codepoints]
+
+    pen = TTGlyphPen(None)
+    pen.moveTo(BOX[0])
+    for point in BOX[1:]:
+        pen.lineTo(point)
+    pen.closePath()
+    box = pen.glyph()
+
+    empty = TTGlyphPen(None).glyph()
+
+    builder = FontBuilder(UPEM, isTTF=True)
+    builder.setupGlyphOrder([".notdef", *names])
+    builder.setupCharacterMap(dict(zip(codepoints, names)))
+    builder.setupGlyf({".notdef": empty, **{name: box for name in names}})
+    builder.setupHorizontalMetrics(
+        {name: (ADVANCE, 80) for name in (".notdef", *names)})
+    builder.setupHorizontalHeader(ascent=800, descent=-200)
+    builder.setupOS2(sTypoAscender=800, sTypoDescender=-200,
+                     usWinAscent=800, usWinDescent=200)
+    builder.setupNameTable({"familyName": family, "styleName": style,
+                            "psName": f"{family}-{style}".replace(" ", "")})
+    builder.setupPost()
+
+    if kern:
+        rules = "\n".join(
+            f"    pos {_glyph_name(left)} {_glyph_name(right)} {value};"
+            for (left, right), value in kern.items())
+        feature = path.with_suffix(".fea")
+        feature.write_text(f"feature kern {{\n{rules}\n}} kern;\n",
+                           encoding="utf-8")
+        addOpenTypeFeatures(builder.font, str(feature))
+        feature.unlink()
+
+    builder.save(str(path))
+    return path
+
+
+#: The default instance is deliberately the light end rather than 400, because
+#: that is the case that matters: Merriweather defaults to Light, so a build
+#: that takes the file as it comes ships a Light face labelled Regular.
+VAR_AXIS = ("wght", 300, 300, 900)
+
+#: Named as a real family names them, since discovery reads these names to
+#: decide which coordinates a slot is built at.
+VAR_INSTANCES = {"Light": 300, "Regular": 400, "Bold": 700, "Black": 900}
+
+
+def variable_box_font(path: pathlib.Path, codepoints, *, family: str = "Probe",
+                      style: str = "Regular", italic: bool = False,
+                      instances=None, axis=None) -> pathlib.Path:
+    """A variable TTF whose one axis makes the box wider as the weight rises.
+
+    Enough of a variable font to be one: an fvar with named instances, and gvar
+    deltas big enough that a build at 700 is visibly not a build at 300. That
+    is what lets a test tell which instance was rasterized without measuring
+    ink -- the advance itself moves.
+    """
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
+    from fontTools.ttLib.tables.TupleVariation import TupleVariation
+
+    tag, minimum, default, maximum = axis or VAR_AXIS
+    instances = VAR_INSTANCES if instances is None else instances
+
+    codepoints = sorted(set(codepoints))
+    names = [_glyph_name(code) for code in codepoints]
+
+    pen = TTGlyphPen(None)
+    pen.moveTo(BOX[0])
+    for point in BOX[1:]:
+        pen.lineTo(point)
+    pen.closePath()
+    box = pen.glyph()
+    empty = TTGlyphPen(None).glyph()
+
+    builder = FontBuilder(UPEM, isTTF=True)
+    builder.setupGlyphOrder([".notdef", *names])
+    builder.setupCharacterMap(dict(zip(codepoints, names)))
+    builder.setupGlyf({".notdef": empty, **{name: box for name in names}})
+    builder.setupHorizontalMetrics(
+        {name: (ADVANCE, 80) for name in (".notdef", *names)})
+    builder.setupHorizontalHeader(ascent=800, descent=-200)
+    builder.setupOS2(sTypoAscender=800, sTypoDescender=-200,
+                     usWinAscent=800, usWinDescent=200)
+    builder.setupNameTable({"familyName": family, "styleName": style,
+                            "psName": f"{family}-{style}".replace(" ", "")})
+    builder.setupPost()
+    builder.setupFvar(
+        axes=[(tag, minimum, default, maximum, "Weight")],
+        instances=[{"location": {tag: value},
+                    "stylename": name + (" Italic" if italic else "")}
+                   for name, value in instances.items()])
+
+    # One tuple per glyph at the heavy end: the two right-hand points move out,
+    # so the box fattens with the weight and the advance grows with it. Four
+    # contour points plus the four phantom points glyf variations carry.
+    #
+    # The region starts at the axis minimum rather than at the default, so
+    # every weight between them differs -- otherwise a slot built at 400 and
+    # one built at the font's own default would rasterize the same and a test
+    # could not tell which of them ran. 600 units is coarse on purpose, for the
+    # same reason: it has to survive being rounded to whole pixels at 13 pt.
+    heavy = [(0, 0), (600, 0), (600, 0), (0, 0), (0, 0), (600, 0), (0, 0), (0, 0)]
+    builder.setupGvar({
+        name: [TupleVariation({tag: (0.0, 1.0, 1.0)}, heavy)] for name in names})
+
+    builder.save(str(path))
+    return path

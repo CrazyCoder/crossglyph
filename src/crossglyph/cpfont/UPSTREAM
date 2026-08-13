@@ -1,0 +1,15 @@
+crosspoint-reader/crosspoint-tools
+scripts/font-builder/fontconvert_sdcard.py  ->  convert.py
+scripts/font-builder/cpfont_version.py      ->  version.py
+
+commit: 759ce9a26993f9c969211859a6218aa755e5803e
+
+MIT, Copyright (c) 2025 SoFriendly.
+
+This is a fork, not a vendored copy: crossglyph adds rasterization knobs upstream
+does not have (gamma, AA thresholds, weight, slant, hinting, stem darkening).
+`uv run tools/refresh_cpfont.py` fetches upstream and shows a diff against the
+fork so changes can be merged by hand. Do not overwrite.
+
+The twelve bundled Noto fallback faces are NOT forked -- they are still read
+from the crosspoint-tools clone beside this one, since only the script diverges.

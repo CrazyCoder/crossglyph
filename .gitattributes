@@ -1,0 +1,14 @@
+# The .cmd wrappers are polyglot: a CRLF header and batch body for cmd.exe, an
+# LF bash body in between. Normalizing either half breaks one of the two
+# interpreters, so git must not touch these bytes on checkout.
+*.cmd  -text
+*.ps1  -text
+*.sh   eol=lf
+*.wasm binary
+
+# Out of the release archive: none of it means anything outside a checkout.
+# The rules above still apply while archiving, because git reads them from the
+# tree rather than from the file it is writing.
+.gitattributes export-ignore
+.gitignore     export-ignore
+.githooks/     export-ignore

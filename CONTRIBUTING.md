@@ -1,0 +1,144 @@
+# Contributing
+
+```sh
+uv sync
+uv run pytest -q          # while iterating: name the file you touched
+uv run pytest -n 8 -q     # the whole suite, before pushing
+node tests/preview_persistence.mjs
+```
+
+`-n 8` is pytest-xdist and belongs on the full run only. Each worker costs about
+two seconds to start, which is more than a scoped run takes at all.
+
+The page has no browser test. `tests/preview_persistence.mjs` runs its
+JavaScript against a stub DOM in Node, which is enough to cover what the page
+remembers, what it sends and when it redraws.
+
+## Fonts the tests need
+
+Almost every test builds its own faces with `tests/fontsmith.py`, which
+synthesizes a font from a list of codepoints. Three kinds of test cannot:
+whole-page rendering, kerning read from a real GPOS table, and stem darkening,
+which only the Adobe CFF driver applies.
+
+Those read a font off your machine, and skip when there is none. Name one and
+they run:
+
+| variable | wanted |
+|---|---|
+| `CROSSGLYPH_TEST_FONT` | a text face with Latin and Cyrillic |
+| `CROSSGLYPH_TEST_ITALIC` | its italic |
+| `CROSSGLYPH_TEST_OTF` | an OTF with a CFF outline, ligatures and a `pnum` feature |
+
+A firmware checkout beside this one supplies NotoSans, which a few metrics
+tests read directly.
+
+## The git hook
+
+```sh
+git config core.hooksPath .githooks
+```
+
+That is one hook, and it checks the line endings described below.
+
+## Line endings in the wrappers
+
+`tools/uv.cmd` is a polyglot. Bash reads the top half; `cmd.exe` jumps past it
+to the bottom half. The two halves need different line endings, so the file
+carries both:
+
+```
+:<<"::CMDLITERAL"          CRLF, the header cmd.exe parses
+@ECHO OFF
+GOTO :CMDSCRIPT
+::CMDLITERAL
+
+# bash body                LF, which bash runs and cmd.exe skips
+exec "$root/tool-wrapper.sh" "$@"
+
+:CMDSCRIPT                 CRLF, the batch body
+call "%~dp0tool-wrapper.cmd"
+```
+
+Making either half uniform breaks one of the two interpreters. All LF misparses
+under a double byte code page on Chinese, Japanese and Korean Windows, where
+`cmd.exe` reports errors like `'etlocal' is not recognized`. It only shows up
+above a certain file size, where a buffer boundary lands inside a word. All
+CRLF puts carriage returns in the bash body, where they become part of the
+tokens.
+
+`.gitattributes` carries `*.cmd -text`, so git normalizes nothing on checkout
+under any `core.autocrlf`. Most editors rewrite a whole file to one ending and
+show no diff for it, which is why there is a checker:
+
+```sh
+sh tools/check-line-endings.sh
+```
+
+The pre-commit hook runs it when a `.cmd` file is staged. There is no repair
+mode. If a wrapper is mangled, `git checkout -- tools/uv.cmd` puts the bytes
+back.
+
+Two more rules for that file. Copy an existing wrapper rather than writing one
+from scratch, and never run `dos2unix` or `unix2dos` on one.
+
+## Making a release
+
+```sh
+uv run tools/make-release.py
+```
+
+It packs `dist/crossglyph-<version>.zip` from HEAD with `git archive`, and
+refuses to run against a dirty working tree, since the archive comes from the
+commit rather than from your files.
+
+`git archive` is what keeps the wrappers byte exact and carries the executable
+bits. The script then reads the archive back and checks four things: that
+everything a release needs is in it, that no checkout furniture came along,
+that the six executable files still are, and that `tools/uv.cmd` still has its
+mixed line endings. A release that lost one of those unpacks cleanly, runs
+nowhere, and says nothing about why.
+
+`.gitattributes`, `.gitignore` and `.githooks/` carry `export-ignore`, so they
+stay out of the archive. They mean nothing to somebody unpacking a zip.
+
+## Rebuilding the render core
+
+`src/crossglyph/render/render.wasm` is committed, because a release has no
+toolchain to build one with. Rebuild it after pulling the firmware, and after
+editing anything under `src/render/`.
+
+It needs [emsdk](https://emscripten.org/docs/getting_started/downloads.html)
+and a [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader)
+checkout, both beside this repository. `$EMSDK` and `$FW` name them somewhere
+else.
+
+```sh
+bash src/render/build.sh
+```
+
+On Windows the script wants a MSYS2 bash:
+
+```sh
+c:/tools/msys64/usr/bin/env.exe MSYSTEM=MINGW64 \
+  c:/tools/msys64/usr/bin/bash.exe -lc 'bash <repo>/src/render/build.sh'
+```
+
+Two things there are easy to get wrong and hard to diagnose. The C++ goes
+through `em++` and the C through `emcc`, because each rejects the other's
+sources. And a stub HAL must not have a data member: `HalDisplay` keeps its
+framebuffer in a function local static because as a member of an `inline`
+variable it came out null in one translation unit and valid in another, so
+every drawn pixel vanished in silence.
+
+The build writes a stamp beside the module holding the firmware commit it came
+from. A checkout whose firmware has moved past that commit gets a warning, once
+per run, and the preview draws with the older renderer until you rebuild. A
+release has no firmware checkout, so nothing is compared and nothing is said.
+
+## Writing
+
+Comments explain why, not what. They describe what the code does now, never
+what it used to do: git has that, and a comment retelling it is wrong by the
+next change. A firmware behaviour a value works around is worth a citation, and
+those citations are why several comments here are long.

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Block a commit that stages a wrapper whose line-ending structure is broken.
+# Enable with: git config core.hooksPath .githooks
+#
+# The working tree is what gets checked, which in the ordinary edit-then-commit
+# flow is the same bytes as the index.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -n "$root" ] || exit 0
+
+git diff --cached --name-only | grep -q '\.cmd$' || exit 0
+
+# The checker names the file and the line on stderr; only its "ok" is hidden.
+sh "$root/tools/check-line-endings.sh" >/dev/null || {
+    echo 'pre-commit: .cmd line endings are broken, commit blocked.' >&2
+    exit 1
+}
+exit 0

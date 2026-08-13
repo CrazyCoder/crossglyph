@@ -1,0 +1,457 @@
+/* The interface is built from the device's own four grey levels
+     (HalDisplay.cpp:195-224) and carries no chroma at all. That is a working
+     rule rather than a style: a colour anywhere near a greyscale specimen
+     biases how you judge it, which is why proofing booths are neutral grey.
+     The surround is the only thing here that is not one of the four. */
+  :root {
+    color-scheme: light;
+    --l0: #ffffff;   /* device white       */
+    --l1: #c8c8c8;   /* device light grey  */
+    --l2: #606060;   /* device dark grey   */
+    --l3: #000000;   /* device black       */
+
+    --stage: #e6e6e6;
+    --panel: #f5f5f5;
+    --field: #ffffff;
+    --line:  #d6d6d6;
+    --rule:  #e4e4e4;
+    --text:  #1a1a1a;
+    --muted: #707070;
+    --hover: #ebebeb;
+    /* Level 2 clears 3:1 against the light panel; on the dark one it measures
+       2.8:1, so the ring steps up a level rather than out of the palette. */
+    --focus: var(--l2);
+    /* The active and inactive tones swap with the scheme rather than staying
+       put: pinned to one level, a thumb that reads as solid on a light panel
+       goes muddy on a dark one. Level 2 rather than pure black, because nine
+       filled tracks at full contrast pull the eye off the specimen -- which is
+       the one thing on this page that is supposed to have weight. */
+    --knob: var(--l2);
+    --knob-off: var(--l1);
+  }
+  /* One dark palette, switched by a class the page sets before it paints. That
+     is what lets the appearance control override the browser's preference
+     without a second copy of the tokens to keep in step. Which surround you
+     judge a specimen against genuinely changes how it reads, so this is a
+     working control rather than a decoration. */
+  :root.dark {
+    color-scheme: dark;
+    --stage: #141414;
+    --panel: #1d1d1d;
+    --field: #272727;
+    --line:  #343434;
+    --rule:  #2a2a2a;
+    --text:  #e8e8e8;
+    --muted: #979797;
+    --hover: #323232;
+    --focus: var(--l1);
+    --knob: var(--l1);
+    --knob-off: var(--l2);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.75rem; display: flex; gap: 1.75rem;
+    align-items: flex-start; flex-wrap: wrap;
+    background: var(--stage); color: var(--text);
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  /* Chrome, above the panel: which specimen, and what to look at it against.
+     The appearance control is not a knob at all. The font picker does reach
+     the render, but it is *which* specimen rather than a setting of one, so it
+     is deliberately outside the form -- nothing resets it, compares against
+     it, or sets it aside, and body() names it rather than sweeping it up. */
+  /* Pinned to the panel's own width. Left to size itself, the column grows to
+     whichever of the two rows is wider -- and the chrome, which is a row of
+     labels and buttons, was wider than the panel and pushed the page a
+     hundred pixels off to the right for nothing. */
+  .column { display: flex; flex-direction: column; gap: .55rem; width: 30rem; }
+  #chrome { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+            padding: 0 .3rem; color: var(--muted); font-size: 11px;
+            text-transform: uppercase; letter-spacing: .11em; }
+  .pushed { margin-left: auto; }
+  #compare {
+    padding: .2rem .55rem; font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; border-radius: 6px;
+  }
+  #compare kbd { font: inherit; opacity: .55; padding-left: .15rem; }
+  #compare[aria-pressed="true"] {
+    background: var(--knob); color: var(--panel); border-color: var(--knob);
+  }
+  /* A font name is a proper noun and keeps its own case, unlike the labels
+     around it. Sized to the longest name rather than to the current one, so
+     the row beside it does not shift when the choice changes -- and capped,
+     because that makes one absurd name the width of every family's picker.
+     The cap is what the rest of the row leaves: past it the appearance switch
+     wraps to a line of its own. A name that does not fit is cut short here and
+     whole in the list, and the title carries it either way. */
+  #family {
+    width: auto; max-width: 11rem; padding: .2rem .35rem;
+    font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer;
+    text-overflow: ellipsis;
+  }
+  /* The picker and the four specimen letters say "font" between them, so the
+     word is for a screen reader rather than the row. */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+
+  /* One badge per style, each set in the style it stands for: the fastest way
+     to say "this family has no bold italic" is to show the four and grey the
+     one that is missing. A specimen letter rather than a label, because the
+     letterform is the thing being reported. */
+  #styles { display: flex; gap: .12rem; margin-left: -.2rem; }
+  #styles span {
+    width: 1.25rem; height: 1.25rem; display: grid; place-items: center;
+    font-size: 12.5px; line-height: 1; text-transform: none; letter-spacing: 0;
+    border-radius: 4px; font-family: Georgia, "Times New Roman", serif;
+  }
+  #styles span[data-loaded="yes"] { color: var(--text); background: var(--hover); }
+  /* Missing, not merely quiet: it draws as its neighbour would, since that is
+     what the device does with a face a family does not carry. */
+  #styles span[data-loaded="no"] { color: var(--muted); opacity: .45; }
+
+  /* Set once and then left alone, so it is worth its width in glyphs rather
+     than in words: spelled out, the three take a third of the row, and the
+     font picker beside them is the control that needs the space. */
+  #theme { display: flex; }
+  #theme button {
+    display: grid; place-items: center; padding: .25rem .35rem;
+    border-radius: 0; margin-left: -1px;
+  }
+  #theme svg {
+    width: 13px; height: 13px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.4;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* The half that says "whichever the system is": a disc filled down its own
+     middle, which reads at 13px where a gradient or a second glyph would not. */
+  #theme svg .solid { fill: currentColor; stroke: none; }
+  #theme button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+  #theme button:last-child { border-radius: 0 6px 6px 0; }
+  #theme button[aria-pressed="true"] {
+    background: var(--knob); color: var(--panel); border-color: var(--knob);
+    position: relative;
+  }
+
+  /* Values are set in a monospace with tabular figures so a number does not
+     jitter sideways as it steps -- the reason instruments have always used
+     one, and the only typographic character the chrome allows itself. */
+  .mono { font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas,
+                        monospace; font-variant-numeric: tabular-nums; }
+
+  /* The font knobs open the panel with no heading of their own: the picker
+     above says which font, and a FONT heading under a FONT picker is the same
+     word twice for a row of vertical space. The other two sections still need
+     theirs, since they are what breaks the column up. */
+  #knobs {
+    width: 30rem; flex: none; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem 1rem;
+  }
+
+  h2 {
+    margin: 1.35rem 0 .5rem; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .11em; color: var(--muted);
+  }
+
+  /* The row has to be taller than its control by enough to hold a focus ring,
+     or the ring crosses the rules above and below and every focused control
+     looks like it has escaped its row. */
+  .row {
+    display: grid; grid-template-columns: 8.2rem 1fr 1.5rem; gap: .55rem;
+    align-items: center; min-height: 2.35rem;
+    border-top: 1px solid var(--rule);
+  }
+  /* Two controls for one value: the slider covers the distance, the field
+     lands on the number. Neither is much use here without the other -- these
+     ranges run to a hundred steps, so stepping across one is a chore, and
+     landing a slider on exactly 1.15 is luck. */
+  /* The stepper column is sized to the longest value any knob produces, which
+     is five characters -- weight reaches -1.00, size 39.75. Sizing it to the
+     usual four clips exactly the values you are squinting at. */
+  .row.num { grid-template-columns: 8.2rem 1fr 7.6rem 1.5rem; }
+  /* A rule separates rows; it must not draw the panel's own top edge twice.
+     The first row used to be under a heading, which is where the second
+     selector came from -- the first is what the font section needs now that it
+     opens the panel on its own. */
+  #knobs > .row:first-child, h2 + .row { border-top: 0; }
+  .name { color: var(--text); }
+  .name .unit { color: var(--muted); font-size: 11px; }
+
+  /* Shown only on a knob that is off its shipped default, so at rest the panel
+     stays quiet and running an eye down the column answers "what have I
+     actually changed?" -- which after twenty minutes of tuning is the harder
+     question of the two. */
+  .revert {
+    width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: none;
+    color: var(--muted); font-size: 14px; line-height: 1; border-radius: 4px;
+    display: grid; place-items: center;
+  }
+  .revert:hover { color: var(--text); background: var(--hover); }
+  /* Set aside rather than reset: the knob is showing its default and your
+     value is waiting. Filled, because this is a state you are currently in
+     rather than an action available to you. */
+  .revert[data-state="on"] { background: var(--knob); color: var(--panel); }
+  .revert[hidden] { display: none; }
+  /* Any element the page hides. The UA stylesheet's [hidden] is display:none
+     at the weakest specificity there is, so a class that sets display -- .row
+     is a grid -- beats it and the element stays on screen. */
+  [hidden] { display: none !important; }
+
+  /* A modifier of the row above rather than a setting of its own: no rule
+     between them, and indented so the grouping is visible without a box. */
+  .row.sub { border-top: 0; min-height: 1.7rem; }
+  .row.sub .name { padding-left: .9rem; color: var(--muted); font-size: 12px; }
+
+  /* The slider is a pointer affordance only: it is out of the tab order and
+     hidden from assistive tech, because the field beside it holds the same
+     value, takes arrow keys, and says what it is. Two focus stops per knob
+     across nine knobs is a worse keyboard experience, not a better one. */
+  /* The track fills to the thumb: it is what says the control is live and
+     where in its range it sits, which a bare rail with a dot on it does not.
+     --fill is set per slider from the value; `--mark` is the one place the
+     enabled and disabled tones are chosen. */
+  input[type=range] {
+    appearance: none; -webkit-appearance: none;
+    width: 100%; height: 1.5rem; background: transparent; cursor: pointer;
+    --fill: 0%; --mark: var(--knob);
+  }
+  input[type=range]:disabled { cursor: default; --mark: var(--knob-off); }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 3px; border-radius: 2px;
+    background: linear-gradient(to right,
+                var(--mark) var(--fill), var(--line) var(--fill));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5.5px;
+    background: var(--mark); border: 0; border-radius: 50%;
+  }
+  input[type=range]::-moz-range-track {
+    height: 3px; background: var(--line); border-radius: 2px;
+  }
+  input[type=range]::-moz-range-progress {
+    height: 3px; background: var(--mark); border-radius: 2px;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; background: var(--mark); border: 0; border-radius: 50%;
+  }
+
+  .stepper { display: flex; align-items: center; gap: .2rem; }
+  .stepper input {
+    flex: 1; min-width: 0; text-align: center; padding: .22rem .2rem;
+    font-size: 13px; color: inherit;
+    background: var(--field); border: 1px solid var(--line); border-radius: 6px;
+  }
+  /* A field that is not being applied has to look it, or the number reads as
+     the one in force -- which is the whole confusion "font's own" invites. */
+  .stepper input:disabled { color: var(--muted); background: transparent;
+                            border-style: dashed; }
+  /* Native spinners would sit beside the buttons doing the same job. */
+  input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+  button {
+    font: inherit; color: inherit; background: var(--field);
+    border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--hover); }
+  button:disabled { opacity: .4; cursor: default; }
+  .step {
+    width: 1.75rem; height: 1.7rem; flex: none; line-height: 1;
+    font-size: 15px; display: grid; place-items: center; padding: 0;
+  }
+
+  select {
+    width: 100%; padding: .22rem .4rem; font: inherit; color: inherit;
+    background: var(--field); border: 1px solid var(--line); border-radius: 6px;
+  }
+
+  /* A checkbox row is a whole-row target: the label is the control. */
+  label.row { cursor: pointer; }
+  label.row input[type=checkbox] { justify-self: start; width: 1rem; height: 1rem;
+                                   accent-color: var(--l2); cursor: pointer; }
+
+  /* Every action on the page is the same control: half the panel wide, in one
+     of two columns, so a row of them lines up and a longer label makes a
+     longer word rather than a bigger button. The note each one writes goes
+     under the row -- sharing it made "Build all" two lines high the moment the
+     build had anything to say. */
+  .actions {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem; margin-top: .9rem;
+  }
+  .actions button {
+    min-height: 2rem; padding: .35rem .7rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Filled while there is something to save: this is the one control on the
+     panel that is asking to be pressed, and the same treatment the page
+     already gives a state that is on. Disabled it goes back to an outline,
+     which the shared button:disabled rule then fades. */
+  #save:not(:disabled) {
+    background: var(--knob); color: var(--panel); border-color: var(--knob);
+  }
+  #save:not(:disabled):hover {
+    background: var(--text); border-color: var(--text);
+  }
+  /* Reset and Save sit together: one throws the knobs back to the converter's
+     own defaults, the other writes them where the build will read them. */
+  #saved { margin-top: .6rem; color: var(--muted); font-size: 11.5px; }
+
+  textarea {
+    width: 100%; height: 7rem; margin-top: .3rem; padding: .45rem .5rem;
+    font: 12px/1.5 ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    color: inherit; background: var(--field);
+    border: 1px solid var(--line); border-radius: 6px; resize: vertical;
+  }
+
+  .hint { color: var(--muted); font-size: 11.5px; line-height: 1.45;
+          margin-top: .5rem; }
+  .hint code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+  #status { margin-top: .7rem; color: var(--muted); font-size: 11.5px; }
+
+  /* The specimen, on a neutral stage. 480x800 device pixels, and the browser
+     must never resample it -- smoothing is exactly the lie this tool exists
+     to avoid. */
+  #stage { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 10px; padding: .85rem; }
+  #page { display: block; image-rendering: pixelated; background: var(--l0);
+          border: 1px solid var(--line); }
+
+  /* A failed render is said where the page would have been, because that is
+     where the eye already is. Over the sheet rather than instead of it: the
+     last page stays faintly visible, which is the difference between "this is
+     out of date" and "there has never been anything here". */
+  #stage { position: relative; }
+  #page-error { position: absolute; inset: 0; display: grid;
+                align-content: center; justify-items: start; gap: .85rem;
+                padding: 2.5rem; background: var(--panel); opacity: .97;
+                border: 1px solid var(--line); }
+  #page-error .what { margin: 0; font-weight: 600; }
+  #page-error .why { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+
+  /* The middle column: the page, and under it the text it is drawing. Its
+     width has to come from the specimen -- 480 device pixels plus the stage's
+     own padding -- and `min-content` is that figure without naming it: the
+     page cannot narrow, while the prose in the box below can wrap to any
+     width. Left to size itself the column took the width of the widest line of
+     that prose instead, and the page sat at the left of a stage wider than it
+     was. */
+  #middle { display: flex; flex-direction: column; gap: .55rem; flex: none;
+            width: min-content; }
+  #textbox {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: .1rem 1rem 1rem;
+  }
+  /* The specimen and its text stay where they are while a panel scrolls past.
+     Only where the whole column fits: sticking a column taller than the window
+     puts its own bottom out of reach, which costs more than the scrolling it
+     saves. */
+  @media (min-height: 1150px) {
+    #middle { position: sticky; top: 1.75rem; }
+  }
+
+  /* Its own column, the width of the other two. Three columns while there is
+     room for them, and the page in the middle: the alternative is one column
+     of knobs beside a column carrying the page *and* everything about the
+     build, which is the imbalance this replaces. Narrower windows wrap, and
+     the export panel drops below the page as it did before. */
+  #export {
+    width: 30rem; flex: none; align-self: flex-start;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: .1rem 1rem 1rem;
+  }
+  /* One control across the row rather than the panel's label-and-knob grid:
+     these are text and lists, and they need the width. */
+  .row.wide { grid-template-columns: 8.2rem 1fr; }
+  .row.wide.check { grid-template-columns: 1rem 1fr; cursor: pointer; }
+  #export input[type=text] {
+    width: 100%; padding: .28rem .45rem; font-size: 12px; color: inherit;
+    background: var(--field); border: 1px solid var(--line); border-radius: 6px;
+  }
+  /* Not in force, and it has to look it -- the same dashed, quiet treatment the
+     line-height field gets when the font's own is in use. The suffix shows the
+     name the second family would take if there were one. */
+  #export input:disabled { color: var(--muted); background: transparent;
+                           border-style: dashed; }
+  /* A box per size with its step named above it, the way the font builder's
+     own page puts them: one field holding "12 14 16 18" says nothing about
+     which number is which step, and editing the third of four means counting
+     along a line of digits. */
+  .sizes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+           gap: .4rem; padding: .35rem 0 .15rem; }
+  .sizes label { display: flex; flex-direction: column; gap: .15rem;
+                 font-size: 11px; color: var(--muted); cursor: pointer; }
+  #export .sizes input[type=text] { text-align: center; }
+
+  /* Its label above rather than beside it: twenty-one checkboxes in three
+     columns need the whole panel, and the 8.2rem label column of a normal row
+     left each column too narrow for "Chinese Traditional" -- which then wrapped
+     to two lines and pushed its neighbours out of line. */
+  .stacked { border-top: 1px solid var(--rule); padding: .6rem 0 .4rem; }
+  .stacked > .name { display: block; margin-bottom: .1rem; }
+
+  /* A "?" beside a label, with the explanation behind it. The website has the
+     same badge over the same list of presets, and the text is long for a good
+     reason -- what a preset contains, and in what order a character is looked
+     for, is not something a checkbox label can say. Hover or focus, so it is
+     reachable from the keyboard and by tapping rather than only by pointer. */
+  .explain { position: relative; display: inline-flex; vertical-align: middle;
+             margin-left: .3rem; }
+  .info {
+    width: 1rem; height: 1rem; padding: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; cursor: help;
+    font-size: 10px; font-weight: 700; line-height: 1;
+    color: var(--panel); background: var(--muted);
+  }
+  .info:hover { background: var(--text); }
+  .tip {
+    position: absolute; top: calc(100% + .45rem); left: -.5rem; z-index: 5;
+    width: 26rem; max-width: min(26rem, calc(100vw - 2rem));
+    /* Taller than most windows have room for below the badge, so it scrolls
+       inside itself rather than running off the bottom of the page. */
+    max-height: 60vh; overflow-y: auto;
+    padding: .7rem .8rem; border-radius: 8px;
+    font-size: 11.5px; line-height: 1.5; font-weight: 400;
+    text-transform: none; letter-spacing: 0;
+    color: var(--panel); background: var(--text);
+    box-shadow: 0 6px 20px rgb(0 0 0 / .25);
+    /* Not display:none -- the box has to keep its layout for the scroll
+       position, and pointer-events keep it from swallowing clicks while it is
+       invisible. Visibility is what makes it inert to assistive tech too. */
+    visibility: hidden; opacity: 0; pointer-events: none;
+  }
+  .explain:hover .tip, .explain:focus-within .tip {
+    visibility: visible; opacity: 1; pointer-events: auto;
+  }
+  /* Bold and nothing else: the box is already the inverse of the panel, and a
+     second colour on it would have to be picked twice -- once per theme. */
+  .tip code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+              font-size: 11px; }
+  /* Three columns, as the website lays the same list out, which is what makes
+     twenty-one checkboxes readable rather than a wall. minmax(0, 1fr) rather
+     than 1fr: a grid column's default minimum is its content, so the longest
+     label would widen its column and squeeze the other two. */
+  .presets {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .1rem .5rem; padding: .35rem 0;
+  }
+  .presets label { display: flex; align-items: center; gap: .35rem;
+                   font-size: 12px; cursor: pointer; }
+  .presets input { width: .95rem; height: .95rem; accent-color: var(--l2);
+                   cursor: pointer; }
+  .presets .note { color: var(--muted); font-size: 11px; }
+  #built, #fetched, #have-fallbacks { color: var(--muted); font-size: 11.5px; }
+  #built { margin-top: .6rem; }
+  #fetch { padding: .3rem .6rem; margin-right: .5rem; }
+
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  /* Inside a row there is no room for an offset ring, and it would sit on the
+     rules rather than around the control. */
+  .row :focus-visible { outline-offset: 1px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

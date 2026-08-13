@@ -1,0 +1,469 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrossGlyph font preview</title>
+<link rel="stylesheet" href="style.css">
+
+<script src="js/theme-boot.js"></script>
+
+<div class="column">
+<div id="chrome">
+  <label class="sr-only" for="family">font</label>
+  <select id="family" title="Which family from the font source folder to set the page in"></select>
+  <span id="styles" aria-label="faces in this family"></span>
+  <button type="button" id="compare" aria-pressed="false"
+          title="Show the page with your font tuning off. Size stays where it is.">
+    untuned <kbd>\</kbd></button>
+  <div id="theme" class="pushed" role="group" aria-label="appearance">
+    <button type="button" data-appearance="system" aria-label="follow the system"
+            title="Follow the system's light or dark setting">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/>
+        <path class="solid" d="M8 2.4a5.6 5.6 0 0 0 0 11.2z"/></svg></button>
+    <button type="button" data-appearance="light" aria-label="light"
+            title="Light">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.1"/>
+        <path d="M8 .9v1.8M8 13.3v1.8M.9 8h1.8M13.3 8h1.8M2.98 2.98l1.27 1.27M11.75 11.75l1.27 1.27M13.02 2.98l-1.27 1.27M4.25 11.75l-1.27 1.27"/></svg></button>
+    <button type="button" data-appearance="dark" aria-label="dark" title="Dark">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6 5.9 5.9 0 1 0 13.4 9.9z"/></svg></button>
+  </div>
+</div>
+
+<form id="knobs">
+  <!-- Quarter points: the integer step is 2.08 px/em at 150 DPI, about a 10%
+       jump at reading sizes. A fractional size ships as its rounded label. -->
+  <div class="row num">
+    <label class="name" for="size">size <span class="unit">pt</span></label>
+    <input type="range" data-slider-for="size" min="6" max="40" step="0.25" value="13" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="size" data-dir="-1" aria-label="decrease size">−</button>
+      <input class="mono" id="size" name="size" type="number" min="6" max="40"
+             value="13" step="0.25" inputmode="decimal" data-group="root">
+      <button type="button" class="step mono" data-for="size" data-dir="1" aria-label="increase size">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="size" title="Compare with the value the config has" aria-label="compare size" hidden>&#8634;</button>
+  </div>
+
+  <!-- A variable family only, and hidden for every other. One file is several
+       faces, so which face each slot is drawn at is a choice this page has to
+       be able to make -- and the font's own named instances are the honest way
+       to offer it. `opsz` is not here: it follows the size above. -->
+  <div id="variable" hidden>
+    <div class="row" id="axis-text-row">
+      <label class="name" for="axis-text">text</label>
+      <select id="axis-text" name="axis_text" data-group="axes"
+              title="The weight the roman and italic slots are built at"></select>
+    </div>
+    <div class="row" id="axis-bold-row">
+      <label class="name" for="axis-bold">bold</label>
+      <select id="axis-bold" name="axis_bold" data-group="axes"
+              title="The weight the bold and bold italic slots are built at"></select>
+    </div>
+    <!-- One row per remaining axis, built from what the font declares. -->
+    <div id="axis-rows"></div>
+  </div>
+
+  <!-- 0.3..4.0 is crengine's own range for the same curve. Past about 3 it
+       darkens less and mostly trades grey edges for solid black. -->
+  <div class="row num">
+    <label class="name" for="gamma">gamma</label>
+    <input type="range" data-slider-for="gamma" min="0.3" max="4" step="0.05" value="1" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="gamma" data-dir="-1" aria-label="decrease gamma">−</button>
+      <input class="mono" id="gamma" name="gamma" type="number" min="0.3" max="4"
+             value="1" step="0.05" inputmode="decimal">
+      <button type="button" class="step mono" data-for="gamma" data-dir="1" aria-label="increase gamma">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="gamma" title="Compare with the value the config has" aria-label="compare gamma" hidden>&#8634;</button>
+  </div>
+
+
+  <div class="row num">
+    <label class="name" for="weight">weight <span class="unit">px</span></label>
+    <input type="range" data-slider-for="weight" min="-1" max="1" step="0.05" value="0" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="weight" data-dir="-1" aria-label="decrease weight">−</button>
+      <input class="mono" id="weight" name="weight" type="number" min="-1" max="1"
+             value="0" step="0.05" inputmode="decimal">
+      <button type="button" class="step mono" data-for="weight" data-dir="1" aria-label="increase weight">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="weight" title="Compare with the value the config has" aria-label="compare weight" hidden>&#8634;</button>
+  </div>
+
+
+  <!-- The line pitch baked into the .cpfont, as a multiple of the em. This is
+       the converter's knob: it is what ships on the card. The reader's own
+       tight/normal/wide setting is under Page, and multiplies it. -->
+  <div class="row num">
+    <label class="name" for="line_height">line height <span class="unit">em</span></label>
+    <input type="range" data-slider-for="line_height" min="0.8" max="2.2" step="0.05" value="1.15" tabindex="-1" aria-hidden="true" disabled>
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="line_height" data-dir="-1" aria-label="decrease line height">−</button>
+      <input class="mono" id="line_height" name="line_height" type="number"
+             min="0.8" max="2.2" value="1.15" step="0.05" inputmode="decimal" disabled>
+      <button type="button" class="step mono" data-for="line_height" data-dir="1" aria-label="increase line height">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="line_height" title="Compare with the value the config has" aria-label="compare line height" hidden>&#8634;</button>
+  </div>
+  <label class="row sub">
+    <span class="name">use the font's own</span>
+    <input type="checkbox" id="lh-auto" checked>
+  </label>
+
+
+  <div class="row num">
+    <label class="name" for="letter_spacing">letter spacing <span class="unit">px</span></label>
+    <input type="range" data-slider-for="letter_spacing" min="-2" max="4" step="0.1" value="0" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="letter_spacing" data-dir="-1" aria-label="decrease letter spacing">−</button>
+      <input class="mono" id="letter_spacing" name="letter_spacing" type="number"
+             min="-2" max="4" value="0" step="0.1" inputmode="decimal">
+      <button type="button" class="step mono" data-for="letter_spacing" data-dir="1" aria-label="increase letter spacing">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="letter_spacing" title="Compare with the value the config has" aria-label="compare letter spacing" hidden>&#8634;</button>
+  </div>
+
+
+  <div class="row num">
+    <label class="name" for="word_spacing">word spacing <span class="unit">px</span></label>
+    <input type="range" data-slider-for="word_spacing" min="-2" max="8" step="0.1" value="0" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="word_spacing" data-dir="-1" aria-label="decrease word spacing">−</button>
+      <input class="mono" id="word_spacing" name="word_spacing" type="number"
+             min="-2" max="8" value="0" step="0.1" inputmode="decimal">
+      <button type="button" class="step mono" data-for="word_spacing" data-dir="1" aria-label="increase word spacing">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="word_spacing" title="Compare with the value the config has" aria-label="compare word spacing" hidden>&#8634;</button>
+  </div>
+
+
+  <div class="row num">
+    <label class="name" for="kerning">kerning <span class="unit">×</span></label>
+    <input type="range" data-slider-for="kerning" min="0" max="2" step="0.05" value="1" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="kerning" data-dir="-1" aria-label="decrease kerning">−</button>
+      <input class="mono" id="kerning" name="kerning" type="number" min="0" max="2"
+             value="1" step="0.05" inputmode="decimal">
+      <button type="button" class="step mono" data-for="kerning" data-dir="1" aria-label="increase kerning">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="kerning" title="Compare with the value the config has" aria-label="compare kerning" hidden>&#8634;</button>
+  </div>
+
+
+  <div class="row num">
+    <label class="name" for="slant">slant <span class="unit">tan</span></label>
+    <input type="range" data-slider-for="slant" min="0" max="0.4" step="0.01" value="0" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="slant" data-dir="-1" aria-label="decrease slant">−</button>
+      <input class="mono" id="slant" name="slant" type="number" min="0" max="0.4"
+             value="0" step="0.01" inputmode="decimal">
+      <button type="button" class="step mono" data-for="slant" data-dir="1" aria-label="increase slant">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="slant" title="Compare with the value the config has" aria-label="compare slant" hidden>&#8634;</button>
+  </div>
+
+
+  <!-- The other half of the quantizer: where the three cut points between
+       the four grey levels sit. Darkened is what the built-in fonts use, and
+       what a face that sets too light on the panel usually wants. -->
+  <div class="row">
+    <label class="name" for="thresholds">thresholds</label>
+    <select id="thresholds" name="thresholds">
+      <option value="4,8,12" selected>default (4, 8, 12)</option>
+      <option value="3,6,10">darkened (3, 6, 10)</option></select>
+    <button type="button" class="revert" data-reset="thresholds" title="Compare with the value the config has" aria-label="compare thresholds" hidden>&#8634;</button>
+  </div>
+
+
+  <div class="row">
+    <label class="name" for="hinting">hinting</label>
+    <select id="hinting" name="hinting">
+      <option>normal</option><option>light</option>
+      <option>none</option><option>auto</option></select>
+    <button type="button" class="revert" data-reset="hinting" title="Compare with the value the config has" aria-label="compare hinting" hidden>&#8634;</button>
+  </div>
+
+
+  <label class="row">
+    <span class="name">stem darkening</span>
+    <input name="stem_darkening" type="checkbox">
+    <button type="button" class="revert" data-reset="stem_darkening" title="Compare with the value the config has" aria-label="compare stem darkening" hidden>&#8634;</button>
+  </label>
+
+  <label class="row">
+    <span class="name">ligatures</span>
+    <input name="ligatures" type="checkbox" checked>
+    <button type="button" class="revert" data-reset="ligatures" title="Compare with the value the config has" aria-label="compare ligatures" hidden>&#8634;</button>
+  </label>
+
+
+  <!-- Only moves a font whose designer drew a pnum feature, and then only the
+       digits they drew: some faces substitute all ten, some a handful, most
+       none at all. -->
+  <div class="row">
+    <label class="name" for="figures">figures</label>
+    <select id="figures" name="figures">
+      <option value="default">default (tabular)</option>
+      <option value="proportional">proportional</option></select>
+    <button type="button" class="revert" data-reset="figures" title="Compare with the value the config has" aria-label="compare figures" hidden>&#8634;</button>
+  </div>
+
+  <div class="actions">
+    <button type="button" class="reset" id="reset-font">Reset font knobs</button>
+    <button type="button" class="reset" id="save" disabled>Save</button>
+  </div>
+  <div id="saved"></div>
+
+  <h2>Page</h2>
+
+  <div class="row num">
+    <label class="name" for="margin">margin <span class="unit">px</span></label>
+    <input type="range" data-slider-for="margin" min="5" max="40" step="1" value="5" tabindex="-1" aria-hidden="true">
+    <span class="stepper">
+      <button type="button" class="step mono" data-for="margin" data-dir="-1" aria-label="decrease margin">−</button>
+      <input class="mono" id="margin" name="margin" type="number" min="5" max="40"
+             value="5" step="1" inputmode="numeric" data-group="page">
+      <button type="button" class="step mono" data-for="margin" data-dir="1" aria-label="increase margin">+</button>
+    </span>
+    <button type="button" class="revert" data-reset="margin" title="Compare with the value the config has" aria-label="compare margin" hidden>&#8634;</button>
+  </div>
+
+  <div class="row">
+    <label class="name" for="alignment">alignment</label>
+    <select id="alignment" name="alignment" data-group="page">
+      <option>justify</option><option>left</option>
+      <option>center</option><option>right</option></select>
+    <button type="button" class="revert" data-reset="alignment" title="Compare with the value the config has" aria-label="compare alignment" hidden>&#8634;</button>
+  </div>
+
+  <div class="row">
+    <label class="name" for="line_spacing">line spacing</label>
+    <select id="line_spacing" name="line_spacing" data-group="page">
+      <option>tight</option><option selected>normal</option>
+      <option>wide</option></select>
+    <button type="button" class="revert" data-reset="line_spacing" title="Compare with the value the config has" aria-label="compare line spacing" hidden>&#8634;</button>
+  </div>
+
+  <div class="row">
+    <label class="name" for="language">hyphenate as</label>
+    <select id="language" name="language" data-group="page">
+      <option value="ru">Russian</option><option value="en">English</option>
+      <option value="de">German</option><option value="fr">French</option>
+      <option value="">off</option></select>
+    <button type="button" class="revert" data-reset="language" title="Compare with the value the config has" aria-label="compare hyphenate as" hidden>&#8634;</button>
+  </div>
+
+  <label class="row">
+    <span class="name">hyphenation</span>
+    <input name="hyphenation" type="checkbox" data-group="page">
+    <button type="button" class="revert" data-reset="hyphenation" title="Compare with the value the config has" aria-label="compare hyphenation" hidden>&#8634;</button>
+  </label>
+  <label class="row">
+    <span class="name">paragraph spacing</span>
+    <input name="extra_paragraph_spacing" type="checkbox" checked data-group="page">
+    <button type="button" class="revert" data-reset="extra_paragraph_spacing" title="Compare with the value the config has" aria-label="compare paragraph spacing" hidden>&#8634;</button>
+  </label>
+  <label class="row">
+    <span class="name">anti-aliasing</span>
+    <input name="antialiased" type="checkbox" checked data-group="page">
+    <button type="button" class="revert" data-reset="antialiased" title="Compare with the value the config has" aria-label="compare anti-aliasing" hidden>&#8634;</button>
+  </label>
+
+  <div class="hint">Anti-aliasing off is the device's 1-bit mode: every
+    non-white level is painted solid black.</div>
+  <div class="hint">Remembered in this browser, so they survive while you turn
+    font knobs.</div>
+
+  <div class="actions">
+    <button type="button" class="reset" id="reset-page">Reset page settings</button>
+  </div>
+</form>
+</div>
+
+<div id="middle">
+  <div id="stage">
+    <img id="page" width="480" height="800" alt="the page as the device draws it">
+    <!-- Hidden until something goes wrong. A sheet that silently stays blank
+         is one nobody can act on, and the reason is usually a sentence long. -->
+    <div id="page-error" hidden>
+      <p class="what"></p>
+      <p class="why mono"></p>
+      <button type="button" class="reset" id="retry">Try again</button>
+    </div>
+  </div>
+
+  <!-- Under the specimen rather than in the panel: everything on the left is a
+       setting, and this is the copy those settings are being judged on. Typing
+       a line and reading it back is one glance now instead of a look across the
+       page. `form="knobs"` keeps it a control of the knob form from here, so
+       /render receives it exactly as it did. -->
+  <div id="textbox">
+    <h2>Text</h2>
+    <textarea name="text" form="knobs" data-group="root"></textarea>
+    <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
+      <code>*_both_*</code> — a face the font does not carry falls back to
+      regular, as it would on the device.</div>
+    <div id="status" class="mono">—</div>
+  </div>
+</div>
+
+<!-- Beside the page rather than under it: the knobs decide how a glyph looks,
+     this decides what gets built and where it lands, and the specimen belongs
+     between the two rather than at the top of a column twice as long as the
+     one next to it. Both panels write the same .conf. -->
+<form id="export">
+    <h2>Export</h2>
+
+    <div class="stacked">
+      <span class="name">sizes <span class="unit">pt</span></span>
+      <div class="sizes">
+        <label><span>Small</span>
+          <input class="mono" id="size1" name="size1" type="text" inputmode="decimal"></label>
+        <label><span>Medium</span>
+          <input class="mono" id="size2" name="size2" type="text" inputmode="decimal"></label>
+        <label><span>Large</span>
+          <input class="mono" id="size3" name="size3" type="text" inputmode="decimal"></label>
+        <label><span>Extra Large</span>
+          <input class="mono" id="size4" name="size4" type="text" inputmode="decimal"></label>
+      </div>
+    </div>
+    <!-- Only for a family that carries more than the four boxes above, which a
+         CJK one does: the reader borrows it at 8, 10 and 12 for the interface.
+         Hidden otherwise rather than dropped, since a save would then write a
+         shorter list than the file had. -->
+    <div class="row wide" id="more-row" hidden>
+      <label class="name" for="size-more">more sizes</label>
+      <input class="mono" id="size-more" name="size_more" type="text"
+             inputmode="decimal">
+    </div>
+    <div class="hint">The reader's Font Size setting lists every size the
+      family carries, one entry each — not the size on the left, which is only
+      what you are tuning at.</div>
+
+    <div class="stacked">
+      <span class="name">second family <span class="unit">pt</span></span>
+      <div class="sizes">
+        <label><span>Small</span>
+          <input class="mono" id="mod1" name="mod1" type="text" inputmode="decimal"></label>
+        <label><span>Medium</span>
+          <input class="mono" id="mod2" name="mod2" type="text" inputmode="decimal"></label>
+        <label><span>Large</span>
+          <input class="mono" id="mod3" name="mod3" type="text" inputmode="decimal"></label>
+        <label><span>Extra Large</span>
+          <input class="mono" id="mod4" name="mod4" type="text" inputmode="decimal"></label>
+      </div>
+    </div>
+    <!-- The same carry the first family has, for the same reason: four boxes
+         and a config with five sizes in it means a save writing a shorter list
+         than the file had. -->
+    <div class="row wide" id="mod-more-row" hidden>
+      <label class="name" for="mod-more">more sizes</label>
+      <input class="mono" id="mod-more" name="mod_more" type="text"
+             inputmode="decimal">
+    </div>
+    <div class="row wide">
+      <label class="name" for="mod-suffix">suffix</label>
+      <input class="mono" id="mod-suffix" name="mod_suffix" type="text"
+             placeholder="Mod">
+    </div>
+    <div class="hint">Sizes here build <strong id="mod-name">a second
+      family</strong> from the same faces, listed beside this one on the
+      device — the way to give a font eight sizes without one long list.
+      Leave them empty for one family; the suffix is what its name ends
+      with.</div>
+
+    <div class="stacked">
+      <span class="name">coverage<!--
+        The website's own explainer, which is where these presets and their
+        wording come from. It is long because the answer is: what each preset
+        actually contains, and in what order a character is looked for.
+     --><span class="explain">
+          <button type="button" class="info" aria-label="What coverage means"
+                  aria-describedby="coverage-tip">?</button>
+          <span class="tip" id="coverage-tip" role="tooltip">
+            Extra Unicode ranges, for books that need them. More coverage means
+            a larger file and a longer build.
+            <br><br>
+            <strong>Base coverage is in every build first</strong>: ASCII and
+            basic Latin plus Unicode punctuation, which keeps letters, numbers,
+            spaces, smart quotes, dashes and ellipses available without adding
+            a language range. What you tick is added on top of it.
+            <br><br>
+            <strong>Default</strong> — the same ranges the fonts CrossPoint
+            ships carry: English, most European languages, Cyrillic (Russian,
+            Ukrainian and so on), combining diacritics, math operators, arrows
+            and common ligatures.
+            <br><br>
+            <strong>Reading</strong> — Default plus the ranges English fiction
+            and popular science actually reach for: broader Latin, Greek terms
+            like λ and φ, box and geometric symbols, supplemental arrows,
+            uncommon dialogue punctuation, CJK quote marks, music notes
+            (♪ ♫ ♬), stars (★) and dingbats (✓).
+            <br><br>
+            <strong>Arabic</strong> — Arabic, Farsi and Urdu letterforms,
+            including the Persian and Urdu letters and presentation forms.
+            Joined rendering depends on the reader's text shaping and not on
+            coverage alone, so isolated codepoints may still draw
+            disconnected.
+            <br><br>
+            <strong>Where a character comes from</strong>: the main family is
+            checked first, then fallback 1, then fallback 2, then the bundled
+            faces. A fallback only fills what is missing — it never replaces a
+            glyph the family already has. Some uncommon codepoints may still
+            be left out of the <code>.cpfont</code>.
+            <br><br>
+            None of this decides the page on the left: a preview is built from
+            the text in the box, whatever is ticked here.
+          </span>
+        </span>
+      </span>
+      <div id="presets" class="presets"></div>
+    </div>
+    <div class="row wide">
+      <label class="name" for="ranges">extra ranges</label>
+      <input class="mono" id="ranges" name="ranges" type="text"
+             placeholder="(0x2900-0x29FF),(0x2E00-0x2E7F)">
+    </div>
+    <div class="hint">Base coverage is always in, whatever is ticked. Ranges
+      are added on top of the presets.</div>
+
+    <label class="row wide check">
+      <input type="checkbox" id="fallbacks" name="fallbacks">
+      <span class="name">bundled fallback faces <span id="have-fallbacks"></span></span>
+    </label>
+    <div class="row wide" id="fetch-row" hidden>
+      <span class="name"></span>
+      <div><button type="button" id="fetch">Fetch the bundled faces</button>
+        <span id="fetched"></span></div>
+    </div>
+    <div class="row wide">
+      <label class="name" for="fallback1">fallback 1</label>
+      <select id="fallback1" name="fallback1"></select>
+    </div>
+    <div class="row wide">
+      <label class="name" for="fallback2">fallback 2</label>
+      <select id="fallback2" name="fallback2"></select>
+    </div>
+    <div class="hint">Families from this folder, tried in order for codepoints
+      the main family lacks — their regular face on every style, as the
+      converter applies them. The bundled Noto faces come after both, and on a
+      wide coverage they are the difference between 300 glyphs and 3,300.
+      <strong>The page above shows them too</strong>, in the same order the
+      build would: paste a character this family has not got and you see which
+      face it will actually come from. Nothing is opened while the family
+      covers the text.</div>
+
+    <div class="row wide">
+      <label class="name" for="out">output</label>
+      <input class="mono" id="out" name="out" type="text">
+    </div>
+    <div class="hint" id="source-note"></div>
+
+    <div class="actions">
+      <button type="button" id="build">Build</button>
+      <button type="button" id="build-all">Build all</button>
+    </div>
+    <div id="built"></div>
+</form>
+
+<script type="module" src="js/app.js"></script>

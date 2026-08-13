@@ -1,0 +1,1005 @@
+"""The preview server: knobs in as JSON, a page of type out as a PNG.
+
+A shim over the preview package and nothing more. All the behaviour is a layer
+down, so this file is the one to delete when the static web version can call
+the wasm module directly from the browser. See docs/preview.md.
+"""
+from __future__ import annotations
+
+import argparse
+import functools
+import io
+import json
+import os
+import pathlib
+import sys
+
+try:
+    from fastapi import FastAPI, HTTPException
+    from fastapi.responses import FileResponse, Response, StreamingResponse
+    from pydantic import BaseModel, Field
+except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
+    raise SystemExit(
+        f"the preview needs its web dependencies ({exc.name}). Install them "
+        f"with:\n  uv sync") from exc
+
+import freetype
+
+from .. import fontbuild, fontconf
+from ..cpfont.convert import FontBuildError
+from ..cpfont.tuning import LineHeight, Tuning
+from ..fontconf import Config, FontConfigError
+from ..render import RenderCoreMissing
+from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, PageSpec,
+               build_font, coverage_for, faces_for, needed_fallbacks,
+               preview_page)
+
+app = FastAPI(title="CrossGlyph font preview")
+
+#: What to call each face when reporting which ones are loaded.
+FACE_NAMES = {REGULAR: "regular", BOLD: "bold", ITALIC: "italic",
+              BOLD_ITALIC: "bold italic"}
+
+STATIC = pathlib.Path(__file__).parent / "static"
+
+#: fontconf's style names, which is what family_faces returns, to ours.
+STYLE_IDS = {"regular": REGULAR, "bold": BOLD, "italic": ITALIC,
+             "bolditalic": BOLD_ITALIC}
+STYLE_NAMES = {style: name for name, style in STYLE_IDS.items()}
+
+_sources: dict[int, pathlib.Path] = {}
+_family: str | None = None
+
+
+def set_font_source(path: pathlib.Path | str | None, *,
+                    family: str | None = None, **faces) -> None:
+    """The faces a render uses when the request names no family.
+
+    `path` is the regular face; bold, italic and bold_italic are optional and
+    fall back to regular when absent, exactly as they would on the device.
+    `family` is the name these faces came from, when they came from one -- the
+    picker shows it as the current choice rather than as a fifth entry.
+    """
+    global _sources, _family
+    _family = family
+    if path is None:
+        _sources = {}
+        return
+    _sources = {REGULAR: pathlib.Path(path)}
+    for name, style in (("bold", BOLD), ("italic", ITALIC),
+                        ("bold_italic", BOLD_ITALIC)):
+        if faces.get(name):
+            _sources[style] = pathlib.Path(faces[name])
+
+
+def _family_styles(family: str) -> tuple[tuple[int, str], ...]:
+    """sources_for's answer in a form that is safe to hand out twice.
+
+    Cached because resolving a family walks the whole source folder -- see
+    family_config -- and the answer only moves when the files do.
+    """
+    return _styles_cached(str(fontbuild.SOURCE_DIR), family)
+
+
+@functools.lru_cache(maxsize=16)
+def _styles_cached(source: str, family: str) -> tuple[tuple[int, str], ...]:
+    del source                          # in the key, not the body
+    return tuple(sorted((STYLE_IDS[name], str(path))
+                        for name, path in family_faces(family).items()
+                        if name in STYLE_IDS))
+
+
+def sources_for(family: str) -> dict[int, pathlib.Path]:
+    """The faces of a family, keyed as the preview keys them.
+
+    A fresh dict per call rather than a cached one: sync endpoints run in a
+    threadpool, so a cached mapping would be shared between requests in flight.
+    """
+    return {style: pathlib.Path(path) for style, path in _family_styles(family)}
+
+
+def axes_for(family: str, size: float,
+             panel: dict | None = None) -> tuple[tuple[int, tuple], ...]:
+    """A family's per-style design coordinates, keyed and shaped for a cache.
+
+    Empty for a static family. The optical size axis follows the size on the
+    page, which is why this takes one -- the page is a build like any other,
+    and a preview at 13 pt that showed the 18 pt optical cut would be showing
+    a face the card will never carry.
+    """
+    if family:
+        config = family_config(family)
+        pairs = [(STYLE_IDS[style], panel_coords(config, style, size, panel))
+                 for style in fontconf.STYLES if style in config.styles]
+    else:
+        # Started on files rather than on a family, so there is no config to
+        # consult and no panel to lay over it: each face is asked for its own
+        # slot's instance directly. Without this a variable file named with
+        # --font draws at its default instance, which for Merriweather is Light.
+        pairs = [(style, fontconf.slot_coords(path, STYLE_NAMES[style], size))
+                 for style, path in _sources.items()]
+    return tuple((style, tuple(sorted(coords.items())))
+                 for style, coords in pairs if coords)
+
+
+#: The coverage presets the panel offers, in the website's own order and
+#: wording (crosspointreader.com/fonts, "Additional Unicode Coverage"). `base`
+#: is not among them: the converter adds it to every build itself.
+COVERAGE_PRESETS = [
+    ("reading", "Reading", "Fiction"), ("default", "Default", "CrossPoint"),
+    ("latin-ext", "Latin Extended", ""), ("greek", "Greek", ""),
+    ("cyrillic", "Cyrillic", ""), ("vietnamese", "Vietnamese", ""),
+    ("hebrew", "Hebrew", ""), ("arabic", "Arabic", "Farsi, Urdu"),
+    ("armenian", "Armenian", ""), ("georgian", "Georgian", ""),
+    ("ethiopic", "Ethiopic", ""), ("cherokee", "Cherokee", ""),
+    ("tifinagh", "Tifinagh", ""), ("bengali", "Bengali", ""),
+    ("thai", "Thai", ""), ("hangul", "Hangul", "Korean"),
+    ("cjk-sc", "Chinese", "Simplified"), ("cjk-tc", "Chinese", "Traditional"),
+    ("cjk-jp", "Japanese", ""), ("symbols", "Symbols & Arrows", ""),
+    ("ipa-chars", "IPA characters", ""),
+]
+
+
+def _fallback_family(path: pathlib.Path | None,
+                     regulars: dict[str, str]) -> str:
+    """Which family a fallback file belongs to, for the picker.
+
+    The config stores a file, since that is what the converter takes; the panel
+    offers families, because picking "the regular of Noto Sans Symbols" is the
+    only sane way to choose one. This is the trip back.
+    """
+    return regulars.get(str(path), "") if path else ""
+
+
+#: The two slots the panel drives, and which style keys each one covers. The
+#: italic slots follow their roman: a family's italic is its text weight in
+#: italic, not a weight of its own.
+WEIGHT_SLOTS = {"text": ("regular", "italic"), "bold": ("bold", "bolditalic")}
+
+#: Not offered on the page: it follows the size being previewed, so a control
+#: for it would be a second, disagreeing way to say what size this is.
+FOLLOWS_SIZE = "opsz"
+
+
+def variable_entry(config: Config) -> dict | None:
+    """What the panel needs to offer a variable family's instances, or None.
+
+    Read from the regular slot's file, which is the one whose named instances
+    the pickers list. The italic file is asked for the same coordinates rather
+    than for its own names -- a family whose text weight is SemiBold is
+    SemiBold in italic too.
+    """
+    regular = config.styles.get("regular")
+    font = fontconf.variable_font(regular) if regular else None
+    if font is None:
+        return None
+    # Every axis the font has, minus the one that follows the size. These are
+    # the sliders, less the weight, which is the two pickers instead.
+    axes = [{"tag": tag, "min": low, "default": default, "max": high}
+            for tag, (low, default, high) in font.axes.items()
+            if tag != FOLLOWS_SIZE]
+    weights = {slot: config.coords(styles[0]).get("wght")
+               for slot, styles in WEIGHT_SLOTS.items()
+               if styles[0] in config.styles}
+    coords = config.coords("regular")
+    # Where each slider sits, which is the config's coordinate or, for an axis
+    # it says nothing about, the font's own default -- the value the row is
+    # built at either way. A slider whose position the panel could not name
+    # would read as an unsaved change on a page nobody had touched.
+    other = {axis["tag"]: coords.get(axis["tag"], axis["default"])
+             for axis in axes if axis["tag"] != "wght"}
+    # A face whose only axis is optical size has nothing to offer here, and an
+    # empty panel section is worse than none.
+    if not other and not any(value is not None for value in weights.values()):
+        return None
+    return {
+        "axes": axes,
+        # Name and weight per named instance, in the font's own order.
+        "instances": [{"name": name, "wght": coords.get("wght")}
+                      for name, coords in font.named if "wght" in coords],
+        "weights": weights,
+        "other": other,
+    }
+
+
+def panel_coords(config: Config, style: str, size: float | None,
+                 panel: dict | None) -> dict[str, float]:
+    """One slot's coordinates with the panel's choices laid over the config's.
+
+    The page is the only thing saying what this font looks like right now, so
+    what it shows wins over what the file was left saying -- the same rule the
+    knobs follow. An empty panel leaves the config's own answer alone.
+    """
+    coords = config.coords(style, size)
+    if not coords or not panel:
+        return coords
+    font = fontconf.variable_font(config.styles[style])
+    axes = font.axes if font else {}
+    for slot, styles in WEIGHT_SLOTS.items():
+        if style in styles and panel.get(slot) is not None and "wght" in axes:
+            coords["wght"] = float(panel[slot])
+    # Only axes this face actually has. A tag it does not carry would reach the
+    # rasterizer, which ignores it, and then a save would write a config that
+    # will not parse -- an error about a font that is fine.
+    for tag, value in panel.items():
+        if tag not in WEIGHT_SLOTS and tag != FOLLOWS_SIZE and tag in axes:
+            coords[tag] = float(value)
+    # Clamped here as well as in the config, because this arrives from a page.
+    for tag in list(coords):
+        if tag in axes:
+            low, _, high = axes[tag]
+            coords[tag] = max(low, min(high, coords[tag]))
+    return coords
+
+
+def _axis_note(config: Config, style: str) -> str:
+    """A slot's design coordinates, for the badge that names its file.
+
+    Empty for a static face. `opsz` is left out: it follows the size on the
+    page rather than saying anything about which face this slot is.
+    """
+    coords = {tag: value for tag, value in config.coords(style).items()
+              if tag != "opsz"}
+    if not coords:
+        return ""
+    return " at " + ", ".join(f"{tag} {value:g}"
+                              for tag, value in sorted(coords.items()))
+
+
+def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict:
+    """One family as the picker and the panel need it.
+
+    `tuning` is what the family is set to today: all.conf underneath its own
+    .conf. That is the build the card would get, so it is where the knobs start
+    and what the arrows compare against.
+
+    `conf` is the file a save would write. For a family all.conf covers without
+    naming, that file does not exist yet -- `derived` says so, because writing
+    to all.conf instead would retune every family in the folder.
+    """
+    return {"name": config.name,
+            "faces": sorted(FACE_NAMES[STYLE_IDS[style]]
+                            for style in config.styles if style in STYLE_IDS),
+            # By style rather than sorted by name, because the page shows one
+            # badge per style and has to say which file is behind each. A
+            # variable font puts the same file behind two of them, so the badge
+            # carries the coordinates that tell those two apart -- otherwise it
+            # reads as the same face listed twice.
+            "files": {FACE_NAMES[STYLE_IDS[style]]: path.name + _axis_note(config, style)
+                      for style, path in config.styles.items()
+                      if style in STYLE_IDS},
+            "tuning": config.tuning.as_dict(),
+            # None for a static family, which is what hides the axis controls.
+            "variable": variable_entry(config),
+            "conf": (config.path.name if not config.derived
+                     else f"{config.name.lower()}.conf"),
+            "derived": config.derived,
+            # What the family builds as, which is the export panel's half of
+            # the same file. `sizes` is what the reader's Font Size setting
+            # lists, one entry each, not the size on screen.
+            "export": {
+                "sizes": " ".join(fontconf.size_spelling(size)
+                                  for size in config.sizes),
+                # The second family the same faces build, if the config asks
+                # for one: <name><mod_suffix> at its own sizes.
+                "sizes_mod": " ".join(fontconf.size_spelling(size)
+                                      for size in config.sizes_mod),
+                "mod_suffix": config.mod_suffix,
+                "intervals": config.intervals,
+                "ranges": config.ranges,
+                "fallbacks": config.fallbacks,
+                "fallback1": _fallback_family(
+                    config.user_fallbacks.get("fallback_regular"),
+                    regulars or {}),
+                "fallback2": _fallback_family(
+                    config.user_fallbacks.get("fallback2_regular"),
+                    regulars or {}),
+            }}
+
+
+def families() -> list[dict]:
+    """Every family the font source folder offers, with what each is set to.
+
+    One walk of the folder answers all of it, so the picker can say what
+    changing to a family will load without a round trip per entry.
+    """
+    configs = fontbuild.gather(fontbuild.SOURCE_DIR)[0]
+    # Every family's regular face, so a fallback file can be reported as the
+    # family it belongs to without a second walk per entry.
+    regulars = {str(config.styles["regular"]): config.name
+                for config in configs if "regular" in config.styles}
+    return [family_entry(config, regulars) for config in configs]
+
+
+class PageKnobs(BaseModel):
+    margin: int = 5
+    alignment: str = "justify"
+    hyphenation: bool = False
+    extra_paragraph_spacing: bool = True
+    line_spacing: str = "normal"
+    language: str = "ru"
+    antialiased: bool = True
+
+
+class RenderRequest(BaseModel):
+    # Fractional: FreeType's char size is 26.6 fixed point, and the integer
+    # step is 2.08 px/em at 150 DPI -- too coarse to tune against.
+    size: float = Field(13, ge=6, le=64)
+    text: str = SAMPLE_TEXT
+    #: A family from the font source folder. Empty means the one the app was
+    #: started on, which is the only choice when it was started on a file.
+    family: str = ""
+    tuning: dict = Field(default_factory=dict)
+    page: PageKnobs = Field(default_factory=PageKnobs)
+    #: The export panel's fallback settings, as it currently shows them rather
+    #: than as the config has them: turning the checkbox on is a change you
+    #: want to see. They only reach a build when the text asks for a codepoint
+    #: the family lacks, which on most pages is never.
+    fallbacks: bool = False
+    fallback1: str = ""
+    fallback2: str = ""
+    #: The coverage the build would carry, which decides whether the 15.7 MB
+    #: CJK face is among the bundled ones. Not what the preview rasterizes --
+    #: that is the text, always.
+    intervals: str = ""
+    #: A variable family's axis controls as the panel shows them: `text` and
+    #: `bold` are weights, anything else is an axis tag. Empty for a static
+    #: family, and for a variable one it means "whatever the config says".
+    axes: dict[str, float] = Field(default_factory=dict)
+
+
+def _cache_key(tuning: dict) -> tuple:
+    """A hashable form of the posted tuning, for the build cache.
+
+    JSON has no tuples, so `thresholds` arrives as a list -- and a list in an
+    lru_cache key raises TypeError, which the caller turns into a 422 saying
+    "unhashable type". thresholds is a documented knob and Tuning.as_dict()
+    emits it as a list, so the round trip has to work.
+    """
+    return tuple(sorted(
+        (name, tuple(value) if isinstance(value, list) else value)
+        for name, value in tuning.items()))
+
+
+def _tuning(items: tuple) -> Tuning:
+    """A Tuning from the wire form, where line_height arrives as a number.
+
+    Everything else on Tuning is a plain scalar, but line_height is a value
+    with a unit -- a bare number is a multiple of the em, and `x` and `px`
+    suffixes mean the font's own height and literal pixels. The panel sends
+    the bare number; the .conf parser sends the same strings through the same
+    LineHeight.parse, so the two agree.
+    """
+    fields = dict(items)
+    # The panel spells the three cut points as one string, because they are one
+    # choice and a <select> holds one value. A config spells them the same way.
+    raw = fields.get("thresholds")
+    if isinstance(raw, str):
+        try:
+            raw = tuple(int(part) for part in raw.replace(",", " ").split())
+        except ValueError as exc:
+            raise ValueError(f"thresholds must be three numbers, "
+                             f"got {fields['thresholds']!r}") from exc
+        fields["thresholds"] = raw
+    # Its own check rather than Tuning's, which unpacks the triple and reports
+    # "not enough values to unpack" -- true, and no help at all in a panel.
+    if raw is not None and len(raw) != 3:
+        raise ValueError(f"thresholds must be three numbers, got {raw!r}")
+    raw = fields.get("line_height")
+    if raw is None or raw == "":
+        fields.pop("line_height", None)
+    elif not isinstance(raw, LineHeight):
+        fields["line_height"] = LineHeight.parse(str(raw))
+    return Tuning(**fields)
+
+
+@functools.lru_cache(maxsize=8)
+def _bundled_faces(source: str, intervals: str) -> tuple[str, ...]:
+    """The bundled Noto faces a build with this coverage would fill from.
+
+    Cached: this reads all.conf and stats a dozen files, and a render must not
+    do that on every keystroke. Nothing here reads a font -- which of them is
+    opened is build_font's decision, and only when the text needs one.
+
+    Keyed on the source folder as well as the coverage, though only one folder
+    is ever live: the alternative is a cache that answers for the folder the
+    *last* caller had, which is a trap for anything that repoints SOURCE_DIR --
+    the tests do, and a session that switched folders would too.
+    """
+    directory = fontbuild.fallback_dir(source)
+    if directory is None:
+        # Not fetched. The page draws with the family's own faces rather than
+        # refusing: what the family covers is exactly what is being tuned, and
+        # a blank page teaches nothing. The panel already says they are not
+        # here, and has the button, a few rows under the box that asked.
+        return ()
+    return tuple(str(path)
+                 for path in fontbuild.wanted_fallbacks(intervals, directory))
+
+
+def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
+    """The faces this request would fall back to, in the converter's order.
+
+    The two chosen families first, then the bundled set -- the same order
+    fontbuild.build_kwargs assembles, so a codepoint the family lacks is drawn
+    from the face the build would have drawn it from.
+    """
+    faces = []
+    for name in (request.fallback1, request.fallback2):
+        if not name:
+            continue
+        regular = sources_for(name).get(REGULAR)
+        if regular is None:
+            raise LookupError(f"the {name!r} family has no regular face to "
+                              f"fall back to")
+        faces.append(str(regular))
+    if request.fallbacks:
+        faces.extend(_bundled_faces(str(fontbuild.SOURCE_DIR), request.intervals))
+    return tuple(faces)
+
+
+@functools.lru_cache(maxsize=32)
+def useful_fallbacks(sources: tuple, coverage: tuple,
+                     fallbacks: tuple) -> tuple:
+    """The fallback faces this text actually needs, cached across knob turns.
+
+    Which face supplies a missing codepoint depends on the family and the text,
+    not on the knobs -- so asking once and remembering is what keeps tuning
+    responsive on a page that does need a fallback. Without it every turn of
+    gamma reopens the whole bundled set to find the same one face.
+    """
+    return tuple(str(path) for path in needed_fallbacks(
+        dict(sources), coverage, fallbacks))
+
+
+@functools.lru_cache(maxsize=32)
+def build_font_cached(sources: tuple, size: float, coverage: tuple,
+                      tuning_items: tuple, fallbacks: tuple = (),
+                      axes: tuple = ()) -> bytes:
+    """A knob that does not touch the font should not pay for a build.
+
+    Keyed on the coverage rather than the text it came from, so editing the
+    sample text only rebuilds when it brings in a character the last build did
+    not have -- which most edits do not. Every key is a tuple because an
+    lru_cache key has to hash."""
+    return build_font(dict(sources), size, tuning=_tuning(tuning_items),
+                      coverage=coverage, fallbacks=fallbacks,
+                      axes={style: dict(coords) for style, coords in axes})
+
+
+@app.post("/render")
+def render(request: RenderRequest) -> Response:
+    if not _sources and not request.family:
+        raise HTTPException(503, "no font source; start with --font")
+    try:
+        spec = PageSpec(**request.page.model_dump())
+        spec.to_call_args()                      # validate before rasterizing
+        sources = sources_for(request.family) if request.family else _sources
+        # Only the styles the text is actually set in. Every style in the build
+        # is a full rasterization of the coverage, so a plain paragraph would
+        # otherwise pay four times over for three faces nothing on the page
+        # wears -- and with a fallback in the list, four GPOS reads of it.
+        sources = faces_for(request.text, sources)
+        keyed = tuple(sorted((style, str(path))
+                             for style, path in sources.items()))
+        coverage = coverage_for(request.text, sources)
+        font = build_font_cached(
+            keyed, request.size, coverage, _cache_key(request.tuning),
+            useful_fallbacks(keyed, coverage, fallbacks_for(request)),
+            axes_for(request.family, request.size, request.axes))
+        page = preview_page(font, request.text, spec)
+    # SystemExit is deliberate and not paranoia: the converter is a script at
+    # heart and calls sys.exit() on bad input rather than raising -- an
+    # advanceY the .cpfont format cannot hold (convert.py:1023-1027), which a
+    # large `size` can reach on a loose-hhea face. SystemExit is a
+    # BaseException, so a bare `except ValueError` lets it past the handler and
+    # out of the app entirely.
+    except SystemExit as exc:
+        # sys.exit("reason") carries one; sys.exit(1) does not, and str() of it
+        # is "1", which would reach the panel as the whole error message.
+        reason = str(exc) if not isinstance(exc.code, int) else ""
+        raise HTTPException(
+            422, reason or "the converter rejected this combination; "
+                           "see the server log") from exc
+    # FontBuildError from cpfont, not fontbuild: two classes share the name,
+    # and the one this path can raise is the converter's (convert.py:321,
+    # from rasterize_font_style on a malformed face). The fontbuild one comes
+    # from the family builder, which the preview never calls.
+    #
+    # FT_Exception comes from freetype-py itself and arrives first for a file
+    # that is not a font at all -- the --font path is user input like any
+    # other knob, so a face FreeType cannot parse is a 422 and not a 500.
+    # LookupError is a family name the source folder does not have -- from the
+    # picker that means a remembered choice whose files have since moved, which
+    # is the reader's problem to see rather than a 500.
+    except (ValueError, TypeError, LookupError, FontBuildError,
+            freetype.FT_Exception) as exc:
+        raise HTTPException(
+            422, str(exc) or f"{type(exc).__name__} from the converter") from exc
+    # A workspace condition, not bad input -- the same class as having no font
+    # source, which is already a 503. As a 422 it shows up in the panel's
+    # status line as though the knob had been rejected.
+    except RenderCoreMissing as exc:
+        raise HTTPException(503, str(exc)) from exc
+    # Fallbacks ticked and not fetched. The same class again, and the panel has
+    # the button for it a few rows down.
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+    buffer = io.BytesIO()
+    page.save(buffer, format="PNG")
+    return Response(buffer.getvalue(), media_type="image/png")
+
+
+#: What the panel is allowed to write back, in the .conf's own spelling.
+#: `size` is not among them: the conf's `sizes` is what the family ships, not
+#: which one you are working at.
+SAVED_KEYS = ("gamma", "thresholds", "weight", "slant", "letter_spacing",
+              "word_spacing", "kerning", "ligatures", "hinting",
+              "stem_darkening", "figures", "line_height")
+
+
+#: The export keys, which are not tuning: they decide what a build contains
+#: rather than how a glyph looks. `fallback_regular` and `fallback2_regular`
+#: name one specific file, so they can only ever live in a family's own config.
+EXPORT_KEYS = ("sizes", "sizes_mod", "mod_suffix", "intervals", "ranges",
+               "fallbacks", "fallback_regular", "fallback2_regular")
+
+
+def axis_changes(panel: dict, config: Config) -> dict[str, str | None]:
+    """The four style keys a save writes for a variable family.
+
+    A slot whose coordinates are the ones discovery would pick anyway has its
+    line removed rather than restated -- the same rule the knobs follow, and
+    what keeps a config from freezing an automatic answer that should go on
+    following the font.
+    """
+    changes: dict[str, str | None] = {}
+    for style in fontconf.STYLES:
+        path = config.styles.get(style)
+        if path is None:
+            continue
+        wanted = panel_coords(config, style, None, panel)
+        # Against the automatic pick, which is this config with nothing pinned.
+        plain = fontconf.slot_coords(path, style)
+        if not wanted or wanted == plain:
+            changes[style] = None
+            continue
+        # The file relative to the config's own folder, so it stays portable --
+        # the same form the fallback keys are written in.
+        name = os.path.relpath(path, config.dir).replace("\\", "/")
+        # Only the axes that differ from the automatic pick. A coordinate is an
+        # override laid over the font's own instance, so restating the rest
+        # says nothing -- and freezes a value that should go on following the
+        # font if its designer ever moves that instance.
+        axes = ",".join(f"{tag}={value:g}" for tag, value in sorted(wanted.items())
+                        if tag != FOLLOWS_SIZE and plain.get(tag) != value)
+        changes[style] = f"{name}@{axes}" if axes else name
+    return changes
+
+
+class SaveRequest(BaseModel):
+    family: str
+    tuning: dict = Field(default_factory=dict)
+    #: A variable family's axis controls, as /render takes them. Absent leaves
+    #: whatever the config says about them alone.
+    axes: dict | None = None
+    #: sizes, intervals, ranges, fallbacks, fallback1, fallback2 -- the last
+    #: two as family names, which is how the panel offers them. Absent leaves
+    #: that half of the config alone.
+    export: dict | None = None
+
+
+def export_changes(request_export: dict, config: Config,
+                   shared: dict[str, str]) -> dict[str, str | None]:
+    """The export half of a save, as .conf keys.
+
+    Fallbacks arrive as family names and go in as the file the converter
+    takes: its regular face, relative to the config's own folder so the file
+    stays portable.
+    """
+    wanted: dict[str, str | None] = {}
+    sizes = str(request_export.get("sizes", "")).strip()
+    if sizes:
+        # Validated by the same parser the config uses, so a typo is a 422
+        # here rather than a family that silently builds nothing.
+        fontconf.parse_sizes(sizes, "sizes")
+    wanted["sizes"] = sizes or None
+
+    # The second family: its own sizes, and the suffix its name ends with. The
+    # suffix means nothing without them, so it is written only alongside them --
+    # and only when it differs from what the family would be called anyway.
+    sizes_mod = str(request_export.get("sizes_mod", "")).strip()
+    if sizes_mod:
+        fontconf.parse_sizes(sizes_mod, "sizes_mod")
+    wanted["sizes_mod"] = sizes_mod or None
+    # sanitize_name answers "CustomFont" for a string with nothing usable in it,
+    # which is right for a family name and wrong for a suffix: empty here means
+    # "whatever the family would be called anyway", not a name of its own.
+    raw_suffix = str(request_export.get("mod_suffix", "")).strip()
+    suffix = fontconf.sanitize_name(raw_suffix) if raw_suffix else ""
+    inherited_suffix = fontconf.sanitize_name(shared.get("mod_suffix", "Mod"))
+    wanted["mod_suffix"] = (suffix if sizes_mod and suffix != inherited_suffix
+                            else None)
+
+    wanted["intervals"] = str(request_export.get("intervals", "")).strip() or None
+    wanted["ranges"] = str(request_export.get("ranges", "")).strip() or None
+    wanted["fallbacks"] = "yes" if request_export.get("fallbacks") else "no"
+
+    for key, field in (("fallback_regular", "fallback1"),
+                       ("fallback2_regular", "fallback2")):
+        name = str(request_export.get(field, "")).strip()
+        if not name:
+            wanted[key] = None
+            continue
+        face = family_config(name).styles.get("regular")
+        if face is None:
+            raise LookupError(f"the {name!r} family has no regular face to "
+                              f"fall back to")
+        wanted[key] = os.path.relpath(face, config.dir).replace("\\", "/")
+
+    # Only what differs from all.conf, the same rule the tuning half follows --
+    # except for the two file keys, which all.conf cannot carry at all.
+    return {key: (value if value != shared.get(key) else None)
+            if key not in fontconf.PATH_KEYS else value
+            for key, value in wanted.items()}
+
+
+@app.post("/save")
+def save(request: SaveRequest) -> dict:
+    """Write the knobs into the family's own .conf, and say what moved.
+
+    Only what differs from all.conf goes in the file, and a knob that returns
+    to the shared value has its line removed rather than restated: the point of
+    all.conf is that changing it moves every family, which stops being true the
+    moment each family repeats its values back.
+    """
+    # Every knob, or none: this saves the state of a panel, and a partial post
+    # would quietly write the converter's default over each knob it left out.
+    missing = [key for key in SAVED_KEYS
+               if key not in request.tuning and key != "line_height"]
+    if missing:
+        raise HTTPException(
+            422, f"a save carries the whole panel; missing {', '.join(missing)}"
+                 f" (line_height is the exception: absent is the font's own)")
+    try:
+        config = family_config(request.family)
+        shared = fontconf.tuning_from(
+            fontbuild.load_defaults(fontbuild.SOURCE_DIR), fontbuild.DEFAULTS_NAME)
+        wanted = fontconf.tuning_values(_tuning(_cache_key(request.tuning)))
+        inherited = fontconf.tuning_values(shared)
+        changes = {key: (wanted[key] if wanted[key] != inherited[key] else None)
+                   for key in SAVED_KEYS}
+        # A family all.conf covers without naming has no file of its own, and
+        # config.path is all.conf itself -- writing there would retune every
+        # family in the folder. It gets its own, and the file names the family
+        # outright rather than leaning on its filename, which cannot spell one
+        # with a space in it.
+        path = config.path
+        if config.derived:
+            path = fontbuild.conf_dir() / f"{config.name.lower()}.conf"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            changes = {"family": config.family, **changes}
+        if request.export is not None:
+            changes.update(export_changes(
+                request.export, config,
+                fontbuild.load_defaults(fontbuild.SOURCE_DIR)))
+        if request.axes is not None:
+            changes.update(axis_changes(request.axes, config))
+        moved = fontconf.write_values(path, changes)
+        # The folder just changed under us, so what was resolved from it is
+        # no longer what it says -- including the read-back below.
+        forget_families()
+    except (ValueError, TypeError, LookupError, FontConfigError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(500, f"could not write {exc.filename}: {exc}") from exc
+
+    # Read back rather than echo: what the next build will use is what the file
+    # now says, which is the only answer worth putting in front of anyone.
+    saved = family_config(request.family)
+    return {"conf": path.name, "moved": sorted(moved),
+            "tuning": saved.tuning.as_dict()}
+
+
+@app.get("/defaults")
+def defaults() -> dict:
+    """What the page starts from, so the sample text lives in one place.
+
+    `families` is the picker's list and `family` the entry to select. When the
+    app was started on a bare file there is no entry to select: `font` names
+    it, and the page keeps it as a choice of its own at the top of the list.
+    """
+    return {"text": SAMPLE_TEXT,
+            "source": str(fontbuild.SOURCE_DIR),
+            # What all.conf says, which is usually nothing, and where that
+            # lands. The field holds the first so that leaving it empty goes
+            # on meaning "wherever the default is" rather than freezing
+            # today's answer into the file.
+            "out": fontbuild.load_defaults(fontbuild.SOURCE_DIR)
+                            .get("out", "").strip(),
+            "out_resolved": str(fontbuild.output_dir()),
+            "presets": [{"name": name, "label": label, "note": note}
+                        for name, label, note in COVERAGE_PRESETS],
+            # Whether the bundled faces are anywhere, so the panel can offer to
+            # fetch them rather than let a build fail on them.
+            "fallbacks": str(fontbuild.fallback_dir() or ""),
+            "font": _sources[REGULAR].name if _sources else None,
+            "faces": sorted(FACE_NAMES[style] for style in _sources),
+            "families": families(),
+            "family": _family}
+
+
+class OutRequest(BaseModel):
+    out: str
+
+
+@app.post("/out")
+def set_out(request: OutRequest) -> dict:
+    """Where builds go, which is all.conf's business rather than a family's.
+
+    Empty clears the key, which puts it back to $CROSSGLYPH_OUT or the cpfonts
+    folder beside the sources.
+    """
+    path = fontbuild.conf_dir() / fontbuild.DEFAULTS_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fontconf.write_values(path, {"out": request.out.strip() or None})
+        forget_families()
+    except OSError as exc:
+        raise HTTPException(500, f"could not write {path.name}: {exc}") from exc
+    return {"out": str(fontbuild.output_dir())}
+
+
+class FetchRequest(BaseModel):
+    #: The coverage to fetch for, which decides whether a CJK face comes too.
+    intervals: str = ""
+
+
+@app.post("/fallbacks")
+def fetch(request: FetchRequest) -> dict:
+    """Put the bundled faces in the font source folder.
+
+    Copied from a crosspoint-tools checkout when there is one and downloaded
+    otherwise, which is the only thing here that reaches the network -- and it
+    happens because somebody pressed a button asking for it.
+    """
+    try:
+        landed = fontbuild.fetch_fallbacks(
+            fontbuild.SOURCE_DIR, request.intervals, say=lambda *_: None)
+    except OSError as exc:
+        raise HTTPException(503, f"could not fetch the fallback faces: {exc}") from exc
+    return {"where": str(fontbuild.fallback_dir() or ""), "faces": len(landed)}
+
+
+class BuildRequest(BaseModel):
+    #: One family, or empty for every family in the folder.
+    family: str = ""
+    force: bool = False
+
+
+@app.post("/build")
+def build(request: BuildRequest) -> StreamingResponse:
+    """Build .cpfont families, exactly as crossglyph build would, saying where it
+    has got to.
+
+    A line of JSON per step rather than one answer at the end: four families at
+    four sizes with fallbacks on is minutes, and a button that says "building"
+    for two of them and nothing else is indistinguishable from a hung one.
+
+    Streaming rather than a job id and a poll: the progress belongs to the
+    request that caused it, so there is no state to keep, nothing to expire and
+    no second build to confuse it with. Nothing here touches the render core,
+    so the page goes on drawing while it runs.
+    """
+    out = fontbuild.output_dir()
+    # Resolved before the response starts: once a byte is out, a failure can
+    # only be a line in the stream, and "no such family" deserves a 422.
+    try:
+        if request.family:
+            configs = [family_config(request.family)]
+        else:
+            configs, errors = fontbuild.gather(fontbuild.SOURCE_DIR)
+            if errors and not configs:
+                raise LookupError("; ".join(errors))
+    except (ValueError, TypeError, LookupError, FontConfigError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    def lines():
+        try:
+            # Build all is `crossglyph build` with no config named, and that prunes
+            # the families no config produces any more -- a renamed one leaves
+            # a whole directory behind that the simulator would go on staging.
+            for step in fontbuild.build_families(
+                    configs, out, force=request.force,
+                    prune=not request.family):
+                yield json.dumps(step) + "\n"
+        # Every one of these means the build stopped, and the headers are long
+        # gone, so they travel as the last line rather than as a status. The
+        # missing bundled faces land here too -- see require_bundled_fallbacks,
+        # whose message carries the fetch command.
+        except (OSError, ValueError, TypeError, LookupError, FontConfigError,
+                FontBuildError, fontbuild.FontBuildError) as exc:
+            yield json.dumps({"event": "error", "error": str(exc)}) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC / "index.html")
+
+
+#: What the page is allowed to ask for beside itself. A whitelist of suffixes
+#: rather than a static mount: this serves one directory of hand-written files,
+#: and a path that escapes it is a bug worth a 404 rather than a file.
+ASSET_SUFFIXES = {".css", ".js"}
+
+
+@app.get("/{asset:path}")
+def asset(asset: str) -> FileResponse:
+    path = (STATIC / asset).resolve()
+    if (path.suffix not in ASSET_SUFFIXES
+            or not path.is_file()
+            or STATIC.resolve() not in path.parents):
+        raise HTTPException(404, f"no such asset: {asset}")
+    return FileResponse(path)
+
+
+def family_config(name: str) -> Config:
+    """The crossglyph build config for a family, by any name that addresses it.
+
+    Cached, because resolving one family parses every config in the folder and
+    walks it once per family it finds -- half a second on a folder of ninety
+    fonts, which every render would otherwise pay before drawing anything. The
+    answer only moves when a file does, and the one thing that moves a file
+    under a running app is a save, which drops it.
+
+    What comes back is shared, so treat it as read-only: `coords()` and the
+    rest hand back fresh dicts, and nothing here writes to a Config.
+
+    The source folder is in the key as well as the name. Only one folder is
+    ever in play at a time, but it is a global the tests move -- and a cache
+    keyed on the name alone answers for whichever folder asked first.
+
+    crossglyph build already resolves a family to its four files -- from the
+    family's own .conf, or from all.conf and the filenames -- so previewing one
+    should not mean typing four paths that the build knows by heart. This is
+    that same resolution, and a face pinned in the .conf is honoured here too.
+
+    The config rather than just the faces, because `--family alto` and
+    `--family alto.conf` both address a family the picker calls Alto, and
+    the picker has to be told the name it uses itself.
+    """
+    return _config_cached(str(fontbuild.SOURCE_DIR), name)
+
+
+@functools.lru_cache(maxsize=16)
+def _config_cached(source: str, name: str) -> Config:
+    del source                          # in the key, not the body
+    configs, errors = fontbuild.gather(fontbuild.SOURCE_DIR, [name])
+    if not configs:
+        known = ", ".join(sorted(config.name for config
+                                 in fontbuild.gather(fontbuild.SOURCE_DIR)[0]))
+        # gather() says which token missed and where it looked; the roll call
+        # of what is there is what turns that into the next command to type.
+        raise LookupError("\n".join(
+            (errors or [f"no font family {name!r} under {fontbuild.SOURCE_DIR}"])
+            + [f"there is: {known or 'nothing'}"]))
+    return configs[0]
+
+
+def forget_families() -> None:
+    """Drop what was resolved from the folder, after something wrote to it.
+
+    A save is the only thing that changes a config under a running app, and it
+    changes exactly the family it named -- but a family can be addressed by
+    several names and all.conf reaches every one of them, so the whole lot goes
+    rather than one entry.
+    """
+    _config_cached.cache_clear()
+    _styles_cached.cache_clear()
+
+
+def family_faces(name: str) -> dict[str, pathlib.Path]:
+    """The faces of a family in the font source folder, keyed by style name."""
+    return dict(family_config(name).styles)
+
+
+def _first_family() -> str | None:
+    """What the preview opens on when nothing says otherwise."""
+    if not fontbuild.SOURCE_DIR.is_dir():
+        return None
+    configs, _ = fontbuild.gather(fontbuild.SOURCE_DIR)
+    return configs[0].name if configs else None
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="crossglyph preview",
+        description="Tune a font against the device's own renderer.")
+    # Neither is required: started with no arguments at all, the preview opens
+    # on the first family in the workspace, which is the whole of what a
+    # tester has to do after unpacking.
+    where = parser.add_mutually_exclusive_group()
+    where.add_argument("--font", help="the regular face to preview")
+    where.add_argument("--family",
+                       help="a family in the workspace, by name -- its four "
+                            "faces are resolved the way crossglyph build "
+                            "resolves them")
+    parser.add_argument("--bold", help="the bold face, if the family has one")
+    parser.add_argument("--italic", help="the italic face")
+    parser.add_argument("--bold-italic", dest="bold_italic",
+                        help="the bold italic face")
+    # float, like every other size in the tool: FreeType takes 26.6 fixed
+    # point and the slider steps a quarter point.
+    parser.add_argument("--size", type=float, default=13,
+                        help="point size for --png (default: %(default)s)")
+    parser.add_argument("--png", metavar="PATH",
+                        help="write one page and exit, instead of serving")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--no-open", dest="open_browser", action="store_false",
+                        help="serve without opening a browser")
+    opts = parser.parse_args(argv)
+
+    if not opts.font and not opts.family:
+        opts.family = _first_family()
+        if opts.family is None:
+            print(f"no fonts in {fontbuild.SOURCE_DIR}\n"
+                  f"Drop TTF or OTF files in, or pass --font or --family.",
+                  file=sys.stderr)
+            return 2
+
+    faces = {"bold": opts.bold, "italic": opts.italic,
+             "bold_italic": opts.bold_italic}
+    font = opts.font
+    family = None
+    if opts.family:
+        try:
+            config = family_config(opts.family)
+        except LookupError as exc:
+            print(exc, file=sys.stderr)
+            return 2
+        # Its own name, not the token that found it: the picker lists families
+        # by name, and it has to be able to select the one already showing.
+        family, resolved = config.name, dict(config.styles)
+        # An explicit --bold beside --family still wins, so one face can be
+        # swapped out without naming the other three.
+        font = resolved.get("regular")
+        for option, style in (("bold", "bold"), ("italic", "italic"),
+                              ("bold_italic", "bolditalic")):
+            faces[option] = faces[option] or resolved.get(style)
+        if font is None:
+            print(f"the {opts.family!r} family has no regular face",
+                  file=sys.stderr)
+            return 2
+
+    for label, path in [("font", font)] + list(faces.items()):
+        if path and not pathlib.Path(path).is_file():
+            print(f"{label} face not found: {path}", file=sys.stderr)
+            return 2
+    source = pathlib.Path(font)
+    set_font_source(source, family=family, **faces)
+
+    if opts.png:
+        preview_page(build_font(
+            _sources, opts.size,
+            axes={style: dict(coords) for style, coords
+                  in axes_for(_family or "", opts.size)})).save(opts.png)
+        print(f"wrote {opts.png}")
+        return 0
+
+    import threading
+    import webbrowser
+
+    import uvicorn
+    address = f"http://{opts.host}:{opts.port}"
+    loaded = ", ".join(FACE_NAMES[style] for style in sorted(_sources))
+    print(f"preview on {address}  ({source.name}: {loaded})")
+    if opts.open_browser:
+        # On a timer, so the browser asks for the page after uvicorn is
+        # listening rather than racing it.
+        threading.Timer(0.5, webbrowser.open, [address]).start()
+    uvicorn.run(app, host=opts.host, port=opts.port, log_level="warning")
+    return 0

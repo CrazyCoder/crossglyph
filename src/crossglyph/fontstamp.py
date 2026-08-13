@@ -1,0 +1,153 @@
+"""Decide which sizes of a family actually need rebuilding.
+
+Rasterizing a full Cyrillic+Greek family at four sizes takes minutes, so the
+loop is only pleasant if repeat runs are free. Each output directory keeps a
+stamp of what produced its files; a size is rebuilt when its inputs changed or
+its .cpfont went missing.
+
+Content hashes rather than mtimes: these fonts arrive by copy, download and
+rsync, and all three hand back a fresh mtime for bytes that did not change.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import pathlib
+import re
+
+from . import cpfont, spacefont
+from .fontconf import STYLES, Variant, size_label
+
+STAMP_NAME = ".crossglyph.json"
+STAMP_VERSION = 1
+
+# The converter is our own module now, so its source is hashed directly rather
+# than a referenced script's path being resolved and read.
+#
+# tuning.py counts as converter source: coverage_lut() decides the bytes of
+# every glyph, and hashing only convert.py meant a change to that curve left
+# every built family looking current. It bit exactly once -- inverting gamma's
+# sense would have shipped stale .cpfonts for anyone with `gamma` in a config,
+# and only escaped notice because convert.py happened to change too.
+CONVERTER_SOURCES = (pathlib.Path(cpfont.convert.__file__),
+                     pathlib.Path(cpfont.tuning.__file__))
+
+
+def _sha256(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def digest(variant: Variant, size: float) -> str:
+    """Everything that can change the bytes of one .cpfont, hashed."""
+    config = variant.config
+    payload = {
+        "name": variant.name,
+        "size": size,
+        "intervals": config.coverage,
+        "fallbacks": config.fallbacks,
+        "tuning": config.tuning.as_dict(),
+        "styles": {s: _sha256(config.styles[s]) for s in STYLES if s in config.styles},
+        # A variable font's slots share a file, so the hash of that file says
+        # nothing about which face each one is: without the coordinates, moving
+        # the bold slot's weight leaves every size looking current.
+        "axes": {style: coords for style in STYLES if style in config.styles
+                 for coords in [config.coords(style, size)] if coords},
+        "user_fallbacks": {k: _sha256(v)
+                           for k, v in sorted(config.user_fallbacks.items())},
+        "converter": [_sha256(path) for path in CONVERTER_SOURCES],
+        # The generated file is not hashed: fontTools stamps head.created, so
+        # its bytes differ run to run while the font does not.
+        "space_glyphs": (spacefont.spec_digest(config.space_widths)
+                         if config.space_glyphs else False),
+        "cpfont_version": cpfont.CPFONT_VERSION,
+    }
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def size_key(size: float) -> str:
+    """How a size is spelled in the stamp.
+
+    One function so the three places that touch it cannot disagree: writing,
+    looking up, and filtering on prune. Whole sizes lose the `.0` so that a
+    stamp written before fractional sizes existed still matches.
+    """
+    return str(int(size)) if float(size).is_integer() else str(size)
+
+
+def read_stamp(directory: pathlib.Path) -> dict[str, str]:
+    """Recorded size -> digest, empty when missing, unreadable or stale-schema."""
+    path = directory / STAMP_NAME
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if data.get("version") != STAMP_VERSION:
+        return {}
+    return {str(k): str(v) for k, v in (data.get("sizes") or {}).items()}
+
+
+def write_stamp(directory: pathlib.Path, sizes: dict[float, str]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / STAMP_NAME).write_text(
+        json.dumps({"version": STAMP_VERSION,
+                    "sizes": {size_key(k): v for k, v in sorted(sizes.items())}},
+                   indent=2),
+        encoding="utf-8")
+
+
+def cpfont_path(directory: pathlib.Path, variant: Variant,
+                size: float) -> pathlib.Path:
+    """Where one size lands on the card.
+
+    The filename carries the *label*, not the size it was rasterized at: the
+    device parses it with strtol into a uint8_t, so a fractional size could not
+    be named there at all. Nothing reads a point size out of the file, so a
+    13.5 pt build shipped as `_14` renders 13.5 pt glyphs under a "14" in the
+    menu. See fontconf.size_label.
+    """
+    return directory / f"{variant.name}_{size_label(size)}.cpfont"
+
+
+def stale_sizes(variant: Variant, directory: pathlib.Path,
+                force: bool = False) -> list[float]:
+    if force:
+        return list(variant.sizes)
+    stamp = read_stamp(directory)
+    stale = []
+    for size in variant.sizes:
+        if stamp.get(size_key(size)) != digest(variant, size):
+            stale.append(size)
+        elif not cpfont_path(directory, variant, size).is_file():
+            stale.append(size)
+    return stale
+
+
+def prune(directory: pathlib.Path, variant: Variant) -> list[pathlib.Path]:
+    """Drop .cpfont files for sizes no longer in the config.
+
+    Only files this variant would itself produce are considered, so a family
+    directory shared with anything else is left alone.
+    """
+    # Labels, not sizes: the filename carries the rounded label, so a variant
+    # built at 13.5 owns Name_14.cpfont and comparing against 13.5 would delete
+    # the file it just wrote.
+    keep = {size_label(size) for size in variant.sizes}
+    pattern = re.compile(rf"^{re.escape(variant.name)}_(\d+)\.cpfont$")
+    removed = []
+    for path in sorted(directory.glob("*.cpfont")):
+        match = pattern.match(path.name)
+        if match and int(match.group(1)) not in keep:
+            path.unlink()
+            removed.append(path)
+    if removed:
+        # The stamp is keyed by the size that was built, which may be
+        # fractional -- so it is the label of each key that has to be kept.
+        stamp = read_stamp(directory)
+        write_stamp(directory, {float(k): v for k, v in stamp.items()
+                                if size_label(float(k)) in keep})
+    return removed

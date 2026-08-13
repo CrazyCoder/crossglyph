@@ -1,0 +1,1591 @@
+// The Page knobs persist to localStorage, and the ways that breaks are all
+// silent: a knob that stops being remembered, a stored value that blanks a
+// select, storage throwing in a private window. None of it shows as an error.
+//
+// Driven from tests/test_preview.py, which skips when node is absent. The page
+// has no build step and no framework, so this stubs the handful of browser
+// globals its script touches and runs the real source out of index.html --
+// there is no second copy of the logic to drift.
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+// The order app.js imports them in, which is the order they ran in when they
+// were one file. A module missing from here is a module this never sees.
+const MODULES = ["dom.js", "remember.js", "knobs.js", "render.js", "resets.js",
+                 "reverts.js", "save.js", "untuned.js", "text.js", "family.js",
+                 "variable.js", "export.js", "theme.js", "start.js"];
+const STATIC = join(here, "..", "src", "crossglyph", "preview", "static");
+
+// Concatenated rather than imported. Every block below wants the page's state
+// fresh, and an import is cached for the life of the process; running the
+// source again in a new sandbox is what gives each one a clean page. So the
+// module syntax comes off: the names all land in one scope, which is the scope
+// they shared before they were split.
+const source = MODULES
+  .map(name => readFileSync(join(STATIC, "js", name), "utf8")
+    .replace(/^import \{[^}]*\} from "\.\/[\w.-]+";$/gm, "")
+    .replace(/^import "\.\/[\w.-]+";$/gm, "")
+    .replace(/^export (?=async function |function |const |let |class )/gm, ""))
+  .join("\n");
+
+// defaultValue / defaultChecked / defaultSelected are what the two reset
+// buttons restore from, so the stub has to carry them the way a real control
+// does: the value the markup declared, fixed at construction.
+function makeControl({ name, type = "text", value = "", checked = false, group,
+                      options, min = "", max = "", step = "1" }) {
+  const el = { name, type, value, checked, dataset: {}, options, min, max, step };
+  el.defaultValue = value;
+  el.defaultChecked = checked;
+  if (group) el.dataset.group = group;
+  if (options) {
+    el.tagName = "SELECT";
+    // A <select> has no `checked` at all, and code that reads it raw gets
+    // undefined rather than false. Mirrored, because that difference is worth
+    // exactly one bug: two selects marked as changed on a page nobody touched.
+    delete el.checked;
+    delete el.defaultChecked;
+    // And it refuses a value none of its options carries, which is the whole
+    // reason the page has to offer a config's own value before applying it.
+    let current = value;
+    Object.defineProperty(el, "value", {
+      get: () => current,
+      set: (next) => {
+        current = el.options.some(option => option.value === next) ? next : "";
+      },
+    });
+    const own = (option) => {
+      option.dataset = option.dataset || {};
+      option.remove = () => {
+        el.options.splice(el.options.indexOf(option), 1);
+      };
+      return option;
+    };
+    el.add = (option) => el.options.push(own(option));
+    // Refilling a select drops what it was showing: a real one blanks when the
+    // value it held is no longer among its options.
+    el.replaceChildren = (...next) => {
+      el.options = next.map(own);
+      el.value = "";
+    };
+    for (const option of options) {
+      own(option).defaultSelected = option.value === value;
+    }
+  }
+  el.parentElement = { querySelector: () => null };
+  // A control can be listened to directly, not only through its form: the text
+  // box belongs to the knob form by `form="knobs"` while sitting outside it in
+  // the DOM, and nothing it fires reaches the form's own listener.
+  el.on = {};
+  el.addEventListener = (kind, fn) => { el.on[kind] = fn; };
+  return el;
+}
+
+// What /defaults answers. The picker is built from it, so a test that changes
+// what the folder holds changes this rather than the page.
+const DEFAULTS = {
+  text: "Съешь ещё этих мягких французских булок.",
+  font: "Alto-Medium.otf",
+  faces: ["bold", "regular"],
+  families: [
+    { name: "Sample", faces: ["bold", "italic", "regular"],
+      conf: "sample.conf", derived: false,
+      tuning: { gamma: 1, weight: 0, hinting: "normal",
+                thresholds: [2, 5, 9], line_height: null },
+      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+                intervals: "reading", ranges: "",
+                fallbacks: true, fallback1: "", fallback2: "" } },
+    // A variable family: two files, four slots, and the weights the font's own
+    // instances put them at.
+    { name: "Vari", faces: ["bold", "bolditalic", "italic", "regular"],
+      conf: "vari.conf", derived: false,
+      tuning: { gamma: 1, weight: 0, hinting: "normal",
+                thresholds: [4, 8, 12], line_height: null },
+      variable: {
+        axes: [{ tag: "wght", min: 300, default: 300, max: 900 },
+               { tag: "wdth", min: 87, default: 100, max: 112 }],
+        instances: [{ name: "Light", wght: 300 }, { name: "Regular", wght: 400 },
+                    { name: "Bold", wght: 700 }, { name: "Black", wght: 900 }],
+        weights: { text: 400, bold: 700 },
+        other: { wdth: 100 },
+      },
+      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+                intervals: "reading", ranges: "",
+                fallbacks: false, fallback1: "", fallback2: "" } },
+    // Alto is set to something in its config, which is what the knobs have
+    // to open at and what their arrows compare against.
+    { name: "Alto", faces: ["bold", "regular"],
+      conf: "alto.conf", derived: false,
+      tuning: { gamma: 1.2, weight: 0.1, hinting: "normal",
+                thresholds: [3, 6, 10], line_height: null },
+      export: { sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
+                intervals: "reading,cyrillic", ranges: "",
+                fallbacks: false, fallback1: "Sample", fallback2: "" } },
+  ],
+  family: "Alto",
+  // Where the bundled faces are, if anywhere: empty means the panel offers
+  // to fetch them.
+  fallbacks: "D:\fonts\fallbacks",
+  source: "D:\\fonts",
+  out: "",
+  presets: [{ name: "reading", label: "Reading", note: "Fiction" },
+            { name: "cyrillic", label: "Cyrillic", note: "" },
+            { name: "greek", label: "Greek", note: "" }],
+};
+
+// What POST /save answers with. The page takes its new baseline from this
+// rather than from what it sent, since the writer decides what is stored.
+const SAVED = {
+  conf: "alto.conf", moved: ["gamma"],
+  tuning: { gamma: 2, weight: 0.1, hinting: "normal", line_height: null },
+};
+
+// A <select> the script fills itself, which the form's stub controls are not:
+// it starts empty, options arrive through add(), and the first one to land is
+// the selected one until something says otherwise.
+function makeSelect() {
+  const el = {
+    options: [],
+    on: {},
+    _value: "",
+    add(option) {
+      el.options.push(option);
+      if (el.options.length === 1) el._value = option.value;
+    },
+    get value() { return el._value; },
+    // A real select refuses a value none of its options carries -- it blanks
+    // instead. Mirrored here, so a regression that posted a family the folder
+    // no longer has fails the probe rather than passing on a lenient stub.
+    set value(next) {
+      el._value = el.options.some(option => option.value === next) ? next : "";
+    },
+    get selectedOptions() {
+      return el.options.filter(option => option.value === el._value);
+    },
+    replaceChildren(...options) { el.options = options; el._value = ""; },
+    addEventListener(kind, fn) { el.on[kind] = fn; },
+    choose(next) { el.value = next; el.on.change(); },
+  };
+  return el;
+}
+
+// Enough of an element for the two places the page builds DOM itself: the
+// style badges and the coverage checkboxes.
+function makeElement() {
+  return {
+    dataset: {}, textContent: "", title: "", className: "",
+    // The fill behind a slider's thumb is a custom property, so a built row
+    // sets one the moment it is shown.
+    style: { props: {}, setProperty(key, value) { this.props[key] = value; } },
+    type: "", value: "", checked: false, children: [], hidden: false,
+    min: "", max: "", step: "", tabIndex: 0, inputMode: "", id: "",
+    htmlFor: "", on: {},
+    attrs: {},
+    append(...kids) { this.children.push(...kids); },
+    setAttribute(key, value) { this.attrs[key] = value; },
+    getAttribute(key) { return this.attrs[key]; },
+    // Elements the page builds itself are listened to as it builds them --
+    // the axis sliders are wired at that moment and never found again.
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    replaceChildren(...kids) { this.children = kids; },
+  };
+}
+
+// A family carrying more sizes than the four steps, which is what a CJK one
+// does: 8, 10 and 12 are the sizes the interface borrows it at. `mod` does the
+// same to the second family, whose overflow has nowhere else to go either.
+function sixSizes(key = "sizes") {
+  const defaults = structuredClone(DEFAULTS);
+  const alto = defaults.families.find(one => one.name === "Alto");
+  alto.export[key] = "8 10 12 14 16 18";
+  return defaults;
+}
+
+function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
+  // A copy per run: the page keeps what /defaults hands it and writes back
+  // into it on save, so sharing the fixture would leak one block's save into
+  // every block after it.
+  defaults = structuredClone(defaults);
+  const controls = [
+    makeControl({ name: "size", type: "number", value: "13", group: "root",
+                  min: "6", max: "40", step: "0.25" }),
+    makeControl({ name: "gamma", type: "number", value: "1",
+                  min: "0.3", max: "4", step: "0.05" }),
+    // A second font knob, so "the save carries the whole panel rather than
+    // only what changed" is a claim this can actually tell apart.
+    makeControl({ name: "weight", type: "number", value: "0",
+                  min: "-1", max: "1", step: "0.05" }),
+    makeControl({ name: "margin", type: "number", value: "5", group: "page",
+                  min: "5", max: "40", step: "1" }),
+    makeControl({
+      name: "alignment", value: "justify", group: "page",
+      options: [{ value: "justify" }, { value: "left" }, { value: "center" }],
+    }),
+    makeControl({
+      name: "language", value: "ru", group: "page",
+      options: [{ value: "ru" }, { value: "en" }, { value: "" }],
+    }),
+    // A font-side select, so the baseline machinery is exercised on the kind
+    // of control that has no `checked` to compare.
+    makeControl({
+      name: "hinting", value: "normal",
+      options: [{ value: "normal" }, { value: "light" }, { value: "auto" }],
+    }),
+    // Two presets in the markup; a config carrying its own triple has to be
+    // offered as a third rather than blanking the control.
+    makeControl({
+      name: "thresholds", value: "4,8,12",
+      options: [{ value: "4,8,12" }, { value: "3,6,10" }],
+    }),
+    makeControl({ name: "hyphenation", type: "checkbox", checked: false, group: "page" }),
+    makeControl({ name: "antialiased", type: "checkbox", checked: true, group: "page" }),
+    makeControl({ name: "line_height", type: "number", value: "1.15",
+                  min: "0.8", max: "2.2", step: "0.05" }),
+    makeControl({ name: "text", value: "", group: "root" }),
+    // The two variable-font weight pickers. They start empty: their options
+    // come from whichever family is showing, and a static one has none.
+    makeControl({ name: "axis_text", value: "", group: "axes", options: [] }),
+    makeControl({ name: "axis_bold", value: "", group: "axes", options: [] }),
+  ];
+  const byName = Object.fromEntries(controls.map(c => [c.name, c]));
+  const listeners = {};
+  // Each numeric knob is a slider and a field showing one value, so the stub
+  // carries the sliders too: "the slider moved but the field did not" is a
+  // failure you would have to catch by eye otherwise.
+  const sliderList = ["size", "gamma", "margin", "line_height"].map(name => ({
+    dataset: { sliderFor: name },
+    value: byName[name].value,
+    min: byName[name].min,
+    max: byName[name].max,
+    disabled: false,
+    // The filled part of the track is how a slider says it is live and where
+    // it sits, so the stub records it rather than discarding it.
+    style: { props: {}, setProperty(key, value) { this.props[key] = value; } },
+    addEventListener(kind, fn) { if (kind === "input") this.fire = fn; },
+  }));
+  // The steppers, so the +/- path can be driven -- it reaches setField without
+  // ever firing an input event, which is its own class of bug.
+  const stepList = ["gamma", "margin"].flatMap(name => [-1, 1].map(dir => ({
+    dataset: { for: name, dir: String(dir) },
+    on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    press() { this.on.pointerdown({ shiftKey: false }); },
+  })));
+  // One arrow per knob, shown only when that knob is off its default.
+  const revertList = ["gamma", "margin", "alignment", "line_height"].map(name => ({
+    dataset: { reset: name },
+    hidden: true,
+    on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    click() { this.on.click(); },
+  }));
+  const form = {
+    elements: Object.assign(controls, byName),
+    addEventListener: (kind, fn) => { listeners[kind] = fn; },
+    querySelectorAll: (selector) => {
+      if (selector === "[data-slider-for]") return sliderList;
+      if (selector === ".revert") return revertList;
+      if (selector === "button.step") return stepList;
+      const named = [...selector.matchAll(/data-(?:slider-)?for="([\w_]+)"/g)]
+        .map(m => m[1]);
+      return named.length
+        ? sliderList.filter(s => named.includes(s.dataset.sliderFor)) : [];
+    },
+  };
+  const clicks = {};
+  const button = id => ({
+    addEventListener: (kind, fn) => { if (kind === "click") clicks[id] = fn; },
+  });
+  const family = makeSelect();
+  const exportFields = {
+    // A box per step, one more for whatever a config carries beyond them, and
+    // the same four again for the second family the same faces can build.
+    size1: { value: "" }, size2: { value: "" }, size3: { value: "" },
+    size4: { value: "" }, size_more: { value: "" },
+    mod1: { value: "" }, mod2: { value: "" }, mod3: { value: "" },
+    mod4: { value: "" }, mod_more: { value: "" },
+    mod_suffix: { value: "", disabled: false },
+    ranges: { value: "" },
+    fallbacks: { type: "checkbox", checked: false },
+    fallback1: makeSelect(), fallback2: makeSelect(),
+    // The output folder saves itself when it loses focus, so it listens.
+    out: { value: "", on: {},
+           addEventListener(kind, fn) { this.on[kind] = fn; },
+           leave() { return this.on.change(); } },
+  };
+  // Every element in a document has a dataset, empty or not, and the page is
+  // entitled to read one off whatever it was handed: a stub without it turns a
+  // working line into "cannot read properties of undefined".
+  for (const [name, field] of Object.entries(exportFields)) {
+    field.dataset = field.dataset || {};
+    field.name = field.name || name;
+  }
+  const exportForm = {
+    hidden: false, elements: exportFields, on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    // What the page listens for: a change to any control in here offers a save.
+    edit(field) { this.on.input({ target: exportFields[field] }); },
+  };
+  const presetList = {
+    children: [],
+    replaceChildren(...kids) { this.children = kids; },
+    querySelectorAll: () => presetList.children.flatMap(
+      label => label.children.filter(kid => kid.type === "checkbox")),
+  };
+  const buildButtons = {};
+  // Every value `disabled` took, in order: "out while it runs, back when it
+  // finishes" is a sequence, and reading the property afterwards only ever
+  // shows the end of it.
+  const buildButton = id => ({
+    states: [],
+    _disabled: false,
+    get disabled() { return this._disabled; },
+    set disabled(next) { this._disabled = next; this.states.push(next); },
+    addEventListener(kind, fn) { if (kind === "click") buildButtons[id] = fn; },
+  });
+  const saveButton = {
+    hidden: false, disabled: true, textContent: "", title: "",
+    on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    click() { return this.on.click(); },
+  };
+  const stubs = {
+    save: saveButton,
+    saved: { textContent: "" },
+    export: exportForm,
+    presets: presetList,
+    // Every value the note took, so the counting can be asserted and not
+    // just the last line of it.
+    built: {
+      steps: [],
+      _text: "",
+      get textContent() { return this._text; },
+      set textContent(next) { this._text = next; this.steps.push(next); },
+    },
+    "source-note": { textContent: "" },
+    // The row of sizes past the four boxes, which most families do not have.
+    "more-row": { hidden: false },
+    "mod-more-row": { hidden: false },
+    "mod-name": { textContent: "" },
+    // The variable-font block, and the row per axis it builds inside it.
+    variable: { hidden: false },
+    "axis-text-row": { hidden: false },
+    "axis-bold-row": { hidden: false },
+    "axis-rows": {
+      children: [],
+      replaceChildren(...kids) { this.children = kids; },
+    },
+    build: buildButton("one"),
+    "build-all": buildButton("all"),
+    fetch: buildButton("fetch"),
+    "fetch-row": { hidden: false },
+    fetched: { textContent: "" },
+    "have-fallbacks": { textContent: "" },
+    knobs: form,
+    page: { src: "", set: null },
+    // The notice drawn over the sheet when a render fails, and the button on it.
+    "page-error": {
+      hidden: true,
+      parts: { what: { textContent: "" }, why: { textContent: "" } },
+      querySelector(selector) { return this.parts[selector.slice(1)]; },
+    },
+    retry: button("retry"),
+    status: { textContent: "" },
+    "lh-auto": { checked: true, defaultChecked: true, addEventListener() {} },
+    faces: { textContent: "" },
+    // One badge per style, rebuilt whenever the choice changes.
+    styles: { children: [], replaceChildren(...kids) { this.children = kids; } },
+    family,
+    "reset-font": button("font"),
+    "reset-page": button("page"),
+    compare: {
+      attrs: { "aria-pressed": "false" },
+      getAttribute(k) { return this.attrs[k]; },
+      setAttribute(k, v) { this.attrs[k] = v; },
+      addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
+    },
+  };
+  const fetches = { render: 0, bodies: [], saves: [], builds: [] };
+  let lastTimer = 0;
+  const cancelled = new Set();
+  const prompts = [];
+  let answer = true;
+  const keys = [];
+  const posted = (options) => {
+    try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
+  };
+  const sandbox = {
+    document: {
+      getElementById: id => stubs[id],
+      createElement: makeElement,
+      createTextNode: (text) => ({ textContent: text }),
+      querySelectorAll: () => [],
+      addEventListener(kind, fn) { if (kind === "keydown") keys.push(fn); },
+      documentElement: {
+        dataset: { appearance: "system" },
+        classList: { toggle() {} },
+      },
+      title: "",
+    },
+    matchMedia: () => ({ matches: false, addEventListener() {} }),
+    createElement: () => ({ dataset: {}, style: {}, textContent: "", title: "" }),
+    // The family-switch guard. Answering yes by default keeps every older
+    // block behaving as it did; the guard has a block of its own below.
+    confirm: (message) => { prompts.push(message); return answer; },
+    localStorage: storage,
+    fetch: (url, options) => {
+      if (String(url).includes("/render")) {
+        fetches.render++;
+        posted(options);
+        // A server that is not there at all: fetch rejects rather than
+        // answering, which is what a stopped process looks like from here.
+        if (opts.renderThrows) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        if (opts.renderFails) {
+          return Promise.resolve({
+            ok: false, status: opts.renderFails.status,
+            text: () => Promise.resolve(opts.renderFails.body),
+          });
+        }
+        if (opts.renderOk) {
+          return Promise.resolve({
+            ok: true, status: 200, blob: () => Promise.resolve({}) });
+        }
+        // Never resolves: the page draws the blob it gets back, and there is
+        // no image here to draw it into.
+        return new Promise(() => {});
+      }
+      if (String(url).includes("/build")) {
+        fetches.builds.push(JSON.parse(options.body));
+        // A build the server refuses outright: nothing streams, and the panel
+        // has to come back from it.
+        if (opts.buildFails) {
+          return Promise.resolve({
+            ok: false, text: () => Promise.resolve("no such family") });
+        }
+        // A stream of progress lines, as the real one answers -- and split
+        // across chunks mid-line, because that is the case the reader has to
+        // get right and the one no tidy fixture would produce.
+        const steps = [
+          { event: "plan", total: 2, out: "D:\\fonts\\cpfonts",
+            families: ["Alto"] },
+          { event: "size", family: "Alto", size: 12, done: 1, total: 2 },
+          { event: "size", family: "Alto", size: 13, done: 2, total: 2 },
+          { event: "done", out: "D:\\fonts\\cpfonts", families: [
+            { name: "Alto", sizes: [12, 13], built: [12, 13], skipped: [],
+              failed: [], removed: [], error: null }] },
+        ];
+        const text = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
+        const chunks = [text.slice(0, 40), text.slice(40)];
+        let at = 0;
+        return Promise.resolve({ ok: true, body: { getReader: () => ({
+          read: () => Promise.resolve(at < chunks.length
+            ? { value: chunks[at++], done: false }
+            : { value: undefined, done: true }),
+        }) } });
+      }
+      if (String(url).includes("/out")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(
+          { out: "D:\\elsewhere" }) });
+      }
+      if (String(url).includes("/save")) {
+        const sent = JSON.parse(options.body);
+        fetches.saves.push(sent);
+        // A config the server will not write -- a size that does not parse, a
+        // read-only folder. Build leans on this answer, so it has to exist.
+        if (opts.saveFails) {
+          return Promise.resolve({
+            ok: false, text: () => Promise.resolve("could not write arial.conf") });
+        }
+        // The real answer is the config read back, which after a save says
+        // what was sent. Echoing a fixed fixture would leave the panel
+        // looking dirty the moment a knob was not the one it named.
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(
+          { ...SAVED, tuning: { line_height: null, ...sent.tuning } }) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve(defaults) });
+    },
+    // The chunks above are already text, so this only has to exist.
+    TextDecoder: class { decode(chunk) { return chunk || ""; } },
+    Option: class {
+      constructor(text, value) {
+        this.textContent = text; this.value = value; this.dataset = {};
+      }
+    },
+    performance: { now: () => 0 },
+    URL: { createObjectURL: () => "blob:x", revokeObjectURL() {} },
+    AbortController: class { abort() {} signal = null; },
+    // A real enough timer: deferred to the next tick, and genuinely
+    // cancellable. Running the callback on the spot would hide the one thing
+    // worth asserting about a slider -- that a burst of events coalesces into
+    // one page rather than one page per event.
+    setTimeout: (fn) => {
+      const id = ++lastTimer;
+      setImmediate(() => { if (!cancelled.has(id)) fn(); });
+      return id;
+    },
+    clearTimeout: (id) => { cancelled.add(id); },
+    // Held steppers repeat on an interval; the stub must not start a real
+    // one or the probe would never exit.
+    setInterval: () => 0,
+    clearInterval() {},
+    console,
+  };
+  return { form, listeners, sandbox, byName, clicks, sliderList, fetches,
+           revertList, compare: stubs.compare, keys, stepList, family,
+           faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
+           builds: buildButtons, built: stubs.built,
+           builtSteps: stubs.built.steps,
+           buildEls: [stubs.build, stubs["build-all"]],
+           save: saveButton, note: stubs.saved, prompts,
+           pageError: stubs["page-error"], status: stubs.status,
+           refuse() { answer = false; } };
+}
+
+function run(storage, defaults, opts) {
+  const env = makeEnv(storage, defaults, opts);
+  const keys = Object.keys(env.sandbox);
+  new Function(...keys, source)(...keys.map(k => env.sandbox[k]));
+  return env;
+}
+
+// The picker is filled from /defaults, so anything about it has to wait for
+// that promise. One macrotask flushes every microtask behind it.
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+async function loaded(storage, defaults, opts) {
+  const env = run(storage, defaults, opts);
+  await settle();
+  return env;
+}
+
+function fakeStorage(initial = {}) {
+  const data = { ...initial };
+  return {
+    data,
+    getItem: k => (k in data ? data[k] : null),
+    setItem: (k, v) => { data[k] = String(v); },
+    removeItem: k => { delete data[k]; },
+  };
+}
+
+let failures = 0;
+function check(label, cond, detail = "") {
+  console.log(`${cond ? "PASS" : "FAIL"}  ${label}${cond ? "" : "  " + detail}`);
+  if (!cond) failures++;
+}
+
+// 1. Changing a page knob writes it.
+{
+  const store = fakeStorage();
+  const env = run(store);
+  env.byName.margin.value = "22";
+  env.byName.hyphenation.checked = true;
+  env.listeners.input({ target: env.byName.margin });
+  const saved = JSON.parse(store.data["crossglyph.page"]);
+  check("a page knob is remembered", saved.margin === "22" && saved.hyphenation === true,
+        JSON.stringify(saved));
+  check("font knobs are not remembered", !("gamma" in saved) && !("size" in saved),
+        JSON.stringify(saved));
+}
+
+// 2. A fresh load restores them.
+{
+  const store = fakeStorage({
+    "crossglyph.page": JSON.stringify(
+      { margin: "22", alignment: "left", language: "en", hyphenation: true, antialiased: false }),
+  });
+  const env = run(store);
+  check("margin restored", env.byName.margin.value === "22", env.byName.margin.value);
+  check("select restored", env.byName.alignment.value === "left", env.byName.alignment.value);
+  check("checkbox on restored", env.byName.hyphenation.checked === true);
+  check("checkbox off restored", env.byName.antialiased.checked === false);
+}
+
+// 3. Resetting the page settings restores them and forgets them.
+{
+  const store = fakeStorage({
+    "crossglyph.page": JSON.stringify({ margin: "22", hyphenation: true }),
+  });
+  const env = run(store);
+  check("the stored values were applied first", env.byName.margin.value === "22");
+  env.clicks.page();
+  check("page reset restores the shipped defaults",
+        env.byName.margin.value === "5" && env.byName.hyphenation.checked === false,
+        `${env.byName.margin.value} ${env.byName.hyphenation.checked}`);
+  check("page reset forgets the remembered settings",
+        !("crossglyph.page" in store.data), JSON.stringify(store.data));
+}
+
+// 4. The whole point of splitting them: each reset leaves the other alone.
+{
+  const store = fakeStorage();
+  const env = run(store);
+  env.byName.margin.value = "30";
+  env.byName.hyphenation.checked = true;
+  env.listeners.input({ target: env.byName.margin });
+  env.byName.gamma.value = "2.5";
+  env.byName.size.value = "18";
+
+  env.clicks.font();
+  check("font reset restores the font knobs",
+        env.byName.gamma.value === "1" && env.byName.size.value === "13",
+        `${env.byName.gamma.value} ${env.byName.size.value}`);
+  check("font reset keeps the reader's page settings",
+        env.byName.margin.value === "30" && env.byName.hyphenation.checked === true,
+        `${env.byName.margin.value} ${env.byName.hyphenation.checked}`);
+  check("font reset does not forget what was remembered",
+        "crossglyph.page" in store.data, JSON.stringify(store.data));
+
+  env.byName.gamma.value = "0.5";
+  env.clicks.page();
+  check("page reset leaves the font knobs alone",
+        env.byName.gamma.value === "0.5", env.byName.gamma.value);
+}
+
+// 5. The slider and the field are one value in two controls.
+{
+  const store = fakeStorage();
+  const env = run(store);
+  const slider = env.sliderList.find(s => s.dataset.sliderFor === "gamma");
+
+  slider.value = "2.5";
+  slider.fire();
+  check("moving the slider moves the field",
+        env.byName.gamma.value === "2.5", env.byName.gamma.value);
+
+  // gamma runs 0.3..4, so 2.5 sits (2.5 - 0.3) / 3.7 of the way along.
+  check("the filled track follows the value",
+        slider.style.props["--fill"] === "59%", slider.style.props["--fill"]);
+
+  env.byName.gamma.value = "1";
+  env.clicks.font();
+  check("resetting the field moves the slider back",
+        slider.value === "1", slider.value);
+  check("resetting repaints the filled track",
+        slider.style.props["--fill"] === "19%", slider.style.props["--fill"]);
+}
+
+// 6. A remembered page value has to reach that knob's slider too, or it shows
+//    the default while the field shows what was restored.
+{
+  const store = fakeStorage({
+    "crossglyph.page": JSON.stringify({ margin: "31" }),
+  });
+  const env = run(store);
+  const slider = env.sliderList.find(s => s.dataset.sliderFor === "margin");
+  check("a restored value reaches its slider",
+        slider.value === "31", `${slider.value} vs field ${env.byName.margin.value}`);
+}
+
+// 7. A stored option that no longer exists leaves the device default standing.
+{
+  const store = fakeStorage({
+    "crossglyph.page": JSON.stringify({ alignment: "diagonal" }),
+  });
+  const env = run(store);
+  check("an unknown select value is ignored, not applied",
+        env.byName.alignment.value === "justify", env.byName.alignment.value);
+}
+
+// 8. The arrow marks only what has actually been changed, which is what makes
+//    the column readable as "here is what I have touched".
+{
+  const env = run(fakeStorage());
+  const arrow = name => env.revertList.find(r => r.dataset.reset === name);
+  check("nothing is marked at rest",
+        env.revertList.every(r => r.hidden === true));
+
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+  check("a changed knob is marked", arrow("gamma").hidden === false);
+  check("an untouched one is not", arrow("margin").hidden === true);
+}
+
+// 9. The arrow is a bypass toggle, not a one-way reset: click to see the
+//    default, click again to get your value back, as often as you like.
+{
+  const env = run(fakeStorage());
+  const arrow = name => env.revertList.find(r => r.dataset.reset === name);
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+
+  arrow("gamma").click();
+  check("one click shows the shipped default",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("the arrow stays, marked as set aside",
+        arrow("gamma").hidden === false && arrow("gamma").dataset.state === "on");
+
+  arrow("gamma").click();
+  check("clicking again puts your value back",
+        env.byName.gamma.value === "2.5", env.byName.gamma.value);
+  check("and it is no longer marked set aside",
+        arrow("gamma").dataset.state === "off");
+
+  arrow("gamma").click();
+  env.byName.gamma.value = "3";
+  env.listeners.input({ target: env.byName.gamma });
+  arrow("gamma").click();
+  check("editing a bypassed knob drops what was set aside",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+}
+
+// 10. Comparing the whole tuning at once, with size held.
+{
+  const env = run(fakeStorage());
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+  env.byName.size.value = "18";
+  env.listeners.input({ target: env.byName.size });
+  env.byName.margin.value = "30";
+  env.listeners.input({ target: env.byName.margin });
+
+  env.compare.fire();
+  check("comparing sets the tuning aside",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("but never the size -- it is which size you are working at, and 13 is "
+        + "this page's default rather than the device's",
+        env.byName.size.value === "18", env.byName.size.value);
+  check("and never the reader's own page settings",
+        env.byName.margin.value === "30", env.byName.margin.value);
+  check("the button says it is on",
+        env.compare.getAttribute("aria-pressed") === "true");
+
+  env.compare.fire();
+  check("and turning it off brings the tuning back",
+        env.byName.gamma.value === "2.5", env.byName.gamma.value);
+}
+
+// 11. Backslash drives the same toggle, except while typing.
+{
+  const env = run(fakeStorage());
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+
+  env.keys[0]({ key: "\\", target: { tagName: "BODY" }, preventDefault() {} });
+  check("backslash compares", env.byName.gamma.value === "1", env.byName.gamma.value);
+
+  env.keys[0]({ key: "\\", target: { tagName: "TEXTAREA" }, preventDefault() {} });
+  check("but not while typing, where it is a character",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+}
+
+// 12. Stepping a knob that is set aside replaces what was set aside. Assigning
+//     .value fires no input event, so the stepper path has to drop the stash
+//     itself -- without it the arrow jumps back to the value from before the
+//     comparison rather than the one you just dialled in.
+{
+  const env = run(fakeStorage());
+  const arrow = env.revertList.find(r => r.dataset.reset === "gamma");
+  const plus = env.stepList.find(s => s.dataset.for === "gamma" && s.dataset.dir === "1");
+
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+  arrow.click();
+  check("set aside, so the knob is at its default",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+
+  plus.press();
+  check("stepping moves it off the default",
+        env.byName.gamma.value === "1.05", env.byName.gamma.value);
+  check("and it is no longer marked set aside", arrow.dataset.state === "off");
+
+  arrow.click();
+  check("so the arrow now compares against the default, not the old value",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  arrow.click();
+  check("and puts back what was actually dialled in",
+        env.byName.gamma.value === "1.05", env.byName.gamma.value);
+}
+
+// 13. Typing a value moves its slider. Only setField did that, so a typed
+//     number left the slider parked until the field lost focus.
+{
+  const env = run(fakeStorage());
+  const slider = env.sliderList.find(s => s.dataset.sliderFor === "margin");
+  env.byName.margin.value = "18";
+  env.listeners.input({ target: env.byName.margin });
+  check("a typed value moves its slider", slider.value === "18", slider.value);
+}
+
+// 14. Custom sample text survives a reload, and clearing it forgets it. Fired
+//     on the box itself, not on the form: it sits under the specimen, joined to
+//     the form by `form="knobs"`, and an event that bubbles up the DOM never
+//     reaches a form the control is not inside.
+{
+  const store = fakeStorage();
+  const env = run(store);
+  check("the text box is listened to directly, wherever the page puts it",
+        typeof env.byName.text.on.input === "function");
+  env.byName.text.value = "Пример текста 12345";
+  env.byName.text.on.input({ target: env.byName.text });
+  check("custom text is remembered",
+        store.data["crossglyph.text"] === "Пример текста 12345",
+        store.data["crossglyph.text"]);
+
+  const back = run(store);
+  check("and comes back on the next load",
+        back.byName.text.value === "Пример текста 12345", back.byName.text.value);
+
+  back.byName.text.value = "";
+  back.byName.text.on.input({ target: back.byName.text });
+  check("emptying the box forgets it, so the shipped sample returns",
+        !("crossglyph.text" in store.data), JSON.stringify(store.data));
+}
+
+// 15. An unnamed control still asks for a page. "Use the font's own" carries an
+//    id and no name, so guarding the input handler on the name left it
+//    re-enabling the field and never re-rendering -- you could switch it back
+//    on and watch the page not change.
+{
+  const env = await loaded(fakeStorage());
+  const before = env.fetches.render;
+  env.listeners.input({ target: { dataset: {} } });
+  // A page is asked for on the next tick, not on the spot: the request is
+  // coalesced, so it lands once the burst it belongs to is over.
+  await settle();
+  check("an unnamed control still triggers a render",
+        env.fetches.render === before + 1, `${before} -> ${env.fetches.render}`);
+}
+
+// 16. Blocked storage must not break the page.
+{
+  const hostile = {
+    getItem() { throw new Error("blocked"); },
+    setItem() { throw new Error("blocked"); },
+    removeItem() { throw new Error("blocked"); },
+  };
+  let threw = null;
+  try {
+    const env = run(hostile);
+    env.listeners.input({ target: env.byName.margin });
+    env.clicks.page();
+    env.clicks.font();
+  } catch (error) { threw = error; }
+  check("a browser with storage blocked still works", threw === null, String(threw));
+}
+
+// 17. Corrupt JSON must not break the page.
+{
+  const store = fakeStorage({ "crossglyph.page": "{not json" });
+  let threw = null;
+  try { run(store); } catch (error) { threw = error; }
+  check("corrupt stored data is ignored", threw === null, String(threw));
+}
+
+// 18. The font picker: what the source folder holds, with the family the app
+//     was started on selected.
+{
+  const env = await loaded(fakeStorage());
+  check("the picker lists every family",
+        env.family.options.map(o => o.value).join() === "Sample,Vari,Alto",
+        env.family.options.map(o => o.value).join());
+  check("and starts on the one the app was started on",
+        env.family.value === "Alto", env.family.value);
+  const shown = () => env.badges.children.map(b => b.dataset.loaded).join();
+  check("a badge per style, lit for the ones this family has",
+        shown() === "yes,yes,no,no", shown());
+
+  env.family.choose("Sample");
+  check("choosing another family renders it",
+        env.fetches.bodies.at(-1).family === "Sample",
+        JSON.stringify(env.fetches.bodies.at(-1)));
+  check("and the badges follow the choice", shown() === "yes,yes,yes,no",
+        shown());
+}
+
+// 19. The choice is remembered: it is what you are looking at, like the sample
+//     text, so neither Reset button has an opinion about it.
+{
+  const store = fakeStorage();
+  const env = await loaded(store);
+  env.family.choose("Sample");
+  check("the chosen family is remembered",
+        store.data["crossglyph.family"] === "Sample",
+        JSON.stringify(store.data));
+
+  env.clicks.font();
+  env.clicks.page();
+  check("and neither reset throws it away", env.family.value === "Sample",
+        env.family.value);
+
+  const back = await loaded(store);
+  check("it comes back on the next load", back.family.value === "Sample",
+        back.family.value);
+}
+
+// 20. A remembered family whose files have left the folder must not be posted:
+//     the server would refuse it and the page would open on an error.
+{
+  const store = fakeStorage({ "crossglyph.family": "Gone" });
+  const env = await loaded(store);
+  check("an unknown remembered family falls back to the startup one",
+        env.family.value === "Alto", env.family.value);
+}
+
+// 21. Started on a bare --font, which is no family and cannot become one. It
+//     has to stay selectable, or choosing another font would strand it.
+{
+  const bare = { ...DEFAULTS, family: null };
+  const env = await loaded(fakeStorage(), bare);
+  check("a file the app was started on is the first entry",
+        env.family.options[0].textContent === "Alto-Medium.otf" &&
+        env.family.options[0].value === "",
+        JSON.stringify(env.family.options[0]));
+  check("and is what is selected", env.family.value === "", env.family.value);
+  check("with the families after it",
+        env.family.options.length === 4, String(env.family.options.length));
+}
+
+// 22. The knobs open at what the family's .conf says, not at the converter's
+//     defaults -- that config is the build the card would get.
+{
+  const env = await loaded(fakeStorage());
+  check("a knob opens at what the config says",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
+  check("and is not marked as changed, since nobody changed it",
+        env.revertList.find(r => r.dataset.reset === "gamma").hidden === true);
+  check("so there is nothing to save yet", env.save.disabled === true);
+  check("and the button names the file it would write",
+        env.save.textContent === "Save to alto.conf", env.save.textContent);
+}
+
+// 23. The arrow compares against the config, and untuned against the factory
+//     defaults. Two baselines, because they answer different questions.
+{
+  const env = await loaded(fakeStorage());
+  const arrow = env.revertList.find(r => r.dataset.reset === "gamma");
+
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+  check("editing off the saved value marks the knob", arrow.hidden === false);
+  check("and offers a save", env.save.disabled === false);
+
+  arrow.click();
+  check("the arrow bypasses to the saved value, not to 1",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
+  arrow.click();
+  check("and back", env.byName.gamma.value === "2.5", env.byName.gamma.value);
+
+  env.compare.fire();
+  check("untuned strips to the converter default, config and all",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  env.compare.fire();
+  check("and puts the whole tuning back",
+        env.byName.gamma.value === "2.5", env.byName.gamma.value);
+}
+
+// 24. Saving posts the panel, and takes its new baseline from the answer.
+{
+  const env = await loaded(fakeStorage());
+  env.byName.gamma.value = "2";
+  env.listeners.input({ target: env.byName.gamma });
+
+  await env.save.click();
+  const posted = env.fetches.saves.at(-1);
+  check("the save names the family", posted.family === "Alto",
+        JSON.stringify(posted));
+  check("and carries the whole panel", posted.tuning.gamma === 2 &&
+        "weight" in posted.tuning, JSON.stringify(posted.tuning));
+  check("what came back becomes the baseline, so nothing is left to save",
+        env.save.disabled === true);
+  check("and the note says what moved where",
+        env.note.textContent === "gamma \u2192 alto.conf", env.note.textContent);
+}
+
+// 25. Save writes the page, comparison or no comparison. The page is the only
+//     thing saying what this font will look like, so a Save that wrote a value
+//     set aside a minute ago -- one nothing on screen shows -- would be a save
+//     nobody could check.
+{
+  const env = await loaded(fakeStorage());
+  env.byName.gamma.value = "2";
+  env.listeners.input({ target: env.byName.gamma });
+  env.compare.fire();
+  check("comparing shows the factory default",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+
+  await env.save.click();
+  check("saving writes what is on screen",
+        env.fetches.saves.at(-1).tuning.gamma === 1,
+        JSON.stringify(env.fetches.saves.at(-1).tuning));
+  check("the page keeps showing it", env.byName.gamma.value === "1",
+        env.byName.gamma.value);
+  check("and the comparison is over rather than still holding a value",
+        env.compare.getAttribute("aria-pressed") === "false",
+        env.compare.getAttribute("aria-pressed"));
+}
+
+// 25a. Peeking one knob is the same story one row down: while the arrow is on,
+//      the panel is showing what the config says, so there is nothing to save
+//      -- and pressing Save anyway writes the page rather than the value the
+//      arrow is holding.
+{
+  const env = await loaded(fakeStorage());
+  env.byName.gamma.value = "2";
+  env.listeners.input({ target: env.byName.gamma });
+  check("an edit offers a save", env.save.disabled === false);
+
+  const arrow = env.revertList.find(one => one.dataset.reset === "gamma");
+  arrow.click();
+  check("peeking shows what the config has", env.byName.gamma.value === "1.2",
+        env.byName.gamma.value);
+  check("and there is nothing to save while it does",
+        env.save.disabled === true);
+
+  // Switching family is the other question: the value the arrow is holding is
+  // work, and it is not on screen to be missed.
+  env.family.choose("Sample");
+  check("but switching family still asks", env.prompts.length === 1,
+        JSON.stringify(env.prompts));
+}
+
+// 26. Switching family loads that family's own settings.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Sample");
+  check("the knobs follow the picker", env.byName.gamma.value === "1",
+        env.byName.gamma.value);
+  check("and the Save button follows it too",
+        env.save.textContent === "Save to sample.conf", env.save.textContent);
+}
+
+// 27. Unsaved knobs are the only thing on the page with nowhere else to live,
+//     so switching away asks first.
+{
+  const env = await loaded(fakeStorage());
+  env.refuse();
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+
+  env.family.choose("Sample");
+  check("switching with unsaved knobs asks", env.prompts.length === 1,
+        JSON.stringify(env.prompts));
+  check("and refusing stays where it was", env.family.value === "Alto",
+        env.family.value);
+  check("with the edit intact", env.byName.gamma.value === "2.5",
+        env.byName.gamma.value);
+}
+
+// 28. The export panel is the same config seen from the other end: it opens
+//     at what the family builds as, and follows the picker.
+{
+  const env = await loaded(fakeStorage());
+  // A box per step, so a config with two sizes leaves the other two empty
+  // rather than showing "12 13" in a field and calling it four steps.
+  const boxes = () => ["size1", "size2", "size3", "size4", "size_more"]
+    .map(name => env.exportForm.elements[name].value).join("|");
+  check("sizes open at what the config says, a step to a box",
+        boxes() === "12|13|||", boxes());
+  const ticked = () => env.presetList.querySelectorAll()
+    .filter(box => box.checked).map(box => box.value).join();
+  check("coverage opens ticked as the config spells it",
+        ticked() === "reading,cyrillic", ticked());
+  check("and a fallback family is shown as a family",
+        env.exportForm.elements.fallback1.value === "Sample",
+        env.exportForm.elements.fallback1.value);
+
+  env.family.choose("Sample");
+  check("the export half follows the picker too",
+        boxes() === "12|14|16|18|", boxes());
+  // The guard runs after the picker has moved, so an export comparison against
+  // its value asks whether this panel matches the family being switched *to* --
+  // which it never does. Every switch then claimed unsaved changes.
+  check("and a switch nobody edited asks nothing",
+        env.prompts.length === 0, JSON.stringify(env.prompts));
+  check("including the fallback pickers, which drop the family being built",
+        env.exportForm.elements.fallback1.options
+          .map(o => o.value).join() === ",Vari,Alto",
+        env.exportForm.elements.fallback1.options.map(o => o.value).join());
+}
+
+// 29. Editing it offers a save, and the save carries it beside the tuning.
+{
+  const env = await loaded(fakeStorage());
+  check("nothing to save at rest", env.save.disabled === true);
+
+  env.exportForm.elements.size1.value = "10";
+  env.exportForm.edit("size1");
+  check("editing an export setting offers a save",
+        env.save.disabled === false);
+
+  await env.save.click();
+  const posted = env.fetches.saves.at(-1);
+  // The boxes go back to the one list the config keeps, in the order they sit
+  // in -- Alto opens at 12 and 13, and only the first was touched.
+  check("and the save carries both halves",
+        posted.export.sizes === "10 13" && posted.tuning.gamma === 1.2,
+        JSON.stringify(posted));
+  check("with coverage as the config spells it",
+        posted.export.intervals === "reading,cyrillic", posted.export.intervals);
+  check("and the panel is clean again", env.save.disabled === true);
+}
+
+// 29a. Putting an export setting back is not a change. A flag set by the first
+//      edit stays set through the undo, and then Save is lit with nothing to
+//      save -- which is the one thing that button must never say.
+{
+  const env = await loaded(fakeStorage());
+  const sizes = env.exportForm.elements;
+  sizes.size1.value = "10";
+  env.exportForm.edit("size1");
+  check("an edit offers a save", env.save.disabled === false);
+
+  sizes.size1.value = "12";
+  env.exportForm.edit("size1");
+  check("and putting it back takes the offer away", env.save.disabled === true);
+
+  // Coverage is a set, and the config may spell the same ticks in either
+  // order: unticking and reticking must not leave the panel dirty either.
+  const box = env.presetList.querySelectorAll().find(one => one.value === "reading");
+  box.checked = false;
+  env.exportForm.edit("size1");
+  check("unticking a preset is a change", env.save.disabled === false);
+  box.checked = true;
+  env.exportForm.edit("size1");
+  check("and ticking it back is not", env.save.disabled === true);
+}
+
+// 29b. The fallbacks are on the page as well as in the build, so every render
+//      carries the ones the panel currently shows -- and changing them draws
+//      the page again, which is the only way to see what they do.
+{
+  const env = await loaded(fakeStorage());
+  const last = () => env.fetches.bodies.at(-1);
+  check("a render carries the family's fallbacks as the panel shows them",
+        last().fallback1 === "Sample" && last().fallbacks === false,
+        JSON.stringify({ fallback1: last().fallback1,
+                         fallbacks: last().fallbacks }));
+  check("and the coverage, which decides which bundled faces those are",
+        last().intervals === "reading,cyrillic", last().intervals);
+
+  const before = env.fetches.render;
+  env.exportForm.elements.fallbacks.checked = true;
+  env.exportForm.edit("fallbacks");
+  await settle();
+  check("ticking the bundled faces redraws the page",
+        env.fetches.render > before, `${before} -> ${env.fetches.render}`);
+  check("with them on the request", last().fallbacks === true);
+
+  // A size is a build setting and nothing else: redrawing for it would
+  // rasterize the same font again on every keystroke.
+  const after = env.fetches.render;
+  env.exportForm.elements.size1.value = "11";
+  env.exportForm.edit("size1");
+  await settle();
+  check("but a size does not", env.fetches.render === after);
+}
+
+// 30. Building, which is the whole point of the export half.
+{
+  const env = await loaded(fakeStorage());
+  await env.builds.one();
+  check("Build builds the family on screen",
+        env.fetches.builds.at(-1).family === "Alto",
+        JSON.stringify(env.fetches.builds.at(-1)));
+  check("and says what it did and where",
+        env.built.textContent === "2 built, 0 already current → D:\\fonts\\cpfonts",
+        env.built.textContent);
+  check("having counted its way there rather than sitting on 'building…'",
+        env.builtSteps.includes("1 of 2 — Alto 12") &&
+        env.builtSteps.includes("2 of 2 — Alto 13"),
+        JSON.stringify(env.builtSteps));
+
+  await env.builds.all();
+  check("Build all builds every family",
+        env.fetches.builds.at(-1).family === "",
+        JSON.stringify(env.fetches.builds.at(-1)));
+  check("and a panel that matches its config is not written on the way",
+        env.fetches.saves.length === 0,
+        JSON.stringify(env.fetches.saves));
+
+  // Both buttons, not only the one pressed: the server builds one family at a
+  // time, so the second press would queue a run behind the progress on screen.
+  for (const button of env.buildEls) {
+    check("a build takes both buttons out and gives them back",
+          button.states.join() === "true,false,true,false", button.states.join());
+  }
+}
+
+// 30a. A build that goes wrong still gives the buttons back -- otherwise the
+//      panel is dead until a reload, and the failure it is reporting is the
+//      moment you most want to press Build again.
+{
+  const env = await loaded(fakeStorage(), undefined, { buildFails: true });
+  await env.builds.one();
+  check("a failed build says so", env.built.textContent.includes("no such family"),
+        env.built.textContent);
+  check("and the buttons come back anyway",
+        env.buildEls.every(b => b.disabled === false),
+        env.buildEls.map(b => b.disabled).join());
+}
+
+// 30a1. Build writes the panel first. The .conf is the only channel a build
+//      has, so a coverage tick that is only on the page is left out of the
+//      staleness comparison entirely: every size looks current, and the build
+//      says so -- which reads as "the setting did nothing" rather than "the
+//      setting never arrived".
+{
+  const env = await loaded(fakeStorage());
+  env.exportForm.elements.fallbacks.checked = true;
+  env.exportForm.edit("fallbacks");
+  await env.builds.one();
+  check("Build writes the panel into the config first",
+        env.fetches.saves.length === 1 &&
+        env.fetches.saves[0].export.fallbacks === true,
+        JSON.stringify(env.fetches.saves));
+  check("and then builds, rather than one instead of the other",
+        env.fetches.builds.length === 1 &&
+        env.built.textContent.includes("2 built"),
+        env.built.textContent);
+
+  // The save is what made the panel clean, so the second press has nothing to
+  // write -- a build should not rewrite a file it just agreed with.
+  await env.builds.one();
+  check("a second press writes nothing",
+        env.fetches.saves.length === 1, JSON.stringify(env.fetches.saves));
+}
+
+// 30a2. A save the server refuses stops the build. Carrying on would build from
+//      the file as it stands and hand back a font that is not the one on the
+//      page, with a progress line saying it worked.
+{
+  const env = await loaded(fakeStorage(), undefined, { saveFails: true });
+  env.exportForm.elements.fallbacks.checked = true;
+  env.exportForm.edit("fallbacks");
+  await env.builds.one();
+  check("a refused save cancels the build",
+        env.fetches.builds.length === 0, JSON.stringify(env.fetches.builds));
+  check("and says the build did not happen",
+        env.built.textContent.startsWith("not built"), env.built.textContent);
+  check("and hands the buttons back",
+        env.buildEls.every(one => one.disabled === false),
+        env.buildEls.map(one => one.disabled).join());
+}
+
+// 30b. Sizes beyond the four steps are kept. A CJK family wants 8, 10 and 12
+//      for the interface as well as its reading sizes, and a control with
+//      nowhere to put them would drop them on the next save.
+{
+  const env = await loaded(fakeStorage(), sixSizes());
+  const boxes = (name) => env.exportForm.elements[name].value;
+  check("the first four fill the steps",
+        ["size1", "size2", "size3", "size4"].map(boxes).join() === "8,10,12,14",
+        ["size1", "size2", "size3", "size4"].map(boxes).join());
+  check("and the rest are held rather than dropped",
+        boxes("size_more") === "16 18", boxes("size_more"));
+  check("in a row that is only there when there are any",
+        env.sandbox.document.getElementById("more-row").hidden === false);
+
+  env.exportForm.elements.size1.value = "9";
+  env.exportForm.edit("size1");
+  await env.save.click();
+  check("a save writes the whole list back, in order",
+        env.fetches.saves.at(-1).export.sizes === "9 10 12 14 16 18",
+        env.fetches.saves.at(-1).export.sizes);
+}
+
+// 30b2. And the same for the second family, which has four boxes of its own.
+{
+  const env = await loaded(fakeStorage(), sixSizes("sizes_mod"));
+  const fields = env.exportForm.elements;
+  check("the second family's overflow is held too",
+        fields.mod_more.value === "16 18", fields.mod_more.value);
+  check("in a row that is only there when there is something in it",
+        env.sandbox.document.getElementById("mod-more-row").hidden === false);
+
+  fields.mod1.value = "9";
+  env.exportForm.edit("mod1");
+  await env.save.click();
+  check("and a save writes the whole second list back",
+        env.fetches.saves.at(-1).export.sizes_mod === "9 10 12 14 16 18",
+        env.fetches.saves.at(-1).export.sizes_mod);
+}
+
+// 30c. The second family: the same faces at other sizes, listed beside this one
+//      on the device. Its suffix names it, so it is dead until there is one.
+{
+  const env = await loaded(fakeStorage());
+  const suffix = env.exportForm.elements.mod_suffix;
+  const modName = env.sandbox.document.getElementById("mod-name");
+  check("a family with no second one leaves the row empty",
+        ["mod1", "mod2", "mod3", "mod4"]
+          .every(name => env.exportForm.elements[name].value === ""));
+  check("and its suffix is out of reach", suffix.disabled === true);
+  check("with nothing named yet", modName.textContent === "a second family",
+        modName.textContent);
+
+  env.exportForm.elements.mod1.value = "13";
+  env.exportForm.edit("mod1");
+  check("a size turns the suffix on", suffix.disabled === false);
+  suffix.value = "Alt";
+  env.exportForm.edit("mod_suffix");
+  check("and the panel says what the second family will be called",
+        modName.textContent === "AltoAlt", modName.textContent);
+
+  await env.save.click();
+  const posted = env.fetches.saves.at(-1).export;
+  check("the save carries both", posted.sizes_mod === "13" &&
+        posted.mod_suffix === "Alt", JSON.stringify(posted));
+  check("and the first family's own sizes are untouched",
+        posted.sizes === "12 13", posted.sizes);
+}
+
+// 31. The thresholds control: one list with both presets on it, and a config
+//     carrying its own triple offered as a third rather than blanked -- a
+//     select refuses a value none of its options has, and would then save it
+//     blank.
+{
+  const env = await loaded(fakeStorage());
+  check("the saved triple is what the control shows",
+        env.byName.thresholds.value === "3,6,10", env.byName.thresholds.value);
+
+  env.family.choose("Sample");
+  check("a config's own triple is offered rather than dropped",
+        env.byName.thresholds.value === "2,5,9", env.byName.thresholds.value);
+  check("as an option beside the two presets",
+        env.byName.thresholds.options.map(o => o.value).join()
+          === "4,8,12,3,6,10,2,5,9",
+        env.byName.thresholds.options.map(o => o.value).join());
+
+  env.family.choose("Alto");
+  check("and the custom one goes when the family that had it does",
+        env.byName.thresholds.options.map(o => o.value).join()
+          === "4,8,12,3,6,10",
+        env.byName.thresholds.options.map(o => o.value).join());
+}
+
+// 32. The bundled faces are not vendored, so the panel offers to fetch them
+//     -- and only when they are not already somewhere.
+{
+  const env = await loaded(fakeStorage());
+  check("with the faces present there is nothing to offer",
+        env.sandbox.document.getElementById("fetch-row").hidden === true);
+
+  const bare = await loaded(fakeStorage(), { ...DEFAULTS, fallbacks: "" });
+  check("and without them the offer appears",
+        bare.sandbox.document.getElementById("fetch-row").hidden === false);
+  check("with the state said in words",
+        bare.sandbox.document.getElementById("have-fallbacks").textContent
+          === "— not fetched yet",
+        bare.sandbox.document.getElementById("have-fallbacks").textContent);
+}
+
+// 40. Variable fonts. One file is several faces, so which face each slot is
+//     drawn at is a choice the page has to be able to make -- and it is the
+//     font's own named instances that are worth offering, not a bare number.
+{
+  const env = await loaded(fakeStorage());
+  const box = env.sandbox.document.getElementById("variable");
+  check("a static family shows no axis controls", box.hidden === true,
+        String(box.hidden));
+
+  env.family.choose("Vari");
+  await settle();
+  check("a variable one shows them", box.hidden === false, String(box.hidden));
+  check("with the font's own instances on the pickers",
+        env.byName.axis_text.options.map(o => o.textContent).join() ===
+          "Light — 300,Regular — 400,Bold — 700,Black — 900",
+        env.byName.axis_text.options.map(o => o.textContent).join());
+  check("each opening at the weight that slot is built at",
+        env.byName.axis_text.value === "400" &&
+        env.byName.axis_bold.value === "700",
+        `${env.byName.axis_text.value}/${env.byName.axis_bold.value}`);
+  check("and a row for every other axis the font declares",
+        env.sandbox.document.getElementById("axis-rows").children.length === 1,
+        String(env.sandbox.document.getElementById("axis-rows").children.length));
+  check("with nothing to save yet", env.save.disabled === true,
+        String(env.save.disabled));
+
+  const rendersBefore = env.fetches.render;
+  env.byName.axis_text.value = "900";
+  env.byName.axis_text.on.change();
+  await settle();
+  check("moving a weight draws the page again",
+        env.fetches.render > rendersBefore,
+        `${rendersBefore} -> ${env.fetches.render}`);
+  check("and carries the weights, not the tuning",
+        env.fetches.bodies.at(-1).axes.text === 900 &&
+        env.fetches.bodies.at(-1).axes.bold === 700 &&
+        env.fetches.bodies.at(-1).tuning.axis_text === undefined,
+        JSON.stringify(env.fetches.bodies.at(-1).axes));
+  check("and offers a save", env.save.disabled === false,
+        String(env.save.disabled));
+
+  // Compared against the config, not remembered: putting a weight back is not
+  // a change, however it got there.
+  env.byName.axis_text.value = "400";
+  env.byName.axis_text.on.change();
+  await settle();
+  check("moving it back to what the config says offers nothing",
+        env.save.disabled === true, String(env.save.disabled));
+
+  env.byName.axis_text.value = "900";
+  env.byName.axis_text.on.change();
+  await settle();
+  await env.save.click();
+  check("saving writes the weights",
+        env.fetches.saves.at(-1).axes.text === 900,
+        JSON.stringify(env.fetches.saves.at(-1).axes));
+  check("and leaves the panel clean against the file it just wrote",
+        env.save.disabled === true, String(env.save.disabled));
+  // And the file now says 900, so 400 is the change from here.
+  env.byName.axis_text.value = "400";
+  env.byName.axis_text.on.change();
+  await settle();
+  check("with the saved weight as the new baseline",
+        env.save.disabled === false, String(env.save.disabled));
+}
+
+// 40a. And switching away puts the controls back out of sight, rather than
+//      leaving one family's instances on another family's page.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Vari");
+  await settle();
+  env.family.choose("Alto");
+  await settle();
+  const box = env.sandbox.document.getElementById("variable");
+  check("a static family after a variable one shows no axis controls",
+        box.hidden === true, String(box.hidden));
+  check("and posts no axes at all",
+        Object.keys(env.fetches.bodies.at(-1).axes).length === 0,
+        JSON.stringify(env.fetches.bodies.at(-1).axes));
+}
+
+// 40b. A slider is a burst of events, not one. The core draws one page at a
+//      time, so a path that asks for a page per event queues them and the page
+//      falls minutes behind the knob -- which is what an axis row wired to its
+//      own redraw instead of the shared one did.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Vari");
+  await settle();
+  const row = env.sandbox.document.getElementById("axis-rows").children[0];
+  const [minus, field, plus] = row.children[2].children;
+
+  check("a built axis row names its field for the label",
+        row.children[0].htmlFor === "axis-wdth" &&
+        row.children[2].children[1].id === "axis-wdth",
+        `${row.children[0].htmlFor}/${row.children[2].children[1].id}`);
+  check("a built axis row has a stepper either side of its field",
+        minus.textContent === "−" && plus.textContent === "+" &&
+        field.type === "number",
+        [minus.textContent, field.type, plus.textContent].join());
+
+  const slider = row.children[1];
+  const before = env.fetches.render;
+  // A drag: twenty events in one tick, as a real one is.
+  for (let at = 88; at <= 107; at++) {
+    slider.value = String(at);
+    slider.on.input();
+  }
+  check("and the field follows the slider through it",
+        field.value === "107", field.value);
+  await settle();
+  check("but a drag asks for one page, not one per event",
+        env.fetches.render === before + 1,
+        `${before} -> ${env.fetches.render}`);
+  check("carrying where the drag ended",
+        env.fetches.bodies.at(-1).axes.wdth === 107,
+        JSON.stringify(env.fetches.bodies.at(-1).axes));
+
+  // The stepper moves it the same way, through the same coalescing.
+  const stepped = env.fetches.render;
+  minus.on.pointerdown({ shiftKey: false });
+  minus.on.pointerdown({ shiftKey: false });
+  await settle();
+  check("the stepper steps by the axis step",
+        field.value === "105", field.value);
+  check("and two presses are still one page",
+        env.fetches.render === stepped + 1,
+        `${stepped} -> ${env.fetches.render}`);
+}
+
+// 40c. Reset font knobs leaves the axis controls where they are. They are not
+//      knobs: they say which face each slot is, and a font's own instances are
+//      the only answer to that -- there is no factory value to go back to.
+//      Reset picks the first option of a select it does not recognise, which
+//      here is the lightest weight the font carries.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Vari");
+  await settle();
+  env.byName.gamma.value = "2.4";
+  env.listeners.input({ target: env.byName.gamma });
+  await settle();
+
+  env.clicks.font();
+  await settle();
+  check("Reset font knobs puts a tuning knob back",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("and leaves the weights alone",
+        env.byName.axis_text.value === "400" &&
+        env.byName.axis_bold.value === "700",
+        `${env.byName.axis_text.value}/${env.byName.axis_bold.value}`);
+  check("so the panel is still clean against its config",
+        env.save.disabled === true, String(env.save.disabled));
+}
+
+// 41. A render that fails says so over the sheet. A blank page with the reason
+//     under the text box is a page nobody reads: the eye is on the specimen,
+//     so that is where the sentence goes.
+{
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 503,
+                                          body: '{"detail":"the bundled fallback faces are not here yet"}'}});
+  check("a failed render shows the notice over the page",
+        env.pageError.hidden === false, String(env.pageError.hidden));
+  check("with a headline that says which kind of failure it was",
+        env.pageError.parts.what.textContent === "The page cannot be drawn yet.",
+        env.pageError.parts.what.textContent);
+  check("and the server's own sentence, out of its JSON envelope",
+        env.pageError.parts.why.textContent ===
+          "the bundled fallback faces are not here yet",
+        env.pageError.parts.why.textContent);
+  check("the status line carries the code rather than the whole body",
+        env.status.textContent === "503", env.status.textContent);
+}
+
+// 41a. A refused setting is a different sentence, because it is a different
+//      thing to do something about.
+{
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 422, body: "gamma: too large"}});
+  check("a refused knob says so",
+        env.pageError.parts.what.textContent === "That setting was refused.",
+        env.pageError.parts.what.textContent);
+  check("and a body that is not JSON is shown as it came",
+        env.pageError.parts.why.textContent === "gamma: too large",
+        env.pageError.parts.why.textContent);
+}
+
+// 41b. A server that has stopped answers nothing at all. There is no status
+//      code to report, and the reader needs to know it is not their setting.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderThrows: true});
+  check("a server that is not answering says that, not a stack trace",
+        env.pageError.parts.what.textContent ===
+          "The preview server is not answering.",
+        env.pageError.parts.what.textContent);
+  check("and says what to do about it",
+        env.pageError.parts.why.textContent.includes("Try again"),
+        env.pageError.parts.why.textContent);
+}
+
+// 41c. And it clears itself: a page that came back must not keep a stale
+//      complaint over it.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  env.pageError.hidden = false;
+  env.byName.gamma.value = "1.4";
+  env.listeners.input({ target: env.byName.gamma });
+  await settle();
+  check("a render that worked takes the notice away",
+        env.pageError.hidden === true, String(env.pageError.hidden));
+}
+
+process.exit(failures ? 1 : 0);

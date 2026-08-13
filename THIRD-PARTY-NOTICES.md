@@ -1,0 +1,72 @@
+# Third party notices
+
+CrossGlyph is MIT licensed. It carries the code below, under the licences
+below.
+
+## The render core
+
+`src/crossglyph/render/render.wasm` is a compiled binary. It is built from
+`src/render/api.cpp` in this repository together with these libraries from the
+CrossPoint firmware, [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader):
+`EpdFont`, `GfxRenderer`, `Utf8`, `MiniBidi`, `InflateReader` and the text and
+hyphenation parts of `Epub`.
+
+    MIT License
+    Copyright (c) 2025 Dave Allie
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+The same binary links three libraries the firmware vendors. Their own licences
+travel with their sources in that repository:
+
+| library | licence |
+|---|---|
+| uzlib | zlib licence, copyright Paul Sokolovsky and Joergen Ibsen |
+| miniz | MIT, copyright Rich Geldreich and Tenacious Software |
+| MiniBidi | free use with attribution, copyright Arabeyes, Ahmad Khalifa |
+
+## The .cpfont writer
+
+`src/crossglyph/cpfont/convert.py` and `version.py` are a fork of
+`scripts/font-builder/` in
+[crosspoint-tools](https://github.com/crosspoint-reader/crosspoint-tools), the
+repository behind the CrossPoint font website. `src/crossglyph/cpfont/UPSTREAM`
+records the commit and what the fork adds.
+
+    MIT License
+    Copyright (c) 2025 SoFriendly
+
+Full text as above, with that copyright line.
+
+## The tool wrapper
+
+`tools/tool-wrapper.sh`, `tools/tool-wrapper.cmd`, `tools/tool-wrapper.ps1` and
+`tools/uv.cmd` download and verify a pinned uv. They derive from the tool
+wrapper in the IntelliJ IDEA monorepo.
+
+    Copyright 2000-2026 JetBrains s.r.o. and contributors
+    Licensed under the Apache License, Version 2.0
+
+Full text: https://www.apache.org/licenses/LICENSE-2.0
+
+## The fallback faces
+
+The twelve Noto faces and the CJK faces are downloaded at run time and are not
+redistributed here. They are licensed under the SIL Open Font License, and
+`fetch-fallbacks` puts `OFL.txt` beside them.

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+build/
+dist/
+# The workspace ships empty apart from the note that says what goes in it. A
+# negation cannot reach inside an ignored directory, so the directory itself is
+# never ignored, only its contents.
+fonts/*
+!fonts/README.md
