@@ -1333,3 +1333,178 @@ def test_saving_the_bundled_family_records_where_its_faces_are(tmp_path,
     assert errors == []
     assert {c.name for c in configs} == {"Literata", "Probe"}
     assert next(c for c in configs if c.name == "Literata").tuning.gamma == 1.4
+
+
+# --- the sample text presets -----------------------------------------------
+
+
+def _samples():
+    from crossglyph.preview import SAMPLES
+
+    return SAMPLES
+
+
+def test_every_preset_marks_whole_words():
+    """The invariant the module indexes by, on every text that ships.
+
+    One byte out of step and every word after it wears the wrong face, which
+    reads as a random emphasis bug rather than as an off-by-one.
+    """
+    from crossglyph.preview import markup
+
+    for tag, sample in _samples().items():
+        text, styles = markup.parse(sample.text)
+        words = [w for para in text.split("\n") for w in para.split(" ") if w]
+        assert len(words) == len(styles), f"{tag} is out of step"
+
+
+def test_every_preset_shows_a_bold_and_an_italic():
+    """A specimen with no emphasis in it says nothing about three of the four
+    faces a family carries."""
+    from crossglyph.preview import markup
+
+    for tag, sample in _samples().items():
+        _, styles = markup.parse(sample.text)
+        worn = {bit for style in styles for bit in (markup.BOLD, markup.ITALIC)
+                if style & bit}
+        assert worn == {markup.BOLD, markup.ITALIC}, \
+            f"{tag} never sets a bold or an italic"
+
+
+def test_no_preset_leaves_a_mark_in_the_text():
+    """An unclosed mark is drawn as an asterisk. On a shipped sample that is a
+    typo on the page somebody is judging a font by."""
+    from crossglyph.preview import markup
+
+    for tag, sample in _samples().items():
+        text, _ = markup.parse(sample.text)
+        assert "*" not in text and "_" not in text, f"{tag} has a stray mark"
+
+
+def test_the_two_presets_with_no_spaces_carry_no_marks():
+    """Japanese and Chinese are written without spaces, and this markup styles
+    a whole word at a time (markup.parse), so one mark inside a paragraph would
+    set the entire paragraph -- and its closing mark, having letters on both
+    sides, would be read as an underscore in a name and never close it. Their
+    English paragraph carries the emphasis instead."""
+    from crossglyph.preview import markup
+
+    for tag in ("ja", "zh-Hans", "zh-Hant"):
+        native = _samples()[tag].text.split("\n")[:-1]
+        for line in native:
+            assert "*" not in line and "_" not in line, \
+                f"{tag} marks a paragraph the engine cannot split into words"
+        # And the English tail does carry them, or the preset shows no italic.
+        _, styles = markup.parse(_samples()[tag].text)
+        assert set(styles) > {0}
+
+
+def test_every_preset_is_long_enough_to_wrap():
+    """One paragraph cannot show a first-line indent, paragraph spacing, or
+    where the hyphenator would break a line."""
+    for tag, sample in _samples().items():
+        assert len(sample.text.split("\n")) >= 3, f"{tag} is one paragraph"
+
+
+def test_every_preset_either_hyphenates_or_is_a_script_that_does_not():
+    """A preset whose language the page cannot hyphenate is fine, and there are
+    four of them. A preset whose language the page *can* hyphenate but does not
+    offer would be one the picker could never follow."""
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    picker = re.search(r'<select id="language".*?</select>', html, re.S)
+    offered = set(re.findall(r'<option value="(\w*)"', picker.group(0)))
+
+    unhyphenated = {tag for tag in _samples() if tag not in offered}
+    assert unhyphenated == {"ja", "ko", "zh-Hans", "zh-Hant"}, unhyphenated
+
+
+def test_the_presets_say_the_same_as_the_device_does():
+    """Each preset opens on the string the firmware itself shows under a font
+    name, so the preview and the device agree on what a font's preview text is.
+
+    Read out of the translations rather than copied here, because a wording
+    somebody improves upstream should turn up as a failure and not as a
+    divergence nobody notices.
+    """
+    import re
+
+    from crossglyph import render
+
+    translations = render.FIRMWARE / "lib" / "I18n" / "translations"
+    if not translations.is_dir():
+        pytest.skip(f"{translations} not found (no firmware checkout beside this one)")
+
+    # The four CJK presets have no translation to read: the firmware carries
+    # none, and their opening lines are named in samples.py.
+    named = {"en": "english", "fi": "finnish", "fr": "french", "de": "german",
+             "it": "italian", "pl": "polish", "ru": "russian", "es": "spanish",
+             "sv": "swedish", "uk": "ukrainian"}
+    for tag, stem in named.items():
+        path = translations / f"{stem}.yaml"
+        if not path.is_file():
+            pytest.skip(f"{path} not found")
+        found = re.search(r'^STR_FONT_PREVIEW_TEXT:\s*"(.*)"\s*$',
+                          path.read_text(encoding="utf-8"), re.M)
+        assert found, f"no preview string in {path.name}"
+        opening = _samples()[tag].text.split("\n")[0]
+        assert opening.rstrip(".") == found.group(1).strip().rstrip("."), \
+            f"{tag} no longer opens on what the device shows"
+
+
+def test_the_page_is_served_every_preset():
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    answered = TestClient(server.app).get("/defaults").json()["samples"]
+    assert list(answered) == list(_samples()), "the order the picker uses"
+    for tag, sample in _samples().items():
+        assert answered[tag]["name"] == sample.name
+        assert answered[tag]["text"] == sample.text
+    # The endonym is what somebody scans the list for, so none may be blank.
+    assert all(entry["name"].strip() for entry in answered.values())
+
+
+@needs_core
+def test_a_render_says_how_much_of_it_could_not_be_drawn(two_families):
+    """A glyph nobody has takes no width on the device, so a paragraph of them
+    is blank space rather than a row of boxes. Without a count on the answer,
+    choosing a language the family cannot set looks exactly like a page that
+    failed to draw, and the remedy is a fetch nobody knows to make."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    client = TestClient(server.app)
+    body = {"size": 13, "family": "Probe", "fallbacks": False}
+
+    covered = client.post("/render", json={**body, "text": "Привет, мир"})
+    assert covered.status_code == 200, covered.text
+    assert covered.headers["x-undrawn"] == "0"
+
+    # Japanese against a family that has no Japanese in it, which is the shape
+    # of a first run: a Latin family and a CJK sample.
+    japanese = client.post("/render", json={**body, "text": "すべての人間は"})
+    assert japanese.status_code == 200, japanese.text
+    assert int(japanese.headers["x-undrawn"]) == len(set("すべての人間は"))
+
+
+@needs_core
+def test_a_fallback_that_covers_the_text_leaves_nothing_undrawn(two_families):
+    """The count is what is missing after the fallbacks, not before them, or
+    every page with a Greek letter on it would carry a warning."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    client = TestClient(server.app)
+    body = {"size": 13, "family": "Probe", "text": "α", "fallbacks": False}
+
+    alone = client.post("/render", json=body)
+    assert alone.headers["x-undrawn"] == "1"
+    filled = client.post("/render", json={**body, "fallback1": two_families})
+    assert filled.headers["x-undrawn"] == "0"

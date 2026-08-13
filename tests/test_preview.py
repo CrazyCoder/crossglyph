@@ -104,7 +104,7 @@ def test_hyphenation_draws_a_hyphen_the_text_never_asked_for(monkeypatch):
             "продемонстрировала высококвалифицированное "
             "переосвидетельствование землепользователей.")
     assert "-" not in text
-    spec = preview.PageSpec(hyphenation=True)
+    spec = preview.PageSpec(hyphenation=True, language="ru")
 
     with_hyphen = preview.preview(SRC, 13, text, spec=spec)
     monkeypatch.setattr(preview, "ESSENTIAL_CODEPOINTS", ())
@@ -248,12 +248,15 @@ def test_a_tuning_change_reaches_the_page():
 def test_the_hyphenation_language_is_a_knob():
     from crossglyph import preview
 
-    font = preview.build_font(SRC, 13)
+    # The Russian preset, named rather than left to the default: the shipped
+    # sample is English, and Russian patterns find nothing to break in it.
+    text = preview.SAMPLES["ru"].text
+    font = font_for(text)
     # Hyphenation is off in the device's defaults, so this has to ask for it.
     russian = preview.preview_page(
-        font, spec=preview.PageSpec(hyphenation=True, language="ru"))
+        font, text, spec=preview.PageSpec(hyphenation=True, language="ru"))
     none = preview.preview_page(
-        font, spec=preview.PageSpec(hyphenation=True, language=""))
+        font, text, spec=preview.PageSpec(hyphenation=True, language=""))
     assert russian.tobytes() != none.tobytes(), \
         "hyphenating in Russian drew the same page as not hyphenating"
 

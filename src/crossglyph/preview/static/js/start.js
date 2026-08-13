@@ -1,16 +1,21 @@
 import {familyPicker} from "./family.js";
-import {form, syncHyphenation, syncLineHeight} from "./dom.js";
+import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState} from "./export.js";
 import {syncSliders} from "./knobs.js";
-import {loadPage} from "./remember.js";
-import {renderNow} from "./render.js";
+import {declareLanguage, loadPage, preferredLanguage} from "./remember.js";
+import {renderNow, scheduleRender} from "./render.js";
 import {refreshReverts} from "./reverts.js";
-import {loadText} from "./text.js";
+import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
 import {fillFamilies, onFamilyChange} from "./variable.js";
 
 familyPicker.addEventListener("change", onFamilyChange);
+samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender(); });
 
-loadPage();
+const remembered = loadPage();
+// Nothing has been set on this device, so the browser's own languages are the
+// best guess there is at which patterns to hyphenate with. Declared rather
+// than saved, so it stays a default and not a decision -- see declareLanguage.
+if (!remembered) declareLanguage(preferredLanguage(navigator.languages));
 loadText();
 syncSliders();
 syncLineHeight();
@@ -21,6 +26,10 @@ refreshReverts();
 // replaced, and fill the picker with what the source folder has.
 fetch("/defaults").then(r => r.json()).then(d => {
   form.elements.text.placeholder = d.text;
+  // The presets, and which of them the box opens on. Before this lands the
+  // picker holds Custom alone, which is why the box is filled from here.
+  fillSamples(d.samples);
+  restoreSample(navigator.languages);
   fillPresets(d.presets || []);
   showFallbackState(d.fallbacks);
   outField.value = d.out || "";

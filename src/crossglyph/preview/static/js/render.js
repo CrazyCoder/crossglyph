@@ -4,7 +4,7 @@ import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage} from "./remember.js";
 import {refreshReverts, stashed} from "./reverts.js";
-import {saveText} from "./text.js";
+import {typedInBox} from "./text.js";
 import {axisSettings} from "./variable.js";
 
 export function body() {
@@ -81,6 +81,21 @@ export function failureHeadline(status) {
   return `The page could not be drawn (${status}).`;
 }
 
+export const undrawnNote = document.getElementById("undrawn");
+
+// What the page could not draw, said under the box the text came from. The
+// count arrives on the render itself, because it is a fact about this page and
+// not about the folder.
+export function showUndrawn(count) {
+  undrawnNote.hidden = !count;
+  if (!count) return;
+  undrawnNote.textContent =
+    `${count} character${count === 1 ? " has" : "s have"} no glyph in this `
+    + `family or its fallback faces, so the page is blank where `
+    + `${count === 1 ? "it is" : "they are"}. Under Export, choose a coverage `
+    + `that includes them and press Fetch.`;
+}
+
 export async function renderNow() {
   const mine = ++latest;
   const started = performance.now();
@@ -110,6 +125,7 @@ export async function renderNow() {
     status.textContent = `${response.status}`;
     return;
   }
+  showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
   const next = URL.createObjectURL(await response.blob());
   if (url) URL.revokeObjectURL(url);
   img.src = url = next;
@@ -133,7 +149,7 @@ export function scheduleRender() {
 
 export function knobChanged(el) {
   if (el.dataset.group === "page") savePage();
-  if (el.name === "text") saveText();
+  if (el.name === "text") typedInBox();
   // Typing goes straight into the field, so without this the slider sits
   // wherever it was until the field loses focus and `change` finally fires.
   if (el.type === "number" && el.value !== "") showSlider(el);

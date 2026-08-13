@@ -153,13 +153,41 @@ First use of a family is slower than the rest, because that is where the folder
 walk and the GPOS read happen. After that a control turn is tens of
 milliseconds. The page prints the elapsed time under the image.
 
+## The sample text
+
+The picker over the text box holds one preset per language, and the page opens
+on one the browser says you read. A specimen you cannot read says nothing about
+a font you are choosing.
+
+Each preset is the pangram the device itself shows under Settings > Font,
+Article 1 of the Universal Declaration of Human Rights in that language, and a
+short English paragraph so a font that has to carry both scripts can be judged
+on both. Between them they exercise what a font decision depends on: tabular
+figures, a justified line, a word long enough to hyphenate, and emphasis inside
+running text. See `src/crossglyph/preview/samples.py`.
+
+Custom is the first entry and holds whatever you type. Choosing a language
+never costs you your own text, and switching back returns it; typing while a
+preset is showing moves the picker to Custom under your hands. Both the choice
+and your own text are remembered between sessions.
+
+Choosing a preset moves `hyphenate as` with it when the core has patterns for
+that language, and leaves it alone when it has none, so a Japanese specimen is
+not quietly hyphenated as English.
+
+On a first visit only, the browser's languages also pick `hyphenate as`,
+English when none of them has patterns. That is a default rather than a
+decision: it is not written down, and Reset page settings goes back to it.
+
+If the family and its fallbacks have no glyph for something on the page, a line
+under the box says how many characters that is. It is worth saying because the
+device gives a glyph nobody has no width at all, so a paragraph of them is
+blank space rather than a row of boxes, and a page with a hole in it looks
+exactly like a page that failed to draw. The four CJK presets need a CJK face,
+which is a coverage choice and a Fetch away under Export.
+
 ## What this is not
 
-The preview draws one page from one paragraph of sample text. It is not the
-reader: no chapters, no pagination, no images, no tables, no footnotes. What it
-covers is what a font decision depends on.
-
-The sample text is pangrams and typography test lines, chosen for what they
-exercise: tabular figures, a justified line, a word long enough to hyphenate,
-and both Cyrillic and Latin. Replace it with your own in the text box, which is
-remembered between sessions.
+The preview draws one page of sample text. It is not the reader: no chapters,
+no pagination, no images, no tables, no footnotes. What it covers is what a
+font decision depends on.

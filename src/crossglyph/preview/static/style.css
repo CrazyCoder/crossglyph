@@ -322,6 +322,12 @@
   /* A key you press, set as one: the same treatment the untuned button gives
      its own, so the two read as the same kind of instruction. */
   .hint kbd { font: inherit; font-weight: 600; color: var(--text); }
+  /* A hint that is about this page rather than about the markup, so it reads
+     at full contrast with a rule beside it. Nothing louder than that: the page
+     did draw, and what is missing from it is a fixable setting and not a
+     fault. */
+  .hint.warn { color: var(--text); border-left: 2px solid var(--line);
+               padding-left: .55rem; }
 
   #status { margin-top: .7rem; color: var(--muted); font-size: 11.5px; }
 
@@ -368,6 +374,14 @@
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
+  /* The heading and the sample picker share a row. The picker names what is in
+     the box under it, so a row of its own would push the box down for a
+     control most people read once and leave alone. It takes the rest of the
+     width so it lines up with the box rather than floating in the middle of
+     nothing, the same way the family picker fills its own row. */
+  #textbox .head { display: flex; align-items: center; gap: .6rem; }
+  #textbox .head h2 { flex: none; }
+  #sample { flex: 1 1 0; min-width: 5rem; }
   /* The specimen and its text stay where they are while a panel scrolls past.
      Only where the whole column fits: sticking a column taller than the window
      puts its own bottom out of reach, which costs more than the scrolling it

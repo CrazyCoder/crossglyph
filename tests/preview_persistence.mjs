@@ -200,6 +200,17 @@ function makeControl({ name, type = "text", value = "", checked = false, group,
 // what the folder holds changes this rather than the page.
 const DEFAULTS = {
   text: "Съешь ещё этих мягких французских булок.",
+  // A few presets, keyed and ordered as /defaults serves them. Short on
+  // purpose: what is under test is the choosing and the remembering, not the
+  // prose. Simplified Chinese is here for the script-not-country rule, and
+  // Japanese because it has no hyphenation patterns to follow.
+  samples: {
+    "zh-Hans": { name: "简体中文", text: "天地玄黄。\nThe quick brown fox." },
+    en: { name: "English", text: "The quick brown fox.\nAll human beings." },
+    de: { name: "Deutsch", text: "Victor jagt zwölf Boxkämpfer.\nAlle Menschen." },
+    ja: { name: "日本語", text: "いろはにほへと\nすべての人間は。" },
+    ru: { name: "Русский", text: "Съешь ещё этих булок.\nВсе люди." },
+  },
   font: "Alto-Medium.otf",
   faces: ["bold", "regular"],
   families: [
@@ -336,9 +347,16 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       name: "alignment", value: "justify", group: "page",
       options: [{ value: "justify" }, { value: "left" }, { value: "center" }],
     }),
+    // Every language the core has patterns for, as the markup lists them, and
+    // English declared as the markup declares it. The real list matters here:
+    // a shorter one would take a value it has no option for and blank, so a
+    // detection test could pass against a control that cannot hold its answer.
     makeControl({
-      name: "language", value: "ru", group: "page",
-      options: [{ value: "ru" }, { value: "en" }, { value: "" }],
+      name: "language", value: "en", group: "page",
+      options: [{ value: "en" }, { value: "fi" }, { value: "fr" },
+                { value: "de" }, { value: "it" }, { value: "pl" },
+                { value: "ru" }, { value: "es" }, { value: "sv" },
+                { value: "uk" }, { value: "" }],
     }),
     // A font-side select, so the baseline machinery is exercised on the kind
     // of control that has no `checked` to compare.
@@ -413,6 +431,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     addEventListener: (kind, fn) => { if (kind === "click") clicks[id] = fn; },
   });
   const family = makeSelect();
+  // The sample picker is not empty in the markup: Custom is declared there, so
+  // a page whose /defaults never answered still has an entry to sit on.
+  const sample = makeSelect();
+  sample.add({ value: "", textContent: "Custom" });
   const exportFields = {
     // A box per step, one more for whatever a config carries beyond them, and
     // the same four again for the second family the same faces can build.
@@ -544,11 +566,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     },
     retry: button("retry"),
     status: { textContent: "" },
+    undrawn: { textContent: "", hidden: true },
     "lh-auto": { checked: true, defaultChecked: true, addEventListener() {} },
     faces: { textContent: "" },
     // One badge per style, rebuilt whenever the choice changes.
     styles: { children: [], replaceChildren(...kids) { this.children = kids; } },
     family,
+    sample,
     "reset-font": button("font"),
     "reset-page": button("page"),
     compare: {
@@ -607,7 +631,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         }
         if (opts.renderOk) {
           return Promise.resolve({
-            ok: true, status: 200, blob: () => Promise.resolve({}) });
+            ok: true, status: 200, blob: () => Promise.resolve({}),
+            // How many characters the page could not draw. A real answer
+            // always carries it; `undrawn` in the options is how a test asks
+            // for a page with holes in it.
+            headers: { get: (name) => (name === "x-undrawn"
+                                       ? String(opts.undrawn ?? 0) : null) },
+          });
         }
         // Never resolves: the page draws the blob it gets back, and there is
         // no image here to draw it into.
@@ -687,10 +717,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // one or the probe would never exit.
     setInterval: () => 0,
     clearInterval() {},
+    // What the page reads on a first visit to guess which language somebody
+    // wants a specimen and hyphenation patterns in. In preference order, as a
+    // browser reports them.
+    navigator: { languages: opts.languages ?? ["en-GB", "en"] },
     console,
   };
   return { form, listeners, sandbox, byName, clicks, sliderList, fetches,
-           revertList, compare: stubs.compare, keys, stepList, family,
+           revertList, compare: stubs.compare, keys, stepList, family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            builtSteps: stubs.built.steps,
@@ -2000,6 +2034,194 @@ for (const { name, text } of sources) {
   check("a refused page shows nothing on the sheet",
         env.sheet.classes.has("shown") === false,
         JSON.stringify([...env.sheet.classes]));
+}
+
+// --- the sample text presets ----------------------------------------------
+
+// 48. A specimen you cannot read says nothing about a font you are choosing,
+//     so a first visit opens on a language the browser says you have.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["de-AT", "en"] });
+  check("a first visit opens on the browser's language",
+        env.sample.value === "de", env.sample.value);
+  check("with that language's words in the box",
+        env.form.elements.text.value.startsWith("Victor jagt"),
+        env.form.elements.text.value.slice(0, 20));
+  check("and hyphenates with its patterns",
+        env.byName.language.value === "de", env.byName.language.value);
+}
+
+// 49. The region is dropped: patterns and presets are per language, and one
+//     preset per country would be a list nobody could scroll.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["ru-BY"] });
+  check("a region falls back to its language",
+        env.sample.value === "ru", env.sample.value);
+}
+
+// 50. Chinese is the exception: it is chosen by script and a browser reports a
+//     country, so zh-CN and zh-TW are two different specimens.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["zh-CN"] });
+  check("a Chinese country picks the script it is written in",
+        env.sample.value === "zh-Hans", env.sample.value);
+}
+
+// 51. A language with a preset but no hyphenation patterns takes the specimen
+//     and leaves the patterns alone. Hyphenating Japanese with English
+//     patterns is a page nobody asked for.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["ja"] });
+  check("Japanese opens on its own specimen",
+        env.sample.value === "ja", env.sample.value);
+  check("and hyphenates as English, having no patterns of its own",
+        env.byName.language.value === "en", env.byName.language.value);
+}
+
+// 52. Nothing on the list matches, so English rather than an empty box.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["pt-BR", "pt"] });
+  check("an unknown language opens on English",
+        env.sample.value === "en", env.sample.value);
+  check("and hyphenates as English too",
+        env.byName.language.value === "en", env.byName.language.value);
+}
+
+// 53. Detection happens once. What you last chose is what you get, however
+//     many languages the browser goes on claiming.
+{
+  const env = await loaded(fakeStorage({ "crossglyph.sample": "ru" }), DEFAULTS,
+                           { languages: ["de-AT"] });
+  check("a stored choice beats the browser",
+        env.sample.value === "ru", env.sample.value);
+  check("and its words are in the box",
+        env.form.elements.text.value.startsWith("Съешь"),
+        env.form.elements.text.value.slice(0, 12));
+}
+
+// 54. Page settings that were remembered are never overwritten by detection.
+//     A language somebody chose outranks one a browser guessed.
+{
+  const env = await loaded(
+    fakeStorage({ "crossglyph.page": JSON.stringify({ language: "ru" }) }),
+    DEFAULTS, { languages: ["de-AT"] });
+  check("a remembered language stands",
+        env.byName.language.value === "ru", env.byName.language.value);
+}
+
+// 55. Typing while a preset is showing makes the text yours rather than
+//     editing the preset, so the picker moves to Custom under your hands.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, DEFAULTS, { languages: ["de"] });
+  env.byName.text.value = "мой текст";
+  env.listeners.input({ target: env.byName.text });
+  check("typing moves the picker to Custom",
+        env.sample.value === "", env.sample.value);
+  check("and what you typed is what is kept",
+        storage.data["crossglyph.text"] === "мой текст",
+        storage.data["crossglyph.text"]);
+  check("with Custom remembered as the choice",
+        storage.data["crossglyph.sample"] === "",
+        storage.data["crossglyph.sample"]);
+}
+
+// 56. The whole point of the Custom entry: choosing a language must not cost
+//     somebody the text they wrote, and coming back has to return it.
+{
+  const storage = fakeStorage({ "crossglyph.text": "мой текст",
+                                "crossglyph.sample": "" });
+  const env = await loaded(storage, DEFAULTS, { languages: ["de"] });
+  check("your own text is what a stored Custom shows",
+        env.form.elements.text.value === "мой текст",
+        env.form.elements.text.value);
+
+  env.sample.choose("ja");
+  check("a preset replaces it in the box",
+        env.form.elements.text.value.startsWith("いろは"),
+        env.form.elements.text.value.slice(0, 8));
+  check("but not in storage",
+        storage.data["crossglyph.text"] === "мой текст",
+        storage.data["crossglyph.text"]);
+
+  env.sample.choose("");
+  check("and switching back returns it",
+        env.form.elements.text.value === "мой текст",
+        env.form.elements.text.value);
+}
+
+// 57. Choosing a preset carries the hyphenation language with it, and that is
+//     a decision rather than a guess, so it is written down.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, DEFAULTS, { languages: ["en"] });
+  env.sample.choose("ru");
+  check("a chosen preset moves the patterns with it",
+        env.byName.language.value === "ru", env.byName.language.value);
+  check("and that is remembered",
+        JSON.parse(storage.data["crossglyph.page"]).language === "ru",
+        storage.data["crossglyph.page"]);
+
+  env.sample.choose("ja");
+  check("a preset with no patterns leaves them where they were",
+        env.byName.language.value === "ru", env.byName.language.value);
+}
+
+// 58. A detected language is a default and not a decision: Reset page settings
+//     goes back to the language you read, not to whatever the markup declared.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, DEFAULTS, { languages: ["de-AT"] });
+  check("nothing is written for a language nobody chose",
+        !("crossglyph.page" in storage.data), JSON.stringify(storage.data));
+  env.byName.language.value = "ru";
+  env.clicks.page();
+  check("and a reset goes back to it rather than to the markup",
+        env.byName.language.value === "de", env.byName.language.value);
+}
+
+// 59. Every preset reaches the picker, in the order the server lists them,
+//     with Custom kept at the top where it can always be found.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS);
+  check("Custom is first and the presets follow in order",
+        env.sample.options.map(o => o.value).join() === ",zh-Hans,en,de,ja,ru",
+        env.sample.options.map(o => o.value).join());
+  check("named in their own languages",
+        env.sample.options[1].textContent === "简体中文",
+        env.sample.options[1].textContent);
+}
+
+// 60. A glyph nobody has takes no width on the device, so a page missing one
+//     is blank where it should be rather than showing a box. The count comes
+//     back on the render, and the note under the box is the only thing that
+//     tells that apart from a page that failed to draw.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 7 });
+  const note = env.sandbox.document.getElementById("undrawn");
+  check("a page with holes in it says so", note.hidden === false);
+  check("counting them", note.textContent.startsWith("7 characters have"),
+        note.textContent);
+  check("and saying what to do about it",
+        note.textContent.includes("press Fetch"), note.textContent);
+}
+
+// 61. One is not "1 characters", and the note is read by somebody already
+//     puzzled by a page with a gap in it.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 1 });
+  const note = env.sandbox.document.getElementById("undrawn");
+  check("one of them reads as one", note.textContent.startsWith("1 character has"),
+        note.textContent);
+}
+
+// 62. And nothing at all on the usual page, which is every page.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  check("a page that drew everything says nothing",
+        env.sandbox.document.getElementById("undrawn").hidden === true);
 }
 
 process.exit(failures ? 1 : 0);

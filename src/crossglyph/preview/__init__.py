@@ -22,6 +22,9 @@ from .. import cpfont, render
 from ..cpfont.tuning import Tuning
 from ..render import image
 from . import markup
+# One preset per language, and the one a request with no text of its own is
+# drawn with. See samples.py for how each is built and where its words are from.
+from .samples import SAMPLE_TEXT, SAMPLES
 
 #: Codepoints every preview build carries whether or not the text names them.
 #: The space is what the layout measures a word gap with -- getSpaceWidth reads
@@ -39,32 +42,6 @@ ALIGNMENTS = {"justify": 0, "left": 1, "center": 2, "right": 3}
 #: The device's own line spacing values for SD card fonts
 #: (CrossPointSettings.cpp:268-280).
 LINE_SPACINGS = {"tight": 95, "normal": 100, "wide": 110}
-
-#: The first line is the device's own font preview string
-#: (lib/I18n/translations/russian.yaml, STR_FONT_PREVIEW_TEXT) -- a pangram, so
-#: it exercises the whole alphabet. The rest is long enough to wrap several
-#: times, which is what shows line breaking, justification and hyphenation.
-#: The emphasis sits inside running text rather than on a line of its own,
-#: because that is where you can tell whether an italic is the right weight
-#: beside its own roman. A face the font does not carry falls back to regular.
-SAMPLE_TEXT = "\n".join([
-    "Съешь ещё этих мягких французских булок, да выпей же чаю.",
-    # Second, so the digits land on the first page rather than past its end.
-    # Heavy on 1s on purpose: it is the digit tabular figures pad most, so the
-    # `figures` knob shows here or nowhere. 111 118 181 811 sets the widths
-    # side by side, which prose alone does not.
-    "Цифры в прозе: 11 января 1918 года, 101-й полк, 1710 рублей 15 копеек, "
-    "страница 118 — у табличных цифр ширина общая, и вокруг единицы остаются "
-    "заметные просветы: 111 118 181 811 1118.",
-    "Широкая электрификация южных губерний даст _мощный толчок_ подъёму "
-    "сельского хозяйства, и по всему выходит, что дело это *долгое*, "
-    "хлопотное и *_совершенно необходимое_*.",
-    "Строка должна где-то переноситься, и именно здесь становится видно, "
-    "как расставлены пробелы при выключке по формату и где переносчик "
-    "решил разорвать длинное слово.",
-    "The quick brown fox jumps over the lazy dog. _Typography_ is what "
-    "language looks like, and at this size every hinting decision shows.",
-])
 
 
 @dataclasses.dataclass(frozen=True)
@@ -84,8 +61,10 @@ class PageSpec:
     line_spacing: str = "normal"
     #: Which language's hyphenation patterns to use. The reader takes this from
     #: the book's own metadata; here the text is whatever you paste, so it is a
-    #: knob. Empty means no hyphenation patterns at all.
-    language: str = "ru"
+    #: knob. Empty means no hyphenation patterns at all. It matches the sample
+    #: a request with no text of its own is drawn with; the page moves both to
+    #: the browser's language the first time it is opened.
+    language: str = "en"
     #: The device's Settings > Text > Anti-Aliasing toggle
     #: (EpubReaderActivity.cpp:1667). Off is 1-bit: the reader never draws the
     #: grey planes, and the black-and-white pass paints every non-white level
@@ -228,11 +207,25 @@ def needed_fallbacks(sources: Mapping[int, pathlib.Path | str],
     answer a codepoint still missing, and stops when nothing is. First face
     wins, which is the order the converter would have used anyway.
     """
+    return fallback_split(sources, coverage, fallbacks)[0]
+
+
+def fallback_split(sources: Mapping[int, pathlib.Path | str],
+                   coverage: tuple[tuple[int, int], ...],
+                   fallbacks: tuple[pathlib.Path | str, ...],
+                   ) -> tuple[tuple[pathlib.Path | str, ...], frozenset[int]]:
+    """The fallbacks worth opening, and what nothing on the list can draw.
+
+    One walk answers both, and the second answer is not a detail: the layout
+    gives a glyph nobody has no width at all, so a paragraph of them comes out
+    as blank space rather than as a row of boxes. A page with a hole in it
+    looks exactly like a page that came out short.
+    """
     missing = set(missing_codepoints(sources, coverage))
-    if not missing:
-        return ()
     keep = []
     for face_path in fallbacks:
+        if not missing:
+            break
         try:
             face = freetype.Face(str(face_path))
         except Exception:                   # noqa: BLE001 -- not this layer's
@@ -242,9 +235,7 @@ def needed_fallbacks(sources: Mapping[int, pathlib.Path | str],
         if supplied:
             keep.append(face_path)
             missing -= supplied
-            if not missing:
-                break
-    return tuple(keep)
+    return tuple(keep), frozenset(missing)
 
 
 def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],

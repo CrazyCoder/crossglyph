@@ -2,6 +2,10 @@ export const form = document.getElementById("knobs");
 export const img = document.getElementById("page");
 export const status = document.getElementById("status");
 export const lineHeightAuto = document.getElementById("lh-auto");
+// Which specimen is in the box. Chrome rather than a knob, so it carries no
+// name and the form sweep never posts it -- what reaches /render is the text
+// itself, whoever chose it.
+export const samplePicker = document.getElementById("sample");
 
 // The field means nothing while the font's own height is in use, so grey it
 // and its steppers out rather than showing a number that is not being applied.

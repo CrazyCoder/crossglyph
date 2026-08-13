@@ -30,9 +30,9 @@ from ..cpfont.convert import FontBuildError
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
-from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, PageSpec,
-               build_font, coverage_for, faces_for, needed_fallbacks,
-               preview_page)
+from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
+               PageSpec, build_font, coverage_for, faces_for,
+               fallback_split, preview_page)
 
 app = FastAPI(title="CrossGlyph font preview")
 
@@ -323,7 +323,7 @@ class PageKnobs(BaseModel):
     hyphenation: bool = False
     extra_paragraph_spacing: bool = True
     line_spacing: str = "normal"
-    language: str = "ru"
+    language: str = "en"
     antialiased: bool = True
     inverted: bool = False
 
@@ -455,8 +455,19 @@ def useful_fallbacks(sources: tuple, coverage: tuple,
     responsive on a page that does need a fallback. Without it every turn of
     gamma reopens the whole bundled set to find the same one face.
     """
-    return tuple(str(path) for path in needed_fallbacks(
-        dict(sources), coverage, fallbacks))
+    return tuple(str(path) for path in resolved_fallbacks(
+        sources, coverage, fallbacks)[0])
+
+
+@functools.lru_cache(maxsize=32)
+def resolved_fallbacks(sources: tuple, coverage: tuple,
+                       fallbacks: tuple) -> tuple:
+    """The faces worth opening and the codepoints none of them has, cached.
+
+    Both come out of one walk of the list, and both are wanted on every render:
+    the faces to build with, and the leftovers to warn about.
+    """
+    return fallback_split(dict(sources), coverage, fallbacks)
 
 
 def _with_the_button(exc: Exception) -> str:
@@ -501,10 +512,14 @@ def render(request: RenderRequest) -> Response:
         keyed = tuple(sorted((style, str(path))
                              for style, path in sources.items()))
         coverage = coverage_for(request.text, sources)
+        offered = fallbacks_for(request)
         font = build_font_cached(
             keyed, request.size, coverage, _cache_key(request.tuning),
-            useful_fallbacks(keyed, coverage, fallbacks_for(request)),
+            useful_fallbacks(keyed, coverage, offered),
             axes_for(request.family, request.size, request.axes))
+        # What nothing on the page can draw. A cache hit, since the same walk
+        # chose the faces above.
+        undrawn = resolved_fallbacks(keyed, coverage, offered)[1]
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
@@ -548,7 +563,13 @@ def render(request: RenderRequest) -> Response:
 
     buffer = io.BytesIO()
     page.save(buffer, format="PNG")
-    return Response(buffer.getvalue(), media_type="image/png")
+    # How many characters drew nothing, so the page can say so. A header rather
+    # than a second request: it belongs to this page and not to the next one,
+    # and the body is a PNG with nowhere to put it. Latin-1 is all a header
+    # may carry, which is the other reason this is a count and not the
+    # characters themselves.
+    return Response(buffer.getvalue(), media_type="image/png",
+                    headers={"x-undrawn": str(len(undrawn))})
 
 
 #: What the panel is allowed to write back, in the .conf's own spelling.
@@ -738,6 +759,11 @@ def defaults() -> dict:
     it, and the page keeps it as a choice of its own at the top of the list.
     """
     return {"text": SAMPLE_TEXT,
+            # Every preset, in picker order, so switching between them is a
+            # dropdown rather than a round trip. The page picks one of these
+            # from the browser's own languages the first time it is opened.
+            "samples": {tag: {"name": sample.name, "text": sample.text}
+                        for tag, sample in SAMPLES.items()},
             "source": str(fontbuild.SOURCE_DIR),
             # What all.conf says, which is usually nothing, and where that
             # lands. The field holds the first so that leaving it empty goes
