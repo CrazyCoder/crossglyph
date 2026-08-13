@@ -26,6 +26,25 @@ from . import RenderModule, exclusive
 WHITE, LIGHT, DARK, BLACK = 255, 200, 96, 0
 GREYS = (BLACK, DARK, LIGHT, WHITE)
 
+#: Night mode, which the device does on the way to the panel rather than while
+#: drawing: the framebuffer is complemented byte by byte just before it is
+#: pushed (FreeInkDisplay.cpp:577, `~buffer[i]`), and put back straight after.
+#: So the page is laid out and rasterized exactly as it is by day, and what
+#: changes is which level each pixel ends up at -- paper and ink swap, and the
+#: two greys swap with each other.
+#:
+#: A complement of the level, not of the value: these four are the panel's own
+#: greys and not an even ramp, so 255 minus a value would ask for 55 and 159,
+#: which are not levels this panel can make.
+INVERTED = {WHITE: BLACK, LIGHT: DARK, DARK: LIGHT, BLACK: WHITE}
+INVERT_TABLE = [INVERTED.get(value, 255 - value) for value in range(256)]
+
+
+def invert_levels(page: Image.Image) -> Image.Image:
+    """The page as night mode shows it."""
+    return page.point(INVERT_TABLE)
+
+
 BW, GRAYSCALE_LSB, GRAYSCALE_MSB = 0, 1, 2
 
 #: What each pass starts from: white paper for the BW pass, an empty plane for
@@ -51,7 +70,8 @@ def _read_pass(module: RenderModule, draw, mode: int,
                                        module.call("rc_framebuffer_size")))
 
 
-def _compose(module: RenderModule, draw, antialiased: bool) -> Image.Image:
+def _compose(module: RenderModule, draw, antialiased: bool,
+             inverted: bool = False) -> Image.Image:
     """Run the device's passes through `draw(mode, clear)` and compose them.
 
     `draw` renders one pass into the framebuffer; everything else here is the
@@ -72,6 +92,12 @@ def _compose(module: RenderModule, draw, antialiased: bool) -> Image.Image:
         lsb = _read_pass(module, draw, GRAYSCALE_LSB, CLEAR_PLANE)
         panel.paste(LIGHT, mask=ImageChops.logical_and(ink, msb))
         panel.paste(DARK, mask=ImageChops.logical_and(ink, lsb))
+
+    # Last, as the device does it: after every pass has been composed, on the
+    # way out. Inverting a plane instead would invert the paper the grey ones
+    # are masked against, which is a different picture.
+    if inverted:
+        panel = invert_levels(panel)
 
     # Panel back to page: logical (x, y) lives at panel (y, height - 1 - x),
     # the inverse of GfxRenderer's Portrait rotation (GfxRenderer.cpp:218).
@@ -104,7 +130,8 @@ def render_png(font_bytes: bytes, text: str, antialiased: bool = True,
 
 
 def render_page_png(font_bytes: bytes, text: str, antialiased: bool = True,
-                    styles: bytes | None = None) -> Image.Image:
+                    styles: bytes | None = None,
+                    inverted: bool = False) -> Image.Image:
     """Draw a page of paragraphs, separated by newlines.
 
     The same three passes as render_png; the difference is that the device's
@@ -123,4 +150,4 @@ def render_page_png(font_bytes: bytes, text: str, antialiased: bool = True,
             lambda mode, clear: module.call("rc_page_render", pointer,
                                             styles_pointer,
                                             len(styles or b""), mode, clear),
-            antialiased)
+            antialiased, inverted)

@@ -92,6 +92,12 @@ class PageSpec:
     #: solid black. Tuning a font *for* that mode is its own use case -- it is
     #: one quantizer threshold that matters rather than three.
     antialiased: bool = True
+    #: The device's night mode (Settings > screenInverted). It is not a layout
+    #: option and never reaches the core: the reader draws the page exactly as
+    #: it does by day and the display complements the framebuffer on its way to
+    #: the panel (ActivityManager.cpp:60, FreeInkDisplay.cpp:577), which is why
+    #: it applies to the reading surfaces and not to the menus over them.
+    inverted: bool = False
 
     def to_call_args(self) -> tuple[int, int, int, int, int]:
         """The five ints rc_page_set_spec takes, validated."""
@@ -315,7 +321,7 @@ def preview_page(font_bytes: bytes, text: str = SAMPLE_TEXT,
                     module.write(spec.language.encode("utf-8") + b"\x00"))
         return image.render_page_png(font_bytes, plain,
                                      antialiased=spec.antialiased,
-                                     styles=styles)
+                                     styles=styles, inverted=spec.inverted)
 
 
 def preview(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],

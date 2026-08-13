@@ -387,6 +387,44 @@ def test_antialiasing_off_is_pure_black_and_white(tmp_path):
     assert _levels(png) <= {image.BLACK, image.WHITE}
 
 
+def test_night_mode_swaps_the_levels_rather_than_the_values():
+    """The device inverts the framebuffer on its way to the panel
+    (FreeInkDisplay.cpp:577), which complements each pixel's *level*: paper and
+    ink swap, and the two greys swap with each other.
+
+    Needs neither a font nor the core, which is the point of pinning it here:
+    255 minus a value would ask for 55 and 159, and those are not levels this
+    panel can make. It has to land back on the four."""
+    from PIL import Image
+
+    from crossglyph.render import image
+
+    page = Image.new("L", (4, 1))
+    page.putdata(image.GREYS)
+    assert list(image.invert_levels(page).get_flattened_data())         == list(reversed(image.GREYS))
+    # And it is its own inverse, as complementing bits twice is.
+    assert list(image.invert_levels(image.invert_levels(page))
+                .get_flattened_data()) == list(image.GREYS)
+
+
+@needs_wasm
+@needs_font
+def test_night_mode_inverts_the_page_the_core_drew(tmp_path):
+    """End to end, and the claim worth making: night mode changes no layout.
+    The core is never told about it -- there is no argument for it in
+    rc_page_set_spec -- so the inverted page has to be the plain one with its
+    levels complemented, pixel for pixel."""
+    from crossglyph.render import image
+
+    blob = _cpfont(tmp_path).read_bytes()
+    plain = image.render_page_png(blob, PARAGRAPH)
+    night = image.render_page_png(blob, PARAGRAPH, inverted=True)
+    assert night.tobytes() == image.invert_levels(plain).tobytes()
+    assert night.tobytes() != plain.tobytes(), "a page of one level proves nothing"
+    # The paper is what most of a page is, so this is the visible claim.
+    assert image.BLACK in _levels(night) and image.WHITE in _levels(plain)
+
+
 @needs_wasm
 @needs_font
 def test_antialiasing_on_produces_greys(tmp_path):

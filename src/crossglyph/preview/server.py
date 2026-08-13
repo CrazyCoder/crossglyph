@@ -319,6 +319,7 @@ class PageKnobs(BaseModel):
     line_spacing: str = "normal"
     language: str = "ru"
     antialiased: bool = True
+    inverted: bool = False
 
 
 class RenderRequest(BaseModel):

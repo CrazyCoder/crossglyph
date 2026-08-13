@@ -40,6 +40,14 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
+Night mode is the reader's inverted screen. The device draws the page exactly
+as it does by day and complements the framebuffer on its way to the panel, so
+what changes is which level each pixel lands on: paper and ink swap, and the
+two greys swap with each other. That is a level complement rather than 255
+minus a value, which would ask for greys this panel cannot make. It is worth
+looking at a font both ways, since a face that is comfortable in black on
+white can read heavy in white on black.
+
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that
 is which size you are working at rather than tuning. Holding is a look and not

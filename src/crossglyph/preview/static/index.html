@@ -276,9 +276,17 @@
     <input name="antialiased" type="checkbox" checked data-group="page">
     <button type="button" class="revert" data-reset="antialiased" title="Compare with the value the config has" aria-label="compare anti-aliasing" hidden>&#8634;</button>
   </label>
+  <label class="row">
+    <span class="name">night mode</span>
+    <input name="inverted" type="checkbox" data-group="page">
+    <button type="button" class="revert" data-reset="inverted" title="Compare with the value the config has" aria-label="compare night mode" hidden>&#8634;</button>
+  </label>
 
   <div class="hint">Anti-aliasing off is the device's 1-bit mode: every
     non-white level is painted solid black.</div>
+  <div class="hint">Night mode inverts the page on its way to the panel, so
+    the two greys swap as well as the paper and the ink. The reader applies it
+    to the book and not to the menus over it.</div>
   <div class="hint">Remembered in this browser, so they survive while you turn
     font knobs.</div>
 

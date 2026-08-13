@@ -354,6 +354,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     }),
     makeControl({ name: "hyphenation", type: "checkbox", checked: false, group: "page" }),
     makeControl({ name: "antialiased", type: "checkbox", checked: true, group: "page" }),
+    makeControl({ name: "inverted", type: "checkbox", checked: false, group: "page" }),
     makeControl({ name: "line_height", type: "number", value: "1.15",
                   min: "0.8", max: "2.2", step: "0.05" }),
     makeControl({ name: "text", value: "", group: "root" }),
@@ -1914,6 +1915,30 @@ for (const { name, text } of sources) {
   env.sheet.press();
   env.sheet.release();
   check("and a hold over it leaves it where it was", untuned() === true);
+}
+
+// 46. Night mode is a page knob like the rest: it posts under `page`, it is
+//     remembered, and it is the reader's setting rather than the font's.
+{
+  const store = fakeStorage();
+  const env = await loaded(store);
+  const last = () => env.fetches.bodies.at(-1);
+
+  env.byName.inverted.checked = true;
+  env.listeners.input({ target: env.byName.inverted });
+  await settle();
+  check("it reaches the render under the page settings",
+        last().page.inverted === true, JSON.stringify(last().page));
+  check("and is remembered like the reader's other settings",
+        JSON.parse(store.data["crossglyph.page"]).inverted === true,
+        store.data["crossglyph.page"]);
+  check("without touching the tuning, which is the font's",
+        !("inverted" in last().tuning), JSON.stringify(last().tuning));
+
+  env.clicks.page();
+  check("and Reset page settings puts it back",
+        env.byName.inverted.checked === false,
+        String(env.byName.inverted.checked));
 }
 
 process.exit(failures ? 1 : 0);
