@@ -1710,4 +1710,31 @@ for (const { name, text } of sources) {
         env.pageError.hidden === true, String(env.pageError.hidden));
 }
 
+// 42. The language only says which patterns hyphenate, so with the switch
+//     under it off it draws the identical page. Greyed, the row says that
+//     before it is turned rather than after.
+{
+  const env = await loaded(fakeStorage());
+  check("with hyphenation off the language is not offered",
+        env.byName.language.disabled === true, String(env.byName.language.disabled));
+
+  env.byName.hyphenation.checked = true;
+  env.byName.hyphenation.on.change();
+  check("turning it on offers the language",
+        env.byName.language.disabled === false, String(env.byName.language.disabled));
+
+  env.clicks.page();
+  check("and resetting the page settings takes it back",
+        env.byName.language.disabled === true, String(env.byName.language.disabled));
+}
+
+// 42b. And a remembered `hyphenation` has to reach it too: the state is
+//      restored from storage, which fires nothing.
+{
+  const env = await loaded(fakeStorage({
+    "crossglyph.page": JSON.stringify({ hyphenation: true, language: "en" }) }));
+  check("a remembered switch leaves the language offered",
+        env.byName.language.disabled === false, String(env.byName.language.disabled));
+}
+
 process.exit(failures ? 1 : 0);

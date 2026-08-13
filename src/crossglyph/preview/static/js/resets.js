@@ -1,4 +1,4 @@
-import {form, lineHeightAuto, syncLineHeight} from "./dom.js";
+import {form, lineHeightAuto, syncHyphenation, syncLineHeight} from "./dom.js";
 import {syncSliders} from "./knobs.js";
 import {STORE, attempt, pageControls} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
@@ -17,6 +17,7 @@ export function resetControl(el) {
 export function afterReset() {
   syncSliders();
   syncLineHeight();
+  syncHyphenation();
   refreshReverts();
   scheduleRender();
 }

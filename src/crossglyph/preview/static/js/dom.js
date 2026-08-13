@@ -16,3 +16,11 @@ export function syncLineHeight() {
   }
 }
 lineHeightAuto.addEventListener("change", syncLineHeight);
+
+// The same again, and for the same reason. A language only says which patterns
+// hyphenate; with the switch under it off, nothing does, and turning the knob
+// draws the identical page. Greyed, the row says so before it is turned.
+export function syncHyphenation() {
+  form.elements.language.disabled = !form.elements.hyphenation.checked;
+}
+form.elements.hyphenation.addEventListener("change", syncHyphenation);

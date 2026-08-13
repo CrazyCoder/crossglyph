@@ -1,5 +1,5 @@
 import {familyPicker} from "./family.js";
-import {form, syncLineHeight} from "./dom.js";
+import {form, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState} from "./export.js";
 import {syncSliders} from "./knobs.js";
 import {loadPage} from "./remember.js";
@@ -14,6 +14,7 @@ loadPage();
 loadText();
 syncSliders();
 syncLineHeight();
+syncHyphenation();
 refreshReverts();
 
 // Seed the box with the server's sample so it can be edited, not just
