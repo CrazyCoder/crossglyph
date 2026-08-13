@@ -422,3 +422,63 @@ def test_a_fetch_says_how_far_it_has_got(tmp_path, monkeypatch):
     # bar names what is in hand rather than what has just finished.
     assert [s["name"] for s in steps if s["event"] == "start"] == \
         fontbuild.fetch_plan("", "")
+
+
+def test_the_bundled_family_is_offered_beside_a_workspace_of_your_own(tmp_path):
+    """Somewhere to flip to mid-tuning, at the size and knobs you are working
+    at, is worth an entry whatever else is in the folder."""
+    import fontsmith
+
+    from crossglyph import fontbuild
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    names = [config.name for config in fontbuild.offered(tmp_path)[0]]
+    assert names == ["Probe", "Literata"], "the bundled one comes last"
+
+
+def test_a_build_with_no_arguments_builds_your_workspace_and_nothing_else(tmp_path):
+    """The picker and the build differ by exactly this entry. Build all must
+    not rasterize four sizes of a family nobody put in the folder."""
+    import fontsmith
+
+    from crossglyph import fontbuild
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    assert [c.name for c in fontbuild.gather(tmp_path)[0]] == ["Probe"]
+
+
+def test_the_bundled_family_answers_to_its_name_whatever_else_is_there(tmp_path):
+    """The picker offers it permanently, so a render has to resolve it
+    permanently -- an entry that 422s when chosen is worse than no entry."""
+    import fontsmith
+
+    from crossglyph import fontbuild
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    configs, errors = fontbuild.gather(tmp_path, ["Literata"])
+    assert errors == []
+    assert [c.name for c in configs] == ["Literata"]
+    assert configs[0].styles["regular"].parent == fontbuild.STARTER_DIR
+
+
+def test_saving_the_bundled_family_makes_it_one_of_yours(tmp_path):
+    """Its config is what turns a thing to look at into a thing you build. It
+    is discovered as a per-font config after that, not as the bundled one."""
+    import fontsmith
+
+    from crossglyph import fontbuild, fontconf
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    conf = fontbuild.conf_dir(tmp_path)
+    conf.mkdir(parents=True, exist_ok=True)
+    fontconf.write_values(conf / "literata.conf",
+                          {"family": "Literata", "dir": str(fontbuild.STARTER_DIR)})
+
+    built = [config.name for config in fontbuild.gather(tmp_path)[0]]
+    assert built == ["Literata", "Probe"], "a saved config joins the workspace"
+    # And it is not offered twice for having a config of its own now.
+    assert [c.name for c in fontbuild.offered(tmp_path)[0]] == built

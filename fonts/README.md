@@ -4,7 +4,8 @@ Put TTF or OTF files in this folder, then run the launcher in the folder above.
 No configuration is needed to start: a folder of fonts is a family list.
 
 Until there is a font in here, the preview opens on Literata, which ships with
-the tool. It steps aside as soon as you add one of your own.
+the tool. It stays in the picker afterwards as something to compare against,
+and it is not built unless you ask for it by name or press Save on it.
 
 A family is a set of files sharing a stem: `NotoSans-Regular.ttf`,
 `NotoSans-Bold.ttf`, `NotoSans-Italic.ttf`, `NotoSans-BoldItalic.ttf`. CrossGlyph

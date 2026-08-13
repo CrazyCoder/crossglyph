@@ -20,12 +20,17 @@ going back to one you were just looking at is free. Started on a bare `--font`,
 that file stays at the top of the list as a choice of its own, since it is no
 family and cannot become one.
 
-While the workspace has no fonts in it, the picker offers Literata, which ships
-with the tool and is marked `(bundled)`. Its faces are read where they are
-installed and nothing is copied into the workspace. It is there so a first run
-has type to look at, and it steps aside as soon as you add a font of your own.
-Saving it first writes a `literata.conf` naming `dir`, which is what keeps it
-in the list after that.
+The picker always ends with Literata, which ships with the tool and is marked
+`(bundled)`. Its faces are read where they are installed and nothing is copied
+into the workspace. It is there so a first run has type to look at, and it
+stays afterwards as somewhere to flip to: a face you know is good, at the size
+and the knobs you are working at.
+
+Being in the picker does not put it in your workspace. `crossglyph build` with
+no arguments, and **Build all**, build the families in your folder and not the
+one that came with the tool. Name it and it builds, and pressing Save on it
+writes a `literata.conf` naming `dir`, after which it is a family like any
+other and builds with the rest.
 
 The server runs until it is killed, and it reads the Python once at startup, so
 a change to the source needs a restart. On Windows, free the port first:

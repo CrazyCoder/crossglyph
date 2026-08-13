@@ -49,7 +49,8 @@ SOURCE_DIR = pathlib.Path(os.environ.get("CROSSGLYPH_FONTS") or ROOT / "fonts")
 #: The family that ships with the tool, inside the package rather than in the
 #: workspace, which belongs to whoever unpacked it. An empty folder and an
 #: error is a poor first five minutes, so this stands in until there is a font
-#: to prefer. Literata is OFL, and one variable file per posture fills all four
+#: to prefer, and stays in the picker after that as something to compare
+#: against. Literata is OFL, and one variable file per posture fills all four
 #: style slots with its opsz axis following the size being built -- so the
 #: family it opens on exercises the knobs rather than just filling the picker.
 STARTER_DIR = pathlib.Path(__file__).resolve().parent / "starter"
@@ -677,8 +678,11 @@ def starter_configs(source: pathlib.Path,
 
     Read where it is installed rather than copied into the workspace: that
     folder is the reader's, and a tool that drops files in it unasked is one
-    you have to clean up after. `dir` is what a Save writes so the config goes
-    on resolving once the folder has a font of its own and this steps aside.
+    you have to clean up after. `dir` is what a Save writes, so the config goes
+    on resolving once this is a family of theirs rather than one of ours.
+
+    gather() takes these only when the workspace has nothing; offered() takes
+    them always, and the difference between the two is what a build builds.
     """
     if not STARTER_DIR.is_dir():
         return [], []                   # an install missing its own faces
@@ -692,6 +696,26 @@ def starter_configs(source: pathlib.Path,
         except FontConfigError as exc:
             errors.append(str(exc))
     return configs, errors
+
+
+def offered(source: pathlib.Path | str | None = None,
+            ) -> tuple[list[Config], list[str]]:
+    """Every family to offer for looking at: the workspace, then the bundled one.
+
+    A build takes gather() and a picker takes this, and the one entry between
+    them is the point. What a build with no arguments does is build your
+    workspace, and the family that came with the tool is not part of it until
+    you save a config for it. Somewhere to flip to mid-tuning, though -- a face
+    you know is good, at the size and the knobs you are working at -- is worth
+    a permanent entry whatever else is in the folder.
+    """
+    source = pathlib.Path(source) if source else SOURCE_DIR
+    configs, errors = gather(source)
+    known = {config.name.casefold() for config in configs}
+    more, more_errors = starter_configs(source, load_defaults(source))
+    return (configs + [config for config in more
+                       if config.name.casefold() not in known],
+            errors + more_errors)
 
 
 def gather(source: pathlib.Path,
@@ -725,8 +749,16 @@ def gather(source: pathlib.Path,
     if not tokens:
         return configs, errors
 
+    # Named outright, the bundled family is addressable whatever else is in the
+    # workspace. The picker offers it permanently and a render has to be able
+    # to resolve what the picker offers -- but it stays out of the list above,
+    # so a build with no arguments still builds your workspace and not the
+    # family that came with the tool.
+    known = {config.name.casefold() for config in configs}
+    pool = configs + [config for config in starter_configs(source, defaults)[0]
+                      if config.name.casefold() not in known]
     wanted = {t.casefold().removesuffix(".conf") for t in tokens}
-    chosen = [c for c in configs
+    chosen = [c for c in pool
               if {c.name.casefold(), c.family.casefold(), c.path.stem.casefold()}
               & wanted]
     missed = wanted - {v for c in chosen

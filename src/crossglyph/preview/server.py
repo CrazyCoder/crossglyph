@@ -275,9 +275,9 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
                      else f"{config.name.lower()}.conf"),
             "derived": config.derived,
             # Whether this is the family that ships with the tool rather than
-            # one of yours. It is offered only while the workspace is empty, so
-            # saying so is what stops it looking like a font you forgot about
-            # -- and explains where it went once you drop your own in.
+            # one of yours. It is in the picker whatever else is there, so
+            # saying so is what stops it looking like a font you put in the
+            # folder and forgot -- and what explains why Build all leaves it.
             "bundled": (config.styles.get("regular", config.path).parent
                         == fontbuild.STARTER_DIR),
             # What the family builds as, which is the export panel's half of
@@ -309,7 +309,7 @@ def families() -> list[dict]:
     One walk of the folder answers all of it, so the picker can say what
     changing to a family will load without a round trip per entry.
     """
-    configs = fontbuild.gather(fontbuild.SOURCE_DIR)[0]
+    configs = fontbuild.offered(fontbuild.SOURCE_DIR)[0]
     # Every family's regular face, so a fallback file can be reported as the
     # family it belongs to without a second walk per entry.
     regulars = {str(config.styles["regular"]): config.name
@@ -721,10 +721,10 @@ def save(request: SaveRequest) -> dict:
             path = fontbuild.conf_dir() / f"{config.name.lower()}.conf"
             path.parent.mkdir(parents=True, exist_ok=True)
             changes = {"family": config.family, **changes}
-            # The bundled family's faces are in the package, not the folder,
-            # and it is only offered while the folder is empty. Saying where
-            # they are is what keeps this config resolving after the first
-            # font of your own arrives and the bundled one steps aside.
+            # The bundled family's faces are in the package rather than the
+            # folder. Saying where they are is what turns this from something
+            # to look at into a family of yours: with `dir` written down it
+            # resolves like any other config, and builds with the rest.
             folder = config.styles["regular"].parent
             if folder != fontbuild.SOURCE_DIR:
                 changes = {"dir": str(folder), **changes}
@@ -963,8 +963,11 @@ def _config_cached(source: str, name: str) -> Config:
     del source                          # in the key, not the body
     configs, errors = fontbuild.gather(fontbuild.SOURCE_DIR, [name])
     if not configs:
+        # offered() rather than gather(): the roll call has to name everything
+        # that can be asked for, and the bundled family can be whatever else
+        # is in the folder.
         known = ", ".join(sorted(config.name for config
-                                 in fontbuild.gather(fontbuild.SOURCE_DIR)[0]))
+                                 in fontbuild.offered(fontbuild.SOURCE_DIR)[0]))
         # gather() says which token missed and where it looked; the roll call
         # of what is there is what turns that into the next command to type.
         raise LookupError("\n".join(

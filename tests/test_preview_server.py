@@ -228,7 +228,11 @@ def test_the_picker_is_told_what_there_is(two_families):
     from crossglyph.preview import server
 
     response = TestClient(server.app).get("/defaults").json()
-    assert {entry["name"] for entry in response["families"]} == {"Probe", "Filler"}
+    names = [entry["name"] for entry in response["families"]]
+    assert set(names) == {"Probe", "Filler", "Literata"}
+    # The bundled family comes after the workspace's own, since it is somewhere
+    # to flip to rather than one of yours.
+    assert names[-1] == "Literata"
     assert all(entry["faces"] for entry in response["families"])
 
 
@@ -1306,7 +1310,8 @@ def test_an_empty_workspace_still_has_a_family_to_show(tmp_path, monkeypatch):
 def test_a_font_of_your_own_is_never_marked_bundled(two_families):
     from crossglyph.preview import server
 
-    assert [entry["bundled"] for entry in server.families()] == [False, False]
+    marked = {entry["name"] for entry in server.families() if entry["bundled"]}
+    assert marked == {"Literata"}, "a font of yours is being called bundled"
 
 
 def test_saving_the_bundled_family_records_where_its_faces_are(tmp_path,
