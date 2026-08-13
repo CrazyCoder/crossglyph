@@ -43,7 +43,7 @@ fetch("/defaults").then(r => r.json()).then(d => {
   // picker holds Custom alone, which is why the box is filled from here.
   fillSamples(d.samples);
   restoreSample(navigator.languages);
-  fillPresets(d.presets || []);
+  fillPresets(d.presets || [], d.base || []);
   showFallbackState(d.fallbacks);
   outField.value = d.out || "";
   outField.placeholder = d.out_resolved || "";

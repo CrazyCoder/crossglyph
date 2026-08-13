@@ -66,7 +66,16 @@ is which size you are working at rather than tuning. Holding is a look and not
 a change: whatever the toggle was set to is what comes back on release.
 
 The export panel holds what a build needs and a page does not: the sizes, the
-coverage intervals, the fallback families. Save writes the lot back to the
+coverage intervals, the fallback families.
+
+The coverage presets overlap, and the row says so rather than leaving it to be
+worked out: `reading` is the converter's `default` block and a good deal more,
+so ticking it shows Default, Latin Extended, Symbols and Vietnamese as carried,
+greyed and not yours to change while it is on. A preset you chose that another
+of your choices already covers stays yours to untick, greyed with a note saying
+it adds nothing. Greek and Cyrillic are never carried: `reading` has the main
+blocks but not polytonic Greek or the Cyrillic Supplement, so ticking those
+still adds something. Only what you chose is written to the config. Save writes the lot back to the
 family's config, and Build then runs the same build the command line runs.
 Save first, then build: the build reads the config from disk, so anything you
 have not saved is not in it.

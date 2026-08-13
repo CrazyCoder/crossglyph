@@ -507,6 +507,10 @@
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: .1rem .5rem; padding: .35rem 0;
   }
+  /* A preset another tick already carries. Muted rather than struck through:
+     the state is true, there is just nothing to decide about it while the tick
+     that carries it is on. */
+  .presets label.implied { color: var(--muted); }
   .presets label { display: flex; align-items: center; gap: .35rem;
                    font-size: 12px; cursor: pointer; }
   .presets input { width: .95rem; height: .95rem; accent-color: var(--l2);

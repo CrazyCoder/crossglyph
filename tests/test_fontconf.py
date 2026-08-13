@@ -74,13 +74,32 @@ def test_unknown_key_is_an_error(tmp_path):
         fontconf.parse_config(tmp_path / "alto.conf")
 
 
-def test_intervals_default_to_the_web_converter_selection(tmp_path):
+def test_intervals_default_to_reading_and_nothing_beside_it(tmp_path):
+    """`reading` is the converter's `default` block and a good deal more, so
+    naming other presets beside it mostly restates it: latin-ext and symbols
+    add nothing at all, and the panel showing five ticks reads as five things
+    a build needs."""
+    from crossglyph.cpfont import convert
+
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text("", encoding="utf-8")
     cfg = fontconf.parse_config(tmp_path / "alto.conf")
-    assert cfg.intervals == "reading,latin-ext,greek,cyrillic,symbols"
+    assert cfg.intervals == "reading"
     # base is injected by the converter itself; listing it would be redundant.
     assert "base" not in cfg.intervals
+
+    # And the claim above, from the ranges rather than from memory.
+    def points(name):
+        return {code for low, high in convert.INTERVAL_PRESETS[name]
+                for code in range(low, high + 1)}
+
+    reading = points("reading") | points("base")
+    for name in ("default", "latin-ext", "symbols", "vietnamese"):
+        assert not points(name) - reading, f"{name} is no longer inside reading"
+    # The two that are not, and why they stay tickable: the main blocks are in
+    # reading, the rest of each block is not.
+    assert points("greek") - reading, "polytonic Greek would have nothing to add"
+    assert points("cyrillic") - reading, "the Cyrillic Supplement likewise"
 
 
 def test_dir_key_points_discovery_at_another_folder(tmp_path):

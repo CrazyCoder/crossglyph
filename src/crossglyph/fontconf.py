@@ -75,7 +75,14 @@ KEYWORD_RANK = {
 
 # What the user ticks on the website: Reading (Fiction), Latin Extended, Greek,
 # Cyrillic, Symbols & Arrows. `base` is injected by the converter itself.
-DEFAULT_INTERVALS = "reading,latin-ext,greek,cyrillic,symbols"
+#: `reading` is not a peer of the other presets: it is the converter's own
+#: `default` block plus a good deal more, so it already carries Latin Extended,
+#: Cyrillic U+0400-04FF, monotonic Greek, the currency and arrow and maths
+#: blocks, and Vietnamese. Naming those beside it added 3431 codepoints where
+#: `reading` alone gives 3127, and the 304 between them are polytonic Greek and
+#: the Cyrillic Supplement -- neither of which a book wants and most faces do
+#: not draw. Listing them made the panel look as though five ticks were needed.
+DEFAULT_INTERVALS = "reading"
 DEFAULT_SIZES = [12, 14, 16, 18]
 
 BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "ligatures"}

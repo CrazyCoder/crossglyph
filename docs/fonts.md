@@ -43,7 +43,7 @@ dir            = .
 sizes          = 12 14 16 18
 sizes_mod      = 13 15 17 19
 mod_suffix     = Mod
-intervals      = reading,latin-ext,greek,cyrillic,symbols
+intervals      = reading
 ranges         = (0x2900-0x29FF),(0x2E00-0x2E7F)
 fallbacks      = yes
 space_glyphs   = yes
@@ -63,7 +63,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `sizes` | `12 14 16 18` | point sizes to build. Fractions are allowed, see below |
 | `sizes_mod` | none | point sizes for a second family, `<name><mod_suffix>` |
 | `mod_suffix` | `Mod` | suffix for that second family |
-| `intervals` | `reading,latin-ext,greek,cyrillic,symbols` | preset names, comma separated |
+| `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
 | `fallbacks` | `yes` | append the twelve bundled Noto faces |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |

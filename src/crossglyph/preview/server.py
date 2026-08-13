@@ -26,7 +26,8 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 import freetype
 
 from .. import fontbuild, fontconf
-from ..cpfont.convert import FontBuildError
+from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
+                              FontBuildError)
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
@@ -772,8 +773,16 @@ def defaults() -> dict:
             "out": fontbuild.load_defaults(fontbuild.SOURCE_DIR)
                             .get("out", "").strip(),
             "out_resolved": str(fontbuild.output_dir()),
-            "presets": [{"name": name, "label": label, "note": note}
+            # The ranges travel with each preset so the panel can work out for
+            # itself which ticks another tick has already made. `reading` is
+            # the converter's `default` and a good deal more, and a row of
+            # boxes with nothing to say about that reads as five independent
+            # choices. Every build carries `base` whatever is ticked, so it is
+            # part of the answer and is sent alongside.
+            "presets": [{"name": name, "label": label, "note": note,
+                         "ranges": INTERVAL_PRESETS.get(name, [])}
                         for name, label, note in COVERAGE_PRESETS],
+            "base": BASE_INTERVALS,
             # Whether the bundled faces are anywhere, so the panel can offer to
             # fetch them rather than let a build fail on them.
             "fallbacks": str(fontbuild.fallback_dir() or ""),

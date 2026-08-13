@@ -254,9 +254,19 @@ const DEFAULTS = {
   fallbacks: "D:\fonts\fallbacks",
   source: "D:\\fonts",
   out: "",
-  presets: [{ name: "reading", label: "Reading", note: "Fiction" },
-            { name: "cyrillic", label: "Cyrillic", note: "" },
-            { name: "greek", label: "Greek", note: "" }],
+  // The ranges are what the panel works containment out from, so the fixture
+  // carries the shape the real ones have: `reading` swallows `default` whole,
+  // and only half of `cyrillic`, which is why one of those can be settled by
+  // ticking it and the other cannot.
+  presets: [{ name: "reading", label: "Reading", note: "Fiction",
+              ranges: [[0x0080, 0x024F], [0x0370, 0x03FF], [0x0400, 0x04FF]] },
+            { name: "default", label: "Default", note: "CrossPoint",
+              ranges: [[0x0080, 0x017F], [0x0400, 0x04FF]] },
+            { name: "cyrillic", label: "Cyrillic", note: "",
+              ranges: [[0x0400, 0x04FF], [0x0500, 0x052F]] },
+            { name: "greek", label: "Greek", note: "",
+              ranges: [[0x0370, 0x03FF], [0x1F00, 0x1FFF]] }],
+  base: [[0x0000, 0x007F], [0x2000, 0x206F]],
 };
 
 // What POST /save answers with. The page takes its new baseline from this
@@ -304,10 +314,28 @@ function makeElement() {
     // sets one the moment it is shown.
     style: { props: {}, setProperty(key, value) { this.props[key] = value; } },
     type: "", value: "", checked: false, children: [], hidden: false,
+    disabled: false,
     min: "", max: "", step: "", tabIndex: 0, inputMode: "", id: "",
-    htmlFor: "", on: {},
+    htmlFor: "", on: {}, parentElement: null,
     attrs: {},
-    append(...kids) { this.children.push(...kids); },
+    classes: new Set(),
+    get classList() {
+      const owner = this;
+      return {
+        add: (name) => owner.classes.add(name),
+        remove: (name) => owner.classes.remove(name),
+        contains: (name) => owner.classes.has(name),
+        toggle: (name, on) => (on ? owner.classes.add(name)
+                                  : owner.classes.delete(name)),
+      };
+    },
+    // A child knows its parent, as one does: the coverage row reaches the
+    // label from the box inside it to say the tick is carried rather than
+    // chosen.
+    append(...kids) {
+      for (const kid of kids) if (kid) kid.parentElement = this;
+      this.children.push(...kids);
+    },
     setAttribute(key, value) { this.attrs[key] = value; },
     getAttribute(key) { return this.attrs[key]; },
     // Elements the page builds itself are listened to as it builds them --
@@ -1386,10 +1414,12 @@ for (const { name, text } of sources) {
     .map(name => env.exportForm.elements[name].value).join("|");
   check("sizes open at what the config says, a step to a box",
         boxes() === "12|13|||", boxes());
-  const ticked = () => env.presetList.querySelectorAll()
-    .filter(box => box.checked).map(box => box.value).join();
+  // What the reader chose, which is what the config spells. Boxes another
+  // tick already carries are shown on as well, and those are block 71's.
+  const chosen = () => env.presetList.querySelectorAll()
+    .filter(box => box.dataset.chosen === "yes").map(box => box.value).join();
   check("coverage opens ticked as the config spells it",
-        ticked() === "reading,cyrillic", ticked());
+        chosen() === "reading,cyrillic", chosen());
   check("and a fallback family is shown as a family",
         env.exportForm.elements.fallback1.value === "Sample",
         env.exportForm.elements.fallback1.value);
@@ -1446,12 +1476,14 @@ for (const { name, text } of sources) {
 
   // Coverage is a set, and the config may spell the same ticks in either
   // order: unticking and reticking must not leave the panel dirty either.
+  // Through the box itself, as a click does: a tick is a choice the panel
+  // records, and the other boxes are worked out from it, so poking `checked`
+  // is not a tick any more than moving a needle is a measurement.
   const box = env.presetList.querySelectorAll().find(one => one.value === "reading");
-  box.checked = false;
-  env.exportForm.edit("size1");
+  const tick = (on) => { box.checked = on; env.exportForm.on.input({target: box}); };
+  tick(false);
   check("unticking a preset is a change", env.save.disabled === false);
-  box.checked = true;
-  env.exportForm.edit("size1");
+  tick(true);
   check("and ticking it back is not", env.save.disabled === true);
 }
 
@@ -2415,6 +2447,77 @@ for (const { name, text } of sources) {
                            { languages: ["de-AT"] });
   check("an empty box takes the browser's language",
         env.sample.value === "de", env.sample.value);
+}
+
+// 71. `reading` is the converter's `default` and a good deal more, so ticking
+//     it settles other boxes. A row that says nothing about that reads as
+//     several separate things a build needs.
+{
+  const env = await loaded(fakeStorage());
+  const boxes = Object.fromEntries(
+    env.presetList.querySelectorAll().map(box => [box.value, box]));
+
+  check("a preset another tick carries whole is shown on",
+        boxes.default.checked === true, String(boxes.default.checked));
+  check("and turned off, there being nothing to decide",
+        boxes.default.disabled === true, String(boxes.default.disabled));
+  check("saying which tick carries it",
+        boxes.default.title.includes("reading"), boxes.default.title);
+  check("and marked so the row reads differently",
+        boxes.default.parentElement.classes.has("implied"));
+
+  // Half inside is not inside: ticking Cyrillic still adds the supplement,
+  // and locking it would claim otherwise.
+  // Half inside is not inside. Cyrillic is named by this config as well, so
+  // it is on -- but as a choice of the reader's, still theirs to untick.
+  check("a preset only partly carried stays yours to untick",
+        boxes.cyrillic.disabled === false, String(boxes.cyrillic.disabled));
+  check("and one nothing carries is neither ticked nor locked",
+        boxes.greek.disabled === false && boxes.greek.checked === false);
+}
+
+// 72. What is carried is not written down. The config keeps the short list
+//     somebody chose, not every preset those imply.
+{
+  const env = await loaded(fakeStorage());
+  const sent = env.modules.get("export.js").exportSettings();
+  check("only the chosen presets reach the config",
+        sent.intervals === "reading,cyrillic", sent.intervals);
+}
+
+// 73. And untick it, and the boxes it was carrying come back to the reader.
+{
+  const env = await loaded(fakeStorage());
+  const boxes = Object.fromEntries(
+    env.presetList.querySelectorAll().map(box => [box.value, box]));
+  boxes.reading.checked = false;
+  env.exportForm.on.input({ target: boxes.reading });
+
+  check("what was carried is released", boxes.default.disabled === false,
+        String(boxes.default.disabled));
+  check("and is no longer ticked, nothing carrying it now",
+        boxes.default.checked === false, String(boxes.default.checked));
+  check("with only what is still chosen written down",
+        env.modules.get("export.js").exportSettings().intervals === "cyrillic",
+        env.modules.get("export.js").exportSettings().intervals);
+}
+
+// 74. A tick of your own is never taken away by one that would imply it: the
+//     config named it, and unticking the other has to give it back.
+{
+  const env = await loaded(fakeStorage());
+  const boxes = Object.fromEntries(
+    env.presetList.querySelectorAll().map(box => [box.value, box]));
+  // Default is carried by reading. Tick it outright and it becomes a choice
+  // of yours, so unticking reading later leaves it standing.
+  boxes.default.disabled = false;            // as releasing reading would
+  boxes.default.checked = true;
+  env.exportForm.on.input({ target: boxes.default });
+  boxes.reading.checked = false;
+  env.exportForm.on.input({ target: boxes.reading });
+  check("a tick of your own outlives the one that implied it",
+        boxes.default.checked === true && boxes.default.disabled === false,
+        `${boxes.default.checked} ${boxes.default.disabled}`);
 }
 
 process.exit(failures ? 1 : 0);

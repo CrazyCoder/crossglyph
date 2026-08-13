@@ -16,9 +16,18 @@ export const outField = exportForm.elements.out;
 export const builtNote = document.getElementById("built");
 export let presetNames = [];
 
-export function fillPresets(presets) {
+//: The ranges behind each preset, and the ones every build carries anyway.
+//: Kept so the panel can answer "is this one already in that one" without a
+//: round trip on every tick.
+export const presetRanges = new Map();
+export let baseRanges = [];
+
+export function fillPresets(presets, base = []) {
   presetNames = presets.map(preset => preset.name);
+  baseRanges = base;
+  presetRanges.clear();
   presetList.replaceChildren(...presets.map(preset => {
+    presetRanges.set(preset.name, preset.ranges || []);
     const label = document.createElement("label");
     const box = document.createElement("input");
     box.type = "checkbox";
@@ -37,6 +46,66 @@ export function fillPresets(presets) {
 
 export function presetBoxes() {
   return [...presetList.querySelectorAll("input")];
+}
+
+// Whether every range in `wanted` is already inside `have`. Ranges rather than
+// codepoints: a preset is a handful of them, and CJK alone would be twenty
+// thousand numbers to compare one at a time.
+export function rangesCover(have, wanted) {
+  return wanted.every(([low, high]) => {
+    let at = low;
+    while (at <= high) {
+      const step = have.find(([from, to]) => from <= at && at <= to);
+      if (!step) return false;
+      at = step[1] + 1;
+    }
+    return true;
+  });
+}
+
+//: A preset the reader ticked, as against one another tick already carries.
+//: The box shows both the same way, so the set it is in has to be recorded
+//: somewhere the display cannot overwrite.
+export function chosenPresets() {
+  return presetBoxes().filter(box => box.dataset.chosen === "yes")
+                      .map(box => box.value);
+}
+
+// Show which ticks the other ticks have already made. `reading` is the
+// converter's `default` and a good deal more, so ticking it settles four of
+// these boxes -- and a row that says nothing about that reads as five separate
+// things a build needs. Implied boxes are ticked and turned off: the state is
+// true, and there is nothing to decide while what implies it is on.
+//
+// They are left out of what the panel posts and saves, so the config stays the
+// short list the reader chose rather than growing every preset those imply.
+export function syncPresetCoverage() {
+  const chosen = chosenPresets();
+  for (const box of presetBoxes()) {
+    const own = box.dataset.chosen === "yes";
+    const mine = presetRanges.get(box.value) || [];
+    // Against the *others*, so a tick is never counted as covering itself.
+    // That is what lets a chosen preset be told it adds nothing: a config
+    // naming both `reading` and `symbols` is one tick doing no work, and the
+    // row saying so is the whole point of this.
+    const others = chosen.filter(name => name !== box.value);
+    const covered = [...baseRanges];
+    for (const name of others) covered.push(...(presetRanges.get(name) || []));
+    // A preset with no ranges is one this build of the panel does not know,
+    // and an empty set is inside everything. Left alone rather than locked.
+    const inside = mine.length > 0 && others.length > 0
+                   && rangesCover(covered, mine);
+
+    // Carried and not chosen: on, and nothing to decide while what carries it
+    // is on. Carried and chosen: still yours to untick, since you asked for it
+    // and only you can take it back -- but said, so you can.
+    box.disabled = inside && !own;
+    box.checked = own || inside;
+    box.parentElement.classList.toggle("implied", inside);
+    box.title = inside
+      ? `Already in ${others.join(", ")}, so this adds nothing`
+      : "";
+  }
 }
 
 // The config keeps a list of sizes, the panel shows a box per step. Four boxes
@@ -101,8 +170,14 @@ export function showExport(entry) {
   showSizes(settings);
   exportForm.elements.ranges.value = settings.ranges;
   exportForm.elements.fallbacks.checked = settings.fallbacks;
+  // What the config names is what the reader chose; the rest of the ticks are
+  // worked out from it, so a config that names `reading` alone still opens
+  // with Default, Latin Extended and the others showing as carried.
   const ticked = new Set(settings.intervals.split(",").map(t => t.trim()));
-  for (const box of presetBoxes()) box.checked = ticked.has(box.value);
+  for (const box of presetBoxes()) {
+    box.dataset.chosen = ticked.has(box.value) ? "yes" : "";
+  }
+  syncPresetCoverage();
   for (const field of ["fallback1", "fallback2"]) {
     exportForm.elements[field].value = settings[field] || "";
   }
@@ -113,8 +188,11 @@ export function exportSettings() {
     sizes: joinSizeBoxes(SIZE_FIELDS, exportForm.elements.size_more),
     sizes_mod: joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more),
     mod_suffix: exportForm.elements.mod_suffix.value.trim(),
-    intervals: presetBoxes().filter(box => box.checked)
-                            .map(box => box.value).join(","),
+    // Only what was chosen. A preset another one already carries is shown
+    // ticked, and writing it down as well would grow the config by every
+    // preset the chosen ones imply, which is the list this is trying to spare
+    // anybody reading it.
+    intervals: chosenPresets().join(","),
     // Trimmed, because this is compared against what the config says to decide
     // whether there is anything to save: a trailing space is not an edit.
     ranges: exportForm.elements.ranges.value.trim(),
@@ -271,6 +349,12 @@ export const FALLBACK_FIELDS = new Set(["fallbacks", "fallback1", "fallback2"]);
 // through instead of arriving at the same state by another road.
 export function exportEdited(field) {
   if (field === outField) return;
+  // A tick is a choice; what it implies is worked out from it. Recorded before
+  // anything reads the row, since the boxes cannot tell the two apart.
+  if (field.dataset && field.dataset.preset) {
+    field.dataset.chosen = field.checked ? "yes" : "";
+    syncPresetCoverage();
+  }
   // Typing a second family's first size is what turns its suffix on.
   showModState();
   showSaveState();
