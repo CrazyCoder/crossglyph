@@ -1006,6 +1006,10 @@ def test_asking_for_bundled_fallbacks_without_them_says_where_to_get_them(
     assert "fetch-fallbacks" in steps[-1]["error"]
     assert str(scratch / "fallbacks") in steps[-1]["error"], \
         "the answer has to say where it looked"
+    # And the way out that this reader has: the command is for a terminal they
+    # are not in, and the button is three rows above the note they are reading.
+    assert "Fetch" in steps[-1]["error"], \
+        "the panel's own answer has to name the panel's own button"
 
 
 # --- variable families ----------------------------------------------------

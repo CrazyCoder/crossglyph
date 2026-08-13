@@ -82,6 +82,15 @@ class FontBuildError(RuntimeError):
     """The converter failed for one family."""
 
 
+class FallbacksMissing(FileNotFoundError):
+    """The bundled Noto faces are not in the workspace.
+
+    A type of its own because it is the one missing file a caller can offer to
+    go and get: the message below names the command, and the preview adds its
+    own button to it. Anything else that is not there is not that.
+    """
+
+
 def output_dir(source: pathlib.Path | str | None = None) -> pathlib.Path:
     """Where this source folder's builds go.
 
@@ -137,7 +146,7 @@ def require_bundled_fallbacks(source: pathlib.Path | str | None = None) -> pathl
     if found is not None:
         return found
     looked = "\n".join(f"  {path}" for path in fallback_candidates(source))
-    raise FileNotFoundError(
+    raise FallbacksMissing(
         "the bundled fallback fonts were not found. Looked in:\n"
         f"{looked}\n"
         "Fetch them with `crossglyph fetch-fallbacks` (3.4 MB, or 19 MB "
@@ -172,7 +181,7 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
         else:
             missing.append(name)
     if missing:
-        raise FileNotFoundError(
+        raise FallbacksMissing(
             f"{directory} is missing {', '.join(missing)}. Fetch the set with "
             f"`crossglyph fetch-fallbacks`, or set 'fallbacks = no'.")
     return paths

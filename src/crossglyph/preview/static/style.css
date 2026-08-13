@@ -463,7 +463,10 @@
                    cursor: pointer; }
   .presets .note { color: var(--muted); font-size: 11px; }
   #built, #fetched, #have-fallbacks { color: var(--muted); font-size: 11.5px; }
-  #built { margin-top: .6rem; }
+  /* An error arrives with its own lines: what went wrong, where it looked,
+     what to do. Collapsed to one paragraph the path runs into the sentence
+     after it, which is how a message written to be read becomes a wall. */
+  #built { margin-top: .6rem; white-space: pre-line; }
   #fetch { padding: .3rem .6rem; }
 
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

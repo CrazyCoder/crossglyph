@@ -452,6 +452,17 @@ def useful_fallbacks(sources: tuple, coverage: tuple,
         dict(sources), coverage, fallbacks))
 
 
+def _with_the_button(exc: Exception) -> str:
+    """The fallbacks message as the panel should tell it.
+
+    The command in it is right for a terminal, and the reader of this one is
+    looking at a page with the button on it. Kept out of fontbuild for that
+    reason: the same words on the command line would name something that is
+    not there.
+    """
+    return f"{exc}\nOr press Fetch, beside 'bundled fallback faces' above."
+
+
 @functools.lru_cache(maxsize=32)
 def build_font_cached(sources: tuple, size: float, coverage: tuple,
                       tuning_items: tuple, fallbacks: tuple = (),
@@ -521,8 +532,10 @@ def render(request: RenderRequest) -> Response:
     # status line as though the knob had been rejected.
     except RenderCoreMissing as exc:
         raise HTTPException(503, str(exc)) from exc
-    # Fallbacks ticked and not fetched. The same class again, and the panel has
-    # the button for it a few rows down.
+    # Fallbacks ticked and not fetched. The same class again, and this is the
+    # one missing file the reader can fix without leaving the page.
+    except fontbuild.FallbacksMissing as exc:
+        raise HTTPException(503, _with_the_button(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(503, str(exc)) from exc
 
@@ -815,9 +828,12 @@ def build(request: BuildRequest) -> StreamingResponse:
                     prune=not request.family):
                 yield json.dumps(step) + "\n"
         # Every one of these means the build stopped, and the headers are long
-        # gone, so they travel as the last line rather than as a status. The
-        # missing bundled faces land here too -- see require_bundled_fallbacks,
-        # whose message carries the fetch command.
+        # gone, so they travel as the last line rather than as a status.
+        # Fallbacks that were asked for and never fetched are the one of them
+        # this page can offer to fix, so that one says how.
+        except fontbuild.FallbacksMissing as exc:
+            yield json.dumps(
+                {"event": "error", "error": _with_the_button(exc)}) + "\n"
         except (OSError, ValueError, TypeError, LookupError, FontConfigError,
                 FontBuildError, fontbuild.FontBuildError) as exc:
             yield json.dumps({"event": "error", "error": str(exc)}) + "\n"
