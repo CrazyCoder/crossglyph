@@ -526,7 +526,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // The sheet, which is a control as well as an image: press and hold on it
     // shows the page untuned.
     page: {
-      src: "", set: null, on: {},
+      src: "", set: null, on: {}, classes: new Set(),
+      classList: {
+        add(name) { stubs.page.classes.add(name); },
+        remove(name) { stubs.page.classes.delete(name); },
+        contains(name) { return stubs.page.classes.has(name); },
+      },
       addEventListener(kind, fn) { this.on[kind] = fn; },
       press(button = 0) { this.on.pointerdown({ button, preventDefault() {} }); },
       release(how = "pointerup") { this.on[how](); },
@@ -1939,6 +1944,34 @@ for (const { name, text } of sources) {
   check("and Reset page settings puts it back",
         env.byName.inverted.checked === false,
         String(env.byName.inverted.checked));
+}
+
+// 47. The sheet is blank until there is a page on it. An img with no source
+//     is the browser's broken-image mark, which is the one thing on this page
+//     that is never true, so it starts on an empty placeholder and is shown
+//     when a real page lands.
+{
+  // The default render never answers, which is the state a reload is in
+  // until the server has drawn: the sheet is blank paper, not a broken mark.
+  const waiting = await loaded(fakeStorage());
+  check("nothing is shown before a page has been drawn",
+        waiting.sheet.classes.has("shown") === false,
+        JSON.stringify([...waiting.sheet.classes]));
+
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  check("and the first page that arrives puts it up",
+        env.sheet.classes.has("shown") === true,
+        JSON.stringify([...env.sheet.classes]));
+}
+
+// 47b. A render that failed leaves it blank rather than showing an empty
+//      sheet as though that were the answer.
+{
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 503, body: "no faces yet"}});
+  check("a refused page shows nothing on the sheet",
+        env.sheet.classes.has("shown") === false,
+        JSON.stringify([...env.sheet.classes]));
 }
 
 process.exit(failures ? 1 : 0);

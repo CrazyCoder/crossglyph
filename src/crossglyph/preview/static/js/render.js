@@ -113,6 +113,10 @@ export async function renderNow() {
   const next = URL.createObjectURL(await response.blob());
   if (url) URL.revokeObjectURL(url);
   img.src = url = next;
+  // The sheet is blank until a page has been drawn on it. Set here rather than
+  // on the img's own load, because the empty placeholder it starts on loads
+  // too -- and it is the page arriving that is worth showing, not the element.
+  img.classList.add("shown");
   pageError.hidden = true;
   status.textContent = `${Math.round(performance.now() - started)} ms`;
 }

@@ -298,7 +298,12 @@
 
 <div id="middle">
   <div id="stage">
-    <img id="page" width="480" height="800" alt="the page as the device draws it">
+    <!-- An empty SVG, so the element is never a source-less img: the browser
+         draws its own broken-image mark for one of those, and it appears on
+         every reload before the first render can answer. This is the sheet at
+         its size with nothing on it yet, which is the truth. -->
+    <img id="page" width="480" height="800" alt="the page as the device draws it"
+         src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%2F%3E">
     <!-- Hidden until something goes wrong. A sheet that silently stays blank
          is one nobody can act on, and the reason is usually a sentence long. -->
     <div id="page-error" hidden>

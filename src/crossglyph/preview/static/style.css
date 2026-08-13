@@ -335,7 +335,13 @@
      and the page stays untuned until something else is clicked. */
   #page { display: block; image-rendering: pixelated; background: var(--l0);
           border: 1px solid var(--line);
-          user-select: none; -webkit-user-drag: none; }
+          user-select: none; -webkit-user-drag: none;
+          opacity: 0; transition: opacity .2s ease-out; }
+  /* Put up by the first page that arrives, and never taken down: the fade is
+     the sheet arriving on a reload, not something to sit through on every
+     turn of a knob. */
+  #page.shown { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #page { transition: none; } }
 
   /* A failed render is said where the page would have been, because that is
      where the eye already is. Over the sheet rather than instead of it: the
