@@ -478,6 +478,18 @@
       <button type="button" id="build">Build</button>
       <button type="button" id="build-all">Build all</button>
     </div>
+    <!-- Progress belongs to the press that started it, so it sits under the
+         two buttons and above the sentence they leave behind. The bar says
+         how far, the line under it says what is being built and how many are
+         left; the note below keeps the outcome, and only the outcome. -->
+    <div id="progress" hidden>
+      <div id="bar" role="progressbar" aria-label="build progress"
+           aria-valuemin="0"><span id="bar-fill"></span></div>
+      <div id="progress-line">
+        <span id="progress-what"></span>
+        <span id="progress-count" class="mono"></span>
+      </div>
+    </div>
     <div id="built"></div>
 </form>
 

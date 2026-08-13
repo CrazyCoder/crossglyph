@@ -1,5 +1,6 @@
 import {familyEntries, familyPicker} from "./family.js";
 import {body, scheduleRender} from "./render.js";
+import {endProgress, showProgress, startProgress} from "./progress.js";
 import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
 
 // --- export ---------------------------------------------------------------
@@ -141,16 +142,26 @@ export function fillFallbackPickers() {
 // indistinguishable from one that has hung.
 export function showStep(step) {
   if (step.event === "plan") {
-    builtNote.textContent = step.total
-      ? `0 of ${step.total}…` : "everything is already current";
+    // The bar takes the counting from here; the note is left for the outcome,
+    // and a run with nothing to do is one.
+    if (step.total) {
+      builtNote.textContent = "";
+      showProgress(0, step.total, "");
+    } else {
+      builtNote.textContent = "everything is already current";
+      endProgress();
+    }
   } else if (step.event === "size") {
-    builtNote.textContent =
-      `${step.done} of ${step.total} — ${step.family} ${step.size}`;
+    showProgress(step.done, step.total, `${step.family} ${step.size}`);
   } else if (step.event === "failed") {
+    // One size of many, and the build carries on: the bar keeps running and
+    // the note says which one went wrong.
     builtNote.textContent = `${step.family} ${step.size}: ${step.error}`;
   } else if (step.event === "error") {
+    endProgress();
     builtNote.textContent = step.error;
   } else if (step.event === "done") {
+    endProgress();
     const count = (key) =>
       step.families.reduce((total, one) => total + one[key].length, 0);
     const failed = count("failed");
@@ -181,11 +192,12 @@ export async function buildFamilies(family) {
     // is only on the page is therefore not in that comparison, so the build
     // finds everything current and says so -- which reads as "your change did
     // nothing" when it means "your change was never seen". Write it first.
+    startProgress(`planning ${label}…`);
+    builtNote.textContent = "";
     if (!saveButton.hidden && knobsDiffer() && !(await saveKnobs())) {
       builtNote.textContent = `not built: ${label} could not be saved`;
       return;
     }
-    builtNote.textContent = `planning ${label}…`;
     let response;
     try {
       response = await fetch("/build", {
@@ -211,7 +223,10 @@ export async function buildFamilies(family) {
     }
   } finally {
     // Whatever happened -- a dropped connection, a line that would not parse --
-    // the buttons come back, or the panel is dead until a reload.
+    // the buttons come back, or the panel is dead until a reload. The bar
+    // goes with them: a dropped connection would otherwise leave it sitting at
+    // whatever fraction it had reached, saying a run is still going.
+    endProgress();
     for (const button of buildButtons) button.disabled = false;
   }
 }

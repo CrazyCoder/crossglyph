@@ -50,6 +50,9 @@ async function evaluatePage(sandbox) {
   const entry = moduleFor(ENTRY);
   await entry.link(specifier => moduleFor(specifier.replace("./", "")));
   await entry.evaluate();
+  // What each module exports, so a helper that is pure arithmetic can be
+  // asked directly rather than through a screen built to provoke it.
+  return new Map([...built].map(([name, module]) => [name, module.namespace]));
 }
 
 // --- the split itself ------------------------------------------------------
@@ -455,6 +458,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     set disabled(next) { this._disabled = next; this.states.push(next); },
     addEventListener(kind, fn) { if (kind === "click") buildButtons[id] = fn; },
   });
+  // A text holder that remembers everything it was set to.
+  const recording = () => ({
+    steps: [],
+    _text: "",
+    get textContent() { return this._text; },
+    set textContent(next) { this._text = next; this.steps.push(next); },
+  });
   const saveButton = {
     hidden: false, disabled: true, textContent: "", title: "",
     on: {},
@@ -468,12 +478,23 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     presets: presetList,
     // Every value the note took, so the counting can be asserted and not
     // just the last line of it.
-    built: {
-      steps: [],
-      _text: "",
-      get textContent() { return this._text; },
-      set textContent(next) { this._text = next; this.steps.push(next); },
+    built: recording(),
+    // The build progress: a rule that fills, and the line under it. Every
+    // value each part took, since "it counted its way there" is a sequence and
+    // reading the property afterwards only shows where it stopped.
+    progress: { hidden: true },
+    bar: {
+      attrs: {}, classes: new Set(),
+      classList: {
+        add(name) { stubs.bar.classes.add(name); },
+        remove(name) { stubs.bar.classes.delete(name); },
+      },
+      setAttribute(name, value) { this.attrs[name] = value; },
+      removeAttribute(name) { delete this.attrs[name]; },
     },
+    "bar-fill": { style: {} },
+    "progress-what": recording(),
+    "progress-count": recording(),
     "source-note": { textContent: "" },
     // The row of sizes past the four boxes, which most families do not have.
     "more-row": { hidden: false },
@@ -652,6 +673,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            builtSteps: stubs.built.steps,
+           progress: stubs.progress, bar: stubs.bar,
+           barFill: stubs["bar-fill"],
+           progressWhat: stubs["progress-what"],
+           progressCount: stubs["progress-count"],
            buildEls: [stubs.build, stubs["build-all"]],
            save: saveButton, note: stubs.saved, prompts,
            pageError: stubs["page-error"], status: stubs.status,
@@ -660,7 +685,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
 
 async function run(storage, defaults, opts) {
   const env = makeEnv(storage, defaults, opts);
-  await evaluatePage(env.sandbox);
+  env.modules = await evaluatePage(env.sandbox);
   return env;
 }
 
@@ -1312,9 +1337,13 @@ for (const { name, text } of sources) {
         env.built.textContent === "2 built, 0 already current → D:\\fonts\\cpfonts",
         env.built.textContent);
   check("having counted its way there rather than sitting on 'building…'",
-        env.builtSteps.includes("1 of 2 — Alto 12") &&
-        env.builtSteps.includes("2 of 2 — Alto 13"),
-        JSON.stringify(env.builtSteps));
+        env.progressCount.steps.includes("1 of 2") &&
+        env.progressCount.steps.includes("2 of 2"),
+        JSON.stringify(env.progressCount.steps));
+  check("and named what it was building at each step",
+        env.progressWhat.steps.includes("Alto 12") &&
+        env.progressWhat.steps.includes("Alto 13"),
+        JSON.stringify(env.progressWhat.steps));
 
   await env.builds.all();
   check("Build all builds every family",
@@ -1735,6 +1764,55 @@ for (const { name, text } of sources) {
     "crossglyph.page": JSON.stringify({ hyphenation: true, language: "en" }) }));
   check("a remembered switch leaves the language offered",
         env.byName.language.disabled === false, String(env.byName.language.disabled));
+}
+
+// 43. The progress bar. A build is minutes with the fallbacks on, and the
+//     stream carries a count from its first line, so the panel says how far
+//     rather than that it is working.
+{
+  const env = await loaded(fakeStorage());
+  const progress = env.modules.get("progress.js");
+
+  // Before the plan arrives there is no total. A progressbar says that by
+  // carrying no aria-valuenow, and the rule sweeps instead of sitting empty.
+  progress.startProgress("planning every family…");
+  check("planning shows the bar", env.progress.hidden === false);
+  check("sweeping rather than claiming a fraction it has not got",
+        env.bar.classes.has("waiting") && !("aria-valuenow" in env.bar.attrs),
+        JSON.stringify([...env.bar.classes]));
+
+  progress.showProgress(3, 12, "Alto 14");
+  check("a counted step fills the rule", env.barFill.style.width === "25%",
+        env.barFill.style.width);
+  check("and stops sweeping", env.bar.classes.has("waiting") === false);
+  check("with the count where a screen reader finds it too",
+        env.bar.attrs["aria-valuenow"] === "3"
+        && env.bar.attrs["aria-valuemax"] === "12",
+        JSON.stringify(env.bar.attrs));
+
+  progress.endProgress();
+  check("and it goes when the build does", env.progress.hidden === true);
+}
+
+// 43b. The estimate, which is arithmetic and worth asking directly. It is
+//      held back rather than shown wrong: the first size pays the one-off
+//      costs of the whole run, so an estimate drawn from it is out by a
+//      factor, and this is the one screen somebody is waiting at.
+{
+  const env = await loaded(fakeStorage());
+  const {timeLeft, spellDuration} = env.modules.get("progress.js");
+  check("nothing from one size, however long it took",
+        timeLeft(1, 10, 60000) === "", timeLeft(1, 10, 60000));
+  check("nothing in the first seconds either",
+        timeLeft(2, 10, 3000) === "", timeLeft(2, 10, 3000));
+  check("then what the sizes so far say the rest will cost",
+        timeLeft(2, 10, 10000) === "40s left", timeLeft(2, 10, 10000));
+  check("and nothing at the end, where there is no rest",
+        timeLeft(10, 10, 60000) === "", timeLeft(10, 10, 60000));
+  check("minutes read as minutes", spellDuration(130) === "2m 10s",
+        spellDuration(130));
+  check("and a round one drops the seconds", spellDuration(120) === "2m",
+        spellDuration(120));
 }
 
 process.exit(failures ? 1 : 0);

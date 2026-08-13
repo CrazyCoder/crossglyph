@@ -44,6 +44,12 @@ family's config, and Build then runs the same build the command line runs.
 Save first, then build: the build reads the config from disk, so anything you
 have not saved is not in it.
 
+A build reports as it goes, which matters because one with the fallbacks on
+runs for minutes: the bar under the two buttons fills with the sizes done, and
+the line under it names the family and size in hand, the count, and once there
+is enough of the run to judge by, what is left. The sentence that stays when
+it finishes says what was built, what was already current, and where it went.
+
 A family that `all.conf` covers without naming has no file of its own. Saving
 one writes a new `<family>.conf` rather than editing `all.conf`, which would
 retune every family in the workspace.
