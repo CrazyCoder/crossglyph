@@ -366,20 +366,26 @@
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */
   .row.wide { grid-template-columns: 8.2rem 1fr; }
-  /* Box, what it is called, what it says, and the button that acts on it. The
-     notes take the flexible column and the button the fixed one, which is what
-     keeps the button still while they change. */
-  .row.wide.check { grid-template-columns: 1rem auto minmax(0, 1fr) auto; }
+  /* Two rows on one grid. The lists are read left to right in the order they
+     are tried, and their label columns are set rather than sized to their
+     words: the words differ only in a digit, and a UI font that draws 1
+     narrower than 2 would otherwise hand the first list a few pixels the
+     second does not get. The row above spends the first three columns on the
+     box and its words, and the fourth on the button -- which is what makes the
+     button the width of the list under it rather than of its own label. */
+  .row.wide.check, .row.wide.pair {
+    grid-template-columns: repeat(2, 4rem minmax(0, 1fr));
+  }
+  .row.wide.check .box {
+    grid-column: 1 / 4; display: flex; align-items: center; gap: .55rem;
+    min-width: 0;
+  }
   .row.wide.check .name { cursor: pointer; }
   .row.wide.check .note {
-    color: var(--muted); font-size: 11.5px;
+    flex: 1; min-width: 0; color: var(--muted); font-size: 11.5px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* Two lists of the same kind, read left to right in the order they are
-     tried. The label columns are set rather than sized to their words: they
-     differ only in a digit, and a UI font that draws 1 narrower than 2 would
-     otherwise hand the first list a few pixels the second does not get. */
-  .row.wide.pair { grid-template-columns: repeat(2, 4rem minmax(0, 1fr)); }
+  .row.wide.check #fetch { grid-column: 4; }
   #export input[type=text] {
     width: 100%; padding: .28rem .45rem; font-size: 12px; color: inherit;
     background: var(--field); border: 1px solid var(--line); border-radius: 6px;
