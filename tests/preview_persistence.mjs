@@ -520,7 +520,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       setAttribute(name, value) { this.attrs[name] = value; },
       removeAttribute(name) { delete this.attrs[name]; },
     },
-    "bar-fill": { style: {} },
+    // Every width it was set to, in order. The end of a run empties it, so
+    // reading the property afterwards only ever says 0% however full it got.
+    "bar-fill": { widths: [], style: {
+      _width: "",
+      get width() { return this._width; },
+      set width(next) { this._width = next; stubs["bar-fill"].widths.push(next); },
+    } },
     "progress-what": recording(),
     "progress-count": recording(),
     "source-note": { textContent: "" },
@@ -542,7 +548,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Assigned onto rather than spread: the disabled accessor is what records
     // the sequence, and a spread would copy its value and drop it.
     fetch: Object.assign(buildButton("fetch"), { hidden: false }),
-    fetched: { textContent: "" },
+    fetched: recording(),
     "have-fallbacks": { textContent: "" },
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
@@ -582,7 +588,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
     },
   };
-  const fetches = { render: 0, bodies: [], saves: [], builds: [] };
+  const fetches = { render: 0, bodies: [], saves: [], builds: [],
+                    fallbacks: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
@@ -672,6 +679,31 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
             : { value: undefined, done: true }),
         }) } });
       }
+      // The fallback fetch answers a line at a time as well, and in bytes: one
+      // face is four fifths of the set, so the bar counts what has arrived
+      // rather than how many files have.
+      if (String(url).includes("/fallbacks")) {
+        fetches.fallbacks.push(JSON.parse(options.body));
+        const steps = opts.fetchSteps ?? [
+          { event: "plan", files: 2, bytes: 20000000 },
+          { event: "start", name: "NotoSans-Regular.ttf", got: 0,
+            bytes: 20000000 },
+          { event: "step", name: "NotoSans-Regular.ttf", got: 500000,
+            bytes: 20000000 },
+          { event: "start", name: "NotoSansCJKjp-Regular.otf", got: 500000,
+            bytes: 20000000 },
+          { event: "step", name: "NotoSansCJKjp-Regular.otf", got: 20000000,
+            bytes: 20000000 },
+          { event: "done", where: "D:\\fonts\\fallbacks", faces: 13 },
+        ];
+        const body = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
+        let sent = false;
+        return Promise.resolve({ ok: true, body: { getReader: () => ({
+          read: () => Promise.resolve(sent
+            ? { value: undefined, done: true }
+            : ((sent = true), { value: body, done: false })),
+        }) } });
+      }
       if (String(url).includes("/out")) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(
           { out: "D:\\elsewhere" }) });
@@ -733,6 +765,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            progressWhat: stubs["progress-what"],
            progressCount: stubs["progress-count"],
            buildEls: [stubs.build, stubs["build-all"]],
+           fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
@@ -2264,6 +2297,104 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
   check("a page that drew everything says nothing",
         env.sandbox.document.getElementById("undrawn").hidden === true);
+}
+
+// 63. The fallback fetch is a 20 MB download when a CJK face is in it. Without
+//     a bar and a button that goes out, a press that is doing something looks
+//     exactly like a press that did nothing, which is a press people repeat.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["ja"] });
+  const before = env.fetches.render;
+  await env.builds.fetch();
+  // The redraw is scheduled rather than immediate, as every redraw here is.
+  await settle();
+
+  check("the button goes out for the download and comes back after",
+        env.fetchButton.states.join() === "true,false",
+        env.fetchButton.states.join());
+  check("the bar ends full before it is put away",
+        env.barFill.widths.includes("100%"), env.barFill.widths.join());
+  check("and is put away when the download is done",
+        env.progress.hidden === true);
+  check("the count is in bytes, not files",
+        env.progressCount.steps.some(line => line.includes("MB of")),
+        env.progressCount.steps.join(" | "));
+  check("the last file named is the one that took the time",
+        env.progressWhat.steps.at(-1).includes("CJK"),
+        env.progressWhat.steps.at(-1));
+  check("what landed is said afterwards",
+        env.fetchNote.textContent === "13 faces", env.fetchNote.textContent);
+  check("and the page redraws, since it can draw more than it could",
+        env.fetches.render > before, `${before} -> ${env.fetches.render}`);
+}
+
+// 64. Which is the point of sending the text: a CJK sample cannot be drawn
+//     without a face nobody ticked a coverage box for, and having to find the
+//     right box first is the step this removes.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["ja"] });
+  await env.builds.fetch();
+  const sent = env.fetches.fallbacks.at(-1);
+  check("the fetch carries what is on the page",
+        sent.text.includes("いろは"), JSON.stringify(sent.text || "").slice(0, 40));
+  check("and the coverage, which is the other reason to bring one",
+        typeof sent.intervals === "string", JSON.stringify(sent));
+}
+
+// 65. Nothing to download is worth saying: the button looks identical whether
+//     it fetched twenty megabytes or found them already there.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { fetchSteps: [
+    { event: "plan", files: 0, bytes: 0 },
+    { event: "done", where: "D:\\fonts\\fallbacks", faces: 13 },
+  ] });
+  await env.builds.fetch();
+  check("a fetch with nothing to do says so first",
+        env.fetchNote.steps.includes("already fetched"),
+        env.fetchNote.steps.join(" | "));
+}
+
+// 66. A download that dies half way leaves the button pressable, or the panel
+//     is dead until a reload.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { fetchSteps: [
+    { event: "plan", files: 2, bytes: 20000000 },
+    { event: "error", error: "could not fetch the fallback faces: no route" },
+  ] });
+  await env.builds.fetch();
+  check("a failed fetch says why", env.fetchNote.textContent.includes("no route"),
+        env.fetchNote.textContent);
+  check("and leaves the button pressable again",
+        env.fetchButton.disabled === false, String(env.fetchButton.disabled));
+  check("with the bar put away rather than stuck part full",
+        env.progress.hidden === true);
+}
+
+// 67. Fetching the faces is half the job: the box beside them is what puts
+//     them on the page and in the build. A 20 MB download that left the page
+//     as blank as it was is a button that visibly did nothing.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 77, languages: ["ja"] });
+  check("the box is off to begin with",
+        env.exportForm.elements.fallbacks.checked === false);
+
+  await env.builds.fetch();
+  await settle();
+  check("a fetch the page was waiting for turns it on",
+        env.exportForm.elements.fallbacks.checked === true);
+  check("and offers to save it, the way any other panel change does",
+        env.save.disabled === false, String(env.save.disabled));
+}
+
+// 68. But not otherwise. A fetch pressed ahead of time is somebody stocking up,
+//     not asking for their build settings to be rewritten.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  await env.builds.fetch();
+  await settle();
+  check("a fetch nothing was waiting for leaves the box alone",
+        env.exportForm.elements.fallbacks.checked === false);
 }
 
 process.exit(failures ? 1 : 0);

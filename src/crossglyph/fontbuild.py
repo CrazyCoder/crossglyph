@@ -195,44 +195,118 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
     return paths
 
 
-def fetch_fallbacks(source: pathlib.Path | str | None = None,
-                    intervals: str = "", *, say=print) -> list[pathlib.Path]:
-    """Put the bundled faces in the workspace, and return what is there.
+#: What a pan-CJK face is for. Han and the two kana blocks, hangul and its
+#: jamo, the CJK punctuation those are written with, and the compatibility and
+#: fullwidth blocks a book picks up from its source. Nothing in the twelve
+#: faces above has a glyph in any of them, so text that needs one of these
+#: draws as blank space until a CJK face is fetched.
+CJK_RANGES = (
+    (0x2E80, 0x2FDF),                   # radicals
+    (0x3000, 0x303F),                   # CJK punctuation
+    (0x3040, 0x30FF),                   # hiragana and katakana
+    (0x3130, 0x318F),                   # hangul compatibility jamo
+    (0x3400, 0x4DBF), (0x4E00, 0x9FFF),  # han
+    (0xAC00, 0xD7A3),                   # hangul syllables
+    (0xF900, 0xFAFF),                   # compatibility ideographs
+    (0xFF00, 0xFFEF),                   # halfwidth and fullwidth forms
+)
+
+
+def needs_cjk(text: str) -> bool:
+    """Whether this text wants one of the pan-CJK faces.
+
+    One of them answers all four languages rather than one each:
+    NotoSansCJKjp carries 20,976 han, 11,172 hangul and both kana, so Korean is
+    covered by it as well, which is just as well since no Korean face is
+    published beside the others.
+    """
+    return any(low <= code <= high
+               for code in map(ord, text) for low, high in CJK_RANGES)
+
+
+def fetch_plan(intervals: str = "", text: str = "") -> list[str]:
+    """Which files a fetch would put in the workspace, in order.
+
+    A CJK face is 15.7 MB against 3.4 MB for everything else, so it comes only
+    when something has asked for it: a coverage that names a script, or text
+    that cannot be drawn without one. The second is what makes pressing Fetch
+    enough when the page says characters are missing, rather than sending
+    somebody off to find the right coverage box first.
+    """
+    names = list(BUNDLED_FALLBACKS) + [FALLBACK_LICENCE]
+    asked = any(preset in intervals.lower() for preset in CJK_FALLBACKS)
+    if asked or needs_cjk(text):
+        names += [name for name in bundled_fallbacks(intervals)
+                  if name not in BUNDLED_FALLBACKS]
+    return names
+
+
+def fetch_steps(source: pathlib.Path | str | None = None, intervals: str = "",
+                text: str = "") -> typing.Iterator[dict]:
+    """Fetch the bundled faces, saying how far it has got.
 
     Downloaded from the same OFL files the website's own converter ships. The
     licence travels with them.
 
-    `intervals` decides whether a CJK face comes too: at 15.7 MB against 3.4 MB
-    for everything else, it is not something to hand someone who is building a
-    Cyrillic family.
+    Sizes are read first so the progress is in bytes rather than in files. One
+    file is usually four fifths of the download, so counting files would race
+    to the last one and then look stalled for a minute.
     """
     import urllib.request
 
     source = pathlib.Path(source) if source else SOURCE_DIR
     target = source / FALLBACK_NAME
-    asked_for_cjk = any(preset in intervals.lower() for preset in CJK_FALLBACKS)
-    names = list(BUNDLED_FALLBACKS) + [FALLBACK_LICENCE]
-    if asked_for_cjk:
-        names += [name for name in bundled_fallbacks(intervals)
-                  if name not in BUNDLED_FALLBACKS]
-
     target.mkdir(parents=True, exist_ok=True)
-    landed = []
-    for name in names:
+
+    landed, wanted = [], []
+    for name in fetch_plan(intervals, text):
         path = target / name
         if path.is_file():
             landed.append(path)
-            continue
+        else:
+            wanted.append((name, path))
+
+    # Asked for up front so the progress can be in bytes. A server that does
+    # not say is not an error: the download still works, the bar just has less
+    # to go on, so an absent length counts as nothing rather than stopping.
+    total = 0
+    for name, _ in wanted:
+        ask = urllib.request.Request(FALLBACK_URL + name, method="HEAD")
+        with urllib.request.urlopen(ask, timeout=30) as answer:
+            headers = getattr(answer, "headers", None)
+            total += int((headers.get("content-length") if headers else 0) or 0)
+    yield {"event": "plan", "files": len(wanted), "bytes": total}
+
+    got = 0
+    for name, path in wanted:
+        yield {"event": "start", "name": name, "got": got, "bytes": total}
         # Written aside and moved into place, so an interrupted fetch cannot
         # leave a half a font that every later run treats as present.
         part = path.with_name(path.name + ".part")
-        say(f"  downloading {name}")
         with urllib.request.urlopen(FALLBACK_URL + name, timeout=60) as answer:
-            part.write_bytes(answer.read())
+            with part.open("wb") as out:
+                while chunk := answer.read(262144):
+                    out.write(chunk)
+                    got += len(chunk)
+                    yield {"event": "step", "name": name,
+                           "got": got, "bytes": total}
         part.replace(path)
         landed.append(path)
+    yield {"event": "done", "where": str(target), "faces": len(landed)}
+
+
+def fetch_fallbacks(source: pathlib.Path | str | None = None,
+                    intervals: str = "", text: str = "",
+                    *, say=print) -> list[pathlib.Path]:
+    """fetch_steps for a caller with nothing to show progress on."""
+    source = pathlib.Path(source) if source else SOURCE_DIR
+    for step in fetch_steps(source, intervals, text):
+        if step["event"] == "start":
+            say(f"  downloading {step['name']}")
+    target = source / FALLBACK_NAME
     say(f"fallback faces in {target}")
-    return landed
+    return [target / name for name in fetch_plan(intervals, text)
+            if (target / name).is_file()]
 
 
 def space_font_path(out_dir: pathlib.Path) -> pathlib.Path:

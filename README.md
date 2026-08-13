@@ -85,9 +85,14 @@ shipped here:
 ```
 
 That is 3.4 MB, and it puts `OFL.txt` beside them. A CJK face is another
-15.7 MB and comes only when a config asks for a CJK script. The preview offers
-the same thing as a button. Set `fallbacks = no` in a config to build without
-them, which is a factor of twelve smaller for a narrow face.
+15.7 MB and comes only when something has asked for it: a config naming a CJK
+script, or, in the preview, text on the page that cannot be drawn without one.
+One face answers all four languages, Korean included, so there is no choice to
+make between them.
+
+The preview offers the same thing as a button, with a bar, since that download
+takes a while. Set `fallbacks = no` in a config to build without them, which is
+a factor of twelve smaller for a narrow face.
 
 ## What is here
 

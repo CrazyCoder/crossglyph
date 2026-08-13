@@ -183,8 +183,16 @@ If the family and its fallbacks have no glyph for something on the page, a line
 under the box says how many characters that is. It is worth saying because the
 device gives a glyph nobody has no width at all, so a paragraph of them is
 blank space rather than a row of boxes, and a page with a hole in it looks
-exactly like a page that failed to draw. The four CJK presets need a CJK face,
-which is a coverage choice and a Fetch away under Export.
+exactly like a page that failed to draw.
+
+The remedy is under Export: **bundled fallback faces**, which is a dozen Noto
+faces covering most scripts, and the Fetch button beside it when they are not
+in the workspace yet. A fetch takes the page into account, so pressing Fetch on
+a Japanese sample brings the 15.7 MB CJK face as well and turns the box on,
+rather than leaving you to work out which coverage would have asked for it. One
+CJK face answers Japanese, Korean and both Chinese scripts. It is a slow
+download, so the same bar the build uses says how far it has got, and the
+button is out until it finishes.
 
 ## What this is not
 

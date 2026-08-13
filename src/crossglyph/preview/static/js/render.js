@@ -83,17 +83,25 @@ export function failureHeadline(status) {
 
 export const undrawnNote = document.getElementById("undrawn");
 
+//: How many characters the last page could not draw. The fetch reads it to
+//: know whether the faces it just brought are ones this page was waiting for.
+export let undrawnCount = 0;
+
 // What the page could not draw, said under the box the text came from. The
 // count arrives on the render itself, because it is a fact about this page and
 // not about the folder.
 export function showUndrawn(count) {
+  undrawnCount = count;
   undrawnNote.hidden = !count;
   if (!count) return;
+  // Both moves, because either can be the one missing: the faces have to be
+  // here, and the box has to be on for the page and the build to use them.
+  // Pressing Fetch does both when it is the faces that are missing.
   undrawnNote.textContent =
     `${count} character${count === 1 ? " has" : "s have"} no glyph in this `
     + `family or its fallback faces, so the page is blank where `
-    + `${count === 1 ? "it is" : "they are"}. Under Export, choose a coverage `
-    + `that includes them and press Fetch.`;
+    + `${count === 1 ? "it is" : "they are"}. Under Export, turn on bundled `
+    + `fallback faces, and press Fetch beside it if they are not here yet.`;
 }
 
 export async function renderNow() {

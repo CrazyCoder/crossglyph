@@ -355,3 +355,70 @@ def test_the_bundled_licence_travels_with_the_faces():
     """The OFL requires it, and a wheel carries whatever is in the package."""
     assert sorted(p.name for p in fontbuild.STARTER_DIR.iterdir()) == [
         "Literata-Italic[opsz,wght].ttf", "Literata[opsz,wght].ttf", "OFL.txt"]
+
+
+def test_text_that_needs_a_cjk_face_brings_one_without_a_coverage_box():
+    """Choosing a Japanese sample is asking for the face that can draw it. The
+    coverage boxes are a build setting, and making somebody find the right one
+    before Fetch will work is a step with nothing behind it."""
+    from crossglyph import fontbuild
+
+    plain = fontbuild.fetch_plan("reading,cyrillic", "Привет, мир")
+    assert not any("CJK" in name for name in plain), "15.7 MB nobody asked for"
+
+    for text in ("すべての人間は", "모든 인간은", "人人生而自由"):
+        wanted = fontbuild.fetch_plan("reading,cyrillic", text)
+        assert any("CJK" in name for name in wanted), f"{text} draws as nothing"
+    # One face answers all four languages, so there is never a choice to make
+    # between them when the coverage has not named a script.
+    assert fontbuild.fetch_plan("reading", "すべて") == \
+        fontbuild.fetch_plan("reading", "人人生而自由")
+
+
+def test_a_coverage_that_names_a_script_still_picks_that_face():
+    """The text decides only when nothing else has. A build for Traditional
+    Chinese wants that face whatever the page happens to be showing."""
+    from crossglyph import fontbuild
+
+    plan = fontbuild.fetch_plan("reading,cjk-tc", "The quick brown fox")
+    assert "NotoSansCJKtc-Regular.otf" in plan
+
+
+def test_latin_text_never_drags_a_cjk_face_in():
+    from crossglyph import fontbuild
+
+    assert not fontbuild.needs_cjk("The quick brown fox, 1918. Привет!")
+    assert fontbuild.needs_cjk("a いろは b")
+
+
+def test_a_fetch_says_how_far_it_has_got(tmp_path, monkeypatch):
+    """A 20 MB download behind a button with no feedback is one people press
+    twice. Bytes rather than files: one face is four fifths of the set."""
+    import contextlib
+    import io
+
+    from crossglyph import fontbuild
+
+    @contextlib.contextmanager
+    def serve(request, *_args, **_kwargs):
+        yield io.BytesIO(b"x" * 400)
+
+    monkeypatch.setattr("urllib.request.urlopen", serve)
+    source = tmp_path / "fonts"
+    source.mkdir()
+
+    steps = list(fontbuild.fetch_steps(source, "", ""))
+    assert steps[0]["event"] == "plan"
+    assert steps[0]["files"] == len(fontbuild.BUNDLED_FALLBACKS) + 1
+    assert steps[-1]["event"] == "done"
+    assert steps[-1]["faces"] == steps[0]["files"]
+
+    # Every byte counted once, and never more than the plan said there were.
+    moving = [s for s in steps if s["event"] == "step"]
+    assert moving, "a download that reported no progress at all"
+    assert [s["got"] for s in moving] == sorted(s["got"] for s in moving)
+    assert all(s["got"] <= max(s["bytes"], s["got"]) for s in moving)
+    # And each file is announced before its bytes arrive, so the line under the
+    # bar names what is in hand rather than what has just finished.
+    assert [s["name"] for s in steps if s["event"] == "start"] == \
+        fontbuild.fetch_plan("", "")

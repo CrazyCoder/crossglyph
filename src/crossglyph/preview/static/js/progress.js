@@ -52,14 +52,25 @@ export function startProgress(what) {
   progressCount.textContent = "";
 }
 
-export function showProgress(done, total, what) {
+//: Bytes as somebody watching a download would say them. A fetch counts in
+//: bytes rather than in files because one face is four fifths of the set, and
+//: "12 of 13" would race to the end and then sit there for a minute.
+export function spellBytes(count) {
+  if (count >= 1e6) return `${(count / 1e6).toFixed(1)} MB`;
+  if (count >= 1e3) return `${Math.round(count / 1e3)} kB`;
+  return `${count} B`;
+}
+
+// `spell` is how the two numbers are said. Sizes are a count of themselves and
+// need nothing; bytes are not worth reading as digits.
+export function showProgress(done, total, what, spell = String) {
   progressRow.hidden = false;
   bar.classList.remove("waiting");
   barFill.style.width = `${total > 0 ? Math.round(done / total * 100) : 0}%`;
   bar.setAttribute("aria-valuemax", String(total));
   bar.setAttribute("aria-valuenow", String(done));
   const left = timeLeft(done, total, performance.now() - startedAt);
-  const count = `${done} of ${total}` + (left ? `, ${left}` : "");
+  const count = `${spell(done)} of ${spell(total)}` + (left ? `, ${left}` : "");
   bar.setAttribute("aria-valuetext", what ? `${what}, ${count}` : count);
   progressWhat.textContent = what;
   progressCount.textContent = count;

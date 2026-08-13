@@ -1508,3 +1508,38 @@ def test_a_fallback_that_covers_the_text_leaves_nothing_undrawn(two_families):
     assert alone.headers["x-undrawn"] == "1"
     filled = client.post("/render", json={**body, "fallback1": two_families})
     assert filled.headers["x-undrawn"] == "0"
+
+
+def test_the_fetch_streams_its_progress_and_reads_the_page(tmp_path, monkeypatch):
+    """The button drives a bar from these lines, and the text on the page is
+    what asks for a CJK face when no coverage box has."""
+    import contextlib
+    import io
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    @contextlib.contextmanager
+    def serve(*_args, **_kwargs):
+        yield io.BytesIO(b"x" * 64)
+
+    monkeypatch.setattr("urllib.request.urlopen", serve)
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+
+    answer = TestClient(server.app).post(
+        "/fallbacks", json={"intervals": "reading", "text": "すべての人間は"})
+    assert answer.status_code == 200
+    assert answer.headers["content-type"].startswith("application/x-ndjson")
+
+    steps = [json.loads(line) for line in answer.text.splitlines() if line.strip()]
+    assert steps[0]["event"] == "plan"
+    assert steps[-1]["event"] == "done"
+    assert steps[-1]["where"].endswith(fontbuild.FALLBACK_NAME)
+
+    started = [step["name"] for step in steps if step["event"] == "start"]
+    assert any("CJK" in name for name in started), \
+        "a Japanese page fetched nothing that could draw it"
+    assert fontbuild.FALLBACK_LICENCE in started, "the OFL requires it"

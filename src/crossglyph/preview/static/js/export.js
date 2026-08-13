@@ -1,6 +1,7 @@
+import {form} from "./dom.js";
 import {familyEntries, familyPicker} from "./family.js";
-import {scheduleRender} from "./render.js";
-import {endProgress, showProgress, startProgress} from "./progress.js";
+import {scheduleRender, undrawnCount} from "./render.js";
+import {endProgress, showProgress, spellBytes, startProgress} from "./progress.js";
 import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
 
 // --- export ---------------------------------------------------------------
@@ -230,18 +231,7 @@ export async function buildFamilies(family, force = false) {
     }
     if (!response.ok) { builtNote.textContent = await response.text(); return; }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let pending = "";
-    for (;;) {
-      const {value, done} = await reader.read();
-      if (done) break;
-      pending += decoder.decode(value, {stream: true});
-      const lines = pending.split("\n");
-      // The last piece is whatever arrived without its newline yet.
-      pending = lines.pop();
-      for (const line of lines) if (line.trim()) showStep(JSON.parse(line));
-    }
+    await readSteps(response, showStep);
   } finally {
     // Whatever happened -- a dropped connection, a line that would not parse --
     // the buttons come back, or the panel is dead until a reload. The bar
@@ -255,23 +245,45 @@ export async function buildFamilies(family, force = false) {
   }
 }
 
+// Both long jobs answer a line of JSON at a time rather than one reply at the
+// end, so both read it the same way. A chunk can split a line anywhere, so
+// whatever arrives without its newline is held for the next one.
+export async function readSteps(response, onStep) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  for (;;) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    pending += decoder.decode(value, {stream: true});
+    const lines = pending.split("\n");
+    pending = lines.pop();
+    for (const line of lines) if (line.trim()) onStep(JSON.parse(line));
+  }
+}
+
 // Editing any of it offers a save, the same as a knob does. The output folder
 // is the exception: it is all.conf's and saves itself below.
 export const FALLBACK_FIELDS = new Set(["fallbacks", "fallback1", "fallback2"]);
 
-exportForm.addEventListener("input", (event) => {
-  if (event.target === outField) return;
+// One field of the panel changed, however it changed. A name rather than an
+// event, so the fetch can go through the same path a tick of the box goes
+// through instead of arriving at the same state by another road.
+export function exportEdited(field) {
+  if (field === outField) return;
   // Typing a second family's first size is what turns its suffix on.
   showModState();
   showSaveState();
   // The fallbacks reach the page as well as the build, so changing which face
   // fills for the family redraws it. A coverage tick only matters while the
   // bundled set is on, since that is the list it decides.
-  if (FALLBACK_FIELDS.has(event.target.name) ||
-      (event.target.dataset.preset && exportForm.elements.fallbacks.checked)) {
+  if (FALLBACK_FIELDS.has(field.name) ||
+      (field.dataset.preset && exportForm.elements.fallbacks.checked)) {
     scheduleRender();
   }
-});
+}
+
+exportForm.addEventListener("input", (event) => exportEdited(event.target));
 
 // The faces are not vendored: they are large, unmodified and OFL, so they are
 // fetched once into the font source folder. The offer only appears when they
@@ -291,28 +303,77 @@ export function showFallbackState(where) {
   haveFallbacks.title = where || "";
 }
 
-fetchButton.addEventListener("click", async () => {
-  fetchNote.textContent = "fetching…";
-  let response;
-  try {
-    response = await fetch("/fallbacks", {
-      method: "POST", headers: {"content-type": "application/json"},
-      body: JSON.stringify({intervals: exportSettings().intervals})});
-  } catch (error) {
-    fetchNote.textContent = String(error);
+export function showFetchStep(step) {
+  if (step.event === "error") { fetchNote.textContent = step.error; return; }
+  // Nothing to download is worth saying: the button looks identical whether it
+  // did twenty megabytes or found them already there.
+  if (step.event === "plan" && !step.files) {
+    fetchNote.textContent = "already fetched";
     return;
   }
-  if (!response.ok) { fetchNote.textContent = await response.text(); return; }
-  const result = await response.json();
-  fetchNote.textContent = `${result.faces} faces`;
-  showFallbackState(result.where);
-});
+  if (step.event === "done") {
+    fetchNote.textContent = `${step.faces} faces`;
+    showFallbackState(step.where);
+    // Fetching the faces is only half of it: the box beside them is what puts
+    // them on the page and in the build, and a download that left the page
+    // exactly as blank as before is a button that did nothing you can see.
+    // Only when something on the page needed them, and by the same path a tick
+    // takes, so the panel offers to save it like any other change. The box
+    // moves where you can see it, which is what keeps this from being a
+    // setting changed behind your back.
+    const box = exportForm.elements.fallbacks;
+    if (undrawnCount && box && !box.checked) {
+      box.checked = true;
+      exportEdited(box);
+      return;                     // exportEdited redraws for this field
+    }
+    // The page can draw more than it could a moment ago, which is the whole
+    // reason anyone pressed this.
+    scheduleRender();
+    return;
+  }
+  if (step.event === "start" || step.event === "step") {
+    showProgress(step.got, step.bytes, step.name, spellBytes);
+  }
+}
+
+export async function fetchFallbacks() {
+  // Out for the duration. It is a 20 MB download with a CJK face in it, and a
+  // button that still looks pressable is one people press again.
+  fetchButton.disabled = true;
+  fetchNote.textContent = "";
+  startProgress("asking for the fallback faces…");
+  try {
+    let response;
+    try {
+      response = await fetch("/fallbacks", {
+        method: "POST", headers: {"content-type": "application/json"},
+        // The coverage says which scripts a build wants; the text says what
+        // this page cannot draw. Either is a reason to bring a CJK face, and
+        // the second is what makes one press enough after the page has said
+        // characters are missing.
+        body: JSON.stringify({intervals: exportSettings().intervals,
+                              text: form.elements.text.value})});
+    } catch (error) {
+      fetchNote.textContent = String(error);
+      return;
+    }
+    if (!response.ok) { fetchNote.textContent = await response.text(); return; }
+    await readSteps(response, showFetchStep);
+  } finally {
+    // Whatever happened, the button comes back and the bar goes: a dropped
+    // connection would otherwise leave both saying a download is still running.
+    endProgress();
+    fetchButton.disabled = false;
+  }
+}
 
 //: Wired by the entry point rather than on import: familyPicker belongs to
 //: family.js, and a module body can run while a module it imports is still
 //: evaluating. Build takes what the picker is on; Build all takes nothing and
 //: means every family in the workspace.
 export function wireBuildButtons() {
+  fetchButton.addEventListener("click", fetchFallbacks);
   buildButtons[0].addEventListener(
     "click", (event) => buildFamilies(familyPicker.value, event.shiftKey));
   buildButtons[1].addEventListener(

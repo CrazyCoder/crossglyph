@@ -807,22 +807,42 @@ def set_out(request: OutRequest) -> dict:
 class FetchRequest(BaseModel):
     #: The coverage to fetch for, which decides whether a CJK face comes too.
     intervals: str = ""
+    #: And what is on the page, which decides the same thing: text that cannot
+    #: be drawn without a CJK face is a request for one, whatever the coverage
+    #: boxes say. Pressing Fetch when the page says characters are missing is
+    #: then enough on its own.
+    text: str = ""
 
 
 @app.post("/fallbacks")
-def fetch(request: FetchRequest) -> dict:
-    """Put the bundled faces in the font source folder.
+def fetch(request: FetchRequest) -> StreamingResponse:
+    """Put the bundled faces in the font source folder, saying how far it got.
 
-    Copied from a crosspoint-tools checkout when there is one and downloaded
-    otherwise, which is the only thing here that reaches the network -- and it
-    happens because somebody pressed a button asking for it.
+    Downloaded from the OFL files the website's own converter ships, which is
+    the only thing here that reaches the network -- and it happens because
+    somebody pressed a button asking for it.
+
+    A line of JSON per step rather than one answer at the end: the CJK face
+    alone is 15.7 MB, and a button that sits there for a minute with nothing to
+    show is one people press again.
     """
-    try:
-        landed = fontbuild.fetch_fallbacks(
-            fontbuild.SOURCE_DIR, request.intervals, say=lambda *_: None)
-    except OSError as exc:
-        raise HTTPException(503, f"could not fetch the fallback faces: {exc}") from exc
-    return {"where": str(fontbuild.fallback_dir() or ""), "faces": len(landed)}
+    def lines():
+        try:
+            for step in fontbuild.fetch_steps(
+                    fontbuild.SOURCE_DIR, request.intervals, request.text):
+                if step["event"] == "done":
+                    step["where"] = str(fontbuild.fallback_dir() or "")
+                yield json.dumps(step) + "\n"
+        # The headers are long gone by here, so a failure travels as the last
+        # line rather than as a status. A network that went away mid-download
+        # is the likely one, and the part file it leaves is not moved into
+        # place, so pressing Fetch again resumes from whole files.
+        except OSError as exc:
+            yield json.dumps({
+                "event": "error",
+                "error": f"could not fetch the fallback faces: {exc}"}) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 class BuildRequest(BaseModel):
