@@ -443,7 +443,10 @@
       <label class="name" for="fallbacks">bundled fallback faces</label>
       <span class="note"><span id="have-fallbacks"></span>
         <span id="fetched"></span></span>
-      <button type="button" id="fetch" hidden>Fetch the bundled faces</button>
+      <!-- One word: the row names what it fetches, and a button repeating it
+           is what made this the widest control in the panel. -->
+      <button type="button" id="fetch" hidden
+              title="Download the bundled Noto faces into the font source folder">Fetch</button>
     </div>
     <!-- Both on one line: they are one setting in two halves, tried in the
          order they are read. -->
