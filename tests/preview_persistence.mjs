@@ -2397,4 +2397,24 @@ for (const { name, text } of sources) {
         env.exportForm.elements.fallbacks.checked === false);
 }
 
+// 69. Somebody who typed their own text before the picker existed has a stored
+//     text and no stored choice, which is exactly what a first visit looks
+//     like. Detecting a language there would put a specimen over their words.
+{
+  const env = await loaded(fakeStorage({ "crossglyph.text": "мой текст" }),
+                           DEFAULTS, { languages: ["de-AT"] });
+  check("text already written keeps the box",
+        env.byName.text.value === "мой текст", env.byName.text.value);
+  check("with the picker saying whose it is",
+        env.sample.value === "", env.sample.value);
+}
+
+// 70. And an empty box is what detection is for.
+{
+  const env = await loaded(fakeStorage({ "crossglyph.text": "" }), DEFAULTS,
+                           { languages: ["de-AT"] });
+  check("an empty box takes the browser's language",
+        env.sample.value === "de", env.sample.value);
+}
+
 process.exit(failures ? 1 : 0);

@@ -124,7 +124,14 @@ export function typedInBox() {
 export function restoreSample(languages) {
   const saved = savedChoice();
   const first = saved === null;
-  showSample(first ? preferredSample(languages) : saved);
+  // Text already in the box is a choice, even though it was made before there
+  // was a picker to record it in. Detection is for somebody who has nothing:
+  // putting a specimen over words you typed is the one thing this must never
+  // do, and the first time anybody opened this after the picker arrived is
+  // exactly when it would have.
+  const tag = first ? (customText() ? CUSTOM : preferredSample(languages))
+                    : saved;
+  showSample(tag);
   // The hyphenation language is not set from here even on a first visit. It is
   // one of the page settings, and those may have been remembered from a visit
   // before this picker existed -- moving it would overwrite a choice somebody
