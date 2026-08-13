@@ -379,8 +379,13 @@
      control most people read once and leave alone. It takes the rest of the
      width so it lines up with the box rather than floating in the middle of
      nothing, the same way the family picker fills its own row. */
-  #textbox .head { display: flex; align-items: center; gap: .6rem; }
-  #textbox .head h2 { flex: none; }
+  #textbox .head { display: flex; align-items: center; gap: .6rem;
+                   margin: .55rem 0 .5rem; }
+  /* The heading's own margins have to go, and the row carries them instead.
+     `center` centres margin boxes, not text, so a heading with 21.6px above it
+     and 8px below rides that much low against the picker beside it -- and its
+     margins set the height of a row the picker is the tallest thing in. */
+  #textbox .head h2 { flex: none; margin: 0; }
   #sample { flex: 1 1 0; min-width: 5rem; }
   /* The specimen and its text stay where they are while a panel scrolls past.
      Only where the whole column fits: sticking a column taller than the window
