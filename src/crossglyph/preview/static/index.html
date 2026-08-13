@@ -435,20 +435,21 @@
     <div class="hint">Base coverage is always in, whatever is ticked. Ranges
       are added on top of the presets.</div>
 
-    <label class="row wide check">
+    <!-- The button sits in a column of its own at the end, so what the two
+         notes beside it say cannot move it: an offer that walks away between
+         reading it and pressing it is worse than a long note cut short. -->
+    <div class="row wide check">
       <input type="checkbox" id="fallbacks" name="fallbacks">
-      <span class="name">bundled fallback faces <span id="have-fallbacks"></span></span>
-    </label>
-    <div class="row wide" id="fetch-row" hidden>
-      <span class="name"></span>
-      <div><button type="button" id="fetch">Fetch the bundled faces</button>
-        <span id="fetched"></span></div>
+      <label class="name" for="fallbacks">bundled fallback faces</label>
+      <span class="note"><span id="have-fallbacks"></span>
+        <span id="fetched"></span></span>
+      <button type="button" id="fetch" hidden>Fetch the bundled faces</button>
     </div>
-    <div class="row wide">
+    <!-- Both on one line: they are one setting in two halves, tried in the
+         order they are read. -->
+    <div class="row wide pair">
       <label class="name" for="fallback1">fallback 1</label>
       <select id="fallback1" name="fallback1"></select>
-    </div>
-    <div class="row wide">
       <label class="name" for="fallback2">fallback 2</label>
       <select id="fallback2" name="fallback2"></select>
     </div>

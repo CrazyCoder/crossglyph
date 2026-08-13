@@ -489,8 +489,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     },
     build: buildButton("one"),
     "build-all": buildButton("all"),
-    fetch: buildButton("fetch"),
-    "fetch-row": { hidden: false },
+    // The offer itself, which is the button rather than a row around it.
+    // Assigned onto rather than spread: the disabled accessor is what records
+    // the sequence, and a spread would copy its value and drop it.
+    fetch: Object.assign(buildButton("fetch"), { hidden: false }),
     fetched: { textContent: "" },
     "have-fallbacks": { textContent: "" },
     knobs: form,
@@ -1483,11 +1485,11 @@ for (const { name, text } of sources) {
 {
   const env = await loaded(fakeStorage());
   check("with the faces present there is nothing to offer",
-        env.sandbox.document.getElementById("fetch-row").hidden === true);
+        env.sandbox.document.getElementById("fetch").hidden === true);
 
   const bare = await loaded(fakeStorage(), { ...DEFAULTS, fallbacks: "" });
   check("and without them the offer appears",
-        bare.sandbox.document.getElementById("fetch-row").hidden === false);
+        bare.sandbox.document.getElementById("fetch").hidden === false);
   check("with the state said in words",
         bare.sandbox.document.getElementById("have-fallbacks").textContent
           === "— not fetched yet",

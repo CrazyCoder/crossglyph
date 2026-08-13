@@ -237,12 +237,12 @@ exportForm.addEventListener("input", (event) => {
 // The faces are not vendored: they are large, unmodified and OFL, so they are
 // fetched once into the font source folder. The offer only appears when they
 // are not already somewhere -- a checkout beside the repo counts.
-export const fetchRow = document.getElementById("fetch-row");
+export const fetchButton = document.getElementById("fetch");
 export const fetchNote = document.getElementById("fetched");
 export const haveFallbacks = document.getElementById("have-fallbacks");
 
 export function showFallbackState(where) {
-  fetchRow.hidden = Boolean(where);
+  fetchButton.hidden = Boolean(where);
   // The last two segments: the whole path is most of a line and says
   // little the tail does not -- once they are fetched it is the font
   // folder and "fallbacks", and before that the checkout's own. The
@@ -252,7 +252,7 @@ export function showFallbackState(where) {
   haveFallbacks.title = where || "";
 }
 
-document.getElementById("fetch").addEventListener("click", async () => {
+fetchButton.addEventListener("click", async () => {
   fetchNote.textContent = "fetching…";
   let response;
   try {
