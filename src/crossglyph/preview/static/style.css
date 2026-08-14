@@ -322,7 +322,14 @@
   }
   /* Reset and Save sit together: one throws the knobs back to the converter's
      own defaults, the other writes them where the build will read them. */
-  #saved { margin-top: .6rem; color: var(--muted); font-size: 11.5px; }
+  /* A line tall whether or not it says anything. The note lands after a save,
+     and the whole Page section under it dropped 26px the moment it did: the
+     line itself, and the top margin, which collapses while the box is empty
+     and stops collapsing when it is not. Reserving the line settles both.
+     `em` first for a browser without `lh`, which is the more accurate of the
+     two since it is the line box being reserved. */
+  #saved { margin-top: .6rem; color: var(--muted); font-size: 11.5px;
+           min-height: 1.45em; min-height: 1lh; }
 
   textarea {
     width: 100%; height: 7rem; margin-top: .3rem; padding: .45rem .5rem;

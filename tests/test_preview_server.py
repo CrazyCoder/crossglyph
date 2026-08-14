@@ -557,6 +557,26 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_the_save_note_reserves_its_line():
+    """It is empty until a save, and the whole Page section sat directly under
+    it: filling it moved that section down 26px, the line plus the top margin
+    that collapses while the box is empty. A min-height keeps the line whether
+    or not there is anything in it.
+
+    Neither suite would notice this going: the probe drives a stub DOM with no
+    stylesheet, and nothing else here reads CSS.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"#saved\s*\{([^}]*)\}", css)
+    assert rule, "#saved has no rule at all"
+    assert "min-height" in rule.group(1), \
+        "#saved no longer reserves its line, so a save shifts the panel"
+
+
 def test_every_asset_the_page_asks_for_is_one_the_server_will_serve():
     """A stylesheet, a script or an icon the route refuses is a 404 the page
     never mentions: the browser asks quietly and draws without it. The route
