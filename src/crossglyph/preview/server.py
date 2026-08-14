@@ -33,7 +33,7 @@ from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
 from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
                PageSpec, build_font, coverage_for, faces_for,
-               fallback_split, on_the_page, preview_page)
+               fallback_split, page_codepoints, preview_page)
 
 app = FastAPI(title="CrossGlyph font preview")
 
@@ -447,26 +447,18 @@ def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
 
 
 @functools.lru_cache(maxsize=32)
-def useful_fallbacks(sources: tuple, coverage: tuple,
-                     fallbacks: tuple) -> tuple:
-    """The fallback faces this text actually needs, cached across knob turns.
-
-    Which face supplies a missing codepoint depends on the family and the text,
-    not on the knobs -- so asking once and remembering is what keeps tuning
-    responsive on a page that does need a fallback. Without it every turn of
-    gamma reopens the whole bundled set to find the same one face.
-    """
-    return tuple(str(path) for path in resolved_fallbacks(
-        sources, coverage, fallbacks)[0])
-
-
-@functools.lru_cache(maxsize=32)
 def resolved_fallbacks(sources: tuple, coverage: tuple,
                        fallbacks: tuple) -> tuple:
-    """The faces worth opening and the codepoints none of them has, cached.
+    """The faces worth opening and the codepoints none of them has.
 
-    Both come out of one walk of the list, and both are wanted on every render:
-    the faces to build with, and the leftovers to warn about.
+    Both come out of one walk of the list and both are wanted on every render:
+    the faces to build with, and the leftovers to say the page cannot draw.
+
+    Cached because which face supplies a missing codepoint depends on the
+    family and the text, not on the knobs -- so asking once and remembering is
+    what keeps tuning responsive on a page that does need a fallback. Without
+    it every turn of gamma reopens the whole bundled set to find the same one
+    face.
     """
     return fallback_split(dict(sources), coverage, fallbacks)
 
@@ -514,23 +506,21 @@ def render(request: RenderRequest) -> Response:
                              for style, path in sources.items()))
         coverage = coverage_for(request.text, sources)
         offered = fallbacks_for(request)
+        drawable = resolved_fallbacks(keyed, coverage, offered)
         font = build_font_cached(
             keyed, request.size, coverage, _cache_key(request.tuning),
-            useful_fallbacks(keyed, coverage, offered),
+            tuple(str(path) for path in drawable[0]),
             axes_for(request.family, request.size, request.axes))
         # What nothing can draw, narrowed to what is actually on the page: the
         # build's coverage carries the output codepoint of every ligature the
         # faces could form, and a face whose GSUB names an `ff` it has no cmap
-        # entry for is not a page with a hole in it (see on_the_page).
+        # entry for is not a page with a hole in it (see page_codepoints).
         #
         # Narrowed rather than asked again, because asking again is a second
-        # walk of every fallback face. on_the_page is a subset of the coverage,
-        # and whether a face supplies a codepoint does not depend on what else
-        # was asked for, so the two give the same answer over the same
-        # codepoints.
-        undrawn = resolved_fallbacks(keyed, coverage, offered)[1] & {
-            code for low, high in on_the_page(request.text)
-            for code in range(low, high + 1)}
+        # walk of every fallback face. The page's codepoints are a subset of
+        # the coverage, and whether a face supplies one does not depend on what
+        # else was asked for, so the two agree over the codepoints they share.
+        undrawn = drawable[1] & page_codepoints(request.text)
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an

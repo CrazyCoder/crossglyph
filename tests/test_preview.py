@@ -599,7 +599,7 @@ def test_a_ligature_the_font_cannot_form_is_not_a_hole_in_the_page():
     text = preview.SAMPLES["en"].text
 
     build = preview.coverage_for(text, sources)
-    page = preview.on_the_page(text)
+    page = preview.as_intervals(preview.page_codepoints(text))
     assert preview.missing_codepoints(sources, build), \
         "the ligature outputs are gone, so this no longer guards anything"
     assert not preview.missing_codepoints(sources, page), \

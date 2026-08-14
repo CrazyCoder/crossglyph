@@ -306,18 +306,8 @@ export async function buildFamilies(family, force = false) {
       builtNote.textContent = `not built: ${label} could not be saved`;
       return;
     }
-    let response;
-    try {
-      response = await fetch("/build", {
-        method: "POST", headers: {"content-type": "application/json"},
-        body: JSON.stringify({family: family, force: force})});
-    } catch (error) {
-      builtNote.textContent = String(error);
-      return;
-    }
-    if (!response.ok) { builtNote.textContent = await response.text(); return; }
-
-    await readSteps(response, showStep);
+    await streamInto("/build", {family: family, force: force},
+                     showStep, builtNote);
   } finally {
     // Whatever happened -- a dropped connection, a line that would not parse --
     // the buttons come back, or the panel is dead until a reload. The bar
@@ -334,6 +324,25 @@ export async function buildFamilies(family, force = false) {
 // Both long jobs answer a line of JSON at a time rather than one reply at the
 // end, so both read it the same way. A chunk can split a line anywhere, so
 // whatever arrives without its newline is held for the next one.
+// Post, and read the answer into `onStep` a line at a time. Both long jobs
+// answer that way, and both can fail in the same two ways before the first
+// line arrives: no answer at all, and a refusal with a sentence in it. `note`
+// is where either is said, and false means the run never started.
+export async function streamInto(url, body, onStep, note) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST", headers: {"content-type": "application/json"},
+      body: JSON.stringify(body)});
+  } catch (error) {
+    note.textContent = String(error);
+    return false;
+  }
+  if (!response.ok) { note.textContent = await response.text(); return false; }
+  await readSteps(response, onStep);
+  return true;
+}
+
 export async function readSteps(response, onStep) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -436,22 +445,14 @@ export async function fetchFallbacks() {
   fetchNote.textContent = "";
   startProgress("asking for the fallback faces…");
   try {
-    let response;
-    try {
-      response = await fetch("/fallbacks", {
-        method: "POST", headers: {"content-type": "application/json"},
-        // The coverage says which scripts a build wants; the text says what
-        // this page cannot draw. Either is a reason to bring a CJK face, and
-        // the second is what makes one press enough after the page has said
-        // characters are missing.
-        body: JSON.stringify({intervals: exportSettings().intervals,
-                              text: form.elements.text.value})});
-    } catch (error) {
-      fetchNote.textContent = String(error);
-      return;
-    }
-    if (!response.ok) { fetchNote.textContent = await response.text(); return; }
-    await readSteps(response, showFetchStep);
+    // The coverage says which scripts a build wants; the text says what this
+    // page cannot draw. Either is a reason to bring a CJK face, and the second
+    // is what makes one press enough after the page has said characters are
+    // missing.
+    await streamInto("/fallbacks",
+                     {intervals: exportSettings().intervals,
+                      text: form.elements.text.value},
+                     showFetchStep, fetchNote);
   } finally {
     // Whatever happened, the button comes back and the bar goes: a dropped
     // connection would otherwise leave both saying a download is still running.

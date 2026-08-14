@@ -679,11 +679,18 @@ def load(paths: list[pathlib.Path], defaults: dict[str, str] | None = None,
     return configs, errors
 
 
-def derived_configs(source: pathlib.Path, defaults: dict[str, str],
-                    covered: set[str]) -> tuple[list[Config], list[str]]:
-    """One config per family in the folder that no per-font config claims."""
+def families_in(source: pathlib.Path, defaults: dict[str, str],
+                directory: pathlib.Path,
+                covered: frozenset[str] = frozenset(),
+                ) -> tuple[list[Config], list[str]]:
+    """A config per family in `directory`, from the shared defaults.
+
+    `directory` is where the files are looked for and `defaults["dir"]` is what
+    the config says about that, which are the same thing for the workspace and
+    are not for the bundled family. Failures are collected rather than raised:
+    one unreadable face must not cost you the rest of the folder.
+    """
     path = conf_dir(source) / DEFAULTS_NAME
-    directory = (source / defaults.get("dir", ".").strip()).resolve()
     configs, errors = [], []
     for family in fontconf.discover_families(directory):
         if family.casefold() in covered:
@@ -694,6 +701,13 @@ def derived_configs(source: pathlib.Path, defaults: dict[str, str],
         except FontConfigError as exc:
             errors.append(str(exc))
     return configs, errors
+
+
+def derived_configs(source: pathlib.Path, defaults: dict[str, str],
+                    covered: set[str]) -> tuple[list[Config], list[str]]:
+    """One config per family in the folder that no per-font config claims."""
+    directory = (source / defaults.get("dir", ".").strip()).resolve()
+    return families_in(source, defaults, directory, frozenset(covered))
 
 
 def starter_configs(source: pathlib.Path,
@@ -710,16 +724,21 @@ def starter_configs(source: pathlib.Path,
     """
     if not STARTER_DIR.is_dir():
         return [], []                   # an install missing its own faces
-    path = conf_dir(source) / DEFAULTS_NAME
-    values = {**defaults, "dir": str(STARTER_DIR)}
-    configs, errors = [], []
-    for family in fontconf.discover_families(STARTER_DIR):
-        try:
-            configs.append(parse_config(path, values=values, family=family,
-                                        derived=True, root=source))
-        except FontConfigError as exc:
-            errors.append(str(exc))
-    return configs, errors
+    return families_in(source, {**defaults, "dir": str(STARTER_DIR)},
+                       STARTER_DIR)
+
+
+def unclaimed_starter(source: pathlib.Path, defaults: dict[str, str],
+                      configs: list[Config]) -> tuple[list[Config], list[str]]:
+    """The bundled family, unless one of `configs` already answers to its name.
+
+    Which happens two ways: the workspace was empty so gather() already took
+    it, or a Save wrote it a config of its own and it is a family like any
+    other now. Either way it belongs in the list once.
+    """
+    known = {config.name.casefold() for config in configs}
+    more, errors = starter_configs(source, defaults)
+    return [c for c in more if c.name.casefold() not in known], errors
 
 
 def offered(source: pathlib.Path | str | None = None,
@@ -735,11 +754,8 @@ def offered(source: pathlib.Path | str | None = None,
     """
     source = pathlib.Path(source) if source else SOURCE_DIR
     configs, errors = gather(source)
-    known = {config.name.casefold() for config in configs}
-    more, more_errors = starter_configs(source, load_defaults(source))
-    return (configs + [config for config in more
-                       if config.name.casefold() not in known],
-            errors + more_errors)
+    more, more_errors = unclaimed_starter(source, load_defaults(source), configs)
+    return configs + more, errors + more_errors
 
 
 def gather(source: pathlib.Path,
@@ -778,9 +794,7 @@ def gather(source: pathlib.Path,
     # to resolve what the picker offers -- but it stays out of the list above,
     # so a build with no arguments still builds your workspace and not the
     # family that came with the tool.
-    known = {config.name.casefold() for config in configs}
-    pool = configs + [config for config in starter_configs(source, defaults)[0]
-                      if config.name.casefold() not in known]
+    pool = configs + unclaimed_starter(source, defaults, configs)[0]
     wanted = {t.casefold().removesuffix(".conf") for t in tokens}
     chosen = [c for c in pool
               if {c.name.casefold(), c.family.casefold(), c.path.stem.casefold()}

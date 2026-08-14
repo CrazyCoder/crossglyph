@@ -116,12 +116,7 @@ def coverage_for(text: str,
     """
     if not isinstance(sources, Mapping):
         sources = {REGULAR: sources}
-    plain, _ = markup.parse(text)
-    # Control characters are not glyphs: the newline is a paragraph break to
-    # the layout, and a tab or a stray \r would rasterize as nothing.
-    codepoints = {code for code in map(ord, plain)
-                  if code >= 0x20 and code != 0x7F}
-    codepoints.update(ESSENTIAL_CODEPOINTS)
+    codepoints = page_codepoints(text)
     for source in sources.values():
         try:
             codepoints |= cpfont.ligature_codepoints(str(source), codepoints)
@@ -136,13 +131,7 @@ def coverage_for(text: str,
                 f"Try re-exporting the font or uploading a different file."
             ) from exc
 
-    intervals: list[tuple[int, int]] = []
-    for code in sorted(codepoints):
-        if intervals and code == intervals[-1][1] + 1:
-            intervals[-1] = (intervals[-1][0], code)
-        else:
-            intervals.append((code, code))
-    return tuple(intervals)
+    return as_intervals(codepoints)
 
 
 def faces_for(text: str,
@@ -210,25 +199,37 @@ def needed_fallbacks(sources: Mapping[int, pathlib.Path | str],
     return fallback_split(sources, coverage, fallbacks)[0]
 
 
-def on_the_page(text: str) -> tuple[tuple[int, int], ...]:
-    """What the page will actually try to draw, as intervals.
+def page_codepoints(text: str) -> set[int]:
+    """What the page will actually try to draw.
 
-    Not coverage_for: that is what a *build* should carry, and it adds the
-    output codepoint of every ligature the faces could form -- nobody types
-    U+FB00, and a face whose GSUB names an `ff` glyph it has no cmap entry for
-    is not a page with a hole in it. The converter drops the ligature and the
-    two letters draw as themselves.
+    The characters somebody typed, plus the space and hyphen the layout
+    supplies for itself (ESSENTIAL_CODEPOINTS): a face missing the hyphen
+    really does leave a gap, because hyphenation appends one nobody typed.
 
-    Asking what cannot be drawn has to be asked of the characters somebody
-    typed, plus the space and hyphen the layout supplies for itself
-    (ESSENTIAL_CODEPOINTS): a face missing the hyphen really does leave a gap,
-    because hyphenation appends one nobody typed.
+    This is coverage_for without the ligature outputs, and the difference is
+    the whole of it. A build has to carry U+FB00 or the converter drops the
+    `ff` rule; a page that cannot draw U+FB00 has no hole in it, because
+    nobody types one. Ask this when the question is about the page, and
+    coverage_for when it is about the build.
     """
     plain, _ = markup.parse(text)
+    # Control characters are not glyphs: the newline is a paragraph break to
+    # the layout, and a tab or a stray \r would rasterize as nothing.
     codepoints = {code for code in map(ord, plain)
                   if code >= 0x20 and code != 0x7F}
     codepoints.update(ESSENTIAL_CODEPOINTS)
-    return tuple((code, code) for code in sorted(codepoints))
+    return codepoints
+
+
+def as_intervals(codepoints: set[int]) -> tuple[tuple[int, int], ...]:
+    """Codepoints as the runs a .cpfont's interval table wants."""
+    intervals: list[tuple[int, int]] = []
+    for code in sorted(codepoints):
+        if intervals and code == intervals[-1][1] + 1:
+            intervals[-1] = (intervals[-1][0], code)
+        else:
+            intervals.append((code, code))
+    return tuple(intervals)
 
 
 def fallback_split(sources: Mapping[int, pathlib.Path | str],

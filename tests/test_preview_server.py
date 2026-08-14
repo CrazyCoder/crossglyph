@@ -95,12 +95,12 @@ def two_families(tmp_path, monkeypatch):
     # a stale entry would answer for the previous folder.
     server.forget_families()
     server.build_font_cached.cache_clear()
-    server.useful_fallbacks.cache_clear()
+    server.resolved_fallbacks.cache_clear()
     server.set_font_source(tmp_path / "Probe-Regular.ttf", family="Probe")
     yield "Filler"
     server.forget_families()
     server.build_font_cached.cache_clear()
-    server.useful_fallbacks.cache_clear()
+    server.resolved_fallbacks.cache_clear()
     server.set_font_source(SRC)
 
 
