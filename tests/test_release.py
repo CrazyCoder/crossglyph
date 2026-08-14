@@ -21,12 +21,18 @@ make_release = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(make_release)
 
 
-@pytest.mark.parametrize("path", [
-    "crossglyph.cmd", "crossglyph.sh",
-    "fonts/README.md", "fonts/conf/all.conf",
-])
+@pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
 def test_what_outlives_a_version_stays_at_the_root(path):
-    assert make_release.release_path(path, "0.2.0") == path
+    assert make_release.release_paths(path, "0.2.0") == (path,)
+
+
+@pytest.mark.parametrize("path", ["fonts/README.md", "fonts/conf/all.conf"])
+def test_a_workspace_file_lands_in_both_places(path):
+    """The root copy is the user's to edit. The one inside the version is how
+    it shipped, which is the only way an update can tell an edited file from
+    one that changed between releases."""
+    assert make_release.release_paths(path, "0.2.0") == \
+        (path, f"versions/0.2.0/{path}")
 
 
 @pytest.mark.parametrize("path", [
@@ -35,14 +41,15 @@ def test_what_outlives_a_version_stays_at_the_root(path):
     "docs/fonts.md",
 ])
 def test_everything_else_is_the_version(path):
-    assert make_release.release_path(path, "0.2.0") == f"versions/0.2.0/{path}"
+    assert make_release.release_paths(path, "0.2.0") == \
+        (f"versions/0.2.0/{path}",)
 
 
 def test_the_version_directory_carries_its_own_uv():
     """The shim execs <version>/tools/uv.cmd, so a release that left uv at the
     root would go on running the old one after every update."""
-    assert make_release.release_path("tools/uv.cmd", "0.2.0") \
-        == "versions/0.2.0/tools/uv.cmd"
+    assert make_release.release_paths("tools/uv.cmd", "0.2.0") \
+        == ("versions/0.2.0/tools/uv.cmd",)
 
 
 @pytest.fixture(scope="module")
@@ -91,7 +98,16 @@ def test_neither_half_leaks_into_the_other(built, members):
     version, _, _ = built
     assert "src/crossglyph/cli.py" not in members
     assert f"versions/{version}/crossglyph.cmd" not in members
-    assert f"versions/{version}/fonts/conf/all.conf" not in members
+    assert f"versions/{version}/update.conf" not in members
+
+
+def test_the_two_copies_of_a_template_are_the_same_bytes(built):
+    """The comparison is byte for byte, so a repack that transformed one of
+    them would make every install look edited."""
+    version, name, path = built
+    with zipfile.ZipFile(path) as archive:
+        assert archive.read(f"{name}/fonts/conf/all.conf") == \
+            archive.read(f"{name}/versions/{version}/fonts/conf/all.conf")
 
 
 def test_the_executables_extract_executable(built, members):
@@ -174,7 +190,8 @@ def test_a_release_writes_the_manifest_beside_the_zip(built, tmp_path):
 def test_the_users_own_files_stay_at_the_root():
     """update.conf is theirs, like fonts/. An update replaces versions/<v>
     wholesale, so anything of theirs in there would go with it."""
-    assert make_release.release_path("update.conf", "0.2.0") == "update.conf"
+    assert make_release.release_paths("update.conf", "0.2.0") == \
+        ("update.conf",)
 
 
 def test_the_release_carries_no_state_of_its_own(members):

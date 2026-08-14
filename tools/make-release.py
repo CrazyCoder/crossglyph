@@ -53,6 +53,9 @@ REQUIRED = [
     "current",
     "crossglyph.sh", "crossglyph.cmd", "update.conf",
     "fonts/README.md", "fonts/conf/all.conf",
+    # The same two inside the version: what an update compares against to tell
+    # a file the user edited from one that changed between releases.
+    "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
     "{v}/THIRD-PARTY-NOTICES.md",
     "{v}/src/crossglyph/cli.py",
@@ -83,16 +86,24 @@ EXECUTABLE = [
 ]
 
 
-def release_path(path: str, version: str) -> str:
-    """Where a tracked file lands in the release tree.
+def release_paths(path: str, version: str) -> tuple[str, ...]:
+    """Where a tracked file lands in the release tree, which can be twice.
 
     Everything belongs to one version except the launcher and the workspace,
     which outlive every version: an update adds a directory under versions/
     and rewrites `current`, and must not touch either of those.
+
+    A workspace file lands in both places, and the second copy is what makes
+    the conffile rule possible. The one at the root is the user's to edit; the
+    one inside the version is the record of how it shipped, which is the only
+    way an update can tell a file somebody edited from one that changed
+    between releases. They are a couple of kilobytes.
     """
-    if path in ROOT_FILES or path == "fonts" or path.startswith("fonts/"):
-        return path
-    return f"versions/{version}/{path}"
+    if path in ROOT_FILES:
+        return (path,)
+    if path == "fonts" or path.startswith("fonts/"):
+        return (path, f"versions/{version}/{path}")
+    return (f"versions/{version}/{path}",)
 
 
 def version() -> str:
@@ -207,11 +218,13 @@ def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
             if info.is_dir():
                 continue
             inner = info.filename[len(name) + 1:]
-            moved = zipfile.ZipInfo(f"{name}/{release_path(inner, version)}",
-                                    date_time=info.date_time)
-            moved.compress_type = zipfile.ZIP_DEFLATED
-            set_mode(moved, info.external_attr >> 16)
-            archive.writestr(moved, source.read(info))
+            body = source.read(info)
+            for where in release_paths(inner, version):
+                moved = zipfile.ZipInfo(f"{name}/{where}",
+                                        date_time=info.date_time)
+                moved.compress_type = zipfile.ZIP_DEFLATED
+                set_mode(moved, info.external_attr >> 16)
+                archive.writestr(moved, body)
         # Generated rather than tracked: a checkout has no live version, and a
         # file saying one would be wrong the moment it was committed.
         current = zipfile.ZipInfo(f"{name}/current",
