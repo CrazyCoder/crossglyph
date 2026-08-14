@@ -248,8 +248,16 @@ export function showStep(step) {
     // and that is worth a word: it is the one thing a build does that removes
     // something you might still have been expecting on the card.
     const gone = (step.removed || []).length;
+    // What it cost, beside what it did: these go on a card with a fixed amount
+    // of room, and a build is the moment to know. Only when something was
+    // built -- "0 built (0 B)" says nothing twice.
+    const made = count("built");
+    const kept = count("skipped");
+    const size = made && step.bytes ? ` (${spellBytes(step.bytes)})` : "";
+    const had = kept && step.current_bytes
+      ? ` (${spellBytes(step.current_bytes)})` : "";
     builtNote.textContent =
-      `${count("built")} built, ${count("skipped")} already current`
+      `${made} built${size}, ${kept} already current${had}`
       + (failed ? `, ${failed} failed` : "")
       + (gone ? `, removed ${step.removed.join(", ")}` : "")
       + ` → ${step.out}`;

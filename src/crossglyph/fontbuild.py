@@ -378,6 +378,15 @@ class Report:
     failed: list[int] = dataclasses.field(default_factory=list)
     removed: list[pathlib.Path] = dataclasses.field(default_factory=list)
     error: str | None = None
+    #: Bytes written this run: the sizes in `built`, and not the ones already
+    #: current, which nothing wrote. What a build costs on the card is the
+    #: question behind "4 built", and it was being computed and dropped.
+    written: int = 0
+    #: And what the sizes in `skipped` already take up. A run that wrote
+    #: nothing still put something on the card last time, and "already current"
+    #: with no number beside it is the one case where the size is missing
+    #: because there was no work rather than because there is no font.
+    current: int = 0
 
 
 @dataclasses.dataclass
@@ -485,6 +494,13 @@ def plan_variant(variant: Variant, out_dir: pathlib.Path,
     report.removed = fontstamp.prune(directory, variant)
     stale = fontstamp.stale_sizes(variant, directory, force=force)
     report.skipped = [s for s in variant.sizes if s not in stale]
+    # Off the files rather than remembered from a run that may never have
+    # happened on this machine: "already current" means the .cpfont is there
+    # and matches, so it is there to be measured.
+    for size in report.skipped:
+        path = fontstamp.cpfont_path(directory, variant, size)
+        if path.is_file():
+            report.current += path.stat().st_size
     return report, [Job(variant, size) for size in stale]
 
 
@@ -561,7 +577,7 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
     for variant, report, jobs in plans:
         for job in jobs:
             try:
-                build_size(job, out_dir)
+                made = build_size(job, out_dir)
             except FontBuildError as exc:
                 report.error = str(exc)
                 report.failed = [size for size in variant.sizes
@@ -573,14 +589,22 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
                        "error": str(exc)}
                 break
             report.built.append(job.size)
+            report.written += made.bytes
             done += 1
             yield {"event": "size", "family": variant.name, "size": job.size,
-                   "done": done, "total": total}
+                   "done": done, "total": total, "bytes": made.bytes}
         if jobs:
             finalize_variant(variant, out_dir, failed=set(report.failed))
 
     yield {"event": "done", "out": str(out_dir), "removed": removed,
+           # What this run wrote, and what the sizes it left alone already take
+           # up. Both, because a run that wrote nothing still put something on
+           # the card the last time it ran.
+           "bytes": sum(report.written for _, report, _ in plans),
+           "current_bytes": sum(report.current for _, report, _ in plans),
            "families": [{"name": variant.name,
+                         "bytes": report.written,
+                         "current_bytes": report.current,
                          "sizes": sorted(variant.sizes),
                          "built": sorted(report.built),
                          "skipped": sorted(report.skipped),

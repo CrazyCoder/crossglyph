@@ -689,14 +689,19 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         // A stream of progress lines, as the real one answers -- and split
         // across chunks mid-line, because that is the case the reader has to
         // get right and the one no tidy fixture would produce.
-        const steps = [
+        const steps = opts.buildSteps ?? [
           { event: "plan", total: 2, out: "D:\\fonts\\cpfonts",
             families: ["Alto"] },
-          { event: "size", family: "Alto", size: 12, done: 1, total: 2 },
-          { event: "size", family: "Alto", size: 13, done: 2, total: 2 },
-          { event: "done", out: "D:\\fonts\\cpfonts", families: [
-            { name: "Alto", sizes: [12, 13], built: [12, 13], skipped: [],
-              failed: [], removed: [], error: null }] },
+          { event: "size", family: "Alto", size: 12, done: 1, total: 2,
+            bytes: 1200000 },
+          { event: "size", family: "Alto", size: 13, done: 2, total: 2,
+            bytes: 1211008 },
+          // What the run wrote. A build lands on a card with a fixed amount of
+          // room, so what it cost belongs beside what it did.
+          { event: "done", out: "D:\\fonts\\cpfonts", bytes: 2411008,
+            families: [
+            { name: "Alto", bytes: 2411008, sizes: [12, 13], built: [12, 13],
+              skipped: [], failed: [], removed: [], error: null }] },
         ];
         const text = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
         const chunks = [text.slice(0, 40), text.slice(40)];
@@ -1524,8 +1529,9 @@ for (const { name, text } of sources) {
   check("Build builds the family on screen",
         env.fetches.builds.at(-1).family === "Alto",
         JSON.stringify(env.fetches.builds.at(-1)));
-  check("and says what it did and where",
-        env.built.textContent === "2 built, 0 already current → D:\\fonts\\cpfonts",
+  check("and says what it did, what it cost and where",
+        env.built.textContent
+          === "2 built (2.4 MB), 0 already current → D:\\fonts\\cpfonts",
         env.built.textContent);
   check("having counted its way there rather than sitting on 'building…'",
         env.progressCount.steps.includes("1 of 2") &&
@@ -2518,6 +2524,37 @@ for (const { name, text } of sources) {
   check("a tick of your own outlives the one that implied it",
         boxes.default.checked === true && boxes.default.disabled === false,
         `${boxes.default.checked} ${boxes.default.disabled}`);
+}
+
+// 75. Nothing was written, so there is no size to give. "0 built (0 B)" says
+//     the same thing twice and reads like a failure.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 0, families: [
+      { name: "Alto", bytes: 0, sizes: [12], built: [], skipped: [12],
+        failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a run that wrote nothing gives no size",
+        env.built.textContent === "0 built, 1 already current → D:\\fonts\\cpfonts",
+        env.built.textContent);
+}
+
+// 76. The unit follows the number: a single small size is kilobytes, and
+//     reading 41000 B off a card is nobody's idea of an answer.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 41000 },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 41000, families: [
+      { name: "Alto", bytes: 41000, sizes: [12], built: [12], skipped: [],
+        failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a small build reads in kilobytes",
+        env.built.textContent.startsWith("1 built (41 kB),"),
+        env.built.textContent);
 }
 
 process.exit(failures ? 1 : 0);

@@ -840,13 +840,27 @@ def test_building_writes_the_families_the_folder_declares(tmp_path, monkeypatch)
     assert steps[0]["total"] == 1
     # Lowercase because the font file is: the family's capitalisation comes
     # from the filename rather than from the config's.
+    made = tmp_path / "cpfonts" / family / f"{family}_12.cpfont"
+    assert made.is_file()
+    # The bytes are the file's own, not an estimate: these go on a card with a
+    # fixed amount of room, and a build is when somebody wants to know.
+    written = made.stat().st_size
     assert steps[1] == {"event": "size", "family": family, "size": 12,
-                        "done": 1, "total": 1}
+                        "done": 1, "total": 1, "bytes": written}
     assert steps[-1]["out"] == str(tmp_path / fontbuild.OUTPUT_NAME)
+    assert steps[-1]["bytes"] == written
     assert steps[-1]["families"] == [
-        {"name": family, "sizes": [12], "built": [12], "skipped": [],
-         "failed": [], "removed": [], "error": None}]
-    assert (tmp_path / "cpfonts" / family / f"{family}_12.cpfont").is_file()
+        {"name": family, "bytes": written, "current_bytes": 0, "sizes": [12],
+         "built": [12], "skipped": [], "failed": [], "removed": [],
+         "error": None}]
+
+    # And again, with nothing to do: what it wrote is zero, and what is already
+    # there is the same file. A run that built nothing still has an answer to
+    # how much is on the card.
+    again = _steps(TestClient(server.app).post("/build", json={}))
+    assert again[-1]["bytes"] == 0
+    assert again[-1]["current_bytes"] == written
+    assert again[-1]["families"][0]["skipped"] == [12]
 
     again = _steps(TestClient(server.app).post("/build", json={}))
     assert again[0]["total"] == 0, "a second build redid the work"

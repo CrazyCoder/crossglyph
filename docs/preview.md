@@ -84,7 +84,11 @@ A build reports as it goes, which matters because one with the fallbacks on
 runs for minutes: the bar under the two buttons fills with the sizes done, and
 the line under it names the family and size in hand, the count, and once there
 is enough of the run to judge by, what is left. The sentence that stays when
-it finishes says what was built, what was already current, and where it went.
+it finishes says what was built, what was already current, and where it went,
+with the bytes beside each count: a card has a fixed amount of room, and a
+build is when somebody wants to know what a family costs on it. The two
+numbers are separate because they answer different things, what this run
+wrote and what the sizes it left alone already take up.
 
 A build does the sizes whose inputs changed. Hold shift and it does the lot,
 current or not, which is what you want when the inputs are the same and the
