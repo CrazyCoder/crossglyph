@@ -264,12 +264,37 @@ def test_a_rollback_with_nowhere_to_go_says_so(capsys, monkeypatch):
     assert "no version older" in capsys.readouterr().err
 
 
-def test_housekeeping_runs_whatever_the_check_flags_say(monkeypatch):
+@pytest.fixture
+def tidied(monkeypatch):
+    seen = []
+    monkeypatch.setattr(cli.layout, "tidy",
+                        lambda root, keep: seen.append(keep))
+    return seen
+
+
+def test_housekeeping_runs_whatever_the_check_flags_say(monkeypatch, tidied):
     """Retention is not a check. Skipping it with --no-update-check would
     leave every old version on disk for anybody who uses the flag."""
-    tidied = []
     monkeypatch.setattr(cli, "_build", lambda argv: 0)
-    monkeypatch.setattr(cli.layout, "tidy",
-                        lambda root, keep: tidied.append(keep))
     cli.main(["build", "--no-update-check"])
     assert tidied == [1]
+
+
+def test_housekeeping_runs_before_the_work(monkeypatch, tidied):
+    """A build that raises is still a launch, and the sweep it skipped would
+    not happen until one succeeded."""
+    def boom(argv):
+        raise RuntimeError("the fallbacks are missing")
+
+    monkeypatch.setattr(cli, "_build", boom)
+    with pytest.raises(RuntimeError):
+        cli.main(["build"])
+    assert tidied == [1]
+
+
+def test_a_question_deletes_nothing(tidied):
+    """--version is what somebody runs to find out what they have. Removing a
+    directory as a side effect of asking is a surprise."""
+    cli.main(["--version"])
+    cli.main(["--help"])
+    assert tidied == []

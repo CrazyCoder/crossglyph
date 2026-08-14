@@ -23,6 +23,11 @@ USAGE = """usage: crossglyph [preview|build|fetch-fallbacks|update] [options]
 #: Not a subcommand's flag, so it comes off before one sees it.
 NO_CHECK_FLAG = "--no-update-check"
 
+#: The commands that are a launch rather than a question. Housekeeping runs
+#: for these and not for --help or --version: those answer without doing
+#: anything, and a diagnostic that deletes a directory is a surprise.
+TIDIES = ("build", "fetch-fallbacks", "update")
+
 
 def _preview(argv: list[str]) -> int:
     # Imported here rather than at the top, so `build` does not pay for a web
@@ -71,10 +76,6 @@ def _checked(code: int, quiet: bool) -> int:
     The code is passed through untouched: a build that failed stays failed,
     however cheerful the note is.
     """
-    root = install.root()
-    # Housekeeping rather than a check, so it happens whatever the flags say.
-    # It early-outs on every launch but the first after an update.
-    layout.tidy(root, updateconf.settings(root).keep_versions)
     if not quiet:
         note = update_note()
         if note:
@@ -184,6 +185,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "preview":
         return _preview(rest)
+    # Before the work rather than after it, so a build that fails still leaves
+    # the install tidy, and so it is never tied to the update-check flags:
+    # retention is housekeeping and not a check. The preview does the same on
+    # its startup thread, where a large removal cannot delay the page.
+    if command in TIDIES:
+        root = install.root()
+        layout.tidy(root, updateconf.settings(root).keep_versions)
     if command == "build":
         return _checked(_build(rest), quiet)
     if command == "fetch-fallbacks":
