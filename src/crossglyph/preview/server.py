@@ -637,14 +637,19 @@ class SaveRequest(BaseModel):
     export: dict | None = None
 
 
-def _name_taken(name: str, config: Config) -> str | None:
-    """The family already building under `name`, if another one is.
+def _name_taken(names: set[str], config: Config) -> tuple[str, str] | None:
+    """The family already building under one of `names`, and which one.
 
     Two families with one output name write over each other in the build
     folder, size by size, and which of them wins is whichever the walk reached
-    last. Nothing downstream can tell them apart afterwards, so a rename onto
-    a taken name is refused here rather than found later.
+    last. Nothing downstream can tell them apart afterwards, so a name already
+    taken is refused here rather than found later.
+
+    Names rather than a name on both sides: a config carrying `sizes_mod`
+    builds a second family called after the first, and landing on one of those
+    is the same overwrite as landing on a family's own name.
     """
+    folded = {name.casefold() for name in names}
     for other in fontbuild.offered(fontbuild.SOURCE_DIR)[0]:
         # The same family, reached twice: every family all.conf covers without
         # naming shares its path, so the family it was discovered under is what
@@ -652,8 +657,9 @@ def _name_taken(name: str, config: Config) -> str | None:
         if (other.path, other.family.casefold()) == (config.path,
                                                      config.family.casefold()):
             continue
-        if other.name.casefold() == name.casefold():
-            return other.family
+        for variant in other.variants():
+            if variant.name.casefold() in folded:
+                return other.family, variant.name
     return None
 
 
@@ -676,11 +682,6 @@ def export_changes(request_export: dict, config: Config,
     plain = fontconf.sanitize_name(config.family)
     raw_name = str(request_export.get("name", "")).strip()
     chosen = fontconf.sanitize_name(raw_name) if raw_name else plain
-    if chosen.casefold() != config.name.casefold():
-        taken = _name_taken(chosen, config)
-        if taken:
-            raise ValueError(f"the {taken} family already builds as {chosen}, "
-                             f"and two of them would write over each other")
     wanted["name"] = chosen if chosen != plain else None
 
     sizes = str(request_export.get("sizes", "")).strip()
@@ -703,8 +704,11 @@ def export_changes(request_export: dict, config: Config,
     raw_suffix = str(request_export.get("mod_suffix", "")).strip()
     suffix = fontconf.sanitize_name(raw_suffix) if raw_suffix else ""
     inherited_suffix = fontconf.sanitize_name(shared.get("mod_suffix", "Mod"))
-    wanted["mod_suffix"] = (suffix if sizes_mod and suffix != inherited_suffix
-                            else None)
+    # `and suffix`, because an empty one is the absence of a key and not a key
+    # set to nothing: written down, it comes back through sanitize_name as
+    # "CustomFont" and the second family builds under that.
+    wanted["mod_suffix"] = (
+        suffix if sizes_mod and suffix and suffix != inherited_suffix else None)
 
     wanted["intervals"] = str(request_export.get("intervals", "")).strip() or None
     wanted["ranges"] = str(request_export.get("ranges", "")).strip() or None
@@ -721,6 +725,20 @@ def export_changes(request_export: dict, config: Config,
             raise LookupError(f"the {name!r} family has no regular face to "
                               f"fall back to")
         wanted[key] = os.path.relpath(face, config.dir).replace("\\", "/")
+
+    # What this save would have the family build, now that the second one is
+    # known too. Against what it builds today rather than always: the answer
+    # costs a walk of the folder, and it can only have moved when one of these
+    # three did.
+    built = {chosen}
+    if wanted["sizes_mod"]:
+        built.add(chosen + (wanted["mod_suffix"] or inherited_suffix))
+    if built != {variant.name for variant in config.variants()}:
+        taken = _name_taken(built, config)
+        if taken:
+            raise ValueError(f"the {taken[0]} family already builds as "
+                             f"{taken[1]}, and two of them would write over "
+                             f"each other")
 
     # Only what differs from all.conf, the same rule the tuning half follows --
     # except for the two file keys, which all.conf cannot carry at all.

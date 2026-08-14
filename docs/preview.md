@@ -75,7 +75,9 @@ the source files are called. It reaches a filename, so letters, digits, `_` and
 what landed. Empty means the name the files already have. Two families may not
 build under one name, since they would write over each other in the output
 folder, so a name another family has taken is refused with a line saying which.
-The picker follows a rename as soon as it is saved.
+A second family counts as a name, being called after the first one. The picker
+follows a rename as soon as it is saved, and so does any family falling back to
+the one that moved.
 
 The coverage presets overlap, and the row says so rather than leaving it to be
 worked out: `reading` is the converter's `default` block and a good deal more,

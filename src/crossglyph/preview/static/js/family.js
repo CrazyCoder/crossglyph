@@ -76,6 +76,16 @@ export function renameFamily(from, to) {
   // Remembered under the new name too, or the next visit asks for a family the
   // server no longer has and opens on whichever one it started with.
   attempt(() => localStorage.setItem(FAMILY, to));
+  // Anything that pointed at the old name follows it. A fallback is held as
+  // the family it belongs to, so another family's panel would otherwise open
+  // its picker on a name no option carries -- which a select answers by
+  // selecting nothing, and the save that offered itself over that would clear
+  // a fallback nobody touched.
+  for (const other of familyEntries.values()) {
+    for (const field of ["fallback1", "fallback2"]) {
+      if (other.export && other.export[field] === from) other.export[field] = to;
+    }
+  }
   showFaces();
 }
 

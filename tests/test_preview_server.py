@@ -765,6 +765,14 @@ def test_a_second_family_saves_with_the_suffix_that_names_it(scratch):
     text = (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
     assert "sizes_mod" not in text and "mod_suffix" not in text
 
+    # An empty box is the absence of the key rather than the key set to
+    # nothing: written down, it comes back as "CustomFont" and the second
+    # family builds under that.
+    _save_export("Alto", sizes_mod="13 15", mod_suffix="")
+    assert _alto_says(scratch, "mod_suffix") is None
+    entry = next(f for f in server.families() if f["name"] == "Alto")
+    assert entry["export"]["mod_suffix"] == "Mod"
+
 
 def _alto_says(scratch, key):
     """What alto.conf sets a key to, or None. Its `name` line arrived with the
@@ -821,6 +829,26 @@ def test_two_families_may_not_build_under_one_name(scratch):
     assert "Ledger" not in \
         (_conf(scratch) / "alto.conf").read_text(encoding="utf-8"), \
         "a refused rename still touched the file"
+
+
+def test_the_second_family_a_config_builds_takes_its_name_too(scratch):
+    """`sizes_mod` builds <name><mod_suffix> from the same faces, so a config
+    holds two names in the output folder rather than one. Landing on the
+    second is the same overwrite as landing on the first."""
+    assert _save_export("Ledger", sizes_mod="9 10").status_code == 200
+
+    response = _save_export("Alto", name="LedgerMod")
+    assert response.status_code == 422
+    assert "LedgerMod" in response.text, response.text
+    assert _alto_says(scratch, "name") == "Alto", \
+        "a refused rename still touched the file"
+
+    # And the other way round: this config's own second family is a name it
+    # did not have before, and it can land on somebody just as squarely.
+    response = _save_export("Alto", name="Ledg", sizes_mod="9 10",
+                            mod_suffix="er")
+    assert response.status_code == 422, response.text
+    assert "Ledger" in response.text
 
 
 def test_a_fallback_family_is_stored_as_its_regular_file(scratch):

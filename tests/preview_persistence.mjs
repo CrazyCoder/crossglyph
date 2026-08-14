@@ -1723,8 +1723,13 @@ for (const { name, text } of sources) {
   const env = await loaded(store);
   const nameBox = env.exportForm.elements.name;
   const modName = env.sandbox.document.getElementById("mod-name");
+  const entries = env.modules.get("family.js").familyEntries;
   check("the box opens on what the family builds as",
         nameBox.value === "Alto", nameBox.value);
+
+  // A family falling back to this one holds it by the name it builds under,
+  // which is the name about to change.
+  entries.get("Sample").export.fallback1 = "Alto";
 
   nameBox.value = "Alt";
   env.exportForm.edit("name");
@@ -1741,15 +1746,28 @@ for (const { name, text } of sources) {
   check("the picker follows it", env.family.value === "Alt", env.family.value);
   check("under the label it had", env.family.selectedOptions[0].textContent
         === "Alt", env.family.selectedOptions[0].textContent);
-  const entries = env.modules.get("family.js").familyEntries;
   check("the entry moves with it, since everything here is keyed by the name",
         entries.has("Alt") && !entries.has("Alto"),
         [...entries.keys()].join());
+  check("and so does a fallback that pointed at the old name",
+        entries.get("Sample").export.fallback1 === "Alt",
+        entries.get("Sample").export.fallback1);
   check("and it is remembered under the new name, or the next visit asks for "
         + "a family the server no longer has",
         store.data["crossglyph.family"] === "Alt",
         store.data["crossglyph.family"]);
   check("with nothing left to save", env.save.disabled === true);
+
+  // The proof of the line above: a picker refuses a value none of its options
+  // carries, so a fallback left on the old name would blank -- and the panel
+  // would then offer to save that emptiness over a config nobody touched.
+  env.family.choose("Sample");
+  check("the family that falls back to it opens on the right one",
+        env.exportForm.elements.fallback1.value === "Alt",
+        env.exportForm.elements.fallback1.value);
+  check("with nothing of its own to save either",
+        env.save.disabled === true);
+  env.family.choose("Alt");
 
   // The strip that makes it a filename is the server's, and the page shows
   // what landed rather than what was typed.
