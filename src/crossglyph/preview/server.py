@@ -27,13 +27,13 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
 
-from .. import fontbuild, fontconf
+from .. import fontbuild, fontconf, install, version
 from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
                               FontBuildError, figure_glyph_overrides,
                               gsub_ligature_sequences)
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
-from ..render import RenderCoreMissing
+from ..render import RenderCoreMissing, stamp
 from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
                Drawable, PageSpec, build_font, coverage_for, faces_for,
                fallback_split, page_codepoints, preview_page)
@@ -265,7 +265,7 @@ FEATURE_KNOBS = {"ligatures": gsub_ligature_sequences,
                  "figures": figure_glyph_overrides}
 
 
-def stamp(path: pathlib.Path) -> tuple[str, int, int] | None:
+def file_stamp(path: pathlib.Path) -> tuple[str, int, int] | None:
     """A file's identity for a cache key, or None when it is not there.
 
     Everything asked about a face here is cached, because every family in the
@@ -283,7 +283,7 @@ def stamp(path: pathlib.Path) -> tuple[str, int, int] | None:
 
 def face_features(path: pathlib.Path) -> frozenset[str]:
     """Which of the feature knobs one face can answer."""
-    known = stamp(path)
+    known = file_stamp(path)
     return _face_features(*known) if known else frozenset(FEATURE_KNOBS)
 
 
@@ -313,7 +313,7 @@ def face_outlines(path: pathlib.Path) -> str:
     read from being described. Stated per face because it decides which of
     FreeType's engines draws it, and only some of them darken stems.
     """
-    known = stamp(path)
+    known = file_stamp(path)
     return _face_outlines(*known) if known else ""
 
 
@@ -347,7 +347,7 @@ def face_hinting(path: pathlib.Path) -> tuple[bool, bool]:
     Both true when the face will not open, since greying is a claim and there
     is nothing to claim about a font nobody could read.
     """
-    known = stamp(path)
+    known = file_stamp(path)
     return _face_hinting(*known) if known else (True, True)
 
 
@@ -1036,6 +1036,22 @@ def defaults() -> dict:
             "faces": sorted(FACE_NAMES[style] for style in _sources),
             "families": families(),
             "family": _family}
+
+
+@app.get("/update")
+def update_state() -> dict:
+    """What this install is, and how it would be updated.
+
+    Separate from /defaults, which carries facts about the workspace that the
+    page reads once. This one grows fields as the check lands, and the page
+    renders whatever it is given rather than deciding anything itself.
+    """
+    kind = install.detect(install.root())
+    return {"version": version.installed(),
+            "firmware": stamp.build_stamp(),
+            "kind": kind,
+            "can_self_update": install.can_self_update(kind),
+            "instruction": install.instruction(kind)}
 
 
 class OutRequest(BaseModel):

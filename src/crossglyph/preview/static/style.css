@@ -591,3 +591,12 @@
      rules rather than around the control. */
   .row :focus-visible { outline-offset: 1px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* What this install is. The strip carries the version alone, in the row's
+     own uppercase voice; the panel foot carries the sentence. No colour: the
+     palette is the device's four greys, for the reason at the top of this
+     file. */
+  #version-strip { margin-left: .5rem; letter-spacing: .06em; }
+  #about { margin: .9rem .3rem .2rem; }
+  #about-line { font-size: 12px; font-weight: 600; color: var(--text); }
+  #about-detail { margin-top: .2rem; }

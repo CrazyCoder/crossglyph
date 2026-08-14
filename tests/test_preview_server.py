@@ -1933,3 +1933,30 @@ def test_the_fetch_streams_its_progress_and_reads_the_page(tmp_path, monkeypatch
     assert any("CJK" in name for name in started), \
         "a Japanese page fetched nothing that could draw it"
     assert fontbuild.FALLBACK_LICENCE in started, "the OFL requires it"
+
+
+def test_the_update_endpoint_says_what_this_install_is(client):
+    from crossglyph import install, version
+
+    said = client.get("/update").json()
+    assert version.parse(said["version"]) is not None
+    assert said["kind"] in install.KINDS
+    assert said["can_self_update"] is install.can_self_update(said["kind"])
+    assert said["instruction"]
+
+
+def test_the_firmware_commit_travels_with_the_version(client, monkeypatch):
+    """Two installs on the same version can carry different renderers, so the
+    commit is part of the answer rather than a detail."""
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.stamp, "build_stamp", lambda: "45caec3e76c2")
+    assert client.get("/update").json()["firmware"] == "45caec3e76c2"
+
+
+def test_a_core_with_no_stamp_reports_null_rather_than_a_guess(client,
+                                                               monkeypatch):
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.stamp, "build_stamp", lambda: None)
+    assert client.get("/update").json()["firmware"] is None

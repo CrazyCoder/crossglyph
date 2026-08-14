@@ -631,6 +631,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     fetch: Object.assign(buildButton("fetch"), { hidden: false }),
     fetched: recording(),
     "have-fallbacks": { textContent: "" },
+    // What this install is: the version in the strip, the sentence at the
+    // foot of the export panel.
+    "version-strip": { textContent: "", title: "" },
+    "about-line": { textContent: "" },
+    "about-detail": { textContent: "" },
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
     // shows the page untuned.
@@ -820,6 +825,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
             name: typed.replace(/[^A-Za-z0-9_-]+/g, "") || sent.family,
             tuning: { line_height: null, ...sent.tuning } }) });
       }
+      if (String(url).includes("/update")) {
+        return Promise.resolve({ json: () => Promise.resolve(
+          opts.about ?? { version: "1.2.3", firmware: "45caec3e76c2472b",
+                          kind: "zip", can_self_update: true,
+                          instruction: "Run crossglyph update to install it." })
+        });
+      }
       return Promise.resolve({ json: () => Promise.resolve(defaults) });
     },
     // The chunks above are already text, so this only has to exist.
@@ -866,6 +878,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
+           about: { strip: stubs["version-strip"], line: stubs["about-line"],
+                    detail: stubs["about-detail"] },
            refuse() { answer = false; } };
 }
 
@@ -3071,6 +3085,39 @@ for (const { name, text } of sources) {
   check("and grayscale hinting is not greyed on facts nobody gave",
         env.byName.grayscale_hinting.disabled === false,
         env.byName.grayscale_hinting.title);
+}
+
+// 58. What this install is reaches both surfaces. The strip is the glance and
+//     never scrolls away; the panel foot is the sentence. The commit is there
+//     because two installs on one version can carry different renderers.
+{
+  const env = await loaded(fakeStorage());
+  check("the strip carries the version",
+        env.about.strip.textContent === "1.2.3", env.about.strip.textContent);
+  check("and the panel foot names the product with it",
+        env.about.line.textContent === "CrossGlyph 1.2.3",
+        env.about.line.textContent);
+  check("and the renderer's commit, shortened",
+        env.about.detail.textContent.includes("45caec3"),
+        env.about.detail.textContent);
+  check("a release that can update itself says nothing about how",
+        !env.about.detail.textContent.includes("crossglyph update"),
+        env.about.detail.textContent);
+}
+
+// 58a. A kind that cannot replace its own files says so instead, because the
+//      way out differs and the notice is the only place it is said.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    version: "1.2.3", firmware: null, kind: "source", can_self_update: false,
+    instruction: "This is a source download. Get the release zip to update." },
+  });
+  check("the instruction takes the place of the commit",
+        env.about.detail.textContent.startsWith("This is a source download"),
+        env.about.detail.textContent);
+  check("and a core with no stamp is left unsaid rather than guessed",
+        !env.about.detail.textContent.includes("crosspoint-reader"),
+        env.about.detail.textContent);
 }
 
 process.exit(failures ? 1 : 0);

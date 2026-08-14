@@ -1,3 +1,4 @@
+import {showAbout} from "./about.js";
 import {familyPicker} from "./family.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
@@ -34,6 +35,11 @@ syncSliders();
 syncLineHeight();
 syncHyphenation();
 refreshReverts();
+
+// What this install is. Its own fetch rather than a field on /defaults: that
+// one is facts about the workspace, and this one grows as the update check
+// lands.
+fetch("/update").then(r => r.json()).then(showAbout);
 
 // Seed the box with the server's sample so it can be edited, not just
 // replaced, and fill the picker with what the source folder has.

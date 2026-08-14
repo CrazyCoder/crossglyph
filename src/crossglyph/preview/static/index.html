@@ -28,6 +28,9 @@
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6 5.9 5.9 0 1 0 13.4 9.9z"/></svg></button>
   </div>
+  <!-- The version, where it never scrolls away. The panel foot below carries
+       the sentence; this is the glance. -->
+  <span id="version-strip" title=""></span>
 </div>
 
 <form id="knobs">
@@ -561,6 +564,13 @@
       </div>
     </div>
     <div id="built"></div>
+    <!-- What this install is. Inside the export card because it is the short
+         column and stays on screen, and because the page has no chrome of its
+         own to hang it on. -->
+    <div id="about">
+      <div id="about-line"></div>
+      <div class="hint" id="about-detail"></div>
+    </div>
 </form>
 
 <script type="module" src="js/app.js"></script>

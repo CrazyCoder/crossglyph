@@ -15,4 +15,5 @@ import "./variable.js";
 import "./progress.js";
 import "./export.js";
 import "./theme.js";
+import "./about.js";
 import "./start.js";
