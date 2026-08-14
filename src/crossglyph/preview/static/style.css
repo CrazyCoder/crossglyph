@@ -289,8 +289,12 @@
   .section { display: flex; align-items: center; gap: .45rem;
              border-top: 1px solid var(--rule);
              margin: 0; padding: .85rem 0 .5rem; }
+  /* As tall as the marks that may or may not be beside it, so the row is one
+     height whatever it is carrying. Left to its text, a heading rises three
+     pixels the moment its dot goes away -- which is every time the section is
+     opened, since the dot is what the fold has to say while it is shut. */
   .section h2 { display: flex; align-items: center; gap: .35rem;
-                flex: 1 1 auto; margin: 0; }
+                flex: 1 1 auto; margin: 0; min-height: 1.5rem; }
 
   /* The heading is the press that folds the section. A button inside the h2
      rather than instead of it: the section keeps its heading, and what opens
