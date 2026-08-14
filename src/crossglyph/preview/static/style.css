@@ -398,6 +398,14 @@
      the arrow's column and every gap in the row a switch with nothing drawn on
      it. The words are a wide enough target on their own. */
   .row.check .name { cursor: pointer; }
+  /* Switches two to a line. Each stays a row in its own right -- its own rule
+     above it, its own mark column -- and the two rules meet to draw the one
+     line the eye reads across. The label column narrows to what these words
+     need, since the wide one is sized for a knob's worth of control and there
+     is only a box here. */
+  .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: .55rem; }
+  .checks .row { grid-template-columns: minmax(0, 1fr) 1.25rem 1.5rem; }
   .row input[type=checkbox] { justify-self: start; width: 1rem; height: 1rem;
                               accent-color: var(--l2); cursor: pointer; }
 
