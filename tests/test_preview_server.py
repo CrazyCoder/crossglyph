@@ -622,26 +622,6 @@ def test_the_three_column_breakpoint_fits_what_it_lays_out():
          f"which a scrollbar eats")
 
 
-def test_the_save_note_reserves_its_line():
-    """The note is empty until a save, and the whole Page section sits directly
-    under it. Left to collapse, the empty box takes its top margin with it, so
-    the first save drops that section 26px under the cursor. A min-height keeps
-    the line whether or not there is anything in it.
-
-    Neither suite would notice this going: the probe drives a stub DOM with no
-    stylesheet, and nothing else here reads CSS.
-    """
-    import re
-
-    from crossglyph.preview import server
-
-    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
-    rule = re.search(r"#saved\s*\{([^}]*)\}", css)
-    assert rule, "#saved has no rule at all"
-    assert "min-height" in rule.group(1), \
-        "#saved no longer reserves its line, so a save shifts the panel"
-
-
 def test_every_asset_the_page_asks_for_is_one_the_server_will_serve():
     """A stylesheet, a script or an icon the route refuses is a 404 the page
     never mentions: the browser asks quietly and draws without it. The route

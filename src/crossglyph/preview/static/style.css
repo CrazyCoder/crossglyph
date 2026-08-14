@@ -68,11 +68,12 @@
     /* The page spans every row, so where it is the taller column the surplus
        has to land somewhere. Named rather than left to the grid, which shares
        it out evenly and pushes the tabs off the panel they are drawn onto. */
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
       "chrome page"
       "tabs   page"
-      "panel  page";
+      "panel  page"
+      "save   page";
     background: var(--stage); color: var(--text);
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
@@ -84,6 +85,7 @@
   #tabs { grid-area: tabs; display: none;
           margin-bottom: calc(-.55rem - 1px); }
   #knobs, #export { grid-area: panel; }
+  #savebar { grid-area: save; }
   #middle { grid-area: page; }
 
   /* Three columns while they fit, and the arithmetic is the whole rule: two
@@ -95,10 +97,11 @@
   @media (min-width: 1610px) {
     body {
       grid-template-columns: 30rem min-content 30rem;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto 1fr;
       grid-template-areas:
         "chrome page export"
-        "panel  page export";
+        "panel  page export"
+        "save   page export";
     }
     /* Out of the panel's cell and into its own column, which is the whole of
        what "three columns" means here. */
@@ -123,7 +126,7 @@
   @media (max-width: 1089px) {
     body {
       grid-template-columns: 30rem;
-      grid-template-areas: "chrome" "tabs" "panel" "page";
+      grid-template-areas: "chrome" "tabs" "panel" "save" "page";
     }
   }
 
@@ -412,15 +415,14 @@
   #save:not(:disabled):hover {
     background: var(--text); border-color: var(--text);
   }
-  /* Reset and Save sit together: one throws the knobs back to the converter's
-     own defaults, the other writes them where the build will read them. */
-  /* A line tall whether or not it says anything. Left to collapse, the empty
-     box takes its top margin with it, so the whole Page section under it
-     drops 26px the first time a save puts a note here. `em` first for a
-     browser without `lh`, which is the more accurate of the two since a line
-     box is what is being reserved. */
-  #saved { margin-top: .6rem; color: var(--muted); font-size: 11.5px;
-           min-height: 1.45em; min-height: 1lh; }
+  /* The bar under the panel: the button, and beside it whatever the last save
+     had to say. Nothing sits below it, so the note can come and go without
+     moving anything, and it reads on the line it belongs to rather than in a
+     reserved gap under the card. */
+  #savebar { display: flex; align-items: center; gap: .6rem;
+             padding: 0 .3rem; }
+  #savebar #save { min-height: 1.85rem; padding: .3rem .8rem; flex: none; }
+  #saved { min-width: 0; color: var(--muted); font-size: 11.5px; }
 
   textarea {
     width: 100%; height: 7rem; margin-top: .3rem; padding: .45rem .5rem;

@@ -242,9 +242,7 @@
 
   <div class="actions">
     <button type="button" class="reset" id="reset-font">Reset font knobs</button>
-    <button type="button" class="reset" id="save" disabled>Save</button>
   </div>
-  <div id="saved"></div>
 
   <h2>Page</h2>
 
@@ -331,6 +329,15 @@
     <button type="button" class="reset" id="reset-page">Reset page settings</button>
   </div>
 </form>
+
+<!-- Under the card rather than in it. This writes the whole .conf, the export
+     panel's half of it included, so it belongs to the column and not to either
+     panel: where the two share one, it has to be on screen whichever of them
+     is showing. -->
+<div id="savebar">
+  <button type="button" class="reset" id="save" disabled>Save</button>
+  <span id="saved"></span>
+</div>
 
 <div id="middle">
   <div id="stage">
