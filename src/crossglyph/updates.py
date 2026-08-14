@@ -56,6 +56,9 @@ class State:
     checked_at: float
     latest: str | None
     error: str | None
+    #: The version a rollback rejected, if one did. Without it the next check
+    #: nags whoever rolled back straight onto the release they just escaped.
+    rejected: str | None = None
 
 
 def parse(raw: bytes) -> Manifest:
@@ -95,12 +98,19 @@ def parse(raw: bytes) -> Manifest:
                     launcher_changed=bool(body.get("launcher_changed", False)))
 
 
-def fetch(url: str, timeout: float = TIMEOUT) -> bytes:
-    """The one place this package talks to the network.
+def open_stream(url: str, timeout: float = TIMEOUT):
+    """The one place this package opens a connection.
 
-    A single seam, so the tests can be sure they never do.
+    A single seam, so the tests can be sure they never do. The manifest reads
+    through it and so does the release download, which is the same request
+    with a great deal more to read.
     """
-    with urllib.request.urlopen(url, timeout=timeout) as answer:  # noqa: S310
+    return urllib.request.urlopen(url, timeout=timeout)  # noqa: S310
+
+
+def fetch(url: str, timeout: float = TIMEOUT) -> bytes:
+    """The manifest, bounded."""
+    with open_stream(url, timeout) as answer:
         return answer.read(MAX_BYTES)
 
 
@@ -110,7 +120,8 @@ def load_state(root: pathlib.Path) -> State:
         body = json.loads((root / STATE_NAME).read_text(encoding="utf-8"))
         return State(checked_at=float(body.get("checked_at", 0)),
                      latest=body.get("latest") or None,
-                     error=body.get("error") or None)
+                     error=body.get("error") or None,
+                     rejected=body.get("rejected") or None)
     except (OSError, ValueError, TypeError, AttributeError):
         return State(checked_at=0.0, latest=None, error=None)
 
@@ -149,13 +160,17 @@ def check(root: pathlib.Path, *, force: bool = False,
         if 0 < known.checked_at and 0 <= waited < wanted.interval_hours * 3600:
             return known
 
+    # A rejected version is the user's decision and survives every check that
+    # follows it. Everything else here is what the network just said.
     try:
         found = parse(fetch(MANIFEST_URL))
-        state = State(checked_at=now, latest=found.version, error=None)
+        state = State(checked_at=now, latest=found.version, error=None,
+                      rejected=known.rejected)
     except (OSError, ValueError) as exc:
         # The time is recorded even on a failure, or an install with no
         # network meets the timeout on every single run.
-        state = State(checked_at=now, latest=None, error=str(exc))
+        state = State(checked_at=now, latest=None, error=str(exc),
+                      rejected=known.rejected)
     save_state(root, state)
     return state
 
@@ -166,8 +181,14 @@ def available(state: State) -> str | None:
     Strictly newer, so a tree already past the last release is never told to
     move backwards. That is the ordinary case for a clone of master, whose
     version is only bumped when a release is cut.
+
+    A version somebody rolled back from stays quiet until something newer than
+    it appears. Rollback would be pointless otherwise: the next check would
+    offer the release they had just escaped, and offer it every day.
     """
     if not state.latest:
+        return None
+    if state.rejected and not version.is_newer(state.latest, state.rejected):
         return None
     return state.latest if version.is_newer(state.latest,
                                             version.installed()) else None
