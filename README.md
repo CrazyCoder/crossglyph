@@ -24,6 +24,11 @@ fetches Python and the dependencies. Nothing is installed system wide, and the
 whole of it lives in a cache directory you can delete. A browser opens on the
 first family it finds.
 
+What you unpack holds the launcher, your `fonts` folder, and a `versions`
+folder with the code in it. The launcher runs whichever version `current`
+names, which is how a later release can be added beside this one rather than
+written over it.
+
 Step 3 is second on purpose: there is nothing to set up before the first run.
 An empty workspace opens on Literata, which ships with the tool, so the page
 has type on it while you decide what to tune. Add a font of your own and it
@@ -40,7 +45,8 @@ publishes none, so uv tries to compile it and needs a build toolchain.
 
 ## The workspace
 
-The folder the launcher opens holds four things:
+The `fonts` folder sits beside the launcher, outside `versions`, so nothing
+that updates the tool can reach it. It holds four things:
 
 ```
 fonts/

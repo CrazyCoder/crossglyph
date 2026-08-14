@@ -2,10 +2,15 @@
 
     uv run tools/make-release.py
 
-`git archive` does the packing, which is what keeps the polyglot wrappers
-byte exact and carries the executable bits. Everything after it is the check:
-a release that has lost a line ending or an executable bit still unpacks, runs
-nowhere, and says nothing about why.
+`git archive` does the reading, and the tree it produces is then repacked into
+the release layout: the launcher and the workspace at the root, the code under
+versions/<v>, so an update can add a version beside the live one rather than
+overwrite it. Members are copied as bytes rather than through the filesystem,
+which is what keeps the polyglot wrappers exact and carries the executable
+bits.
+
+Everything after that is the check: a release that has lost a line ending or
+an executable bit still unpacks, runs nowhere, and says nothing about why.
 """
 from __future__ import annotations
 
@@ -13,38 +18,59 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-#: Without any one of these the release does not run.
+#: What stays outside versions/, because it outlives any one version: the
+#: launcher, which an update cannot replace while cmd.exe is holding it, and
+#: the workspace, which is the user's. `current` is generated, not tracked.
+ROOT_FILES = frozenset({"crossglyph.cmd", "crossglyph.sh"})
+
+#: Without any one of these the release does not run. `{v}` is the version
+#: directory, filled in per build.
 REQUIRED = [
-    "pyproject.toml", "uv.lock", "LICENSE", "README.md",
-    "THIRD-PARTY-NOTICES.md", "crossglyph.sh", "crossglyph.cmd",
+    "current",
+    "crossglyph.sh", "crossglyph.cmd",
     "fonts/README.md", "fonts/conf/all.conf",
-    "src/crossglyph/cli.py",
-    "src/crossglyph/render/render.wasm",
-    "src/crossglyph/render/render.built-from.json",
-    "src/crossglyph/preview/static/index.html",
+    "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
+    "{v}/THIRD-PARTY-NOTICES.md",
+    "{v}/src/crossglyph/cli.py",
+    "{v}/src/crossglyph/render/render.wasm",
+    "{v}/src/crossglyph/render/render.built-from.json",
+    "{v}/src/crossglyph/preview/static/index.html",
     # The family the preview opens on before anybody has filled the workspace
     # in, and the licence the OFL requires travel with it.
-    "src/crossglyph/starter/Literata[opsz,wght].ttf",
-    "src/crossglyph/starter/Literata-Italic[opsz,wght].ttf",
-    "src/crossglyph/starter/OFL.txt",
-    "tools/uv.cmd", "tools/tool-wrapper.sh", "tools/tool-wrapper.cmd",
-    "tools/tool-wrapper.ps1",
+    "{v}/src/crossglyph/starter/Literata[opsz,wght].ttf",
+    "{v}/src/crossglyph/starter/Literata-Italic[opsz,wght].ttf",
+    "{v}/src/crossglyph/starter/OFL.txt",
+    "{v}/tools/uv.cmd", "{v}/tools/tool-wrapper.sh",
+    "{v}/tools/tool-wrapper.cmd", "{v}/tools/tool-wrapper.ps1",
 ]
 
 #: A checkout's own furniture, which means nothing to somebody unpacking a zip.
 #: `export-ignore` in .gitattributes is what keeps them out; this is the check.
 EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit"]
 
-#: Executed on macOS and Linux, so the bit has to survive the archive. uv.cmd
-#: is on the list because crossglyph.sh execs it.
+#: Executed on macOS and Linux, so the bit has to survive the archive and the
+#: repack. uv.cmd is on the list because crossglyph.sh execs it.
 EXECUTABLE = [
-    "crossglyph.sh", "tools/uv.cmd", "tools/tool-wrapper.sh",
-    "tools/check-line-endings.sh", "src/render/build.sh",
+    "crossglyph.sh", "{v}/tools/uv.cmd", "{v}/tools/tool-wrapper.sh",
+    "{v}/tools/check-line-endings.sh", "{v}/src/render/build.sh",
 ]
+
+
+def release_path(path: str, version: str) -> str:
+    """Where a tracked file lands in the release tree.
+
+    Everything belongs to one version except the launcher and the workspace,
+    which outlive every version: an update adds a directory under versions/
+    and rewrites `current`, and must not touch either of those.
+    """
+    if path in ROOT_FILES or path == "fonts" or path.startswith("fonts/"):
+        return path
+    return f"versions/{version}/{path}"
 
 
 def version() -> str:
@@ -80,6 +106,33 @@ def check_polyglot(data: bytes, name: str) -> list[str]:
     return problems
 
 
+def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
+           version: str) -> None:
+    """The archive git produced, restructured into the release tree.
+
+    Each member's bytes and its external_attr are copied straight across
+    rather than extracted to disk and re-added: the executable bits and the
+    mixed line endings in tools/uv.cmd both live in the archive, and a round
+    trip through the filesystem is where either of them would quietly be lost.
+    """
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+        for info in source.infolist():
+            if info.is_dir():
+                continue
+            inner = info.filename[len(name) + 1:]
+            moved = zipfile.ZipInfo(f"{name}/{release_path(inner, version)}",
+                                    date_time=info.date_time)
+            moved.external_attr = info.external_attr
+            moved.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(moved, source.read(info))
+        # Generated rather than tracked: a checkout has no live version, and a
+        # file saying one would be wrong the moment it was committed.
+        current = zipfile.ZipInfo(f"{name}/current",
+                                  date_time=(1980, 1, 1, 0, 0, 0))
+        current.external_attr = 0o644 << 16
+        archive.writestr(current, f"{version}\n")
+
+
 def main() -> int:
     if git("status", "--porcelain"):
         print("the working tree has uncommitted changes; commit them first, "
@@ -87,29 +140,39 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    name = f"crossglyph-{version()}"
+    release = version()
+    name = f"crossglyph-{release}"
     out = ROOT / "dist" / f"{name}.zip"
     out.parent.mkdir(exist_ok=True)
-    git("archive", "--format=zip", f"--prefix={name}/", "-o", str(out), "HEAD")
 
+    with tempfile.TemporaryDirectory() as work:
+        flat = pathlib.Path(work) / "flat.zip"
+        git("archive", "--format=zip", f"--prefix={name}/", "-o", str(flat),
+            "HEAD")
+        with zipfile.ZipFile(flat) as source:
+            repack(source, out, name, release)
+
+    where = f"versions/{release}"
     problems = []
     with zipfile.ZipFile(out) as archive:
         members = {info.filename[len(name) + 1:]: info
                    for info in archive.infolist()}
         for wanted in REQUIRED:
-            if wanted not in members:
-                problems.append(f"missing: {wanted}")
+            if wanted.format(v=where) not in members:
+                problems.append(f"missing: {wanted.format(v=where)}")
         for unwanted in EXCLUDED:
-            if unwanted in members:
-                problems.append(f"should not be in a release: {unwanted}")
+            for path in (unwanted, f"{where}/{unwanted}"):
+                if path in members:
+                    problems.append(f"should not be in a release: {path}")
         for path in EXECUTABLE:
-            info = members.get(path)
+            info = members.get(path.format(v=where))
             if info is None:
                 continue                      # already reported, if required
             if not (info.external_attr >> 16) & 0o111:
-                problems.append(f"not executable: {path}")
-        if "tools/uv.cmd" in members:
-            problems.extend(check_polyglot(archive.read(f"{name}/tools/uv.cmd"),
+                problems.append(f"not executable: {path.format(v=where)}")
+        uv = f"{where}/tools/uv.cmd"
+        if uv in members:
+            problems.extend(check_polyglot(archive.read(f"{name}/{uv}"),
                                            "tools/uv.cmd"))
         total = sum(info.file_size for info in archive.infolist())
 
