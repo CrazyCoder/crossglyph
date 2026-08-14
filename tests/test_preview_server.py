@@ -577,6 +577,51 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_the_three_column_breakpoint_fits_what_it_lays_out():
+    """The page shows three columns above a width and folds the export panel
+    behind a tab below it. That width is arithmetic -- two panels, the sheet
+    and the stage around it, the gaps and the page's padding -- and nothing
+    recomputes it: widen a panel and the breakpoint has to move with it, or the
+    third column comes back to wrapping under the first, which is the whole
+    thing the fold exists to stop.
+
+    Neither of the other suites can see this. The probe drives a stub DOM with
+    no stylesheet, and a browser would have to be opened at exactly the wrong
+    width to catch it.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+
+    def rem(pattern: str, text: str) -> float:
+        found = re.search(pattern, text)
+        assert found, pattern
+        return float(found.group(1)) * 16
+
+    breakpoint_px = float(re.search(r"min-width:\s*(\d+)px", css).group(1))
+    panel = rem(r"#knobs \{\s*\n?\s*width: ([\d.]+)rem", css)
+    gap = rem(r"column-gap: ([\d.]+)rem", css)
+    padding = rem(r"body \{\s*\n\s*margin: 0; padding: ([\d.]+)rem", css)
+    stage = rem(r"#stage \{[^}]*padding: ([\d.]+)rem", css)
+    sheet = float(re.search(r'id="page" width="(\d+)"', html).group(1))
+    # The sheet's own border, which the stage's box adds to the two paddings.
+    page_column = sheet + 2 + 2 * stage + 2
+
+    needs = 2 * panel + page_column + 2 * gap + 2 * padding
+    assert breakpoint_px >= needs, \
+        (f"three columns need {needs:.0f}px and the breakpoint is at "
+         f"{breakpoint_px:.0f}px, so the export panel wraps just above it")
+    # A media query counts the scrollbar as width the layout does not get, and
+    # this page always has one. Anything less than that margin is a breakpoint
+    # that fires while the layout below it still cannot fit.
+    assert breakpoint_px - needs >= 17, \
+        (f"only {breakpoint_px - needs:.0f}px of headroom over {needs:.0f}px, "
+         f"which a scrollbar eats")
+
+
 def test_the_save_note_reserves_its_line():
     """The note is empty until a save, and the whole Page section sits directly
     under it. Left to collapse, the empty box takes its top margin with it, so

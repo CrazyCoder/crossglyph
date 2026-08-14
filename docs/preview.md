@@ -122,6 +122,13 @@ not, rather than to the first entry in the picker.
 The export panel holds what a build needs and a page does not: the name, the
 sizes, the coverage intervals, the fallback families.
 
+It has a column of its own beside the page while the window is wide enough for
+three. Below that it folds in beside the font knobs, with **Tune** and
+**Export** tabs above the panel deciding which of the two is showing, and the
+page stays where it is either way. A build running behind the Export tab marks
+it, since a build is minutes and the panel it reports in may not be the one
+you are looking at.
+
 The box beside the heading is what the family is called once it is built, which
 is the name the reader picks from on a phone-sized screen rather than whatever
 the source files are called. It reaches a filename, so letters, digits, `_` and

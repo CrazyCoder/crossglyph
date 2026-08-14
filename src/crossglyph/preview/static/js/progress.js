@@ -44,7 +44,12 @@ export function spellBytes(count) {
 // the export panel, and the update's, in the island under the specimen -- and
 // each keeps its own start time, so what one reports says nothing about when
 // the other began.
-export function progressBar(row) {
+//
+// `mark` is shown when the run starts and left alone after that: a bar hidden
+// behind a tab has to leave something on the tab, and what it has to say
+// outlasts the run. Whoever owns the mark clears it, since only they know when
+// it has been seen. A bar nothing can hide gets none.
+export function progressBar(row, mark) {
   const bar = row.querySelector(".bar");
   const fill = row.querySelector(".bar-fill");
   const what = row.querySelector(".progress-what");
@@ -60,6 +65,7 @@ export function progressBar(row) {
     start(text) {
       startedAt = performance.now();
       row.hidden = false;
+      if (mark) mark.hidden = false;
       bar.classList.add("waiting");
       // At nothing, not at whatever the last run ended on: the first counted
       // step has to fill from empty rather than back down from a bar already

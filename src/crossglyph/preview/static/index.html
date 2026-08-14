@@ -7,7 +7,6 @@
 
 <script src="js/theme-boot.js"></script>
 
-<div class="column">
 <div id="chrome">
   <label for="family">font</label>
   <select id="family" title="Which family from the font source folder to set the page in"></select>
@@ -28,6 +27,19 @@
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6 5.9 5.9 0 1 0 13.4 9.9z"/></svg></button>
   </div>
+</div>
+
+<!-- Which of the two panels this column is showing, for the widths where the
+     export panel has folded in beside the knobs. Hidden where all three
+     columns fit, since there is nothing to switch between there. The mark on
+     Export is what a build says while the panel it is running in is behind a
+     tab. -->
+<div id="tabs" role="group" aria-label="which panel">
+  <button type="button" id="tab-tune" aria-pressed="true"
+          aria-controls="knobs">Tune</button>
+  <button type="button" id="tab-export" aria-pressed="false"
+          aria-controls="export">Export<span id="tab-busy" hidden
+    aria-label="a build is running"></span></button>
 </div>
 
 <form id="knobs">
@@ -319,7 +331,6 @@
     <button type="button" class="reset" id="reset-page">Reset page settings</button>
   </div>
 </form>
-</div>
 
 <div id="middle">
   <div id="stage">

@@ -50,11 +50,81 @@
   }
 
   * { box-sizing: border-box; }
+  /* Two columns: the panel and the page. The third, the export panel, joins
+     them only where there is room for it -- see the widths below -- and folds
+     in behind a tab where there is not. It is a grid rather than a wrapping
+     row because a wrap is a decision the browser makes: at 1440 it dropped the
+     export panel under the knobs at its own width and left the other 900px of
+     the window empty for the whole lower half of the page.
+
+     Rows are close together and columns are not: chrome, tabs and panel are
+     one column's worth of stacked parts, where the columns are separate
+     things standing beside each other. */
   body {
-    margin: 0; padding: 1.75rem; display: flex; gap: 1.75rem;
-    align-items: flex-start; flex-wrap: wrap;
+    margin: 0; padding: 1.75rem;
+    display: grid; align-items: start; justify-content: start;
+    column-gap: 1.75rem; row-gap: .55rem;
+    grid-template-columns: 30rem min-content;
+    /* The page spans every row, so where it is the taller column the surplus
+       has to land somewhere. Named rather than left to the grid, which shares
+       it out evenly and pushes the tabs off the panel they are drawn onto. */
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "chrome page"
+      "tabs   page"
+      "panel  page";
     background: var(--stage); color: var(--text);
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #chrome { grid-area: chrome; }
+  /* Out of the document where all three columns fit: with both panels on
+     screen there is nothing to switch between. Where it is in, it sits on the
+     panel rather than above it: the row gap is cancelled and a further pixel
+     taken, so the tabs and the card share one edge. */
+  #tabs { grid-area: tabs; display: none;
+          margin-bottom: calc(-.55rem - 1px); }
+  #knobs, #export { grid-area: panel; }
+  #middle { grid-area: page; }
+
+  /* Three columns while they fit, and the arithmetic is the whole rule: two
+     30rem panels, the page at 480 device pixels plus the stage's padding, the
+     gaps between them, the page's own padding, and a scrollbar, which the
+     media query counts as width the layout has and the layout does not. Widen
+     a panel without moving this and the third column wraps again -- which is
+     what test_the_three_column_breakpoint_fits_what_it_lays_out is for. */
+  @media (min-width: 1610px) {
+    body {
+      grid-template-columns: 30rem min-content 30rem;
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        "chrome page export"
+        "panel  page export";
+    }
+    /* Out of the panel's cell and into its own column, which is the whole of
+       what "three columns" means here. */
+    #export { grid-area: export; }
+  }
+
+  /* Below that the export panel is behind a tab, and one of the two is on
+     screen at a time. Tune with nothing said, so the page opens on the knobs
+     without a script having to run first. */
+  @media (max-width: 1609px) {
+    #tabs { display: flex; }
+    #export { display: none; }
+    :root[data-panel="export"] #export { display: block; }
+    :root[data-panel="export"] #knobs { display: none; }
+    /* The mark says "something happened in there while you were elsewhere",
+       so it has nothing to say about the panel you are looking at. */
+    :root[data-panel="export"] #tab-busy { display: none; }
+  }
+
+  /* Narrower than the panel and the page side by side: one column, the page
+     under the panel, as the wrap used to leave it. */
+  @media (max-width: 1089px) {
+    body {
+      grid-template-columns: 30rem;
+      grid-template-areas: "chrome" "tabs" "panel" "page";
+    }
   }
 
   /* Chrome, above the panel: which specimen, and what to look at it against.
@@ -62,11 +132,6 @@
      the render, but it is *which* specimen rather than a setting of one, so it
      is deliberately outside the form -- nothing resets it, compares against
      it, or sets it aside, and body() names it rather than sweeping it up. */
-  /* Pinned to the panel's own width. Left to size itself, the column grows to
-     whichever of the two rows is wider -- and the chrome, which is a row of
-     labels and buttons, was wider than the panel and pushed the page a
-     hundred pixels off to the right for nothing. */
-  .column { display: flex; flex-direction: column; gap: .55rem; width: 30rem; }
   #chrome { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
             padding: 0 .3rem; color: var(--muted); font-size: 11px;
             text-transform: uppercase; letter-spacing: .11em; }
@@ -141,8 +206,33 @@
      above says which font, and a FONT heading under a FONT picker is the same
      word twice for a row of vertical space. The other two sections still need
      theirs, since they are what breaks the column up. */
+  /* Two tabs across the panel, each half of it, joined to the card below the
+     way tabs have been drawn since they were card dividers: the selected one
+     is the same material as the panel with no edge between them, and the other
+     is a lid sitting on the stage. That join is the whole of what says these
+     are two faces of one thing rather than two buttons that happen to be
+     above it -- so the tabs overlap the card's top border by a pixel and the
+     selected one paints over it. */
+  #tabs button {
+    flex: 1 1 0; padding: .45rem .55rem .5rem; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .11em; color: var(--muted);
+    background: transparent; border-radius: 10px 10px 0 0;
+    margin-left: -1px; position: relative;
+  }
+  #tabs button:first-child { margin-left: 0; }
+  #tabs button:hover:not([aria-pressed="true"]) { background: var(--hover); }
+  #tabs button[aria-pressed="true"] {
+    background: var(--panel); color: var(--text);
+    border-bottom-color: var(--panel); z-index: 1;
+  }
+  /* What a build says while the panel it is running in is behind a tab. A
+     filled dot rather than a colour, like everything else here. */
+  #tab-busy { display: inline-block; width: .38rem; height: .38rem;
+              border-radius: 50%; background: currentColor;
+              margin-left: .4rem; vertical-align: .08rem; }
+
   #knobs {
-    width: 30rem; flex: none; background: var(--panel);
+    width: 30rem; background: var(--panel);
     border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem 1rem;
   }
 
@@ -391,7 +481,7 @@
      width. Left to size itself the column took the width of the widest line of
      that prose instead, and the page sat at the left of a stage wider than it
      was. */
-  #middle { display: flex; flex-direction: column; gap: .55rem; flex: none;
+  #middle { display: flex; flex-direction: column; gap: .55rem;
             width: min-content; }
   #textbox {
     background: var(--panel); border: 1px solid var(--line);
@@ -420,19 +510,36 @@
     #middle { position: sticky; top: 1.75rem; }
   }
 
-  /* Its own column, the width of the other two. Three columns while there is
-     room for them, and the page in the middle: the alternative is one column
-     of knobs beside a column carrying the page *and* everything about the
-     build, which is the imbalance this replaces. Narrower windows wrap, and
-     the export panel drops below the page as it did before. */
+  /* Its own column, the width of the other two, with the page between them:
+     the alternative is one column of knobs beside a column carrying the page
+     *and* everything about the build, which is the imbalance this replaces.
+     Where the third column will not fit, this one folds in beside the knobs
+     and the tab bar decides which of them is on screen. */
   #export {
-    width: 30rem; flex: none; align-self: flex-start;
+    width: 30rem;
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
   /* The margins the heading carried on its own, so the panel still opens level
      with the two columns beside it. */
   #export .head { margin: 1.35rem 0 .5rem; }
+
+  /* What the card gives up to the tabs, and it has to be said after the two
+     rules above rather than beside the layout: a media query adds no
+     specificity, so #knobs stated later wins wherever it says the same thing.
+     The corners go because the tabs carry them now -- a card keeping its own
+     leaves a notch where the two roundings meet -- and the top padding
+     matches the knobs, since under a tab these are two faces of one card and
+     the heading's margin was for standing level with columns that are not
+     there. */
+  @media (max-width: 1609px) {
+    #knobs, #export { border-top-left-radius: 0; border-top-right-radius: 0; }
+    #export { padding-top: .9rem; }
+    #export .head { margin-top: 0; }
+    /* The tab an inch above already says Export. The field keeps the row, and
+       its own label is on the field. */
+    #export .head h2 { display: none; }
+  }
   #family-name { flex: 1 1 0; min-width: 6rem; }
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */

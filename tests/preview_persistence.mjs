@@ -609,6 +609,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     return { hidden: true, bar, fill, what, count,
              querySelector(selector) { return parts[selector]; } };
   };
+  // The panel tabs. What a press leaves on the element is asserted as well as
+  // what it does, so this keeps the attribute rather than dropping it.
+  const tabPress = {};
+  const tabStub = (name) => ({
+    attrs: {},
+    setAttribute(key, value) { this.attrs[key] = value; },
+    addEventListener(kind, fn) { if (kind === "click") tabPress[name] = fn; },
+  });
   const saveButton = {
     hidden: false, disabled: true, textContent: "", title: "",
     on: {},
@@ -624,6 +632,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // just the last line of it.
     built: recording(),
     progress: progressRow(),
+    "tab-tune": tabStub("tune"),
+    "tab-export": tabStub("export"),
+    // What a build leaves on the tab it ran behind.
+    "tab-busy": { hidden: true },
     "source-note": { textContent: "" },
     // The row of sizes past the four boxes, which most families do not have.
     "more-row": { hidden: false },
@@ -920,6 +932,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            builtSteps: stubs.built.steps,
+           root: sandbox.document.documentElement,
+           tabs: { tune: stubs["tab-tune"], export: stubs["tab-export"],
+                   busy: stubs["tab-busy"],
+                   press: (which) => tabPress[which]() },
            progress: stubs.progress, bar: stubs.progress.bar,
            barFill: stubs.progress.fill,
            progressWhat: stubs.progress.what,
@@ -3370,6 +3386,74 @@ for (const { name, text } of sources) {
   check("and the failure is said rather than swallowed",
         env.about.updated.textContent.includes("connection lost"),
         env.about.updated.textContent);
+}
+
+// 59. The panel tabs. Below the width where all three columns fit, the export
+//     panel folds in beside the knobs and one of them is on screen at a time.
+//     Which one is an attribute on the root, and only the stylesheet reads it:
+//     whether there is anything to switch at all is a width, so nothing here
+//     measures a window or listens for a resize.
+{
+  const env = await loaded(fakeStorage());
+  check("nothing is said before a press, so the page opens on the knobs "
+        + "without waiting for a script",
+        env.root.dataset.panel === undefined,
+        String(env.root.dataset.panel));
+
+  env.tabs.press("export");
+  check("a press says which panel", env.root.dataset.panel === "export",
+        env.root.dataset.panel);
+  check("and the tabs say which of them it was",
+        env.tabs.export.attrs["aria-pressed"] === "true"
+        && env.tabs.tune.attrs["aria-pressed"] === "false",
+        JSON.stringify([env.tabs.tune.attrs, env.tabs.export.attrs]));
+
+  env.tabs.press("tune");
+  check("and back", env.root.dataset.panel === "tune", env.root.dataset.panel);
+  check("with the pressed state following",
+        env.tabs.tune.attrs["aria-pressed"] === "true"
+        && env.tabs.export.attrs["aria-pressed"] === "false",
+        JSON.stringify([env.tabs.tune.attrs, env.tabs.export.attrs]));
+}
+
+// 59a. A build marks the tab it is running behind. It is minutes long and it
+//      reports into a panel that may not be the one on screen, so without the
+//      mark a reader who went back to the knobs is told nothing at all.
+{
+  const env = await loaded(fakeStorage());
+  check("the tab is unmarked before", env.tabs.busy.hidden === true);
+  await env.builds.one();
+  // The press is awaited, so the run is over by here: the mark outlasting it
+  // is the point of the mark. What it says is that something happened in
+  // there, and that is as true a minute later as it is while it is happening.
+  check("a build marks it, and the mark outlasts the run",
+        env.tabs.busy.hidden === false, String(env.tabs.busy.hidden));
+
+  env.tabs.press("export");
+  check("looking clears it", env.tabs.busy.hidden === true,
+        String(env.tabs.busy.hidden));
+}
+
+// 59b. Leaving the panel the build ran in clears it too. The mark is for a
+//      result nobody has seen, and watching it arrive is having seen it.
+{
+  const env = await loaded(fakeStorage());
+  env.tabs.press("export");
+  await env.builds.one();
+  env.tabs.press("tune");
+  check("the mark does not follow you out",
+        env.tabs.busy.hidden === true, String(env.tabs.busy.hidden));
+}
+
+// 59c. The update's bar has no mark to leave. It draws in the island under the
+//      specimen, which nothing hides.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    available: "2.0.0", latest: "2.0.0" } });
+  env.about.apply();
+  await settle();
+  check("an update marks no tab", env.tabs.busy.hidden === true,
+        String(env.tabs.busy.hidden));
 }
 
 process.exit(failures ? 1 : 0);

@@ -15,8 +15,12 @@ export const presetList = document.getElementById("presets");
 export const outField = exportForm.elements.out;
 export const builtNote = document.getElementById("built");
 // The panel's own bar. The island under the specimen has another, for the
-// update, and neither run can be told anything by the other's clock.
-const progress = progressBar(document.getElementById("progress"));
+// update, and neither run can be told anything by the other's clock. The mark
+// is on the tab that opens this panel, for the widths where the panel is
+// behind one: a build is minutes, and it must not be minutes of nothing said
+// because the reader went back to the knobs.
+const progress = progressBar(document.getElementById("progress"),
+                             document.getElementById("tab-busy"));
 export let presetNames = [];
 
 //: The ranges behind each preset, and the ones every build carries anyway.
