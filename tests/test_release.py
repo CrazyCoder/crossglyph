@@ -126,3 +126,46 @@ def test_the_polyglot_wrapper_keeps_its_mixed_line_endings(built):
     with zipfile.ZipFile(path) as archive:
         uv = archive.read(f"{name}/versions/{version}/tools/uv.cmd")
     assert not make_release.check_polyglot(uv, "tools/uv.cmd")
+
+
+# --- the manifest ---------------------------------------------------------
+
+
+def test_the_manifest_describes_the_release():
+    said = make_release.manifest("0.2.0", "b" * 64, 1656832,
+                                 "CrazyCoder/crossglyph")
+    assert said["version"] == "0.2.0"
+    assert said["url"].startswith("https://github.com/CrazyCoder/crossglyph/")
+    assert said["url"].endswith("/v0.2.0/crossglyph-0.2.0.zip")
+    assert said["notes_url"].endswith("/tag/v0.2.0")
+    assert said["sha256"] == "b" * 64
+    assert said["size"] == 1656832
+    assert said["signature"] is None
+
+
+def test_the_manifest_is_what_the_client_accepts():
+    """The two halves are written apart and have to agree. Parsing the real
+    thing with the real parser is the only assertion that says they do."""
+    import json
+
+    from crossglyph import updates
+
+    said = make_release.manifest("0.2.0", "c" * 64, 10, "CrazyCoder/crossglyph")
+    parsed = updates.parse(json.dumps(said).encode("utf-8"))
+    assert parsed.version == "0.2.0"
+    assert parsed.launcher_changed is False
+
+
+def test_a_release_writes_the_manifest_beside_the_zip(built, tmp_path):
+    """Whatever the workflow uploads has to come from the run that produced
+    the zip, or the hash in it describes a different file."""
+    import hashlib
+    import json
+
+    version, _, path = built
+    out = tmp_path / "latest.json"
+    make_release.write_manifest(path, version, out, "CrazyCoder/crossglyph")
+
+    said = json.loads(out.read_text(encoding="utf-8"))
+    assert said["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert said["size"] == path.stat().st_size

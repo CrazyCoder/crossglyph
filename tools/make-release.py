@@ -14,6 +14,9 @@ an executable bit still unpacks, runs nowhere, and says nothing about why.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import pathlib
 import re
 import subprocess
@@ -22,6 +25,10 @@ import tempfile
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+#: Where the release lives. The workflow passes $GITHUB_REPOSITORY; a run by
+#: hand gets the same answer without one.
+REPO = "CrazyCoder/crossglyph"
 
 #: What stays outside versions/, because it outlives any one version: the
 #: launcher, which an update cannot replace while cmd.exe is holding it, and
@@ -114,6 +121,50 @@ def check_polyglot(data: bytes, name: str) -> list[str]:
     if b"\n:CMDSCRIPT\r\n" not in data:
         problems.append(f"{name}: the batch body is not CRLF")
     return problems
+
+
+def launcher_changed(tag: str) -> bool:
+    """Whether this release changes a file no update can replace.
+
+    cmd.exe holds the launcher open while the tool runs, so an update cannot
+    rewrite it. When one changes, the manifest says so and the updater sends
+    people to download by hand instead. Compared against the previous tag; the
+    first release has none, and everybody downloads that one by hand anyway.
+    """
+    try:
+        previous = git("describe", "--tags", "--abbrev=0", f"{tag}^")
+    except subprocess.CalledProcessError:
+        return False
+    return bool(git("diff", "--name-only", f"{previous}..HEAD", "--",
+                    *sorted(ROOT_FILES)).strip())
+
+
+def manifest(version: str, sha256: str, size: int, repo: str) -> dict:
+    """What an install reads to learn that a newer release exists.
+
+    `signature` is reserved and null: adding a detached Ed25519 signature
+    later is then a field somebody fills in rather than a format break, and
+    every install already out there goes on reading the file.
+    """
+    tag = f"v{version}"
+    return {
+        "version": version,
+        "url": (f"https://github.com/{repo}/releases/download/"
+                f"{tag}/crossglyph-{version}.zip"),
+        "sha256": sha256,
+        "size": size,
+        "notes_url": f"https://github.com/{repo}/releases/tag/{tag}",
+        "launcher_changed": launcher_changed(tag),
+        "signature": None,
+    }
+
+
+def write_manifest(zip_path: pathlib.Path, version: str, out: pathlib.Path,
+                   repo: str) -> None:
+    """The manifest for a zip that exists, hashed from that very file."""
+    body = manifest(version, hashlib.sha256(zip_path.read_bytes()).hexdigest(),
+                    zip_path.stat().st_size, repo)
+    out.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
 
 
 def set_mode(info: zipfile.ZipInfo, mode: int) -> None:
@@ -223,10 +274,17 @@ def main() -> int:
         print(f"{out.name} is not fit to release", file=sys.stderr)
         return 1
 
+    # Written from the zip that was just checked, so the hash in it cannot
+    # come to describe a different build than the one it travels with.
+    latest = out.with_name("latest.json")
+    write_manifest(out, release, latest,
+                   os.environ.get("GITHUB_REPOSITORY") or REPO)
+
     print(f"{out}\n"
           f"  {len(members)} files, {total / 1024:.0f} KB unpacked, "
           f"{out.stat().st_size / 1024:.0f} KB zipped\n"
-          f"  from {git('rev-parse', '--short', 'HEAD')}")
+          f"  from {git('rev-parse', '--short', 'HEAD')}\n"
+          f"{latest}")
     return 0
 
 
