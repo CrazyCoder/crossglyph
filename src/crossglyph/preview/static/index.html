@@ -342,7 +342,7 @@
          cannot set looks like a page that failed to draw. -->
     <div id="undrawn" class="hint warn" hidden></div>
     <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
-      <code>*_both_*</code> — a face the font does not carry falls back to
+      <code>*_both_*</code>. A face the font does not carry falls back to
       regular, as it would on the device.</div>
     <div id="status" class="mono">—</div>
   </div>
@@ -388,7 +388,7 @@
              inputmode="decimal">
     </div>
     <div class="hint">The reader's Font Size setting lists every size the
-      family carries, one entry each — not the size on the left, which is only
+      family carries, one entry each. Not the size on the left, which is only
       what you are tuning at.</div>
 
     <div class="stacked">
@@ -419,7 +419,7 @@
     </div>
     <div class="hint">Sizes here build <strong id="mod-name">a second
       family</strong> from the same faces, listed beside this one on the
-      device — the way to give a font eight sizes without one long list.
+      device. It is the way to give a font eight sizes without one long list.
       Leave them empty for one family; the suffix is what its name ends
       with.</div>
 
@@ -435,32 +435,32 @@
             Extra Unicode ranges, for books that need them. More coverage means
             a larger file and a longer build.
             <br><br>
-            <strong>Base coverage is in every build first</strong>: ASCII and
+            Base coverage is in every build first: ASCII and
             basic Latin plus Unicode punctuation, which keeps letters, numbers,
             spaces, smart quotes, dashes and ellipses available without adding
             a language range. What you tick is added on top of it.
             <br><br>
-            <strong>Default</strong> — the same ranges the fonts CrossPoint
+            <strong>Default</strong>: the same ranges the fonts CrossPoint
             ships carry: English, most European languages, Cyrillic (Russian,
             Ukrainian and so on), combining diacritics, math operators, arrows
             and common ligatures.
             <br><br>
-            <strong>Reading</strong> — Default plus the ranges English fiction
+            <strong>Reading</strong>: Default plus the ranges English fiction
             and popular science actually reach for: broader Latin, Greek terms
             like λ and φ, box and geometric symbols, supplemental arrows,
             uncommon dialogue punctuation, CJK quote marks, music notes
             (♪ ♫ ♬), stars (★) and dingbats (✓).
             <br><br>
-            <strong>Arabic</strong> — Arabic, Farsi and Urdu letterforms,
+            <strong>Arabic</strong>: Arabic, Farsi and Urdu letterforms,
             including the Persian and Urdu letters and presentation forms.
             Joined rendering depends on the reader's text shaping and not on
             coverage alone, so isolated codepoints may still draw
             disconnected.
             <br><br>
-            <strong>Where a character comes from</strong>: the main family is
+            Where a character comes from: the main family is
             checked first, then fallback 1, then fallback 2, then the bundled
-            faces. A fallback only fills what is missing — it never replaces a
-            glyph the family already has. Some uncommon codepoints may still
+            faces. A fallback only fills what is missing, and never replaces
+            a glyph the family already has. Some uncommon codepoints may still
             be left out of the <code>.cpfont</code>.
             <br><br>
             None of this decides the page on the left: a preview is built from
@@ -503,10 +503,10 @@
       <select id="fallback2" name="fallback2"></select>
     </div>
     <div class="hint">Families from this folder, tried in order for codepoints
-      the main family lacks — their regular face on every style, as the
+      the main family lacks. Their regular face goes on every style, as the
       converter applies them. The bundled Noto faces come after both, and on a
       wide coverage they are the difference between 300 glyphs and 3,300.
-      <strong>The page above shows them too</strong>, in the same order the
+      The page above shows them too, in the same order the
       build would: paste a character this family has not got and you see which
       face it will actually come from. Nothing is opened while the family
       covers the text.</div>

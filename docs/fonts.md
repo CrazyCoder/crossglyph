@@ -359,32 +359,38 @@ Where two files claim one slot, an explicit weight beats a bare stem and
 
 Four rules go beyond the website's.
 
-**Variable fonts.** Google Fonts ships `Merriweather[opsz,wdth,wght].ttf` and
+### A variable font's axes are not part of its family name
+
+Google Fonts ships `Merriweather[opsz,wdth,wght].ttf` and
 `Merriweather-Italic[opsz,wdth,wght].ttf`. The bracketed axis list comes off
 the stem before anything is matched. Left on, it survives the non-alphanumeric
 strip as a family called `Merriweatheropszwdthwght`, and the italic, whose
 suffix is no longer at the end of the stem, becomes a second one-face family
 instead of that family's italic.
 
-**The italic follows the roman's weight.** The website drops every extra weight
-italic such as `MediumItalic`, which is right when one would fight a plain
-`Italic` for the slot, and wrong when the family's roman is itself an extra
-weight. A family whose roman is `Name-Medium` pairs with `Name-MediumItalic`
-rather than with the lighter `Name Italic`. A family whose roman is
-`Name-Regular` is unaffected.
+### The italic follows the roman's weight
 
-**A foundry's series number is not part of the family.** Linotype numbers the
-styles: 65 Medium, 66 Medium Italic, 75 Bold, 76 Bold Italic, where the first
-digit is the weight and the second says upright or italic. The number sits in
-the stem, so without dropping it each file strips to a family of its own and
-the four never meet. Only a whole number between the family and a tail of
-nothing but style words goes, which keeps the rule off a name where the number
-is the family: `Roboto_Condensed_300` has no style tail, so it stays its own
-family.
+The website drops every extra weight italic such as `MediumItalic`, which is
+right when one would fight a plain `Italic` for the slot, and wrong when the
+family's roman is itself an extra weight. A family whose roman is
+`Name-Medium` pairs with `Name-MediumItalic` rather than with the lighter
+`Name Italic`. A family whose roman is `Name-Regular` is unaffected.
 
-**Terse suffixes.** The old convention has no separator: `b` or `bd` bold, `i`
-or `it` italic, `bi`, `bdi` or `bdit` bold italic, and `z` bold italic, which
-is what Microsoft's own core fonts ship (`georgiaz.ttf`, `verdanaz.ttf`,
+### A foundry's series number is not part of the family
+
+Linotype numbers the styles: 65 Medium, 66 Medium Italic, 75 Bold, 76 Bold
+Italic, where the first digit is the weight and the second says upright or
+italic. The number sits in the stem, so without dropping it each file strips
+to a family of its own and the four never meet. Only a whole number between
+the family and a tail of nothing but style words goes, which keeps the rule
+off a name where the number is the family: `Roboto_Condensed_300` has no style
+tail, so it stays its own family.
+
+### Terse suffixes
+
+The old convention has no separator: `b` or `bd` bold, `i` or `it` italic,
+`bi`, `bdi` or `bdit` bold italic, and `z` bold italic, which is what
+Microsoft's own core fonts ship (`georgiaz.ttf`, `verdanaz.ttf`,
 `CALIBRIZ.TTF`). A bare trailing letter is read as a style only when a file
 named for the plain family sits beside it. Otherwise `Bodoni.ttf` would be the
 italic of a family called `Bodon`. A spelled out suffix always outranks a terse

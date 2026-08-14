@@ -37,11 +37,11 @@ export function showFaces() {
     badge.dataset.loaded = loaded.has(face) ? "yes" : "no";
     badge.title = loaded.has(face)
       ? `${face}: ${files[face] || "loaded"}`
-      : `${face}: not in this family — drawn as regular, as the device would`;
+      : `${face}: not in this family, so it is drawn as regular, as the device would`;
     return badge;
   }));
   const label = familyPicker.selectedOptions[0];
-  document.title = label ? `${label.textContent} — CrossGlyph preview`
+  document.title = label ? `${label.textContent} in CrossGlyph preview`
                          : "CrossGlyph preview";
   // The picker is capped, so a long name is cut short on the closed control.
   // Naming it here is what makes it readable without opening the list.

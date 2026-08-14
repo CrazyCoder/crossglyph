@@ -122,9 +122,9 @@ export function refreshReverts() {
     // What pressing it does, in both states. It is a comparison rather than a
     // reset: your value is set aside, not thrown away.
     button.title = off
-      ? "Showing what the config has — click to put your value back"
-      : "Set your value aside and show what the config has — click again to "
-        + "bring it back";
+      ? "Showing what the config has. Click to put your value back."
+      : "Set your value aside and show what the config has. Click again to "
+        + "bring it back.";
   }
   showSaveState();
 }

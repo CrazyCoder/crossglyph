@@ -31,7 +31,7 @@ export function fillWeights(picker, instances, value) {
   for (const one of instances) {
     if (one.wght == null || seen.has(one.wght)) continue;
     seen.add(one.wght);
-    options.push(new Option(`${one.name} — ${one.wght}`, String(one.wght)));
+    options.push(new Option(`${one.name} ${one.wght}`, String(one.wght)));
   }
   // A weight no instance is named for still has to be selectable: a config can
   // pin one, and a font naming none at all falls back to the CSS numbers.

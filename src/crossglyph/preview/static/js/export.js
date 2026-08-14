@@ -409,7 +409,7 @@ export function showFallbackState(where) {
   // folder and "fallbacks", and before that the checkout's own. The
   // whole of it stays in the title.
   const tail = where ? where.split(/[\\/]/).slice(-2).join("\\") : "";
-  haveFallbacks.textContent = where ? `— from ${tail}` : "— not fetched yet";
+  haveFallbacks.textContent = where ? `from ${tail}` : "not fetched yet";
   haveFallbacks.title = where || "";
 }
 

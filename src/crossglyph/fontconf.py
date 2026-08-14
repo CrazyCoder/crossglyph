@@ -910,7 +910,8 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
         font = variable_font(styles[key])
         unknown = sorted(set(axes) - set(font.axes if font else ()))
         if unknown:
-            have = ", ".join(sorted(font.axes)) if font else "none — it is not variable"
+            have = (", ".join(sorted(font.axes)) if font
+                    else "none, since it is not variable")
             raise FontConfigError(
                 f"{where}: {key} asks for {', '.join(unknown)}, which "
                 f"{styles[key].name} does not have. Its axes: {have}.")

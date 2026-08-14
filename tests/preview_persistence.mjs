@@ -1824,7 +1824,7 @@ for (const { name, text } of sources) {
         bare.sandbox.document.getElementById("fetch").hidden === false);
   check("with the state said in words",
         bare.sandbox.document.getElementById("have-fallbacks").textContent
-          === "— not fetched yet",
+          === "not fetched yet",
         bare.sandbox.document.getElementById("have-fallbacks").textContent);
 }
 
@@ -1842,7 +1842,7 @@ for (const { name, text } of sources) {
   check("a variable one shows them", box.hidden === false, String(box.hidden));
   check("with the font's own instances on the pickers",
         env.byName.axis_text.options.map(o => o.textContent).join() ===
-          "Light — 300,Regular — 400,Bold — 700,Black — 900",
+          "Light 300,Regular 400,Bold 700,Black 900",
         env.byName.axis_text.options.map(o => o.textContent).join());
   check("each opening at the weight that slot is built at",
         env.byName.axis_text.value === "400" &&
