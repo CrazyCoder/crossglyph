@@ -45,10 +45,12 @@ export function spellBytes(count) {
 // each keeps its own start time, so what one reports says nothing about when
 // the other began.
 //
-// `mark` is shown when the run starts and left alone after that: a bar hidden
-// behind a tab has to leave something on the tab, and what it has to say
-// outlasts the run. Whoever owns the mark clears it, since only they know when
-// it has been seen. A bar nothing can hide gets none.
+// `mark` is what a bar behind a tab leaves on that tab. It goes up when the
+// run starts and stays up past the end of it, because what it says is that
+// something happened in there and that is still true a minute later. It comes
+// down when the run ends in plain sight -- watching it is having seen it --
+// and otherwise when the reader presses a tab. A bar nothing can hide gets
+// none.
 export function progressBar(row, mark) {
   const bar = row.querySelector(".bar");
   const fill = row.querySelector(".bar-fill");
@@ -97,6 +99,9 @@ export function progressBar(row, mark) {
     // The sentence the run leaves behind is the note's job, and a bar sitting
     // at some fraction under it would say the run is still going.
     end() {
+      // Before the row goes, while there is still something to ask: an
+      // offsetParent is how an element says no ancestor of it is hidden.
+      if (mark && row.offsetParent) mark.hidden = true;
       row.hidden = true;
       bar.classList.remove("waiting");
       // Emptied while it is out of the document, so the next run opens at

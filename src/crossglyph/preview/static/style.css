@@ -223,7 +223,6 @@
     margin-left: -1px; position: relative;
   }
   #tabs button:first-child { margin-left: 0; }
-  #tabs button:hover:not([aria-pressed="true"]) { background: var(--hover); }
   #tabs button[aria-pressed="true"] {
     background: var(--panel); color: var(--text);
     border-bottom-color: var(--panel); z-index: 1;
@@ -319,7 +318,7 @@
            fill: none; stroke: currentColor; stroke-width: 2.1;
            stroke-linecap: round; stroke-linejoin: round;
            transition: transform .15s ease-out; }
-  [aria-expanded="true"] .twist { transform: rotate(90deg); }
+  button[aria-expanded="true"] .twist { transform: rotate(90deg); }
   @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
   :root:not([data-folds~="page"]) #page-settings { display: none; }
   :root:not([data-folds~="mod"]) #mod-settings { display: none; }
@@ -328,8 +327,9 @@
      dot the rows carry, in the same column, said for the whole section because
      the rows that would say it are out of sight. Nothing sets it: it is the
      rows' own marks, read through the fold. */
-  #page-dot { width: 1.5rem; height: 1.5rem; display: none;
-              place-items: center; color: var(--muted); font-size: 14px; }
+  #page-dot, #mod-dot { width: 1.5rem; height: 1.5rem; display: none;
+                        place-items: center; color: var(--muted);
+                        font-size: 14px; }
   :root:not([data-folds~="page"])
     .section:has(+ #page-settings .mark:not([hidden])) #page-dot {
     display: grid;
@@ -337,8 +337,6 @@
   /* The same, for a second family that is set while the fold is hiding it.
      What is set is a value in a box rather than a mark, so this one is put
      there by the panel that already works that out for the suffix field. */
-  #mod-dot { width: 1.5rem; height: 1.5rem; display: none;
-             place-items: center; color: var(--muted); font-size: 14px; }
   :root:not([data-folds~="mod"]) #mod-dot:not([hidden]) { display: grid; }
 
   .revert, .clear {
@@ -478,7 +476,7 @@
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .5rem; margin-top: .9rem;
   }
-  .actions button {
+  .actions button, #savebar button {
     min-height: 2rem; padding: .35rem .7rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -506,10 +504,6 @@
     gap: .5rem; padding: .6rem .8rem;
     background: var(--rule); border: 1px solid var(--line);
     border-radius: 0 0 10px 10px;
-  }
-  #savebar button {
-    min-height: 2rem; padding: .35rem .7rem;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   #saved { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
   /* An empty note is not a short line, it is no line: left in, the grid gap
@@ -642,14 +636,13 @@
   @media (max-width: 1609px) {
     #knobs, #export { border-top-left-radius: 0; border-top-right-radius: 0; }
     #export { padding-top: .9rem; }
-    #export .head { margin-top: 0; }
+    /* The tab an inch above already says Export, and a row emptied of its
+       heading still holds the margin under it. */
+    #export .head { display: none; }
     /* The knobs are not on screen, so neither is the press that resets them.
        Out of sight rather than out of the grid: Save stays in the half it was
        in, and the foot is the same shape on either tab. */
     :root[data-panel="export"] #reset-font { visibility: hidden; }
-    /* The tab an inch above already says Export. The field keeps the row, and
-       its own label is on the field. */
-    #export .head h2 { display: none; }
   }
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */
