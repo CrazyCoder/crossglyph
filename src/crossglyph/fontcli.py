@@ -120,13 +120,14 @@ def main(argv=None) -> int:
     # name and each plan still has a report of its own.
     reports = {id(plan.variant): plan.report for plan in plans}
 
-    # Only when building everything: with an explicit config list, the families
-    # that were not asked for are absent from `plans`, not orphaned.
-    if not opts.configs:
-        for path in fontbuild.orphan_dirs(
-                out_dir, {plan.variant.name for plan in plans}):
-            shutil.rmtree(path)
-            print(f"removed {path.name}/ (no config produces it any more)")
+    # Against every family the workspace accounts for, not against the ones
+    # this run was asked for: building one family says nothing about the
+    # others, while a directory no config claims at all is left over whichever
+    # family you happen to be building.
+    for path in fontbuild.orphan_dirs(out_dir,
+                                      fontbuild.wanted_families(source)):
+        shutil.rmtree(path)
+        print(f"removed {path.name}/ (no config produces it any more)")
 
     for plan in plans:
         for path in plan.report.removed:

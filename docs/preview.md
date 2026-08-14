@@ -105,6 +105,13 @@ build is when somebody wants to know what a family costs on it. The two
 numbers are separate because they answer different things, what this run
 wrote and what the sizes it left alone already take up.
 
+A build also tidies the output folder against the workspace: a family you
+renamed, dropped, or took the second size list off leaves a whole directory
+behind, and the note says which ones went. Either button does it, since what
+should be in that folder does not depend on which family you pressed Build on.
+A family whose config still names it keeps what it built even when its face has
+gone missing, and a directory the tool did not build is never touched.
+
 A build does the sizes whose inputs changed. Hold shift and it does the lot,
 current or not, which is what you want when the inputs are the same and the
 answer should not be: a converter that has moved on, or a face edited in

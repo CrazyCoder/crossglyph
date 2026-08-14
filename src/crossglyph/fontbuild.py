@@ -649,7 +649,7 @@ def build_variant(variant: Variant, out_dir: pathlib.Path,
 
 
 def build_families(configs, out_dir: pathlib.Path, force: bool = False,
-                   prune: bool = False):
+                   keep: set[str] | None = None):
     """Build every variant of every config, saying where it has got to.
 
     Yields a dict per step: one `plan` first, then a `size` as each .cpfont
@@ -666,19 +666,21 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
     the next one usually fails the same way -- but the other families carry on,
     so a folder-wide build is not lost to one bad face.
 
-    `prune` is for a build of everything, and only that: a family that no
-    config produces any more leaves a whole directory behind that per-size
-    pruning never looks at, and the simulator would go on staging it. With a
-    chosen config the families that were not asked for are absent from the
-    plan rather than orphaned, so pruning then would delete the folder.
+    `keep` is every family the workspace accounts for, from
+    `wanted_families()`. Anything else under the output folder that we put
+    there is left behind by a family that has been renamed, dropped, or had
+    its second size list removed, and per-size pruning never looks at a whole
+    directory -- the simulator would go on staging it. It is the workspace and
+    not this run, because a build of one family says nothing about the others.
+    None leaves the folder alone.
     """
     import shutil
 
     plans = plan_families(configs, out_dir, force=force)
 
     removed = []
-    if prune:
-        for path in orphan_dirs(out_dir, {plan.variant.name for plan in plans}):
+    if keep is not None:
+        for path in orphan_dirs(out_dir, keep):
             shutil.rmtree(path)
             removed.append(path.name)
 
@@ -748,11 +750,16 @@ def orphan_dirs(out_dir: pathlib.Path, wanted: set[str]) -> list[pathlib.Path]:
     that per-size pruning never looks at -- and the simulator would go on
     staging it. Only directories carrying our own stamp file are considered, so
     a family that was put there by hand is never touched.
+
+    Matched without regard to case, which is how the workspace addresses a
+    family everywhere else -- and on the filesystem this runs on, `Alto` and
+    `alto` are one directory anyway.
     """
     if not out_dir.is_dir():
         return []
+    folded = {name.casefold() for name in wanted}
     return [path for path in sorted(out_dir.iterdir())
-            if path.is_dir() and path.name not in wanted
+            if path.is_dir() and path.name.casefold() not in folded
             and (path / fontstamp.STAMP_NAME).is_file()]
 
 
@@ -891,6 +898,49 @@ def offered(source: pathlib.Path | str | None = None,
     configs, errors = gather(source)
     more, more_errors = unclaimed_starter(source, load_defaults(source), configs)
     return configs + more, errors + more_errors
+
+
+def claimed_names(source: pathlib.Path) -> set[str]:
+    """The output names the workspace's config files ask for, resolvable or not.
+
+    Read from the files rather than from parsed configs, because a config whose
+    faces have gone missing produces nothing and would otherwise look like a
+    family nobody wants: its output would be swept up as an orphan for the one
+    reason it cannot be rebuilt. A name it claims is a name it keeps.
+    """
+    names = set()
+    for path in discover_configs(source):
+        try:
+            values = fontconf.read_values(path)
+        except FontConfigError:
+            # Unreadable, so it claims whatever it is called. A file nobody can
+            # parse is a worse reason still to delete something.
+            names.add(path.stem)
+            continue
+        family = values.get("family", "").strip() or path.stem
+        name = fontconf.sanitize_name(values.get("name", "").strip() or family)
+        names.add(name)
+        if values.get("sizes_mod", "").strip():
+            names.add(name + fontconf.sanitize_name(
+                values.get("mod_suffix", "Mod").strip() or "Mod"))
+    return names
+
+
+def wanted_families(source: pathlib.Path | str | None = None) -> set[str]:
+    """Every family directory the workspace accounts for.
+
+    What a build compares the output folder against: anything else under it
+    that we put there is left over from a family that has been renamed,
+    dropped, or had its second size list removed.
+
+    `offered` rather than `gather`, so the bundled family keeps the output a
+    preview build gave it -- the command line would not produce that directory
+    and would otherwise delete it.
+    """
+    source = pathlib.Path(source) if source else SOURCE_DIR
+    return ({variant.name for config in offered(source)[0]
+             for variant in config.variants()}
+            | claimed_names(source))
 
 
 def gather(source: pathlib.Path,

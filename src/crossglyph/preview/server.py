@@ -959,14 +959,16 @@ def build(request: BuildRequest) -> StreamingResponse:
     except (ValueError, TypeError, LookupError, FontConfigError) as exc:
         raise HTTPException(422, str(exc)) from exc
 
+    # Against the whole workspace rather than against this build: renaming a
+    # family and pressing Build leaves the directory it used to have, and the
+    # simulator would go on staging it. Read before the response starts, since
+    # it walks the folder.
+    keep = fontbuild.wanted_families(fontbuild.SOURCE_DIR)
+
     def lines():
         try:
-            # Build all is `crossglyph build` with no config named, and that prunes
-            # the families no config produces any more -- a renamed one leaves
-            # a whole directory behind that the simulator would go on staging.
             for step in fontbuild.build_families(
-                    configs, out, force=request.force,
-                    prune=not request.family):
+                    configs, out, force=request.force, keep=keep):
                 yield json.dumps(step) + "\n"
         # Every one of these means the build stopped, and the headers are long
         # gone, so they travel as the last line rather than as a status.

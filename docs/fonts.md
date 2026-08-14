@@ -451,10 +451,15 @@ rsync, and all three hand back a fresh mtime for unchanged bytes.
 
 A size disappears from the config and its `.cpfont` goes with it. A whole
 family disappears, because you dropped `sizes_mod` or renamed it, and its
-directory is removed too, but only when building everything: with an explicit
-config list, families you did not ask for are not under consideration. Only
-directories carrying our stamp are ever deleted, so anything you put in the
-output directory by hand is safe.
+directory is removed too. Any build does this, not only a build of everything:
+what the output folder should hold is what the workspace produces, which does
+not depend on which family you happened to ask for.
+
+Two things are never removed. A directory with no stamp of ours was not built
+here, so anything you put in the output folder by hand is safe. And a family
+whose config still names it keeps what it built even when it cannot build
+today, because a face that has gone missing is the one reason its fonts could
+not be replaced.
 
 `--force` ignores the stamps. A failed size is left out of the stamp, so the
 next run retries exactly that one.

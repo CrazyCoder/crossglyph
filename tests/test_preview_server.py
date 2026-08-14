@@ -1015,45 +1015,86 @@ def test_a_family_that_cannot_build_does_not_take_the_others_with_it(
     assert any(one["built"] for one in done)
 
 
-def test_building_everything_drops_the_families_no_config_produces(
-        tmp_path, monkeypatch):
-    """`crossglyph build` with no config named removes them, and Build all is that
-    same command: a renamed family -- or one that stops being its own, the way
-    georgiaz became the bold italic of georgia -- otherwise leaves a whole
-    directory behind that the simulator would go on staging.
-    """
-    from fastapi.testclient import TestClient
-
+def _two_families(tmp_path, monkeypatch, extra=""):
     from fontsmith import box_font
 
     from crossglyph import fontbuild
-    from crossglyph.preview import server
 
     box_font(tmp_path / "Alpha-Regular.ttf", range(0x20, 0x7F), family="Alpha")
     box_font(tmp_path / "Beta-Regular.ttf", range(0x20, 0x7F), family="Beta")
     (_conf(tmp_path) / "all.conf").write_text(
-        "sizes = 12\nintervals = base\nfallbacks = no\nspace_glyphs = no\n",
-        encoding="utf-8")
+        "sizes = 12\nintervals = base\nfallbacks = no\nspace_glyphs = no\n"
+        + extra, encoding="utf-8")
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    return tmp_path / fontbuild.OUTPUT_NAME
+
+
+def test_a_build_drops_the_families_no_config_produces(tmp_path, monkeypatch):
+    """A family that stops being one -- renamed, or gone the way georgiaz went
+    when it became the bold italic of georgia -- otherwise leaves a whole
+    directory behind that per-size pruning never looks at, and the simulator
+    would go on staging it.
+
+    Any build, not only a build of everything: what the output folder should
+    hold is what the workspace produces, which does not depend on which family
+    you happened to press Build on.
+    """
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    out = _two_families(tmp_path, monkeypatch)
     client = TestClient(server.app)
 
     built = _steps(client.post("/build", json={}))
     assert built[-1]["event"] == "done", built
-    out = tmp_path / fontbuild.OUTPUT_NAME
     assert (out / "Alpha").is_dir() and (out / "Beta").is_dir()
 
     (tmp_path / "Beta-Regular.ttf").unlink()
-    # Naming a family is not a build of everything: the others are simply not
-    # under consideration, so nothing of theirs may be removed.
     named = _steps(client.post("/build", json={"family": "Alpha"}))
-    assert named[0]["removed"] == [], named[0]
-    assert (out / "Beta").is_dir(), "a build of one family deleted another"
-
-    everything = _steps(client.post("/build", json={}))
-    assert everything[0]["removed"] == ["Beta"], everything[0]
-    assert everything[-1]["removed"] == ["Beta"], "the summary lost it"
+    assert named[0]["removed"] == ["Beta"], named[0]
+    assert named[-1]["removed"] == ["Beta"], "the summary lost it"
     assert not (out / "Beta").exists()
     assert (out / "Alpha").is_dir(), "the family that still exists went too"
+
+
+def test_a_rename_takes_the_directory_it_used_to_build_into(tmp_path, monkeypatch):
+    """What the panel's name box does, end to end: the old name is not a
+    family any more, so the fonts under it are not either."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    out = _two_families(tmp_path, monkeypatch)
+    client = TestClient(server.app)
+    _steps(client.post("/build", json={}))
+    assert (out / "Alpha").is_dir()
+
+    assert _save_export("Alpha", name="Alfa", sizes="12").status_code == 200
+    steps = _steps(client.post("/build", json={"family": "Alfa"}))
+    assert steps[0]["removed"] == ["Alpha"], steps[0]
+    assert (out / "Alfa").is_dir() and not (out / "Alpha").exists()
+    assert (out / "Beta").is_dir(), "a rename took an unrelated family with it"
+
+
+def test_a_family_whose_face_went_missing_keeps_what_it_built(tmp_path, monkeypatch):
+    """Its config still claims the name, and a config that cannot resolve
+    today produces nothing -- which is the one reason its output could not be
+    rebuilt, and so the worst reason to delete it."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    out = _two_families(tmp_path, monkeypatch)
+    (_conf(tmp_path) / "beta.conf").write_text("family = Beta\n", encoding="utf-8")
+    client = TestClient(server.app)
+    _steps(client.post("/build", json={}))
+    assert (out / "Beta").is_dir()
+
+    (tmp_path / "Beta-Regular.ttf").unlink()
+    steps = _steps(client.post("/build", json={"family": "Alpha"}))
+    assert steps[0]["removed"] == [], steps[0]
+    assert (out / "Beta").is_dir()
 
 
 @needs
