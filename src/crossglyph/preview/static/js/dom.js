@@ -79,7 +79,10 @@ export function grayscaleReason(outlines, bytecode, tricky, hinting) {
     return "These are not TrueType outlines, so there is no bytecode for "
       + "either interpreter to run.";
   }
-  if (!bytecode) {
+  // `null` is no answer rather than a no: a file the app was started on is not
+  // a family and reports none of this, and it may well carry bytecode. Greying
+  // is a claim, and this one would be about a font nothing has looked at.
+  if (bytecode === false) {
     return "This family carries no hinting bytecode, so FreeType fits it with "
       + "the auto-hinter whichever interpreter is chosen.";
   }
@@ -98,14 +101,15 @@ export function grayscaleReason(outlines, bytecode, tricky, hinting) {
 //: that knob moves and there is no family to hand then.
 let supported = null;
 let outlines = "";
-let bytecode = false;
+//: null until a family answers, which a bare file never does.
+let bytecode = null;
 let tricky = false;
 
 // The family changed. Everything a knob can be greyed on is a property of it.
 export function showFeatures(entry) {
   supported = (entry && entry.features) || null;
   outlines = (entry && entry.outlines) || "";
-  bytecode = Boolean(entry && entry.bytecode);
+  bytecode = entry && "bytecode" in entry ? Boolean(entry.bytecode) : null;
   tricky = Boolean(entry && entry.tricky);
   syncFeatures();
 }
@@ -123,37 +127,40 @@ export function syncFeatures() {
     el.disabled = missing;
     el.title = missing ? why : "";
   }
+  syncCoverage();
   const darkening = form.elements.stem_darkening;
   const hinting = form.elements.hinting;
-  // Mono rasterizing leaves a pixel either empty or full, so the two knobs
-  // that shape coverage in between have nothing to shape: the curve maps 0 and
-  // 255 to themselves, and any triple of cut points sorts two values into the
-  // same two levels.
-  const mono = form.elements.mono;
-  if (mono) {
-    const why = mono.checked
-      ? "Mono rasterizing leaves a pixel empty or full, so there is no "
-        + "coverage in between for this to act on."
-      : "";
-    for (const name of ["gamma", "thresholds"]) {
-      const el = form.elements[name];
-      if (!el) continue;
-      el.disabled = Boolean(why);
-      el.title = why;
-      for (const control of form.querySelectorAll(
-          `[data-for="${name}"], [data-slider-for="${name}"]`)) {
-        control.disabled = Boolean(why);
-      }
-    }
-  }
   const grayscale = form.elements.grayscale_hinting;
   if (!darkening || !hinting || !grayscale) return;
-  const why = darkeningReason(outlines, hinting.value);
-  darkening.disabled = Boolean(why);
-  darkening.title = why;
-  const whyNot = grayscaleReason(outlines, bytecode, tricky, hinting.value);
-  grayscale.disabled = Boolean(whyNot);
-  grayscale.title = whyNot;
+  const dark = darkeningReason(outlines, hinting.value);
+  darkening.disabled = Boolean(dark);
+  darkening.title = dark;
+  const grey = grayscaleReason(outlines, bytecode, tricky, hinting.value);
+  grayscale.disabled = Boolean(grey);
+  grayscale.title = grey;
+}
+
+// The two knobs that shape coverage between empty and full, which mono
+// rasterizing leaves nothing of: the curve maps 0 and 255 to themselves, and
+// any triple of cut points sorts two values into the same two levels. Their
+// sliders and steppers go with them, being the same knob by another control.
+export function syncCoverage() {
+  const mono = form.elements.mono;
+  if (!mono) return;
+  const why = mono.checked
+    ? "Mono rasterizing leaves a pixel empty or full, so there is no coverage "
+      + "in between for this to act on."
+    : "";
+  for (const name of ["gamma", "thresholds"]) {
+    const el = form.elements[name];
+    if (!el) continue;
+    el.disabled = Boolean(why);
+    el.title = why;
+    for (const control of form.querySelectorAll(
+        `[data-for="${name}"], [data-slider-for="${name}"]`)) {
+      control.disabled = Boolean(why);
+    }
+  }
 }
 // Both rows the rules above read. A comparison or a reset moves them with no
 // event at all, which is why reverts.js and resets.js call syncFeatures too.

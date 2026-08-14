@@ -472,7 +472,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // A checkbox on each side of the font/page line, because a checkbox's state
   // is `checked` alone and everything else about it is a trap.
   const revertList = ["gamma", "margin", "alignment", "line_height",
-                      "hinting"].map(name => ({
+                      "hinting", "language"].map(name => ({
     dataset: { reset: name },
     hidden: true,
     on: {},
@@ -3031,6 +3031,46 @@ for (const { name, text } of sources) {
   check("a reset turns mono off and hands the coverage knobs back",
         mono.checked === false && gamma.disabled === false,
         `${mono.checked}/${gamma.disabled}`);
+}
+
+// 57c. Setting a language aside for a comparison is not choosing one. The
+//      arrow moves the row through the same setter a person does, so without
+//      care the peeked value is written down as the one your text is in, and
+//      a trip through a preset brings back whatever you were comparing with.
+{
+  const storage = fakeStorage({ "crossglyph.text": "eigener Text",
+                                "crossglyph.sample": "" });
+  const env = await loaded(storage, DEFAULTS, { languages: ["en"] });
+  env.byName.language.value = "de";
+  env.listeners.input({ target: env.byName.language });
+  check("the language your text is in is written down",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+
+  const arrow = env.revertList.find(r => r.dataset.reset === "language");
+  arrow.click();
+  check("setting it aside does not rewrite that",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+  arrow.click();
+  check("and neither does putting it back",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+}
+
+// 35a. A file the app was started on is no family and reports none of the
+//      facts a family reports. A knob is greyed on an answer, never on the
+//      absence of one: the file may well carry bytecode, and nothing has
+//      looked.
+{
+  const bare = { ...DEFAULTS, family: "", font: "Loose.ttf",
+                 faces: ["regular"], families: [] };
+  const env = await loaded(fakeStorage(), bare);
+  check("the bare file is what the picker is on",
+        env.family.value === "", env.family.value);
+  check("and grayscale hinting is not greyed on facts nobody gave",
+        env.byName.grayscale_hinting.disabled === false,
+        env.byName.grayscale_hinting.title);
 }
 
 process.exit(failures ? 1 : 0);

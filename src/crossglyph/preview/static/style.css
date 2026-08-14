@@ -186,11 +186,13 @@
   }
   .revert:hover { color: var(--text); background: var(--hover); }
   /* The same column, saying the same thing, without offering a press: a switch
-     is already its own way back. Never a click target, so the arrow's column
-     stays inert on these rows. */
+     is already its own way back. It has to be hoverable even so, since what it
+     says beyond "this differs" is in its tooltip, and an element excluded from
+     hit testing has no hover to show one on. The row under it is a div, so
+     nothing happens on the way past. */
   .mark {
     width: 1.5rem; height: 1.5rem; color: var(--muted); font-size: 14px;
-    display: grid; place-items: center; pointer-events: none;
+    display: grid; place-items: center; cursor: default;
   }
   /* Set aside rather than reset: the knob is showing its default and your
      value is waiting. Filled, because this is a state you are currently in

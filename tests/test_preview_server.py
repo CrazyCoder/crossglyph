@@ -535,7 +535,26 @@ def test_every_greyable_knob_is_a_knob_the_page_has():
     # rule quietly doing nothing.
     reached = set(re.findall(r"form\.elements\.(\w+)", source))
     assert reached <= set(_controls()), reached - set(_controls())
-    assert {"stem_darkening", "hinting", "grayscale_hinting"} <= reached, reached
+    assert {"stem_darkening", "hinting", "grayscale_hinting", "mono"} <= reached, \
+        reached
+
+
+def test_the_mark_beside_a_switch_can_be_hovered():
+    """Everything it says past "this row differs" is in its tooltip, and an
+    element taken out of hit testing has no hover for one to appear on. It sits
+    in the arrow's column, which must stay inert -- but the row under it is a
+    div rather than a label now, so nothing happens on the way past and the
+    mark does not have to be excluded to be harmless.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.mark\s*\{([^}]*)\}", css)
+    assert rule, ".mark has no rule at all"
+    assert "pointer-events" not in rule.group(1), \
+        "the mark is out of hit testing, so its tooltip can never be shown"
 
 
 def test_no_compare_arrow_sits_inside_a_label():

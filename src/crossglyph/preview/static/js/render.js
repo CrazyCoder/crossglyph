@@ -158,10 +158,6 @@ export function scheduleRender() {
 export function knobChanged(el) {
   if (el.dataset.group === "page") savePage();
   if (el.name === "text") typedInBox();
-  // The same idea for the language: while your own text is showing, which
-  // language to hyphenate it as is a fact about that text, and it has to come
-  // back with it.
-  if (el.name === "language") languageChosen();
   // Typing goes straight into the field, so without this the slider sits
   // wherever it was until the field loses focus and `change` finally fires.
   if (el.type === "number" && el.value !== "") showSlider(el);
@@ -178,6 +174,12 @@ export function onInput(event) {
   // already moved on from.
   const name = event.target.name || event.target.dataset.sliderFor;
   if (name) stashed.delete(name);
+  // While your own text is showing, which language to hyphenate it as is a
+  // fact about that text and has to come back with it. Recorded from here
+  // rather than from knobChanged, which the arrow also reaches: setting the
+  // row aside to compare it is not a choice about your text, and writing the
+  // compared value down would hand it back the next time you returned.
+  if (event.target.name === "language") languageChosen();
   knobChanged(event.target);
 }
 //: Wired by the entry point rather than on import: `form` belongs to dom.js,
