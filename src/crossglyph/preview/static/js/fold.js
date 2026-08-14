@@ -1,29 +1,42 @@
-// Whether the page settings are showing. They are the reader's own device
-// settings -- set to match the device you are judging against, then left --
-// so they fold away, and the fold is remembered: a section somebody closed
-// that opens again on the next reload has not saved them anything.
+// Which sections are open. Both of them -- the page settings and the second
+// family -- are things you set once and leave, where the rows around them are
+// what a session is actually for, so they fold and start folded. The fold is
+// remembered: one that opens again on the next reload has saved nobody
+// anything.
 //
-// The attribute is on the root and the stylesheet does the folding, which is
-// what lets boot.js put it there before the first paint. Nothing here reads a
-// width or a mark: the dot on the heading is the rows' own marks, seen through
-// the fold by a CSS rule.
+// The open ones are named in an attribute on the root and the stylesheet does
+// the folding, which is what lets boot.js put it there before the first paint.
+// A list rather than one attribute apiece so there is a single thing to write
+// down, and `[data-folds~="page"]` is how a rule asks about one of them.
 import {attempt} from "./remember.js";
 
-export const PAGE_OPEN = "crossglyph.page-open";
+export const FOLDS = "crossglyph.folds";
 
-const toggle = document.getElementById("page-toggle");
+const toggles = [...document.querySelectorAll("[data-fold]")];
 
-export function showPage(open) {
-  document.documentElement.dataset.page = open ? "open" : "closed";
-  toggle.setAttribute("aria-expanded", String(open));
-  attempt(() => localStorage.setItem(PAGE_OPEN, open ? "yes" : "no"));
+function open() {
+  const said = document.documentElement.dataset.folds || "";
+  return new Set(said.split(" ").filter(Boolean));
 }
 
-toggle.addEventListener("click", () => {
-  showPage(document.documentElement.dataset.page !== "open");
-});
+export function showFolds(names) {
+  const said = [...names].join(" ");
+  document.documentElement.dataset.folds = said;
+  for (const toggle of toggles) {
+    toggle.setAttribute("aria-expanded",
+                        String(names.has(toggle.dataset.fold)));
+  }
+  attempt(() => localStorage.setItem(FOLDS, said));
+}
 
-// The root already says which it is, from before the first paint. This is the
-// button catching up with it, rather than a second place deciding.
-toggle.setAttribute("aria-expanded",
-  String(document.documentElement.dataset.page === "open"));
+for (const toggle of toggles) {
+  toggle.addEventListener("click", () => {
+    const names = open();
+    const name = toggle.dataset.fold;
+    if (!names.delete(name)) names.add(name);
+    showFolds(names);
+  });
+  // The root already says which are open, from before the first paint. This is
+  // the button catching up with it, rather than a second place deciding.
+  toggle.setAttribute("aria-expanded", String(open().has(toggle.dataset.fold)));
+}

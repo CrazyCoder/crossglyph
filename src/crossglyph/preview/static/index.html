@@ -255,7 +255,8 @@
        that one is a comparison you can press again, and this throws the
        section away. -->
   <div class="section">
-    <h2><button type="button" id="page-toggle" aria-expanded="false"
+    <h2><button type="button" id="page-toggle" data-fold="page"
+                aria-expanded="false"
                 aria-controls="page-settings"><svg class="twist"
       viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.2 11.2 8 6 12.8"/>
       </svg>Page</button></h2>
@@ -447,18 +448,30 @@
 <form id="export">
     <div class="head">
       <h2>Export</h2>
-      <!-- What the family is called once it is on the device, beside the
-           heading rather than in a row of its own: a source family can be
-           called MerriweatherSansCondensed and the reader's Font list is a
-           phone-sized screen. It starts at the name in the picker above, and
-           a save writes it into the same .conf as everything else here. -->
+    </div>
+    <!-- What the family is called once it is on the device: a source family
+         can be called MerriweatherSansCondensed and the reader's Font list is
+         a phone-sized screen. It starts at the name in the picker above, and a
+         save writes it into the same .conf as everything else here. A row like
+         the rest, so its label lines up with theirs -- and behind a tab, where
+         the heading above is what the tab already says and is hidden, this is
+         what names the field. -->
+    <div class="row wide">
+      <label class="name" for="family-name">name</label>
       <input id="family-name" name="name" type="text" spellcheck="false"
-             aria-label="what the built family is called"
              title="What the built family is called on the device, and the name its folder takes. Letters, digits, _ and - only.">
     </div>
 
     <div class="stacked">
-      <span class="name">sizes <span class="unit">pt</span></span>
+      <span class="name">sizes <span class="unit">pt</span><span class="explain">
+          <button type="button" class="info" aria-label="What these sizes are"
+                  aria-describedby="sizes-tip">?</button>
+          <span class="tip" id="sizes-tip" role="tooltip">
+            The reader's Font Size setting lists every size the family carries,
+            one entry each. Not the size on the left, which is only what you
+            are tuning at.
+          </span>
+        </span></span>
       <div class="sizes">
         <label><span>Small</span>
           <input class="mono" id="size1" name="size1" type="text" inputmode="decimal"></label>
@@ -479,12 +492,32 @@
       <input class="mono" id="size-more" name="size_more" type="text"
              inputmode="decimal">
     </div>
-    <div class="hint">The reader's Font Size setting lists every size the
-      family carries, one entry each. Not the size on the left, which is only
-      what you are tuning at.</div>
 
+    <!-- Most families are one family, so this folds and starts folded. The
+         dot says the fold is hiding sizes that are set, which is the one thing
+         somebody could otherwise lose track of behind it. -->
+    <div class="section">
+      <h2><button type="button" id="mod-toggle" data-fold="mod"
+                  aria-expanded="false" aria-controls="mod-settings"><svg
+        class="twist" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M6 3.2 11.2 8 6 12.8"/></svg>Second family</button><span
+        class="explain">
+        <button type="button" class="info" aria-label="What a second family is"
+                aria-describedby="mod-tip">?</button>
+        <span class="tip" id="mod-tip" role="tooltip">
+          Sizes here build <strong id="mod-name">a second family</strong> from
+          the same faces, listed beside this one on the device. It is the way
+          to give a font eight sizes without one long list. Leave them empty
+          for one family; the suffix is what its name ends with.
+        </span>
+      </span></h2>
+      <span id="mod-dot" aria-hidden="true" hidden
+            title="This family builds a second one">&#8226;</span>
+    </div>
+
+    <div id="mod-settings">
     <div class="stacked">
-      <span class="name">second family <span class="unit">pt</span></span>
+      <span class="name">sizes <span class="unit">pt</span></span>
       <div class="sizes">
         <label><span>Small</span>
           <input class="mono" id="mod1" name="mod1" type="text" inputmode="decimal"></label>
@@ -509,11 +542,7 @@
       <input class="mono" id="mod-suffix" name="mod_suffix" type="text"
              placeholder="Mod">
     </div>
-    <div class="hint">Sizes here build <strong id="mod-name">a second
-      family</strong> from the same faces, listed beside this one on the
-      device. It is the way to give a font eight sizes without one long list.
-      Leave them empty for one family; the suffix is what its name ends
-      with.</div>
+    </div>
 
     <div class="stacked">
       <span class="name">coverage<!--
@@ -563,12 +592,18 @@
       <div id="presets" class="presets"></div>
     </div>
     <div class="row wide">
-      <label class="name" for="ranges">extra ranges</label>
+      <span class="name"><label for="ranges">extra ranges</label><span
+        class="explain">
+          <button type="button" class="info" aria-label="What extra ranges add"
+                  aria-describedby="ranges-tip">?</button>
+          <span class="tip" id="ranges-tip" role="tooltip">
+            Base coverage is always in, whatever is ticked. Ranges are added on
+            top of the presets.
+          </span>
+        </span></span>
       <input class="mono" id="ranges" name="ranges" type="text"
              placeholder="(0x2900-0x29FF),(0x2E00-0x2E7F)">
     </div>
-    <div class="hint">Base coverage is always in, whatever is ticked. Ranges
-      are added on top of the presets.</div>
 
     <!-- The box, what it is called and what it says take the three columns the
          row below spends on its first list; the button takes the fourth, which
@@ -580,6 +615,24 @@
       <span class="box">
         <input type="checkbox" id="fallbacks" name="fallbacks">
         <label class="name" for="fallbacks">bundled fallback faces</label>
+        <!-- Beside the label rather than inside it: a press inside a label is
+             a press on the box it names. -->
+        <span class="explain">
+          <button type="button" class="info" aria-label="How fallbacks are used"
+                  aria-describedby="fallbacks-tip">?</button>
+          <span class="tip" id="fallbacks-tip" role="tooltip">
+            Families from this folder, tried in order for codepoints the main
+            family lacks. Their regular face goes on every style, as the
+            converter applies them. The bundled Noto faces come after both, and
+            on a wide coverage they are the difference between 300 glyphs and
+            3,300.
+            <br><br>
+            The page above shows them too, in the same order the build would:
+            paste a character this family has not got and you see which face it
+            will actually come from. Nothing is opened while the family covers
+            the text.
+          </span>
+        </span>
         <span class="note"><span id="have-fallbacks"></span>
           <span id="fetched"></span></span>
       </span>
@@ -594,20 +647,17 @@
       <label class="name" for="fallback2">fallback 2</label>
       <select id="fallback2" name="fallback2"></select>
     </div>
-    <div class="hint">Families from this folder, tried in order for codepoints
-      the main family lacks. Their regular face goes on every style, as the
-      converter applies them. The bundled Noto faces come after both, and on a
-      wide coverage they are the difference between 300 glyphs and 3,300.
-      The page above shows them too, in the same order the
-      build would: paste a character this family has not got and you see which
-      face it will actually come from. Nothing is opened while the family
-      covers the text.</div>
 
     <div class="row wide">
-      <label class="name" for="out">output</label>
+      <!-- Where the folders are is written by the server at startup, so the
+           tip is what it fills rather than a sentence about it. -->
+      <span class="name"><label for="out">output</label><span class="explain">
+          <button type="button" class="info" aria-label="Where fonts come from and go"
+                  aria-describedby="source-note">?</button>
+          <span class="tip" id="source-note" role="tooltip"></span>
+        </span></span>
       <input class="mono" id="out" name="out" type="text">
     </div>
-    <div class="hint" id="source-note"></div>
 
     <!-- A build does the sizes whose inputs changed. Holding shift does the
          lot, for the times the inputs are the same and the answer should not

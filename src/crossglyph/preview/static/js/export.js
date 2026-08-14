@@ -126,6 +126,9 @@ export const MOD_FIELDS = ["mod1", "mod2", "mod3", "mod4"];
 export const moreRow = document.getElementById("more-row");
 export const modMoreRow = document.getElementById("mod-more-row");
 export const modName = document.getElementById("mod-name");
+// What the fold says about itself: sizes are set in there. The panel works
+// that out for the suffix field anyway, so it is the one that says so.
+export const modDot = document.getElementById("mod-dot");
 export const sizeNumbers = (text) => String(text).split(/[,\s]+/).filter(Boolean);
 
 export function fillSizeBoxes(fields, text, spill) {
@@ -170,6 +173,7 @@ export function showModState() {
   modName.textContent = sizes
     ? (family || "this family") + (suffix.value || "Mod")
     : "a second family";
+  modDot.hidden = !sizes;
 }
 
 // The config spells coverage as one comma-separated string, because that is

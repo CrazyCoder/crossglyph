@@ -577,6 +577,31 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_every_fold_has_a_heading_that_opens_it():
+    """fold.js collects its toggles by `data-fold`, and the stylesheet folds
+    `#<name>-settings`. A heading that lost the attribute is a section nothing
+    can open, and nothing else notices: the markup is still valid, the section
+    is still hidden, and the press does nothing at all. That shipped once.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+
+    folded = set(re.findall(r'data-folds~="(\w+)"\]\)\s*#(\w+)-settings', css))
+    assert folded, "the stylesheet folds nothing"
+    for name, section in sorted(folded):
+        assert name == section, \
+            f"the fold named {name} hides #{section}-settings"
+        assert f'id="{name}-settings"' in html, f"#{name}-settings is not there"
+        toggle = re.search(rf'<button[^>]*data-fold="{name}"[^>]*>', html)
+        assert toggle, f"nothing carries data-fold=\"{name}\", so it cannot open"
+        assert f'aria-controls="{name}-settings"' in toggle.group(0), \
+            f"the {name} heading does not say what it controls"
+
+
 def test_what_boot_reads_is_what_the_modules_write():
     """boot.js restores both of these before the first paint, and a module
     writes each one after a press. Two files per key, and the failure when they
@@ -589,7 +614,7 @@ def test_what_boot_reads_is_what_the_modules_write():
 
     js = server.STATIC / "js"
     boot = (js / "boot.js").read_text(encoding="utf-8")
-    for module, name in (("theme.js", "THEME"), ("fold.js", "PAGE_OPEN")):
+    for module, name in (("theme.js", "THEME"), ("fold.js", "FOLDS")):
         source = (js / module).read_text(encoding="utf-8")
         key = re.search(rf'{name} = "([^"]+)"', source)
         assert key, f"{module} names no key for {name}"

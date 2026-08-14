@@ -133,7 +133,10 @@ The foot of the card is where **Save** is, rather than either panel, because it
 writes the whole `.conf`: a coverage tick lights it exactly as a slider does.
 
 The export panel holds what a build needs and a page does not: the name, the
-sizes, the coverage intervals, the fallback families.
+sizes, the coverage intervals, the fallback families. What each of them means
+is behind the **?** beside its label, since it is an answer you want once. Its
+**Second family** section folds like **Page** does, since most families are one
+family, and a dot on the folded heading says this one is not.
 
 It has a column of its own beside the page while the window is wide enough for
 three. Below that it folds in beside the font knobs, with **Tune** and
@@ -142,9 +145,9 @@ page stays where it is either way. A build running behind the Export tab marks
 it, since a build is minutes and the panel it reports in may not be the one
 you are looking at.
 
-The box at the top of the panel is what the family is called once it is built, which
-is the name the reader picks from on a phone-sized screen rather than whatever
-the source files are called. It reaches a filename, so letters, digits, `_` and
+**name** is what the family is called once it is built, which is the name the
+reader picks from on a phone-sized screen rather than whatever the source files
+are called. It reaches a filename, so letters, digits, `_` and
 `-` are all it can keep: the rest is stripped on the way in and the box shows
 what landed. Empty means the name the files already have. Two families may not
 build under one name, since they would write over each other in the output

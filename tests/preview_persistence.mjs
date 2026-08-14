@@ -635,8 +635,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     progress: progressRow(),
     "tab-tune": pressStub("tune"),
     "tab-export": pressStub("export"),
-    // The Page heading, which is the press that folds the section under it.
-    "page-toggle": pressStub("page"),
+    // The two headings that fold the section under them.
+    "page-toggle": Object.assign(pressStub("page"), {dataset: {fold: "page"}}),
+    "mod-toggle": Object.assign(pressStub("mod"), {dataset: {fold: "mod"}}),
+    "mod-dot": { hidden: true },
     // What a build leaves on the tab it ran behind.
     "tab-busy": { hidden: true },
     "source-note": { textContent: "" },
@@ -728,7 +730,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       getElementById: id => stubs[id],
       createElement: makeElement,
       createTextNode: (text) => ({ textContent: text }),
-      querySelectorAll: () => [],
+      // The fold reaches for its toggles by attribute rather than by id, so
+      // this is the one document-wide query the page makes.
+      querySelectorAll: (selector) => selector === "[data-fold]"
+        ? [stubs["page-toggle"], stubs["mod-toggle"]] : [],
       addEventListener(kind, fn) {
         if (kind === "keydown") keys.push(fn);
         if (kind === "keyup") keyups.push(fn);
@@ -939,8 +944,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            tabs: { tune: stubs["tab-tune"], export: stubs["tab-export"],
                    busy: stubs["tab-busy"],
                    press: (which) => presses[which]() },
-           fold: { toggle: stubs["page-toggle"],
-                   press: () => presses.page() },
+           fold: { page: stubs["page-toggle"], mod: stubs["mod-toggle"],
+                   dot: stubs["mod-dot"],
+                   press: (which) => presses[which]() },
            progress: stubs.progress, bar: stubs.progress.bar,
            barFill: stubs.progress.fill,
            progressWhat: stubs.progress.what,
@@ -3471,25 +3477,30 @@ for (const { name, text } of sources) {
 {
   const storage = fakeStorage();
   const env = await loaded(storage);
-  check("the button says what the root says",
-        env.fold.toggle.attrs["aria-expanded"] === "false",
-        env.fold.toggle.attrs["aria-expanded"]);
+  check("both headings say what the root says",
+        env.fold.page.attrs["aria-expanded"] === "false"
+        && env.fold.mod.attrs["aria-expanded"] === "false",
+        JSON.stringify([env.fold.page.attrs, env.fold.mod.attrs]));
 
-  env.fold.press();
-  check("a press opens it", env.root.dataset.page === "open",
-        env.root.dataset.page);
+  env.fold.press("page");
+  check("a press opens that one", env.root.dataset.folds === "page",
+        env.root.dataset.folds);
   check("and says so where a screen reader hears it",
-        env.fold.toggle.attrs["aria-expanded"] === "true",
-        env.fold.toggle.attrs["aria-expanded"]);
-  check("and it is written down", storage.data["crossglyph.page-open"] === "yes",
-        storage.data["crossglyph.page-open"]);
+        env.fold.page.attrs["aria-expanded"] === "true",
+        env.fold.page.attrs["aria-expanded"]);
+  check("and it is written down", storage.data["crossglyph.folds"] === "page",
+        storage.data["crossglyph.folds"]);
 
-  env.fold.press();
-  check("and closes again", env.root.dataset.page === "closed",
-        env.root.dataset.page);
+  env.fold.press("mod");
+  check("the other opens beside it rather than instead of it",
+        env.root.dataset.folds === "page mod", env.root.dataset.folds);
+
+  env.fold.press("page");
+  check("and closes on its own", env.root.dataset.folds === "mod",
+        env.root.dataset.folds);
   check("with that written down too, rather than left to the default",
-        storage.data["crossglyph.page-open"] === "no",
-        storage.data["crossglyph.page-open"]);
+        storage.data["crossglyph.folds"] === "mod",
+        storage.data["crossglyph.folds"]);
 }
 
 process.exit(failures ? 1 : 0);

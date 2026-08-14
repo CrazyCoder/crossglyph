@@ -278,13 +278,24 @@
      throws the section's settings away. Same size and weight, since they are
      the same family of thing; different mark, since one of them is not
      reversible. */
-  .section { display: flex; align-items: center; margin: 1.35rem 0 .5rem; }
-  .section h2 { flex: 1 1 auto; margin: 0; }
+  /* A section heading and, at the right of the row, whatever the section says
+     about itself. The heading grows, so those stay on the right however long
+     the word is; a badge belongs to the heading and rides inside it.
+
+     Its own rule above it, like every other band in the panel. On a margin
+     alone a folded heading floats between the block it follows and the rule
+     under the next one, which reads as a heading for whatever is below --
+     exactly wrong for a heading whose own section is shut. */
+  .section { display: flex; align-items: center; gap: .45rem;
+             border-top: 1px solid var(--rule);
+             margin: 0; padding: .85rem 0 .5rem; }
+  .section h2 { display: flex; align-items: center; gap: .35rem;
+                flex: 1 1 auto; margin: 0; }
 
   /* The heading is the press that folds the section. A button inside the h2
      rather than instead of it: the section keeps its heading, and what opens
      it is a control rather than a word people have to guess is clickable. */
-  #page-toggle {
+  #page-toggle, #mod-toggle {
     /* Each of these is a property a button does not inherit on its own, and
        the heading beside it in the next panel does: `font` misses
        text-transform, and the UA sets that one to none, so the word came out
@@ -295,7 +306,7 @@
     padding: .1rem .3rem .1rem 0; margin-left: -.15rem;
     background: none; border: 0; border-radius: 4px;
   }
-  #page-toggle:hover { color: var(--text); background: none; }
+  #page-toggle:hover, #mod-toggle:hover { color: var(--text); background: none; }
   /* A drawn chevron rather than a glyph. At the heading's 10px a text triangle
      is a comma with ideas, and this is the one mark on the panel that has to
      read as "there is more under here" at a glance. Stroked like the
@@ -304,9 +315,10 @@
            fill: none; stroke: currentColor; stroke-width: 2.1;
            stroke-linecap: round; stroke-linejoin: round;
            transition: transform .15s ease-out; }
-  #page-toggle[aria-expanded="true"] .twist { transform: rotate(90deg); }
+  [aria-expanded="true"] .twist { transform: rotate(90deg); }
   @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
-  :root[data-page="closed"] #page-settings { display: none; }
+  :root:not([data-folds~="page"]) #page-settings { display: none; }
+  :root:not([data-folds~="mod"]) #mod-settings { display: none; }
 
   /* Folded, and something under it is not what the device ships with. The same
      dot the rows carry, in the same column, said for the whole section because
@@ -314,10 +326,16 @@
      rows' own marks, read through the fold. */
   #page-dot { width: 1.5rem; height: 1.5rem; display: none;
               place-items: center; color: var(--muted); font-size: 14px; }
-  :root[data-page="closed"]
+  :root:not([data-folds~="page"])
     .section:has(+ #page-settings .mark:not([hidden])) #page-dot {
     display: grid;
   }
+  /* The same, for a second family that is set while the fold is hiding it.
+     What is set is a value in a box rather than a mark, so this one is put
+     there by the panel that already works that out for the suffix field. */
+  #mod-dot { width: 1.5rem; height: 1.5rem; display: none;
+             place-items: center; color: var(--muted); font-size: 14px; }
+  :root:not([data-folds~="mod"]) #mod-dot:not([hidden]) { display: grid; }
 
   .revert, .clear {
     width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: none;
@@ -595,6 +613,11 @@
   /* The margins the heading carried on its own, so the panel still opens level
      with the two columns beside it. */
   #export .head { margin: 1.35rem 0 .5rem; }
+  /* The first row under the panel's own heading draws no rule: there is
+     nothing above it to be divided from. The rows inside a fold draw none
+     either -- the sizes and the suffix they are named with are one thing, and
+     a rule through them says they are two. */
+  #export .head + .row, #mod-settings .row { border-top: 0; }
 
   /* What the card gives up to the tabs, and it has to be said after the two
      rules above rather than beside the layout: a media query adds no
@@ -624,7 +647,6 @@
        its own label is on the field. */
     #export .head h2 { display: none; }
   }
-  #family-name { flex: 1 1 0; min-width: 6rem; }
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */
   .row.wide { grid-template-columns: 8.2rem 1fr; }
@@ -642,6 +664,10 @@
     grid-column: 1 / 4; display: flex; align-items: center; gap: .55rem;
     min-width: 0;
   }
+  /* The button is only there while there is something to fetch. While there is
+     not, its column is empty and the note is being cut short beside it, which
+     is a truncated path with a hand's width of nothing next to it. */
+  .row.wide.check:has(#fetch[hidden]) .box { grid-column: 1 / 5; }
   .row.wide.check .name { cursor: pointer; }
   .row.wide.check .note {
     flex: 1; min-width: 0; color: var(--muted); font-size: 11.5px;
@@ -683,8 +709,12 @@
      measured from the baseline plus half an x-height, which is not the middle
      of anything you can see, and a length offset would be a number tuned to
      one font at one size. */
-  .name:has(.explain) { display: flex; align-items: center; }
-  .explain { position: relative; display: inline-flex; margin-left: .35rem; }
+  /* A label with a badge is a flex row, and a flex row drops the whitespace
+     between its items -- which is what held `sizes` off its `pt`. The gap puts
+     it back and spaces the badge, so the label's parts are set by one number
+     rather than by a space in the markup and a margin in here. */
+  .name:has(.explain) { display: flex; align-items: center; gap: .35rem; }
+  .explain { position: relative; display: inline-flex; }
   /* Outlined, not filled. It answers a question nobody has yet, so it should
      be findable and not first: a solid disc beside a quiet label is the
      highest-contrast thing in the row, which is backwards. */
