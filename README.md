@@ -102,6 +102,7 @@ a factor of twelve smaller for a narrow face.
 | `src/crossglyph/cpfont/` | the `.cpfont` writer, forked from the tool behind the CrossPoint website |
 | `src/crossglyph/render/` | the firmware's renderer, compiled to WebAssembly, and the Python that drives it |
 | `src/render/` | the C++ and the build script that produce that module |
+| `src/crossglyph/starter/` | Literata, the family an empty workspace opens on |
 | `docs/` | [fonts.md](docs/fonts.md) for building, [preview.md](docs/preview.md) for the renderer |
 
 CrossGlyph is MIT licensed. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)

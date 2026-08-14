@@ -66,7 +66,7 @@ OUTPUT_NAME = "cpfonts"
 
 # .github/workflows/build-fonts.yml, in order. These fill holes the chosen
 # family does not cover, on every style: the converter appends the style-0 list
-# to all four (cpfont/convert.py:882).
+# to all four (cpfont/convert.py:1192-1195).
 BUNDLED_FALLBACKS = (
     "NotoSans-Regular.ttf",
     "NotoSansHebrew-Regular.ttf",
@@ -350,7 +350,7 @@ def build_kwargs(variant: Variant, size: int, out_dir: pathlib.Path) -> dict:
     """Arguments for one generate_cpfont_multistyle call: one family, one size.
 
     The converter takes every fallback for style 0 and appends that list to all
-    four styles itself (cpfont/convert.py:882), which is why the user, bundled
+    four styles itself (cpfont/convert.py:1192-1195), which is why the user, bundled
     and space faces all go into one ordered list.
     """
     config: Config = variant.config
@@ -452,9 +452,9 @@ def style_metrics(path: pathlib.Path) -> Metrics:
     are padding it, which the byte size alone does not say. The line metrics are
     what a too-tight line_height has to be checked against.
 
-    Layout, from cpfont/convert.py:971-979 -- a 32-byte header, then 32-byte
-    style TOC entries: glyphCount at +8, advanceY +12, ascender +13, descender
-    +15.
+    Layout: HEADER_SIZE is 32 (cpfont/convert.py:1182) and STYLE_TOC_FORMAT
+    packs each 32-byte style entry (cpfont/convert.py:1226), with glyphCount
+    at +8, advanceY +12, ascender +13 and descender +15.
     """
     with path.open("rb") as handle:
         header = handle.read(32 + 32)

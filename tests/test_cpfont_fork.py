@@ -21,6 +21,43 @@ def test_base_coverage_is_always_injected():
     assert (0x0000, 0x007F) in cpfont.resolve_intervals("cyrillic")
 
 
+#: What our own comments say convert.py does, and the line each one points at.
+#: The converter is a pinned fork that gets refreshed wholesale, so every one
+#: of these numbers moves without anything else changing -- and a citation that
+#: has drifted onto an unrelated line is worse than none, since it reads as
+#: proof. Each entry is the cited range and a token the code there must carry.
+CITATIONS = [
+    ("1192-1195", "fallback_style_fonts.get(0, [])"),
+    ("1182", "HEADER_SIZE = 32"),
+    ("1226", "STYLE_TOC_FORMAT"),
+    ("1232-1237", "advanceY > 255"),
+    ("1055", "raise FontBuildError"),
+]
+
+
+def test_the_lines_we_cite_in_the_converter_are_the_ones_we_mean():
+    source = (ROOT / "src/crossglyph/cpfont/convert.py").read_text(
+        encoding="utf-8").splitlines()
+
+    for where, token in CITATIONS:
+        first, _, last = where.partition("-")
+        lines = source[int(first) - 1:int(last or first)]
+        assert any(token in line for line in lines), \
+            f"convert.py:{where} no longer carries {token!r}"
+
+    # And every citation in our own source is one of the above, so a new one
+    # cannot be added without being pinned here too.
+    import re
+
+    cited = set()
+    for path in sorted((ROOT / "src/crossglyph").rglob("*.py")):
+        if path.parts[-2] == "cpfont":
+            continue                    # the fork citing itself is upstream's
+        cited |= set(re.findall(r"convert\.py:([0-9]+(?:-[0-9]+)?)",
+                                path.read_text(encoding="utf-8")))
+    assert cited == {where for where, _ in CITATIONS}, cited
+
+
 # --- lazy font opening ------------------------------------------------------
 
 
