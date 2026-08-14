@@ -190,3 +190,102 @@ def test_the_batch_launcher_reports_neither_layout(tmp_path):
     done = _cmd(tmp_path)
     assert done.returncode != 0
     assert "CrossGlyph install" in done.stdout + done.stderr
+
+
+# --- a launcher an update left beside this one ----------------------------
+#
+# An update cannot write over the launcher: it is open, and both cmd.exe and a
+# POSIX shell resume at the byte offset they had reached, which in a file that
+# changed length is the middle of a word. So the new one is staged, and this
+# is the run that applies it. Measured on both, because the failure is a
+# corrupt launcher and nobody would guess at it from a stack trace.
+
+
+def _staged(root: pathlib.Path, name: str, says: str) -> pathlib.Path:
+    """A newer launcher waiting to be applied, which reports and stops."""
+    body = (f"@ECHO OFF\r\necho PROJECT={says}\r\n" if name.endswith(".cmd")
+            else f'#!/bin/sh\necho "PROJECT={says}"\n')
+    staged = root / (name + ".staged")
+    staged.write_bytes(body.encode("utf-8"))
+    return staged
+
+
+@needs_sh
+def test_a_staged_launcher_is_applied_and_run(tmp_path):
+    root = _release(tmp_path)
+    _staged(root, "crossglyph.sh", "the-new-launcher")
+    said = _said(_sh(root))
+    assert said["PROJECT"] == "the-new-launcher", "the staged one did not run"
+    assert not (root / "crossglyph.sh.staged").exists()
+    assert "the-new-launcher" in (root / "crossglyph.sh").read_text(
+        encoding="utf-8")
+
+
+@needs_sh
+def test_the_launcher_it_replaced_is_kept(tmp_path):
+    """A release that shipped a broken launcher is then a rename away from
+    being undone, rather than a reinstall."""
+    root = _release(tmp_path)
+    _staged(root, "crossglyph.sh", "the-new-launcher")
+    _sh(root)
+    assert "CrossGlyph install" in (root / "crossglyph.sh.previous").read_text(
+        encoding="utf-8")
+
+
+@needs_sh
+def test_nothing_staged_leaves_the_launcher_alone(tmp_path):
+    root = _release(tmp_path)
+    _said(_sh(root))
+    assert not (root / "crossglyph.sh.previous").exists()
+
+
+@needs_windows
+def test_the_batch_launcher_applies_a_staged_one(tmp_path):
+    root = _release(tmp_path)
+    _staged(root, "crossglyph.cmd", "the-new-launcher")
+    said = _said(_cmd(root))
+    assert said["PROJECT"] == "the-new-launcher"
+    assert not (root / "crossglyph.cmd.staged").exists()
+    assert (root / "crossglyph.cmd.previous").is_file()
+
+
+@needs_sh
+def test_the_staged_run_still_reports_what_the_work_returned(tmp_path):
+    """exec on this side, so the code comes back out. The batch launcher
+    cannot do that on the one run that applies a staged launcher, and the test
+    below the platform split says so."""
+    root = _release(tmp_path)
+    (root / "crossglyph.sh.staged").write_bytes(b"#!/bin/sh\nexit 3\n")
+    assert _sh(root).returncode == 3
+
+
+@needs_windows
+def test_the_batch_run_that_applies_one_cannot_carry_the_code_out(tmp_path):
+    """Measured, and accepted rather than worked around. Reporting the code
+    needs a line after the call, and a line after the call is what corrupts
+    the run: cmd.exe would read it out of the replaced file. Delayed expansion
+    would buy the code back at the price of eating a `!` in anybody's
+    arguments, which is the more common thing to get wrong.
+
+    Only this one run, and only the number: what the user sees comes from the
+    launcher inside, which is whole.
+    """
+    root = _release(tmp_path)
+    (root / "crossglyph.cmd.staged").write_bytes(
+        b"@ECHO OFF\r\nexit /B 3\r\n")
+    assert _cmd(root).returncode == 0
+
+
+@needs_windows
+def test_the_batch_launcher_reads_no_further_after_applying_one(tmp_path):
+    """The reason the apply is one line ending in exit /B. With it on several,
+    cmd.exe resumes in the replaced file at the offset it had reached and runs
+    fragments: 'ause' rather than pause, and a nonzero exit nobody asked for.
+    """
+    root = _release(tmp_path)
+    # Much shorter than the launcher it replaces, so any later read lands in
+    # a completely different place.
+    (root / "crossglyph.cmd.staged").write_bytes(b"@ECHO OFF\r\n")
+    done = _cmd(root)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "not recognized" not in done.stdout + done.stderr

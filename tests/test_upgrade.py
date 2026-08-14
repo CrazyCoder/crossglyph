@@ -23,6 +23,10 @@ PREFIX = f"crossglyph-{NEW}"
 
 TEMPLATE = b"# out = \n"
 
+#: What the new release's launcher says, which is not what the install's does.
+LAUNCHER = "#!/bin/sh\n# a launcher with a fix in it\n"
+OLD_LAUNCHER = b"#!/bin/sh\n"
+
 
 def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
              executable=False) -> bytes:
@@ -30,7 +34,8 @@ def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
     body = io.BytesIO()
     with zipfile.ZipFile(body, "w") as archive:
         inside = f"{PREFIX}/versions/{version}"
-        archive.writestr(f"{PREFIX}/crossglyph.sh", "#!/bin/sh\n")
+        archive.writestr(f"{PREFIX}/crossglyph.sh", LAUNCHER)
+        archive.writestr(f"{inside}/crossglyph.sh", LAUNCHER)
         archive.writestr(f"{PREFIX}/current", f"{version}\n")
         archive.writestr(f"{PREFIX}/fonts/conf/all.conf", template)
         archive.writestr(f"{inside}/pyproject.toml", f'version = "{version}"\n')
@@ -53,7 +58,6 @@ def manifest(raw: bytes, version=NEW, **over) -> bytes:
         "sha256": hashlib.sha256(raw).hexdigest(),
         "size": len(raw),
         "notes_url": f"https://example.invalid/releases/tag/v{version}",
-        "launcher_changed": False,
     }
     return json.dumps({**body, **over}).encode("utf-8")
 
@@ -89,6 +93,10 @@ def release(tmp_path):
     (tmp_path / "versions" / OLD / "fonts" / "conf").mkdir(parents=True)
     (tmp_path / "versions" / OLD / "fonts" / "conf" / "all.conf").write_bytes(
         TEMPLATE)
+    # Bytes rather than text: what is staged is decided by a byte comparison,
+    # and a fixture that wrote CRLF here would be testing the line endings.
+    (tmp_path / "versions" / OLD / "crossglyph.sh").write_bytes(OLD_LAUNCHER)
+    (tmp_path / "crossglyph.sh").write_bytes(OLD_LAUNCHER)
     (tmp_path / "fonts" / "conf").mkdir(parents=True)
     (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(TEMPLATE)
     layout.write_current(tmp_path, OLD)
@@ -133,16 +141,24 @@ def test_an_unreachable_server_says_so(release, monkeypatch):
     assert "could not reach" in last(run(release))["error"]
 
 
-def test_a_release_that_changes_the_launcher_refuses(release, served,
-                                                     monkeypatch):
-    """cmd.exe is holding the launcher open at the line that started this."""
-    monkeypatch.setattr(
-        updates, "fetch",
-        lambda url, timeout=2.0: manifest(served.raw, launcher_changed=True))
+def test_a_release_that_changes_the_launcher_stages_it(release, served):
+    """The live one is open and being read by whatever started this, and
+    writing over it, by write or by rename, is what makes a shell resume in
+    the middle of a word. The launcher applies this at the next launch."""
     said = last(run(release))
-    assert said["event"] == "error"
-    assert "launcher" in said["error"]
-    assert layout.current(release) == OLD
+    assert said["staged"] == ["crossglyph.sh"]
+    assert (release / "crossglyph.sh").read_bytes() == OLD_LAUNCHER, \
+        "it wrote over the launcher that is running"
+    assert (release / f"crossglyph.sh{upgrade.STAGED}").read_bytes() == \
+        LAUNCHER.encode()
+
+
+def test_a_launcher_that_did_not_change_is_not_staged(release, served):
+    """A file appearing beside the launcher is something to explain. Only when
+    there is a reason for it."""
+    (release / "crossglyph.sh").write_bytes(LAUNCHER.encode())
+    assert last(run(release))["staged"] == []
+    assert not (release / f"crossglyph.sh{upgrade.STAGED}").exists()
 
 
 # --- the whole path -------------------------------------------------------
@@ -161,7 +177,7 @@ def test_only_the_version_subtree_is_taken(release, served):
     in it belongs to a root that already exists."""
     run(release)
     landed = release / "versions" / NEW
-    assert not (landed / "crossglyph.sh").exists()
+    assert not (landed / "current").exists()
     assert not (landed / "versions").exists()
 
 

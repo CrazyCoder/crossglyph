@@ -92,7 +92,11 @@ export function showUpdateStep(step) {
     updateRow.hidden = true;
     updateNote.textContent =
       `${step.version} installed. Restart CrossGlyph to use it.` +
-      keptLine(step.kept) + (step.converting
+      keptLine(step.kept) +
+      (step.staged.length
+        ? ` ${step.staged.join(" and ")} will be replaced at the next launch.`
+        : "") +
+      (step.converting
         ? " The files at the root are no longer read." : "");
   }
 }

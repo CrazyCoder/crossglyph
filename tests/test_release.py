@@ -21,9 +21,11 @@ make_release = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(make_release)
 
 
-@pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
-def test_what_outlives_a_version_stays_at_the_root(path):
-    assert make_release.release_paths(path, "0.2.0") == (path,)
+def test_what_the_user_writes_stays_at_the_root():
+    """update.conf is theirs. An update replaces versions/<v> wholesale, so a
+    copy in there would be replaced with it."""
+    assert make_release.release_paths("update.conf", "0.2.0") == \
+        ("update.conf",)
 
 
 @pytest.mark.parametrize("path", ["fonts/README.md", "fonts/conf/all.conf"])
@@ -31,6 +33,15 @@ def test_a_workspace_file_lands_in_both_places(path):
     """The root copy is the user's to edit. The one inside the version is how
     it shipped, which is the only way an update can tell an edited file from
     one that changed between releases."""
+    assert make_release.release_paths(path, "0.2.0") == \
+        (path, f"versions/0.2.0/{path}")
+
+
+@pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
+def test_the_launcher_lands_in_both_places(path):
+    """The root copy is the one that runs. The one inside the version is what
+    an update stages beside it, and without it a release could never fix the
+    launcher of an install already out there."""
     assert make_release.release_paths(path, "0.2.0") == \
         (path, f"versions/0.2.0/{path}")
 
@@ -93,11 +104,11 @@ def test_the_archive_holds_both_halves_of_the_release(built, members):
 
 
 def test_neither_half_leaks_into_the_other(built, members):
-    """An update replaces versions/<v> wholesale. Anything of the install's
-    that ended up in there would be replaced with it."""
+    """An update replaces versions/<v> wholesale. Anything the user owns that
+    ended up in there would be replaced with it, and the code at the root
+    would be run by nothing."""
     version, _, _ = built
     assert "src/crossglyph/cli.py" not in members
-    assert f"versions/{version}/crossglyph.cmd" not in members
     assert f"versions/{version}/update.conf" not in members
 
 
@@ -169,7 +180,7 @@ def test_the_manifest_is_what_the_client_accepts():
     said = make_release.manifest("0.2.0", "c" * 64, 10, "CrazyCoder/crossglyph")
     parsed = updates.parse(json.dumps(said).encode("utf-8"))
     assert parsed.version == "0.2.0"
-    assert parsed.launcher_changed is False
+    assert parsed.sha256 == "c" * 64
 
 
 def test_a_release_writes_the_manifest_beside_the_zip(built, tmp_path):

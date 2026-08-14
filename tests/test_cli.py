@@ -201,7 +201,8 @@ def test_a_bare_update_installs(capsys, monkeypatch):
         {"event": "plan", "version": "0.2.0", "bytes": 1600000,
          "notes_url": "https://example.invalid/", "converting": False},
         {"event": "step", "got": 1600000, "bytes": 1600000},
-        {"event": "done", "version": "0.2.0", "kept": [], "converting": False,
+        {"event": "done", "version": "0.2.0", "kept": [], "staged": [],
+         "converting": False,
          "where": "versions/0.2.0"}))
     assert cli.main(["update"]) == 0
     said = capsys.readouterr().out
@@ -229,10 +230,24 @@ def test_a_file_that_was_kept_is_named(capsys, monkeypatch):
     nobody ever reads."""
     monkeypatch.setattr(cli.upgrade, "steps", steps(
         {"event": "done", "version": "0.2.0", "kept": ["conf/all.conf"],
+         "staged": [],
          "converting": False, "where": "versions/0.2.0"}))
     cli.main(["update"])
     said = capsys.readouterr().out
     assert "fonts/conf/all.conf" in said and "all.conf.new" in said
+
+
+def test_a_staged_launcher_is_named_and_so_is_when_it_lands(capsys,
+                                                            monkeypatch):
+    """A file appearing beside the launcher, and an update that only half
+    took effect until the next run, both need saying."""
+    monkeypatch.setattr(cli.upgrade, "steps", steps(
+        {"event": "done", "version": "0.2.0", "kept": [],
+         "staged": ["crossglyph.cmd"], "converting": False,
+         "where": "versions/0.2.0"}))
+    cli.main(["update"])
+    said = capsys.readouterr().out
+    assert "crossglyph.cmd" in said and "next launch" in said
 
 
 def test_a_conversion_says_the_old_files_are_no_longer_read(capsys,
@@ -240,7 +255,8 @@ def test_a_conversion_says_the_old_files_are_no_longer_read(capsys,
     monkeypatch.setattr(cli.upgrade, "steps", steps(
         {"event": "plan", "version": "0.2.0", "bytes": 1600000,
          "notes_url": "https://example.invalid/", "converting": True},
-        {"event": "done", "version": "0.2.0", "kept": [], "converting": True,
+        {"event": "done", "version": "0.2.0", "kept": [], "staged": [],
+         "converting": True,
          "where": "versions/0.2.0"}))
     cli.main(["update"])
     said = capsys.readouterr().out

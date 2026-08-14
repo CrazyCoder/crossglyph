@@ -17,10 +17,6 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          # launcher_changed compares against the previous tag, which a
-          # shallow clone does not have.
-          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
 

@@ -13,7 +13,6 @@ GOOD = {
     "sha256": "a" * 64,
     "size": 1656832,
     "notes_url": "https://github.com/CrazyCoder/crossglyph/releases/tag/v0.2.0",
-    "launcher_changed": False,
     "signature": None,
 }
 
@@ -26,7 +25,7 @@ def test_a_good_manifest_parses():
     said = updates.parse(_raw())
     assert said.version == "0.2.0"
     assert said.sha256 == "a" * 64
-    assert said.launcher_changed is False
+    assert said.notes_url.endswith("v0.2.0")
 
 
 def test_an_unknown_key_is_ignored():

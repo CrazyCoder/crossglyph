@@ -30,12 +30,18 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: hand gets the same answer without one.
 REPO = "CrazyCoder/crossglyph"
 
-#: What stays outside versions/, because it outlives any one version: the
-#: launcher, which an update cannot replace while cmd.exe is holding it, and
-#: the workspace, which is the user's. `current` is generated, not tracked.
-#: update.conf is here for the same reason fonts/ is: it is the user's, and
-#: an update must not write over what they set.
-ROOT_FILES = frozenset({"crossglyph.cmd", "crossglyph.sh", "update.conf"})
+#: What runs the tool, and what an update cannot write over while it is being
+#: read. The copy inside the version is where the new one comes from: an
+#: update leaves it beside the live one, which applies it at the next launch.
+LAUNCHERS = frozenset({"crossglyph.cmd", "crossglyph.sh"})
+
+#: The user's, and never written by an update: what they set stays set.
+#: `current` is generated rather than tracked, so it is not here.
+USERS = frozenset({"update.conf"})
+
+#: What lands at the root of the install as well as, or instead of, inside a
+#: version. Everything here outlives any one version.
+ROOT_FILES = LAUNCHERS | USERS
 
 #: "Version made by", saying Unix. It is what decides whether a reader honours
 #: the mode at all: an entry claiming DOS carries no mode a POSIX unzip will
@@ -56,6 +62,9 @@ REQUIRED = [
     # The same two inside the version: what an update compares against to tell
     # a file the user edited from one that changed between releases.
     "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
+    # And the launcher, which is where a staged one comes from. Without these
+    # a release can never fix the launcher of an install already out there.
+    "{v}/crossglyph.cmd", "{v}/crossglyph.sh",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
     "{v}/THIRD-PARTY-NOTICES.md",
     "{v}/src/crossglyph/cli.py",
@@ -81,7 +90,8 @@ EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
 #: Executed on macOS and Linux, so the bit has to survive the archive and the
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.
 EXECUTABLE = [
-    "crossglyph.sh", "{v}/tools/uv.cmd", "{v}/tools/tool-wrapper.sh",
+    "crossglyph.sh", "{v}/crossglyph.sh",
+    "{v}/tools/uv.cmd", "{v}/tools/tool-wrapper.sh",
     "{v}/tools/check-line-endings.sh", "{v}/src/render/build.sh",
 ]
 
@@ -93,15 +103,17 @@ def release_paths(path: str, version: str) -> tuple[str, ...]:
     which outlive every version: an update adds a directory under versions/
     and rewrites `current`, and must not touch either of those.
 
-    A workspace file lands in both places, and the second copy is what makes
-    the conffile rule possible. The one at the root is the user's to edit; the
-    one inside the version is the record of how it shipped, which is the only
-    way an update can tell a file somebody edited from one that changed
-    between releases. They are a couple of kilobytes.
+    Two kinds of file land in both places, for the same reason from opposite
+    ends: the root copy is live and the version copy is the record. For a
+    workspace file that record is how an update tells a file somebody edited
+    from one that changed between releases. For the launcher it is the new one
+    itself, which an update stages beside the running copy.
+
+    They are a few kilobytes between them.
     """
-    if path in ROOT_FILES:
+    if path in USERS:
         return (path,)
-    if path == "fonts" or path.startswith("fonts/"):
+    if path in LAUNCHERS or path == "fonts" or path.startswith("fonts/"):
         return (path, f"versions/{version}/{path}")
     return (f"versions/{version}/{path}",)
 
@@ -139,22 +151,6 @@ def check_polyglot(data: bytes, name: str) -> list[str]:
     return problems
 
 
-def launcher_changed(tag: str) -> bool:
-    """Whether this release changes a file no update can replace.
-
-    cmd.exe holds the launcher open while the tool runs, so an update cannot
-    rewrite it. When one changes, the manifest says so and the updater sends
-    people to download by hand instead. Compared against the previous tag; the
-    first release has none, and everybody downloads that one by hand anyway.
-    """
-    try:
-        previous = git("describe", "--tags", "--abbrev=0", f"{tag}^")
-    except subprocess.CalledProcessError:
-        return False
-    return bool(git("diff", "--name-only", f"{previous}..HEAD", "--",
-                    *sorted(ROOT_FILES)).strip())
-
-
 def manifest(version: str, sha256: str, size: int, repo: str) -> dict:
     """What an install reads to learn that a newer release exists.
 
@@ -170,7 +166,6 @@ def manifest(version: str, sha256: str, size: int, repo: str) -> dict:
         "sha256": sha256,
         "size": size,
         "notes_url": f"https://github.com/{repo}/releases/tag/{tag}",
-        "launcher_changed": launcher_changed(tag),
         "signature": None,
     }
 

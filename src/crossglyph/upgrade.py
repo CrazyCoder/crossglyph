@@ -42,6 +42,15 @@ WORKSPACE = "fonts"
 #: Written beside a file the user has edited, rather than over it.
 SUFFIX = ".new"
 
+#: The launcher, which is the one file an update cannot write over: it is open
+#: and being read by cmd.exe or by a shell as this runs. The new one is left
+#: beside it with this suffix, and the launcher itself applies it at the next
+#: launch, before it has done anything else. See the comment at the top of
+#: crossglyph.cmd for what happens when that rule is broken.
+STAGED = ".staged"
+
+LAUNCHERS = ("crossglyph.cmd", "crossglyph.sh")
+
 #: "Version made by" saying Unix, which is what makes a mode in the archive
 #: mean anything. zipfile does not apply either, so this module does.
 UNIX = 3
@@ -138,6 +147,31 @@ def seed_workspace(root: pathlib.Path, incoming: pathlib.Path,
     return kept
 
 
+def stage_launchers(root: pathlib.Path, incoming: pathlib.Path) -> list[str]:
+    """Leave the new launcher beside the running one. Returns what was staged.
+
+    Only where it differs, so an install whose launcher has not changed gets
+    no file it has to notice. The live one is never written: it is open, and
+    the platforms differ only in how badly that ends.
+    """
+    staged = []
+    for name in LAUNCHERS:
+        arriving = incoming / name
+        live = root / name
+        if not arriving.is_file() or (live.is_file()
+                                      and live.read_bytes()
+                                      == arriving.read_bytes()):
+            continue
+        beside = root / (name + STAGED)
+        beside.write_bytes(arriving.read_bytes())
+        # The one it replaces was executable, and the one that replaces it has
+        # to be, or the next launch is the last one.
+        if os.name != "nt":
+            beside.chmod(arriving.stat().st_mode & 0o777 or 0o755)
+        staged.append(name)
+    return staged
+
+
 def _download(url: str, into: pathlib.Path, sha256: str,
               size: int) -> Iterator[dict]:
     """Stream the release to disk, hashing it on the way past.
@@ -191,15 +225,6 @@ def steps(root: pathlib.Path, kind: str | None = None) -> Iterator[dict]:
     if not version.is_newer(found.version, here):
         yield {"event": "current", "version": here}
         return
-    if found.launcher_changed:
-        # The launcher is the file cmd.exe is reading as this runs. A release
-        # that changes it has to be unpacked by hand, and saying so is more
-        # honest than a swap that half works.
-        yield {"event": "error",
-               "error": f"{found.version} changes the launcher, which cannot "
-                        f"be replaced while it is running. Download it from "
-                        f"{found.notes_url}"}
-        return
 
     versions = layout.versions_dir(root)
     archive = versions / f"{layout.TMP_PREFIX}{found.version}.zip"
@@ -225,6 +250,10 @@ def steps(root: pathlib.Path, kind: str | None = None) -> Iterator[dict]:
         shutil.rmtree(landing, ignore_errors=True)
         incoming.replace(landing)
         layout.write_current(root, found.version)
+        # After current, so an install interrupted before this still starts:
+        # the old launcher understands the new layout, which is what keeping
+        # it thin is for.
+        staged = stage_launchers(root, landing)
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         shutil.rmtree(incoming, ignore_errors=True)
         yield {"event": "error", "error": str(exc)}
@@ -233,7 +262,7 @@ def steps(root: pathlib.Path, kind: str | None = None) -> Iterator[dict]:
         archive.unlink(missing_ok=True)
 
     yield {"event": "done", "version": found.version, "kept": kept,
-           "converting": converting, "where": str(landing)}
+           "staged": staged, "converting": converting, "where": str(landing)}
 
 
 def rollback(root: pathlib.Path) -> str:

@@ -74,14 +74,27 @@ goes to `versions/.tmp-<version>.zip` and the unpack to
 `versions/.incoming-<version>`, neither of which the launcher will ever start,
 and both of which are swept at the next launch.
 
-Two things stop it before it downloads anything:
+One thing stops it before it downloads anything: an install that does not own
+its own files, which is a clone, a container, or a folder nobody can write to.
+The notice says what to do instead.
 
-- an install that does not own its own files, which is a clone, a container,
-  or a folder nobody can write to. The notice says what to do instead.
-- a release that changes the launcher. cmd.exe reads a batch file as it runs
-  it, so the file that started the update is open, and replacing it would
-  corrupt the run. That release has to be unpacked by hand, and the message
-  links to it.
+### The launcher
+
+`crossglyph.cmd` and `crossglyph.sh` are the one thing an update cannot write
+over, because one of them is the file running the update. Both cmd.exe and a
+POSIX shell read a script as they execute it and resume at the offset they had
+reached, so a file that changed length underneath them is read from the middle
+of a word.
+
+So a release that changes the launcher leaves the new one beside it as
+`crossglyph.cmd.staged`, and the launcher applies it at the next launch,
+before it does anything else. The one it replaces is kept as
+`crossglyph.cmd.previous`: if a launcher ever ships broken, renaming that back
+undoes it without reinstalling anything.
+
+Nothing about this needs doing by hand, and nothing is left half applied: an
+install whose launcher is one release behind still runs, because what the
+launcher does is read `current` and start the version it names.
 
 ### Your workspace
 

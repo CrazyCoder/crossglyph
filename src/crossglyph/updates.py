@@ -48,7 +48,6 @@ class Manifest:
     sha256: str
     size: int
     notes_url: str
-    launcher_changed: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -94,8 +93,7 @@ def parse(raw: bytes) -> Manifest:
     # Unknown keys are ignored on purpose: the format has to be able to grow
     # without every install already out there refusing to read it.
     return Manifest(version=declared, url=url, sha256=sha256, size=size,
-                    notes_url=notes,
-                    launcher_changed=bool(body.get("launcher_changed", False)))
+                    notes_url=notes)
 
 
 def open_stream(url: str, timeout: float = TIMEOUT):

@@ -862,7 +862,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
             notes_url: "https://example.invalid/", converting: false },
           { event: "step", got: 800000, bytes: 1600000 },
           { event: "step", got: 1600000, bytes: 1600000 },
-          { event: "done", version: "2.0.0", kept: [], converting: false,
+          { event: "done", version: "2.0.0", kept: [], staged: [], converting: false,
             where: "versions/2.0.0" },
         ];
         const body = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
@@ -3288,12 +3288,31 @@ for (const { name, text } of sources) {
         JSON.stringify(env.about.update.states));
 }
 
+// 58i0. A launcher an update could not replace is left beside the live one,
+//       and the sentence is where anybody learns it will be applied at the
+//       next launch rather than now.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [{ event: "done", version: "2.0.0", converting: false,
+                    kept: [], staged: ["crossglyph.cmd"],
+                    where: "versions/2.0.0" }] });
+  env.about.apply();
+  await settle();
+  check("the staged launcher is named",
+        env.about.updated.textContent.includes("crossglyph.cmd"),
+        env.about.updated.textContent);
+  check("and when it lands",
+        env.about.updated.textContent.includes("next launch"),
+        env.about.updated.textContent);
+}
+
 // 58i. A file the user had edited is kept, and saying so is the only way
 //      anybody learns the .new is there.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, {
     about: { available: "2.0.0", latest: "2.0.0" },
-    updateSteps: [{ event: "done", version: "2.0.0", converting: false,
+    updateSteps: [{ event: "done", version: "2.0.0", converting: false, staged: [],
                     kept: ["conf/all.conf"], where: "versions/2.0.0" }] });
   env.about.apply();
   await settle();

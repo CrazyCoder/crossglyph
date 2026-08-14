@@ -134,17 +134,31 @@ they shipped. An update compares against that second copy to tell a file
 somebody edited from one that changed between releases, and without it every
 install would look edited.
 
-### Changing the launcher costs a release
+### The launcher updates itself, one launch late
 
-`crossglyph.cmd`, `crossglyph.sh` and `update.conf` are the three files an
-update cannot replace: cmd.exe reads a batch file by byte offset while it runs
-it, so the launcher is open at the line that started the update. When a
-release changes one of them the manifest says `launcher_changed: true`, and
-every install refuses to apply it and points at the download page instead.
+The launcher lands twice for the same reason: the root copy is the one that
+runs, and the one inside the version is what an update stages beside it. A
+release can therefore fix the launcher of an install already out there, which
+is the whole reason it is in the version at all.
 
-Nobody is stuck, but everybody has to unpack a zip by hand, so it is worth
-knowing before changing a file at the root rather than after. Keep the shim
-thin and put anything that might need fixing in the versioned tree.
+It cannot be replaced during the run that installs it. Both cmd.exe and a
+POSIX shell read a script as they execute it and resume at the byte offset
+they had reached, so a file that changed length underneath them is read from
+the middle of a word. Measured on both rather than assumed: on Windows a
+mid-run replacement, by write or by rename, makes cmd execute fragments like
+`'ause'`; on Linux dash re-ran two lines and then failed. So the updater
+writes `crossglyph.cmd.staged` and never touches the live file.
+
+Two rules follow, and both are checked by `tests/test_shim.py`:
+
+- **The apply must be one line ending in `exit /B`.** Anything after it, even
+  a `)` closing a block cmd has to skip, is a read from the replaced file. The
+  cost is that this one run reports exit 0 whatever the tool returned;
+  `crossglyph.sh` uses `exec` and has no such trouble.
+- **An old launcher must be able to start a new version.** It is one launch
+  behind for exactly one launch, so keep it thin: read `current`, run the
+  version it names. Anything that might need fixing belongs in the versioned
+  tree, where a release replaces it outright.
 
 The script then reads the archive back and checks that everything a release
 needs is in it, that no checkout furniture or state file came along, that the

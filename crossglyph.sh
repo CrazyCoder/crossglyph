@@ -8,6 +8,23 @@
 # at the root and is run where it stands.
 root="$(cd "$(dirname "$0")" && pwd)"
 
+# An update leaves a new launcher beside this one rather than writing over it,
+# and this is where it lands. A shell reads a script as it runs it, the same
+# way cmd.exe does, so a file rewritten in place under a running shell is read
+# from the wrong offset: measured, not assumed, and it duplicated two lines
+# before failing. Replacing it by rename is safe here because the running
+# shell keeps the file it opened, and exec leaves nothing to read anyway. The
+# same staging is used on both platforms because cmd.exe needs it, and one
+# mechanism is one thing to understand.
+if [ -f "$0.staged" ]; then
+    # Kept, so a release that shipped a broken launcher is a rename away from
+    # being undone rather than a reinstall.
+    cp -p "$0" "$0.previous" 2>/dev/null || :
+    mv -f "$0.staged" "$0"
+    chmod +x "$0" 2>/dev/null || :
+    exec "$0" "$@"
+fi
+
 if [ -f "$root/current" ] && [ -d "$root/versions" ]; then
     version="$(head -n 1 "$root/current" | tr -d ' \t\r\n')"
     # Both halves of this matter. An empty `current` is what an interrupted

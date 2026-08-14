@@ -2054,7 +2054,7 @@ def test_applying_streams_a_line_at_a_time(client, monkeypatch):
                  {"event": "plan", "version": "9.9.9", "bytes": 1600000,
                   "notes_url": "https://example.invalid/", "converting": False},
                  {"event": "step", "got": 1600000, "bytes": 1600000},
-                 {"event": "done", "version": "9.9.9", "kept": [],
+                 {"event": "done", "version": "9.9.9", "kept": [], "staged": [],
                   "converting": False, "where": "versions/9.9.9"})
     assert [step["event"] for step in said] == ["plan", "step", "done"]
 

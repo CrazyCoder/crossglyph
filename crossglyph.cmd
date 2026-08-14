@@ -6,6 +6,25 @@ REM Two layouts, as in crossglyph.sh: a release runs versions\<current>, and a
 REM clone or source download is run where it stands.
 SETLOCAL EnableExtensions
 
+REM An update leaves a new launcher beside this one rather than writing over
+REM it, and this line is where it lands. It has to be one line, and it has to
+REM end the script: cmd.exe reads this file as it runs it, and resumes at the
+REM byte offset it had reached, so a file that changed length under it is
+REM executed from the middle of a word. Measured on Windows 10, not assumed:
+REM replacing this file mid run, by write or by rename, makes cmd run
+REM fragments like 'ause'. A whole line, on the other hand, is parsed before
+REM any of it executes, so `call` and `exit /B` here both come from memory.
+REM The outgoing launcher is kept as .previous, so a release that shipped a
+REM broken one is a rename away from being undone rather than a reinstall.
+REM
+REM This one run reports success whatever the tool returned: carrying the code
+REM out needs a line after the call, and a line after the call is the thing
+REM that cannot exist here. Everything the user sees, including the pause on a
+REM failed double click, comes from the run inside, which has the whole
+REM launcher and is unaffected. crossglyph.sh has no such trouble: exec leaves
+REM nothing behind to lose it.
+if exist "%~f0.staged" (copy /y "%~f0" "%~f0.previous" >nul & move /y "%~f0.staged" "%~f0" >nul & call "%~f0" %* & exit /B)
+
 REM Double-clicked in Explorer, this script is started as `cmd /c "...\
 REM crossglyph.cmd"`, so cmd.exe's own command line names it. Started from a
 REM console it does not. The difference matters because a console window opened

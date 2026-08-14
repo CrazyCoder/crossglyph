@@ -148,6 +148,10 @@ def _apply(root) -> int:
             for kept in step["kept"]:
                 print(f"kept your fonts/{kept}. The new one is beside it as "
                       f"{kept.rsplit('/', 1)[-1]}{upgrade.SUFFIX}.")
+            if step["staged"]:
+                print(f"{' and '.join(step['staged'])} will be replaced at "
+                      f"the next launch. The one in use cannot be, since it "
+                      f"is the file running this.")
             if step["converting"]:
                 print("The files at the root are no longer read. Deleting "
                       "them is safe, and leaving them costs disk.")
