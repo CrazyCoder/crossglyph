@@ -82,7 +82,32 @@ def test_any_one_of_them_is_enough(tmp_path):
 
 
 def test_a_key_the_reader_does_not_know_is_ignored(tmp_path):
-    """update.conf grows a key in the next phase. A file written for a newer
-    version should not stop an older one running."""
-    root = _conf(tmp_path, "keep_versions = 2\ncheck = no\n")
+    """The file grows keys. One written for a newer version should not stop an
+    older one running."""
+    root = _conf(tmp_path, "some_later_key = 2\ncheck = no\n")
     assert updateconf.settings(root, {}).check is False
+
+
+# --- how many versions to keep --------------------------------------------
+
+
+def test_one_version_is_kept_by_default(tmp_path):
+    assert updateconf.settings(tmp_path, {}).keep_versions == 1
+
+
+def test_a_written_count_is_used(tmp_path):
+    root = _conf(tmp_path, "keep_versions = 3\n")
+    assert updateconf.settings(root, {}).keep_versions == 3
+
+
+def test_keeping_none_is_a_choice(tmp_path):
+    """Zero means the live version alone, which is a thing somebody short of
+    disk may want. It is not nonsense and does not get the default."""
+    root = _conf(tmp_path, "keep_versions = 0\n")
+    assert updateconf.settings(root, {}).keep_versions == 0
+
+
+@pytest.mark.parametrize("written", ["-1", "lots", "1.5", ""])
+def test_a_count_that_is_not_one_leaves_the_default(tmp_path, written):
+    root = _conf(tmp_path, f"keep_versions = {written}\n")
+    assert updateconf.settings(root, {}).keep_versions == 1

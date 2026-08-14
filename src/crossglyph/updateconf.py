@@ -19,6 +19,11 @@ PATH_NAME = "update.conf"
 #: a release is noticed the day after it lands.
 DEFAULT_INTERVAL_HOURS = 24.0
 
+#: Versions kept besides the live one. One is what a rollback needs, and a
+#: version that has been run costs about 80 MB once uv has built its venv: a
+#: second one buys a rollback to a release nobody is on.
+DEFAULT_KEEP = 1
+
 _NO = {"no", "false", "off", "0"}
 _YES = {"yes", "true", "on", "1"}
 
@@ -27,6 +32,7 @@ _YES = {"yes", "true", "on", "1"}
 class Settings:
     check: bool
     interval_hours: float
+    keep_versions: int
 
 
 def read(root: pathlib.Path) -> dict[str, str]:
@@ -82,6 +88,22 @@ def _hours(value: str | None) -> float:
     return hours if hours > 0 else DEFAULT_INTERVAL_HOURS
 
 
+def _count(value: str | None) -> int:
+    """A whole number of versions to keep, or the default.
+
+    Zero is allowed and means the live one only. Below zero is not a smaller
+    number of versions, it is a typo, and it gets the default rather than a
+    reading of its own.
+    """
+    if value is None:
+        return DEFAULT_KEEP
+    try:
+        kept = int(value)
+    except ValueError:
+        return DEFAULT_KEEP
+    return kept if kept >= 0 else DEFAULT_KEEP
+
+
 def settings(root: pathlib.Path, environ: Mapping[str, str] | None = None,
              flag_off: bool = False) -> Settings:
     """What this install wants, from the file and the environment together.
@@ -98,4 +120,5 @@ def settings(root: pathlib.Path, environ: Mapping[str, str] | None = None,
              or "CI" in environ
              or not _flag(keys.get("check"), True))
     return Settings(check=not quiet,
-                    interval_hours=_hours(keys.get("interval_hours")))
+                    interval_hours=_hours(keys.get("interval_hours")),
+                    keep_versions=_count(keys.get("keep_versions")))
