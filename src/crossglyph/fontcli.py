@@ -115,10 +115,8 @@ def main(argv=None) -> int:
         return 1 if errors else 0
 
     plans = fontbuild.plan_families(configs, out_dir, force=opts.force)
-    jobs = [job for plan in plans for job in plan.jobs]
-    # By identity, because two hand-written configs can produce one output
-    # name and each plan still has a report of its own.
-    reports = {id(plan.variant): plan.report for plan in plans}
+    jobs = fontbuild.all_jobs(plans)
+    reports = fontbuild.reports_by_variant(plans)
 
     # Against every family the workspace accounts for, not against the ones
     # this run was asked for: building one family says nothing about the

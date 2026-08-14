@@ -13,6 +13,7 @@ from __future__ import annotations
 import dataclasses
 import pathlib
 import tempfile
+import typing
 from collections.abc import Mapping
 
 import freetype
@@ -196,7 +197,7 @@ def needed_fallbacks(sources: Mapping[int, pathlib.Path | str],
     answer a codepoint still missing, and stops when nothing is. First face
     wins, which is the order the converter would have used anyway.
     """
-    return fallback_split(sources, coverage, fallbacks)[0]
+    return fallback_split(sources, coverage, fallbacks).faces
 
 
 def page_codepoints(text: str) -> set[int]:
@@ -232,10 +233,15 @@ def as_intervals(codepoints: set[int]) -> tuple[tuple[int, int], ...]:
     return tuple(intervals)
 
 
+class Drawable(typing.NamedTuple):
+    """What a list of fallbacks answers: the faces to open, and the leftovers."""
+    faces: tuple[pathlib.Path | str, ...]
+    undrawn: frozenset[int]
+
+
 def fallback_split(sources: Mapping[int, pathlib.Path | str],
                    coverage: tuple[tuple[int, int], ...],
-                   fallbacks: tuple[pathlib.Path | str, ...],
-                   ) -> tuple[tuple[pathlib.Path | str, ...], frozenset[int]]:
+                   fallbacks: tuple[pathlib.Path | str, ...]) -> Drawable:
     """The fallbacks worth opening, and what nothing on the list can draw.
 
     One walk answers both, and the second answer is not a detail: the layout
@@ -257,7 +263,7 @@ def fallback_split(sources: Mapping[int, pathlib.Path | str],
         if supplied:
             keep.append(face_path)
             missing -= supplied
-    return tuple(keep), frozenset(missing)
+    return Drawable(tuple(keep), frozenset(missing))
 
 
 def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],

@@ -35,7 +35,7 @@ from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
 from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
-               PageSpec, build_font, coverage_for, faces_for,
+               Drawable, PageSpec, build_font, coverage_for, faces_for,
                fallback_split, page_codepoints, preview_page)
 
 app = FastAPI(title="CrossGlyph font preview")
@@ -248,6 +248,13 @@ def _axis_note(config: Config, style: str) -> str:
         return ""
     return " at " + ", ".join(f"{tag} {value:g}"
                               for tag, value in sorted(coords.items()))
+
+
+#: What a request can get wrong, as opposed to what the server can. A family
+#: name the folder does not have, a size that will not parse, a coordinate off
+#: an axis: every one of them is something the page sent, so every one is a 422
+#: with the reason in it rather than a traceback.
+CLIENT_ERRORS = (ValueError, TypeError, LookupError, FontConfigError)
 
 
 #: The knobs that only do something when the font has the feature behind them.
@@ -505,7 +512,7 @@ def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
 
 @functools.lru_cache(maxsize=32)
 def resolved_fallbacks(sources: tuple, coverage: tuple,
-                       fallbacks: tuple) -> tuple:
+                       fallbacks: tuple) -> Drawable:
     """The faces worth opening and the codepoints none of them has.
 
     Both come out of one walk of the list and both are wanted on every render:
@@ -566,7 +573,7 @@ def render(request: RenderRequest) -> Response:
         drawable = resolved_fallbacks(keyed, coverage, offered)
         font = build_font_cached(
             keyed, request.size, coverage, _cache_key(request.tuning),
-            tuple(str(path) for path in drawable[0]),
+            tuple(str(path) for path in drawable.faces),
             axes_for(request.family, request.size, request.axes))
         # What nothing can draw, narrowed to what is actually on the page: the
         # build's coverage carries the output codepoint of every ligature the
@@ -577,7 +584,7 @@ def render(request: RenderRequest) -> Response:
         # walk of every fallback face. The page's codepoints are a subset of
         # the coverage, and whether a face supplies one does not depend on what
         # else was asked for, so the two agree over the codepoints they share.
-        undrawn = drawable[1] & page_codepoints(request.text)
+        undrawn = drawable.undrawn & page_codepoints(request.text)
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
@@ -603,7 +610,7 @@ def render(request: RenderRequest) -> Response:
     # LookupError is a family name the source folder does not have -- from the
     # picker that means a remembered choice whose files have since moved, which
     # is the reader's problem to see rather than a 500.
-    except (ValueError, TypeError, LookupError, FontBuildError,
+    except (*CLIENT_ERRORS, FontBuildError,
             freetype.FT_Exception) as exc:
         raise HTTPException(
             422, str(exc) or f"{type(exc).__name__} from the converter") from exc
@@ -851,7 +858,7 @@ def save(request: SaveRequest) -> dict:
         # The folder just changed under us, so what was resolved from it is
         # no longer what it says -- including the read-back below.
         forget_families()
-    except (ValueError, TypeError, LookupError, FontConfigError) as exc:
+    except CLIENT_ERRORS as exc:
         raise HTTPException(422, str(exc)) from exc
     except OSError as exc:
         raise HTTPException(500, f"could not write {exc.filename}: {exc}") from exc
@@ -1008,7 +1015,7 @@ def build(request: BuildRequest) -> StreamingResponse:
             configs, errors = fontbuild.gather(fontbuild.SOURCE_DIR)
             if errors and not configs:
                 raise LookupError("; ".join(errors))
-    except (ValueError, TypeError, LookupError, FontConfigError) as exc:
+    except CLIENT_ERRORS as exc:
         raise HTTPException(422, str(exc)) from exc
 
     # Against the whole workspace rather than against this build: renaming a
@@ -1029,8 +1036,8 @@ def build(request: BuildRequest) -> StreamingResponse:
         except fontbuild.FallbacksMissing as exc:
             yield json.dumps(
                 {"event": "error", "error": _with_the_button(exc)}) + "\n"
-        except (OSError, ValueError, TypeError, LookupError, FontConfigError,
-                FontBuildError, fontbuild.FontBuildError) as exc:
+        except (*CLIENT_ERRORS, OSError, FontBuildError,
+                fontbuild.FontBuildError) as exc:
             yield json.dumps({"event": "error", "error": str(exc)}) + "\n"
 
     return StreamingResponse(lines(), media_type="application/x-ndjson")

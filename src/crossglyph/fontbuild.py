@@ -568,6 +568,23 @@ def plan_families(configs, out_dir: pathlib.Path,
             for config in configs for variant in config.variants()]
 
 
+def all_jobs(plans: list[Plan]) -> list[Job]:
+    """Every outstanding size across the plans, for one pool to cover."""
+    return [job for plan in plans for job in plan.jobs]
+
+
+def reports_by_variant(plans: list[Plan]) -> dict[int, Report]:
+    """Each plan's report, addressed by the variant a finished job carries.
+
+    By identity rather than by name: nothing stops two hand-written configs
+    from producing one output name, and a map keyed on that would file both
+    families' sizes under whichever of them was planned last. A job holds the
+    very Variant its plan was built from, on the way out to a worker and back,
+    so identity is exact here in a way the name is not.
+    """
+    return {id(plan.variant): plan.report for plan in plans}
+
+
 class Landed(typing.NamedTuple):
     """One job's outcome. `error` is None when it built."""
     job: Job
@@ -690,13 +707,9 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
            "removed": removed}
 
     done = 0
-    # By identity rather than by name: nothing stops two hand-written configs
-    # from producing one output name, and a map keyed on that would file both
-    # families' sizes under whichever of them was planned last.
-    reports = {id(plan.variant): plan.report for plan in plans}
+    reports = reports_by_variant(plans)
     written_off = set()
-    for job, _seconds, error, made in run_jobs(
-            [job for plan in plans for job in plan.jobs], out_dir):
+    for job, _seconds, error, made in run_jobs(all_jobs(plans), out_dir):
         variant = job.variant
         report = reports[id(variant)]
         # A family whose first failure has already been reported. Its other
