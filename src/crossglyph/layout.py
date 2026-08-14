@@ -124,7 +124,13 @@ def sweep(root: pathlib.Path) -> None:
         if path.name.startswith(INCOMING_PREFIX):
             shutil.rmtree(path, ignore_errors=True)
         elif path.name.startswith(TMP_PREFIX):
-            path.unlink(missing_ok=True)
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                # A locked file, or a directory where a zip was expected.
+                # This runs at launch, so nothing it meets is worth failing a
+                # build over: the next launch tries again.
+                pass
 
 
 def tidy(root: pathlib.Path, keep: int) -> None:

@@ -37,6 +37,15 @@ def test_a_workspace_file_lands_in_both_places(path):
         (path, f"versions/0.2.0/{path}")
 
 
+def test_the_packer_and_the_updater_mean_the_same_launcher():
+    """The packer decides what lands in the version and the updater decides
+    what it stages from there. Two lists, and a release that added a launcher
+    to one of them would stage nothing and say nothing about why."""
+    from crossglyph import upgrade
+
+    assert set(make_release.LAUNCHERS) == set(upgrade.LAUNCHERS)
+
+
 @pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
 def test_the_launcher_lands_in_both_places(path):
     """The root copy is the one that runs. The one inside the version is what

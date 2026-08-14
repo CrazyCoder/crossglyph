@@ -259,6 +259,7 @@ def test_a_staged_launcher_that_will_not_move_does_not_loop(tmp_path):
     root = _release(tmp_path)
     launcher = _install(root, "crossglyph.sh")
     _staged(root, "crossglyph.sh", "the-new-launcher")
+    assert sh is not None                       # guarded by needs_sh
     root.chmod(0o555)
     try:
         done = subprocess.run([sh, str(launcher)], capture_output=True,

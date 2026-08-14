@@ -273,16 +273,20 @@ def rollback(root: pathlib.Path) -> str:
     check undoes by nagging is not a safety net.
     """
     live = layout.current(root)
-    if live is None:
+    on = version.parse(live or "")
+    if on is None:
         raise Refused("this install has no versions to roll back through")
-    installed = layout.present(root)
-    older = [name for name in installed
-             if version.parse(name) < version.parse(live)] \
-        if version.parse(live) else []
+    # present() answers in version order and only with names that parse, so
+    # the last one below the live version is the one to go back to.
+    older = [name for name in layout.present(root)
+             if version.parse(name) < on]
     if not older:
         raise Refused(f"there is no version older than {live} to go back to")
     target = older[-1]
-    layout.write_current(root, target)
+    try:
+        layout.write_current(root, target)
+    except OSError as exc:
+        raise Refused(f"could not write which version to run: {exc}") from exc
     known = updates.load_state(root)
     updates.save_state(root, dataclasses.replace(known, rejected=live))
     return target

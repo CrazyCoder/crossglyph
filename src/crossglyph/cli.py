@@ -1,6 +1,7 @@
 """crossglyph: build and tune .cpfont families for CrossPoint readers."""
 from __future__ import annotations
 
+import pathlib
 import sys
 
 from . import install, layout, updateconf, updates, upgrade, version
@@ -83,7 +84,7 @@ def _checked(code: int, quiet: bool) -> int:
     return code
 
 
-def _check_only(root) -> int:
+def _check_only(root: pathlib.Path) -> int:
     """Ask now, and install nothing.
 
     Both of the states it can report are ones the automatic check keeps to
@@ -103,7 +104,7 @@ def _check_only(root) -> int:
     return 0
 
 
-def _rollback(root) -> int:
+def _rollback(root: pathlib.Path) -> int:
     try:
         gone = upgrade.rollback(root)
     except upgrade.Refused as exc:
@@ -115,7 +116,7 @@ def _rollback(root) -> int:
     return 0
 
 
-def _apply(root) -> int:
+def _apply(root: pathlib.Path) -> int:
     """Install the newest release, saying how far it has got.
 
     The percentage rewrites one line, and only when somebody is watching it: a
