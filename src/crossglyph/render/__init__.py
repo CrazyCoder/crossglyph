@@ -14,24 +14,17 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import json
-import os
 import pathlib
-import subprocess
 import sys
 import threading
 from collections.abc import Iterator
 
-import wasmtime
-
-ROOT = pathlib.Path(__file__).resolve().parents[3]
-WASM_PATH = pathlib.Path(__file__).resolve().parent / "render.wasm"
-STAMP_PATH = WASM_PATH.with_name("render.built-from.json")
-
-#: Only a checkout has this. Without one there is nothing to compare the
-#: module against, and is_stale() says so rather than guessing.
-FIRMWARE = pathlib.Path(os.environ.get("CROSSGLYPH_FIRMWARE")
-                        or ROOT.parent / "crosspoint-reader")
+from . import stamp
+# Spelled as this module's own before the split, and every caller still spells
+# them that way. The module is imported too, because a test that redirects a
+# path has to reach the code that reads it.
+from .stamp import (FIRMWARE, ROOT, STAMP_PATH, WASM_PATH, build_stamp,
+                    firmware_commit, is_stale)
 
 
 class RenderCoreMissing(RuntimeError):
@@ -55,6 +48,13 @@ class RenderModule:
     """One instantiation of the render core, with its own linear memory."""
 
     def __init__(self, path: pathlib.Path):
+        # Imported here rather than at the top, so that reading what the core
+        # says about itself does not load a wasm runtime to do it. `crossglyph
+        # --version` wants the firmware commit and nothing else. Same reason
+        # cli.py defers the preview: a command should not pay for what it
+        # never touches.
+        import wasmtime
+
         engine = wasmtime.Engine()
         self._store = wasmtime.Store(engine)
         # The module imports WASI stdio it never calls; wasmtime supplies it.
@@ -197,80 +197,17 @@ def load_module(path: pathlib.Path | None = None) -> RenderModule:
                 f"{path} not found. Build it with:\n{_rebuild_hint()}")
         return RenderModule(path)
 
-    if not WASM_PATH.is_file():
+    if not stamp.WASM_PATH.is_file():
         raise RenderCoreMissing(
-            f"{WASM_PATH} not found. Build it with:\n{_rebuild_hint()}")
-    if is_stale() and not _said_stale:
+            f"{stamp.WASM_PATH} not found. Build it with:\n{_rebuild_hint()}")
+    if stamp.is_stale() and not _said_stale:
         _said_stale = True
-        current, where = _current_firmware()
-        print(f"warning: the render core was built from {_describe_stamp()}, "
-              f"and {where} is now at {_short(current)}.\n"
+        current, where = stamp.current_firmware()
+        print(f"warning: the render core was built from {stamp.describe()}, "
+              f"and {where} is now at {stamp.short(current)}.\n"
               f"         The preview draws with the older renderer until you "
               f"rebuild it:\n{_rebuild_hint()}", file=sys.stderr)
-    return RenderModule(WASM_PATH)
-
-
-def _short(commit: str | None) -> str:
-    return commit[:12] if commit else "an unknown commit"
-
-
-def _describe_stamp() -> str:
-    stamp = build_stamp()
-    return (f"{FIRMWARE.name} {_short(stamp)}" if stamp
-            else "sources it kept no record of")
-
-
-def _stamp() -> dict:
-    """What build.sh recorded beside the module, or nothing."""
-    try:
-        stamp = json.loads(STAMP_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return stamp if isinstance(stamp, dict) else {}
-
-
-def firmware_commit(source: str | pathlib.Path | None = None) -> str | None:
-    """HEAD of the firmware clone the core would be built from, or None."""
-    try:
-        return subprocess.run(
-            ["git", "-C", str(source or FIRMWARE), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def build_stamp() -> str | None:
-    """The firmware commit the module on disk was built from, if it says."""
-    return _stamp().get("firmware") or None
-
-
-def _current_firmware() -> tuple[str | None, str | pathlib.Path]:
-    """The commit to compare against, and the checkout it came from.
-
-    The stamp records a commit and not a path, so this is the sibling checkout
-    or whatever $CROSSGLYPH_FIRMWARE names. Returns which one answered, so
-    the warning can name it rather than guessing.
-    """
-    return firmware_commit(FIRMWARE), FIRMWARE
-
-
-def is_stale() -> bool:
-    """True when the module is missing, or the firmware has moved past it.
-
-    A module with no record of where it came from counts as not matching, so a
-    checkout that has never rebuilt pays one rebuild and is accurate from then
-    on.
-    """
-    if not WASM_PATH.is_file():
-        return True
-    current, _ = _current_firmware()
-    if current is None:
-        # Nothing to compare against: a release, a firmware exported as a
-        # tarball, or no git on PATH. "Cannot check" is not "does not match" --
-        # calling it stale would advise a rebuild the caller has no way to
-        # run, on every single run.
-        return False
-    return build_stamp() != current
+    return RenderModule(stamp.WASM_PATH)
 
 
 def module_imports(path: pathlib.Path | None = None) -> set[str]:
@@ -279,7 +216,9 @@ def module_imports(path: pathlib.Path | None = None) -> set[str]:
     This is the property the browser phase rests on, so it is asserted in the
     tests rather than merely intended.
     """
-    path = path or WASM_PATH
+    import wasmtime
+
+    path = path or stamp.WASM_PATH
     engine = wasmtime.Engine()
     module = wasmtime.Module.from_file(engine, str(path))
     return {f"{item.module}.{item.name}" for item in module.imports}

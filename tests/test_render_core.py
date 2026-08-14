@@ -61,9 +61,9 @@ def stamped(tmp_path, monkeypatch):
     wasm = tmp_path / "render.wasm"
     wasm.write_bytes(b"\0asm")
     stamp = tmp_path / "render.built-from.json"
-    monkeypatch.setattr(render, "WASM_PATH", wasm)
-    monkeypatch.setattr(render, "STAMP_PATH", stamp)
-    monkeypatch.setattr(render, "firmware_commit", lambda source=None: "abc123")
+    monkeypatch.setattr(render.stamp, "WASM_PATH", wasm)
+    monkeypatch.setattr(render.stamp, "STAMP_PATH", stamp)
+    monkeypatch.setattr(render.stamp, "firmware_commit", lambda source=None: "abc123")
     return stamp
 
 
@@ -72,9 +72,18 @@ def _write_stamp(stamp, **fields):
     stamp.write_text(json.dumps(fields), encoding="utf-8")
 
 
+def test_patching_the_stamp_module_is_what_reaches_the_reader(stamped):
+    """The fixture redirects render.stamp, not render. If build_stamp ever
+    moves back beside the loader, these tests would read the real stamp file
+    and pass while testing nothing -- so assert the redirection took."""
+    _write_stamp(stamped, firmware="abc123")
+    assert render.stamp.STAMP_PATH == stamped
+    assert render.build_stamp() == "abc123"
+
+
 def test_a_missing_core_counts_as_stale(tmp_path, monkeypatch):
-    monkeypatch.setattr(render, "WASM_PATH", tmp_path / "absent.wasm")
-    monkeypatch.setattr(render, "STAMP_PATH", tmp_path / "absent.json")
+    monkeypatch.setattr(render.stamp, "WASM_PATH", tmp_path / "absent.wasm")
+    monkeypatch.setattr(render.stamp, "STAMP_PATH", tmp_path / "absent.json")
     assert render.is_stale() is True
 
 
@@ -108,9 +117,9 @@ def test_staleness_is_judged_against_the_checkout_that_is_there(
     wasm = tmp_path / "render.wasm"
     wasm.write_bytes(b"\0asm")
     stamp = tmp_path / "render.built-from.json"
-    monkeypatch.setattr(render, "WASM_PATH", wasm)
-    monkeypatch.setattr(render, "STAMP_PATH", stamp)
-    monkeypatch.setattr(render, "firmware_commit", lambda source=None: "here")
+    monkeypatch.setattr(render.stamp, "WASM_PATH", wasm)
+    monkeypatch.setattr(render.stamp, "STAMP_PATH", stamp)
+    monkeypatch.setattr(render.stamp, "firmware_commit", lambda source=None: "here")
 
     _write_stamp(stamp, firmware="here")
     assert render.is_stale() is False
@@ -877,7 +886,7 @@ def test_a_firmware_without_git_is_not_called_stale(stamped, monkeypatch):
     tarball has no commit, so refusing to load and advising a rebuild would
     advise something that records nothing again -- the module could never be
     loaded at all."""
-    monkeypatch.setattr(render, "firmware_commit", lambda source=None: None)
+    monkeypatch.setattr(render.stamp, "firmware_commit", lambda source=None: None)
     _write_stamp(stamped, firmware="abc123")
     assert render.is_stale() is False
     stamped.unlink()
@@ -917,7 +926,7 @@ def test_the_defaults_are_the_ones_the_device_ships(tmp_path):
 def test_a_stamp_carries_no_path(stamped, monkeypatch):
     """The stamp is committed, so a path from the machine that built it would
     travel with the release. A key that arrives anyway is ignored."""
-    monkeypatch.setattr(render, "firmware_commit", lambda source=None: "here")
+    monkeypatch.setattr(render.stamp, "firmware_commit", lambda source=None: "here")
     _write_stamp(stamped, firmware="here", source="/gone/crosspoint-reader")
     assert render.is_stale() is False
     _write_stamp(stamped, firmware="elsewhere", source="/gone/crosspoint-reader")
