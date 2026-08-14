@@ -1052,6 +1052,9 @@ def _about() -> dict:
     found = updates.available(state)
     return {"version": version.installed(),
             "firmware": stamp.build_stamp(),
+            # Sent rather than written into the page, so the link and the
+            # place the updater fetches from cannot come to disagree.
+            "home": updates.HOME,
             "kind": kind,
             "can_self_update": install.can_self_update(kind),
             # The sentence, already decided. The page renders what it is given

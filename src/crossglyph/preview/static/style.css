@@ -828,6 +828,16 @@
            color: var(--muted); font-size: 11.5px; }
   #about-line { display: flex; align-items: center; gap: .5rem; }
   #about-version { color: var(--text); font-weight: 600; }
+  /* Whose it is, said once and quietly: the line is about the install, and a
+     name in the same weight as the version competes with it. */
+  #about-version .by { color: var(--muted); font-weight: 400; }
+  /* The one link on the page. Underlined in the rule colour rather than set in
+     a colour of its own, since the palette is the device's four greys. */
+  #about-home {
+    color: inherit; text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: var(--line);
+  }
+  #about-home:hover { text-decoration-color: var(--text); }
   /* Identity on the left, the update on the right, and this between them, so
      a state that runs long cannot move the version. */
   #about-line .gap { flex: 1 1 0; }

@@ -21,10 +21,20 @@ from collections.abc import Mapping
 
 from . import updateconf, version
 
+#: The project, named once. Everything that has to point at it is built from
+#: this, so a rename is one line rather than a hunt for the copy that was
+#: missed -- and the page cannot come to link somewhere other than where the
+#: updater fetches from.
+REPO = "CrazyCoder/crossglyph"
+_OWNER, _NAME = REPO.split("/")
+
+#: Where the project lives, which is what the preview links from its version.
+HOME = f"https://github.com/{REPO}"
+
 #: Published to Pages by the release workflow. Pages is CDN served and
 #: unmetered, unlike the REST API, which is 60 requests an hour per address
 #: and shared by everyone behind one.
-MANIFEST_URL = "https://crazycoder.github.io/crossglyph/latest.json"
+MANIFEST_URL = f"https://{_OWNER.lower()}.github.io/{_NAME}/latest.json"
 
 #: Written by the tool, beside the launcher. Not a config: nothing in it is a
 #: decision somebody made.

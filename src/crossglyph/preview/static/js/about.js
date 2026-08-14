@@ -5,7 +5,8 @@ import {streamInto} from "./export.js";
 import {progressBar, spellBytes} from "./progress.js";
 
 const island = document.getElementById("about");
-const version = document.getElementById("about-version");
+const number = document.getElementById("about-number");
+const home = document.getElementById("about-home");
 const state = document.getElementById("about-state");
 const detail = document.getElementById("about-detail");
 const button = document.getElementById("check-now");
@@ -39,7 +40,8 @@ function checkedLine(about) {
 }
 
 export function showAbout(about) {
-  version.textContent = `CrossGlyph ${about.version}`;
+  number.textContent = about.version;
+  if (about.home) home.href = about.home;
   // One thing on the right, which is what keeps the row to one line. A
   // release to install is the only answer worth having while there is one, so
   // it replaces the line about when the asking last happened.

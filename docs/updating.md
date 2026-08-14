@@ -36,7 +36,9 @@ command above.
 In the preview, the island under the specimen names the new version where it
 otherwise says when it last looked. Beside that is one button: **Check now**
 ordinarily, and **Update** in its place when there is a release this install
-can install.
+can install. The name at the left of that line links the project, and the
+address comes from the same constant the updater fetches from, so the two
+cannot come to point at different places.
 
 ## Asking on purpose
 

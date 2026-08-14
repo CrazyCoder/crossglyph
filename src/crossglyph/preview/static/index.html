@@ -417,7 +417,13 @@
        into space no other column is using. -->
   <div id="about">
     <div id="about-line">
-      <span id="about-version"></span>
+      <!-- The name links the project and the version is filled in beside it.
+           Both come from the server rather than being written in here: the
+           page must not be able to link somewhere other than where the
+           updater fetches from. -->
+      <span id="about-version"><a id="about-home" target="_blank"
+        rel="noreferrer">CrossGlyph</a> <span id="about-number"></span><span
+        class="by"> by JetSerge</span></span>
       <span class="gap"></span>
       <span id="about-state"></span>
       <!-- One at a time. Asking again is pointless once the answer is on

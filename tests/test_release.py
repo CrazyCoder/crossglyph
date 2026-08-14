@@ -37,6 +37,16 @@ def test_a_workspace_file_lands_in_both_places(path):
         (path, f"versions/0.2.0/{path}")
 
 
+def test_the_packer_and_the_client_mean_the_same_project():
+    """The packer writes the release URLs and the client fetches the manifest,
+    links the project and downloads what the manifest names. Two files naming
+    the repository, and a rename that misses one of them ships releases to an
+    address nothing reads."""
+    from crossglyph import updates
+
+    assert make_release.REPO == updates.REPO
+
+
 def test_the_packer_and_the_updater_mean_the_same_launcher():
     """The packer decides what lands in the version and the updater decides
     what it stages from there. Two lists, and a release that added a launcher

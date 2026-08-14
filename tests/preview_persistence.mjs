@@ -210,6 +210,7 @@ function makeControl({ name, type = "text", value = "", checked = false, group,
 // version there is, so a block only says what it is changing.
 const ABOUT = {
   version: "1.2.3", firmware: "45caec3e76c2472b", kind: "zip",
+  home: "https://github.com/CrazyCoder/crossglyph",
   can_self_update: true, notice: "",
   latest: "1.2.3", available: null, checked_at: 1000, checking_off: false,
   error: null,
@@ -665,7 +666,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // What this install is: the island under the specimen. The version, the
     // state of the asking, and the one button that state offers.
     about: { title: "" },
-    "about-version": { textContent: "" },
+    // The version, and the name beside it that links the project. The link's
+    // href comes from the server rather than the markup, so it is asserted.
+    "about-number": { textContent: "" },
+    "about-home": { href: "" },
     "about-state": recording(),
     "about-detail": { textContent: "" },
     // Both carry `hidden`: one of them is on offer at a time, and which one is
@@ -956,7 +960,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
-           about: { island: stubs.about, version: stubs["about-version"],
+           about: { island: stubs.about, number: stubs["about-number"],
+                    home: stubs["about-home"],
                     state: stubs["about-state"],
                     detail: stubs["about-detail"],
                     button: stubs["check-now"],
@@ -3180,8 +3185,12 @@ for (const { name, text } of sources) {
 {
   const env = await loaded(fakeStorage());
   check("the island names the product and version",
-        env.about.version.textContent === "CrossGlyph 1.2.3",
-        env.about.version.textContent);
+        env.about.number.textContent === "1.2.3",
+        env.about.number.textContent);
+  check("and the name beside it links the project, from the server rather "
+        + "than from the markup",
+        env.about.home.href === "https://github.com/CrazyCoder/crossglyph",
+        env.about.home.href);
   check("and the renderer's commit, shortened the way the CLI does",
         env.about.detail.textContent.includes("45caec3e76c2"),
         env.about.detail.textContent);
