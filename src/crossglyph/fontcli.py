@@ -114,45 +114,40 @@ def main(argv=None) -> int:
             describe(config)
         return 1 if errors else 0
 
-    # Plan every family first, then run all the outstanding sizes through one
-    # pool. Planning per family and building per family would leave workers
-    # idle whenever a family had fewer stale sizes than there are cores.
-    variants, reports, jobs = [], {}, []
-    for config in configs:
-        for variant in config.variants():
-            report, pending = fontbuild.plan_variant(variant, out_dir,
-                                                     force=opts.force)
-            variants.append(variant)
-            reports[variant.name] = report
-            jobs += pending
+    plans = fontbuild.plan_families(configs, out_dir, force=opts.force)
+    jobs = [job for plan in plans for job in plan.jobs]
+    # By identity, because two hand-written configs can produce one output
+    # name and each plan still has a report of its own.
+    reports = {id(plan.variant): plan.report for plan in plans}
 
     # Only when building everything: with an explicit config list, the families
-    # that were not asked for are absent from `variants`, not orphaned.
+    # that were not asked for are absent from `plans`, not orphaned.
     if not opts.configs:
-        for path in fontbuild.orphan_dirs(out_dir, {v.name for v in variants}):
+        for path in fontbuild.orphan_dirs(
+                out_dir, {plan.variant.name for plan in plans}):
             shutil.rmtree(path)
             print(f"removed {path.name}/ (no config produces it any more)")
 
-    for variant in variants:
-        report = reports[variant.name]
-        for path in report.removed:
-            print(f"{variant.name}: removed {path.name} "
+    for plan in plans:
+        for path in plan.report.removed:
+            print(f"{plan.variant.name}: removed {path.name} "
                   f"(size no longer in the config)")
-        if report.skipped:
-            print(f"{variant.name}: up to date "
-                  f"{' '.join(str(s) for s in report.skipped)}")
+        if plan.report.skipped:
+            print(f"{plan.variant.name}: up to date "
+                  f"{' '.join(str(s) for s in plan.report.skipped)}")
 
-    workers = max(1, min(opts.jobs, len(jobs))) if jobs else 1
+    workers = fontbuild.worker_count(len(jobs), opts.jobs)
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
     started = time.monotonic()
     for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir, workers):
+        report = reports[id(job.variant)]
         if error:
-            reports[job.variant.name].failed.append(job.size)
+            report.failed.append(job.size)
             print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
                   file=sys.stderr, flush=True)
         else:
-            reports[job.variant.name].built.append(job.size)
+            report.built.append(job.size)
             # Glyph count alongside the size: it is what distinguishes a
             # genuinely wide family from a narrow one padded out by the
             # bundled fallbacks.
@@ -161,14 +156,13 @@ def main(argv=None) -> int:
             for warning in built.warnings:
                 print(f"    warning: {warning}", file=sys.stderr, flush=True)
 
-    for variant in variants:
-        report = reports[variant.name]
-        if report.built or report.failed:
-            fontbuild.finalize_variant(variant, out_dir,
-                                       failed=set(report.failed))
+    for plan in plans:
+        if plan.report.built or plan.report.failed:
+            fontbuild.finalize_variant(plan.variant, out_dir,
+                                       failed=set(plan.report.failed))
 
-    built = sum(len(r.built) for r in reports.values())
-    failures = len(errors) + sum(len(r.failed) for r in reports.values())
+    built = sum(len(plan.report.built) for plan in plans)
+    failures = len(errors) + sum(len(plan.report.failed) for plan in plans)
     if jobs:
         print(f"\n{built} size(s) built in {time.monotonic() - started:.0f}s"
               f"{f', {failures} failed' if failures else ''}")

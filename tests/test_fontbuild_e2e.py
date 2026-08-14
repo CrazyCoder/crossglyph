@@ -52,6 +52,31 @@ def test_changing_the_font_rebuilds(project, tmp_path, noto_or_skip):
     assert _build(project, tmp_path).built == []
 
 
+def test_the_pool_really_builds_in_other_processes(tmp_path):
+    """The one thing only a real pool can show: a Job survives the trip to a
+    spawned interpreter and back. Everything else about a build is tested
+    against a stubbed run_jobs, which would never notice a Config that had
+    stopped pickling."""
+    import fontsmith
+
+    source = tmp_path / "src"
+    source.mkdir()
+    fontsmith.box_font(source / "Probe-Regular.ttf", range(0x41, 0x5B))
+    (source / "probe.conf").write_text(
+        "sizes = 10 12\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    variant = fontconf.parse_config(source / "probe.conf").variants()[0]
+    out = tmp_path / "out"
+    jobs = fontbuild.plan_variant(variant, out)[1]
+    assert len(jobs) == 2
+
+    landed = list(fontbuild.run_jobs(jobs, out, workers=2))
+    assert sorted(one.job.size for one in landed) == [10, 12]
+    assert [one.error for one in landed] == [None, None], landed
+    assert all(one.built.bytes > 0 for one in landed)
+    for size in (10, 12):
+        assert (out / "Probe" / f"Probe_{size}.cpfont").is_file()
+
+
 # --- variable fonts -------------------------------------------------------
 # These build a synthetic variable face rather than a real one, so they run
 # without the clones the fixture above needs.

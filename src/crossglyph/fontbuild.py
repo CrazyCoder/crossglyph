@@ -428,6 +428,15 @@ def default_jobs() -> int:
     return max(1, min((os.cpu_count() or 4) - 1, 12))
 
 
+def worker_count(job_count: int, workers: int | None = None) -> int:
+    """How many processes a run of `job_count` sizes will use.
+
+    Shared so that the count a caller announces is the count it gets: there is
+    no sense in opening more workers than there are sizes to give them.
+    """
+    return max(1, min(workers or default_jobs(), job_count))
+
+
 class Metrics(typing.NamedTuple):
     glyphs: int
     advance_y: int
@@ -540,6 +549,25 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
         and fontstamp.cpfont_path(directory, variant, size).is_file()})
 
 
+class Plan(typing.NamedTuple):
+    """One variant, what is already current, and the sizes still to build."""
+    variant: Variant
+    report: Report
+    jobs: list[Job]
+
+
+def plan_families(configs, out_dir: pathlib.Path,
+                  force: bool = False) -> list[Plan]:
+    """Every variant of every config, and the sizes each still owes.
+
+    Planning the lot before building any of it is what lets one pool cover
+    them all: a family with fewer stale sizes than there are cores would
+    otherwise leave workers idle while it finished.
+    """
+    return [Plan(variant, *plan_variant(variant, out_dir, force=force))
+            for config in configs for variant in config.variants()]
+
+
 class Landed(typing.NamedTuple):
     """One job's outcome. `error` is None when it built."""
     job: Job
@@ -582,7 +610,7 @@ def run_jobs(jobs: list[Job], out_dir: pathlib.Path,
         if job.variant.config.space_glyphs:
             ensure_space_font(out_dir, job.variant.config.space_widths)
 
-    count = max(1, min(workers or default_jobs(), len(jobs)))
+    count = worker_count(len(jobs), workers)
     if count == 1:
         for job in jobs:
             seconds, error, built = _run(job, out_dir)
@@ -605,8 +633,12 @@ def run_jobs(jobs: list[Job], out_dir: pathlib.Path,
 
 def build_variant(variant: Variant, out_dir: pathlib.Path,
                   force: bool = False) -> Report:
-    """Build one variant serially. The CLI parallelizes across variants; this
-    is the single-variant path used by tests and by callers with one family."""
+    """Build one variant here, in this process, and let a failure out.
+
+    The path the end-to-end tests take: one size, no pool, and an exception
+    rather than an error field, so a broken build fails the test where it
+    broke rather than being reported as data.
+    """
     report, jobs = plan_variant(variant, out_dir, force=force)
     for job in jobs:
         build_size(job, out_dir)
@@ -642,37 +674,36 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
     """
     import shutil
 
-    plans = []
-    for config in configs:
-        for variant in config.variants():
-            report, jobs = plan_variant(variant, out_dir, force=force)
-            plans.append((variant, report, jobs))
+    plans = plan_families(configs, out_dir, force=force)
 
     removed = []
     if prune:
-        for path in orphan_dirs(out_dir, {variant.name for variant, _, _ in plans}):
+        for path in orphan_dirs(out_dir, {plan.variant.name for plan in plans}):
             shutil.rmtree(path)
             removed.append(path.name)
 
-    total = sum(len(jobs) for _, _, jobs in plans)
+    total = sum(len(plan.jobs) for plan in plans)
     yield {"event": "plan", "total": total, "out": str(out_dir),
-           "families": [variant.name for variant, _, _ in plans],
+           "families": [plan.variant.name for plan in plans],
            "removed": removed}
 
     done = 0
-    reports = {variant.name: report for variant, report, _ in plans}
+    # By identity rather than by name: nothing stops two hand-written configs
+    # from producing one output name, and a map keyed on that would file both
+    # families' sizes under whichever of them was planned last.
+    reports = {id(plan.variant): plan.report for plan in plans}
     written_off = set()
     for job, _seconds, error, made in run_jobs(
-            [job for _, _, jobs in plans for job in jobs], out_dir):
+            [job for plan in plans for job in plan.jobs], out_dir):
         variant = job.variant
-        report = reports[variant.name]
+        report = reports[id(variant)]
         # A family whose first failure has already been reported. Its other
         # sizes were counted then, so whatever they came back with here is a
         # result nobody is waiting for.
-        if variant.name in written_off:
+        if id(variant) in written_off:
             continue
         if error:
-            written_off.add(variant.name)
+            written_off.add(id(variant))
             report.error = error
             report.failed = [size for size in variant.sizes
                              if size not in report.built
@@ -688,26 +719,26 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
         yield {"event": "size", "family": variant.name, "size": job.size,
                "done": done, "total": total, "bytes": made.bytes}
 
-    for variant, report, jobs in plans:
-        if jobs:
-            finalize_variant(variant, out_dir, failed=set(report.failed))
+    for plan in plans:
+        if plan.jobs:
+            finalize_variant(plan.variant, out_dir, failed=set(plan.report.failed))
 
     yield {"event": "done", "out": str(out_dir), "removed": removed,
            # What this run wrote, and what the sizes it left alone already take
            # up. Both, because a run that wrote nothing still put something on
            # the card the last time it ran.
-           "bytes": sum(report.written for _, report, _ in plans),
-           "current_bytes": sum(report.current for _, report, _ in plans),
-           "families": [{"name": variant.name,
-                         "bytes": report.written,
-                         "current_bytes": report.current,
-                         "sizes": sorted(variant.sizes),
-                         "built": sorted(report.built),
-                         "skipped": sorted(report.skipped),
-                         "failed": sorted(report.failed),
-                         "removed": sorted(str(path) for path in report.removed),
-                         "error": report.error}
-                        for variant, report, _ in plans]}
+           "bytes": sum(plan.report.written for plan in plans),
+           "current_bytes": sum(plan.report.current for plan in plans),
+           "families": [{"name": plan.variant.name,
+                         "bytes": plan.report.written,
+                         "current_bytes": plan.report.current,
+                         "sizes": sorted(plan.variant.sizes),
+                         "built": sorted(plan.report.built),
+                         "skipped": sorted(plan.report.skipped),
+                         "failed": sorted(plan.report.failed),
+                         "removed": sorted(str(p) for p in plan.report.removed),
+                         "error": plan.report.error}
+                        for plan in plans]}
 
 
 def orphan_dirs(out_dir: pathlib.Path, wanted: set[str]) -> list[pathlib.Path]:
