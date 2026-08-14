@@ -63,7 +63,7 @@
   body {
     margin: 0; padding: 1.75rem;
     display: grid; align-items: start; justify-content: start;
-    column-gap: 1.75rem; row-gap: .55rem;
+    column-gap: .875rem; row-gap: .55rem;
     grid-template-columns: 30rem min-content;
     /* The page spans every row, so where it is the taller column the surplus
        has to land somewhere. Named rather than left to the grid, which shares
@@ -93,8 +93,8 @@
      gaps between them, the page's own padding, and a scrollbar, which the
      media query counts as width the layout has and the layout does not. Widen
      a panel without moving this and the third column wraps again -- which is
-     what test_the_three_column_breakpoint_fits_what_it_lays_out is for. */
-  @media (min-width: 1610px) {
+     what test_the_breakpoints_fit_what_they_lay_out is for. */
+  @media (min-width: 1580px) {
     body {
       grid-template-columns: 30rem min-content 30rem;
       grid-template-rows: auto auto 1fr;
@@ -111,7 +111,7 @@
   /* Below that the export panel is behind a tab, and one of the two is on
      screen at a time. Tune with nothing said, so the page opens on the knobs
      without a script having to run first. */
-  @media (max-width: 1609px) {
+  @media (max-width: 1579px) {
     #tabs { display: flex; }
     #export { display: none; }
     :root[data-panel="export"] #export { display: block; }
@@ -123,7 +123,7 @@
 
   /* Narrower than the panel and the page side by side: one column, the page
      under the panel, as the wrap used to leave it. */
-  @media (max-width: 1089px) {
+  @media (max-width: 1078px) {
     body {
       grid-template-columns: 30rem;
       grid-template-areas: "chrome" "tabs" "panel" "save" "page";
@@ -633,7 +633,7 @@
     border-bottom-left-radius: 0; border-bottom-right-radius: 0;
   }
 
-  @media (max-width: 1609px) {
+  @media (max-width: 1579px) {
     #knobs, #export { border-top-left-radius: 0; border-top-right-radius: 0; }
     #export { padding-top: .9rem; }
     /* The tab an inch above already says Export, and a row emptied of its
@@ -711,7 +711,15 @@
      it back and spaces the badge, so the label's parts are set by one number
      rather than by a space in the markup and a margin in here. */
   .name:has(.explain) { display: flex; align-items: center; gap: .35rem; }
-  .explain { position: relative; display: inline-flex; }
+  .explain { display: inline-flex; }
+  /* The tip hangs from whatever holds the badge rather than from the badge, so
+     a badge in the middle of a row cannot swing a 26rem panel off the side of
+     the page -- which the fallbacks one did, by 72px, putting a horizontal
+     scrollbar under a tooltip nobody had opened. Each of these starts at the
+     panel's own left edge, which is where a tip that wide has to start to fit
+     inside it. */
+  .name:has(.explain), .section h2:has(.explain),
+  .row.wide.check .box:has(.explain) { position: relative; }
   /* Outlined, not filled. It answers a question nobody has yet, so it should
      be findable and not first: a solid disc beside a quiet label is the
      highest-contrast thing in the row, which is backwards. */

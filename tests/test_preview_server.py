@@ -643,13 +643,13 @@ def test_save_is_reachable_from_either_panel():
         assert part in foot.group(1), f"{part} is not in the save bar"
 
 
-def test_the_three_column_breakpoint_fits_what_it_lays_out():
-    """The page shows three columns above a width and folds the export panel
-    behind a tab below it. That width is arithmetic -- two panels, the sheet
-    and the stage around it, the gaps and the page's padding -- and nothing
-    recomputes it: widen a panel and the breakpoint has to move with it, or the
-    third column comes back to wrapping under the first, which is the whole
-    thing the fold exists to stop.
+def test_the_breakpoints_fit_what_they_lay_out():
+    """The page shows three columns above a width, two below it and one below
+    that. Both widths are arithmetic -- the panels, the sheet and the stage
+    around it, the gaps between them and the page's padding -- and nothing
+    recomputes them: widen a panel or narrow a gap and they have to move with
+    it, or a column comes back to wrapping under another, which is the whole
+    thing the folding exists to stop.
 
     Neither of the other suites can see this. The probe drives a stub DOM with
     no stylesheet, and a browser would have to be opened at exactly the wrong
@@ -667,7 +667,10 @@ def test_the_three_column_breakpoint_fits_what_it_lays_out():
         assert found, pattern
         return float(found.group(1)) * 16
 
-    breakpoint_px = float(re.search(r"min-width:\s*(\d+)px", css).group(1))
+    three_at = max(float(w) for w in re.findall(r"min-width:\s*(\d+)px", css))
+    # The narrowest width it folds at is where two columns stop fitting, and a
+    # max-width query names the last width that still folds.
+    two_at = min(float(w) for w in re.findall(r"max-width:\s*(\d+)px", css)) + 1
     panel = rem(r"#knobs \{\s*\n?\s*width: ([\d.]+)rem", css)
     gap = rem(r"column-gap: ([\d.]+)rem", css)
     padding = rem(r"body \{\s*\n\s*margin: 0; padding: ([\d.]+)rem", css)
@@ -676,16 +679,17 @@ def test_the_three_column_breakpoint_fits_what_it_lays_out():
     # The sheet's own border, which the stage's box adds to the two paddings.
     page_column = sheet + 2 + 2 * stage + 2
 
-    needs = 2 * panel + page_column + 2 * gap + 2 * padding
-    assert breakpoint_px >= needs, \
-        (f"three columns need {needs:.0f}px and the breakpoint is at "
-         f"{breakpoint_px:.0f}px, so the export panel wraps just above it")
     # A media query counts the scrollbar as width the layout does not get, and
-    # this page always has one. Anything less than that margin is a breakpoint
-    # that fires while the layout below it still cannot fit.
-    assert breakpoint_px - needs >= 17, \
-        (f"only {breakpoint_px - needs:.0f}px of headroom over {needs:.0f}px, "
-         f"which a scrollbar eats")
+    # this page always has one. A breakpoint with less headroom than that fires
+    # while what is below it still cannot fit.
+    scrollbar = 17
+    for what, at, needs in (
+            ("three columns", three_at,
+             2 * panel + page_column + 2 * gap + 2 * padding),
+            ("two columns", two_at, panel + page_column + gap + 2 * padding)):
+        assert at >= needs + scrollbar, \
+            (f"{what} need {needs:.0f}px and the layout goes to them at "
+             f"{at:.0f}px, which a scrollbar eats into")
 
 
 def test_every_asset_the_page_asks_for_is_one_the_server_will_serve():
