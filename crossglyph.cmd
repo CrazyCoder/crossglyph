@@ -23,7 +23,10 @@ REM that cannot exist here. Everything the user sees, including the pause on a
 REM failed double click, comes from the run inside, which has the whole
 REM launcher and is unaffected. crossglyph.sh has no such trouble: exec leaves
 REM nothing behind to lose it.
-if exist "%~f0.staged" (copy /y "%~f0" "%~f0.previous" >nul & move /y "%~f0.staged" "%~f0" >nul & call "%~f0" %* & exit /B)
+REM The && is what stops a root nobody can write to turning this into a loop:
+REM the move fails, the staged file is still there, and re-running would find
+REM it again. Falling through instead runs the old launcher, which works.
+if exist "%~f0.staged" (copy /y "%~f0" "%~f0.previous" >nul 2>&1 & move /y "%~f0.staged" "%~f0" >nul && (call "%~f0" %* & exit /B))
 
 REM Double-clicked in Explorer, this script is started as `cmd /c "...\
 REM crossglyph.cmd"`, so cmd.exe's own command line names it. Started from a

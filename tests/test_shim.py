@@ -249,6 +249,27 @@ def test_the_batch_launcher_applies_a_staged_one(tmp_path):
     assert (root / "crossglyph.cmd.previous").is_file()
 
 
+@pytest.mark.skipif(os.name == "nt",
+                    reason="the read-only attribute does not stop a rename")
+@needs_sh
+def test_a_staged_launcher_that_will_not_move_does_not_loop(tmp_path):
+    """Without the guard this is not a failed update, it is a launcher that
+    re-runs itself forever: the staged file is still there, so the run it
+    starts finds it and starts another."""
+    root = _release(tmp_path)
+    launcher = _install(root, "crossglyph.sh")
+    _staged(root, "crossglyph.sh", "the-new-launcher")
+    root.chmod(0o555)
+    try:
+        done = subprocess.run([sh, str(launcher)], capture_output=True,
+                              text=True, env=CLEAN, timeout=30)
+    finally:
+        root.chmod(0o755)
+    assert "the-new-launcher" not in done.stdout, "it moved a file it could not"
+    assert "versions/0.2.0" in done.stdout.replace("\\", "/"), \
+        "it should fall through and run the launcher it has"
+
+
 @needs_sh
 def test_the_staged_run_still_reports_what_the_work_returned(tmp_path):
     """exec on this side, so the code comes back out. The batch launcher

@@ -20,9 +20,12 @@ if [ -f "$0.staged" ]; then
     # Kept, so a release that shipped a broken launcher is a rename away from
     # being undone rather than a reinstall.
     cp -p "$0" "$0.previous" 2>/dev/null || :
-    mv -f "$0.staged" "$0"
-    chmod +x "$0" 2>/dev/null || :
-    exec "$0" "$@"
+    # Only re-run when the move worked. A root nobody can write to would
+    # otherwise leave the staged file in place and exec this again, and again.
+    if mv -f "$0.staged" "$0" 2>/dev/null; then
+        chmod +x "$0" 2>/dev/null || :
+        exec "$0" "$@"
+    fi
 fi
 
 if [ -f "$root/current" ] && [ -d "$root/versions" ]; then
