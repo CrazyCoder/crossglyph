@@ -116,7 +116,7 @@ class Tuning:
     # strokes into each other. FreeType's own 1-bit rasterizer decides the
     # same question with dropout control instead, and keeps the strokes apart:
     # measured on DejaVu Serif at 12px, a third less ink and none of it the
-    # ink that was holding the letters open.
+    # ink that holds the letters open.
     #
     # Not tied to that switch. A font built this way draws in two levels
     # whatever the page is set to, which is the only way to see what it does

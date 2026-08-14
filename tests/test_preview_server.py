@@ -558,10 +558,10 @@ def test_no_compare_arrow_sits_inside_a_label():
 
 
 def test_the_save_note_reserves_its_line():
-    """It is empty until a save, and the whole Page section sat directly under
-    it: filling it moved that section down 26px, the line plus the top margin
-    that collapses while the box is empty. A min-height keeps the line whether
-    or not there is anything in it.
+    """The note is empty until a save, and the whole Page section sits directly
+    under it. Left to collapse, the empty box takes its top margin with it, so
+    the first save drops that section 26px under the cursor. A min-height keeps
+    the line whether or not there is anything in it.
 
     Neither suite would notice this going: the probe drives a stub DOM with no
     stylesheet, and nothing else here reads CSS.
