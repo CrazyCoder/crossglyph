@@ -37,3 +37,57 @@ def test_an_unknown_command_names_the_ones_there_are(capsys):
 def test_help_lists_the_commands(capsys):
     assert cli.main(["--help"]) == 0
     assert "fetch-fallbacks" in capsys.readouterr().out
+
+
+def test_the_version_is_reported(capsys, monkeypatch):
+    monkeypatch.setattr(cli, "version_report", lambda: "crossglyph 9.9.9")
+    assert cli.main(["--version"]) == 0
+    assert capsys.readouterr().out.strip() == "crossglyph 9.9.9"
+
+
+def test_the_report_names_the_version_and_the_render_core(monkeypatch):
+    from crossglyph import install
+
+    monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
+    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: "45caec3e76c2472b")
+    monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.ZIP)
+
+    said = cli.version_report()
+    assert said.startswith("crossglyph 1.2.3")
+    assert "45caec3e76c2" in said
+    assert "crosspoint-reader" in said
+
+
+def test_a_core_with_no_stamp_says_so_rather_than_nothing(monkeypatch):
+    from crossglyph import install
+
+    monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
+    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: None)
+    monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.ZIP)
+    assert "unknown commit" in cli.version_report()
+
+
+def test_a_kind_that_cannot_update_itself_is_named(monkeypatch):
+    """Somebody filing a report from a source download should not have to be
+    asked how they installed it."""
+    from crossglyph import install
+
+    monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
+    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: None)
+    monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.SOURCE)
+    assert "source download" in cli.version_report()
+
+
+def test_a_release_says_nothing_about_its_kind(monkeypatch):
+    """The ordinary case stays quiet: naming it would be noise on every run."""
+    from crossglyph import install
+
+    monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
+    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: None)
+    monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.ZIP)
+    assert "(" not in cli.version_report().splitlines()[0]
+
+
+def test_help_mentions_the_version_flag(capsys):
+    assert cli.main(["--help"]) == 0
+    assert "--version" in capsys.readouterr().out
