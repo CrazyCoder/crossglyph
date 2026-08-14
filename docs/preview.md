@@ -28,7 +28,7 @@ and the knobs you are working at.
 
 Being in the picker does not put it in your workspace. `crossglyph build` with
 no arguments, and **Build all**, build the families in your folder and not the
-one that came with the tool. Name it and it builds, and pressing Save on it
+one that came with the tool. Name it and it builds, and pressing **Save** on it
 writes a `literata.conf` naming `dir`, after which it is a family like any
 other and builds with the rest.
 
@@ -44,8 +44,9 @@ Get-NetTCPConnection -LocalPort 8000 -State Listen |
 
 Font controls (`gamma`, `weight`, `line_height`, the spacings, `kerning`,
 `slant`, `thresholds`, `hinting`, `grayscale_hinting`, `mono`,
-`stem_darkening`, `ligatures`, `figures`) rebuild the `.cpfont` behind the page. Page controls (margin, alignment,
-hyphenation and the language its patterns come from, line spacing, paragraph
+`stem_darkening`, `ligatures`, `figures`) rebuild the `.cpfont` behind the
+page. Page controls (margin, alignment, hyphenation and the language its
+patterns come from, line spacing, paragraph
 spacing, antialiasing) are the reader's own settings, and they only
 re-lay-out. The language list is every one the firmware carries patterns for;
 on the device it comes from the book's own metadata instead. A control that
@@ -98,6 +99,26 @@ key, or press and hold the page itself. The size stays where it is, since that
 is which size you are working at rather than tuning. Holding is a look and not
 a change: whatever the toggle was set to is what comes back on release.
 
+One knob at a time is the arrow beside it. It is a comparison rather than a
+reset: your value is set aside and one press brings it back, so you can flick
+between the two as often as it takes. Which value it offers depends on where
+the knob stands. While the panel differs from the config, it offers the config,
+which answers "undo what I just did to this row". Once they agree, which is
+what saving makes true of every knob at once, it offers the stock value
+instead, which answers "what does this font change". Leave a knob on stock and
+it differs from the config again, so the arrow points back the other way. The
+tooltip names which of the two it is holding.
+
+A switch has no arrow. There is nothing to set aside when the value you are not
+looking at is the other one, a click away on the box itself, so a checkbox
+carries a mark instead: it says the row differs, and the tooltip says which way
+the baseline has it.
+
+**Reset font knobs** puts the whole section back, including the weight
+pickers of a variable family. Those go to what the family declares, which is
+its config's weight if it has one and the font's own named instance if it has
+not, rather than to the first entry in the picker.
+
 The export panel holds what a build needs and a page does not: the name, the
 sizes, the coverage intervals, the fallback families.
 
@@ -119,8 +140,9 @@ greyed and not yours to change while it is on. A preset you chose that another
 of your choices already covers stays yours to untick, greyed with a note saying
 it adds nothing. Greek and Cyrillic are never carried: `reading` has the main
 blocks but not polytonic Greek or the Cyrillic Supplement, so ticking those
-still adds something. Only what you chose is written to the config. Save writes the lot back to the
-family's config, and Build then runs the same build the command line runs.
+still adds something. Only what you chose is written to the config. **Save**
+writes the lot back to the family's config, and Build then runs the same
+build the command line runs.
 Save first, then build: the build reads the config from disk, so anything you
 have not saved is not in it.
 
@@ -248,9 +270,16 @@ Choosing a preset moves `hyphenate as` with it when the core has patterns for
 that language, and leaves it alone when it has none, so a Japanese specimen is
 not quietly hyphenated as English.
 
+Your own text is in some language too, so Custom keeps a `hyphenate as` of its
+own and brings it back with the words. Set one while Custom is showing and it
+is remembered; go through a preset and return, and both the text and the
+language you were reading it in come back. Changing `hyphenate as` while a
+preset is showing is about that specimen and is not kept, and Custom with
+nothing of its own recorded leaves whatever is showing alone.
+
 On a first visit only, the browser's languages also pick `hyphenate as`,
 English when none of them has patterns. That is a default rather than a
-decision: it is not written down, and Reset page settings goes back to it.
+decision: it is not written down, and **Reset page settings** goes back to it.
 
 If the family and its fallbacks have no glyph for something on the page, a line
 under the box says how many characters that is. It is worth saying because the
@@ -259,9 +288,10 @@ blank space rather than a row of boxes, and a page with a hole in it looks
 exactly like a page that failed to draw.
 
 The remedy is under Export: **bundled fallback faces**, which is a dozen Noto
-faces covering most scripts, and the Fetch button beside it when they are not
-in the workspace yet. A fetch takes the page into account, so pressing Fetch on
-a Japanese sample brings the 15.7 MB CJK face as well and turns the box on,
+faces covering most scripts, and the **Fetch** button beside it when they are
+not in the workspace yet. A fetch takes the page into account, so pressing
+**Fetch** on a Japanese sample brings the 15.7 MB CJK face as well and turns
+the box on,
 rather than leaving you to work out which coverage would have asked for it. One
 CJK face answers Japanese, Korean and both Chinese scripts. It is a slow
 download, so the same bar the build uses says how far it has got, and the

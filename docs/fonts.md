@@ -98,8 +98,8 @@ family carries, one entry each. It is a point size that is stored and shown,
 not an abstract small, medium or large slot.
 
 `sizes_mod` builds a second family from the same faces at another set of sizes,
-so `NotoSans` at 12, 14, 16, 18 and `NotoSansMod` at 13, 15, 17, 19. It is a way to
-keep two lists apart.
+so `NotoSans` at 12, 14, 16, 18 and `NotoSansMod` at 13, 15, 17, 19. It is a
+way to keep two lists apart.
 
 Two sizes are special. The built-in interface fonts render at 8, 10 and 12 pt,
 and CJK text in the interface is drawn by borrowing the selected family at the
@@ -380,8 +380,9 @@ The rules come from the website's folder picker.
 3. Stripping that suffix leaves the family stem, which must equal `family`,
    case insensitively.
 
-So `NotoSans-Regular.ttf` is the roman face, and `Roboto_SemiCondensed-Light.ttf`
-strips to `Roboto_SemiCondensed-Light`, its own family, which is how an
+So `NotoSans-Regular.ttf` is the roman face, and
+`Roboto_SemiCondensed-Light.ttf` strips to `Roboto_SemiCondensed-Light`, its
+own family, which is how an
 eighteen file Roboto SemiCondensed folder narrows to the four faces you want.
 
 Where two files claim one slot, an explicit weight beats a bare stem and
@@ -502,8 +503,9 @@ next run retries exactly that one.
 
 Sizes are rasterized in parallel, one process each. The default is a worker per
 core less one, so the machine stays usable while a build runs, and never more
-than twelve however many cores there are. `-j` changes it. One size on its own skips the pool, since starting an interpreter
-to do a job this process could have done costs more than the job. The
+than twelve however many cores there are. `-j` changes it. One size on its own
+skips the pool, since starting an interpreter to do a job this process could
+have done costs more than the job. The
 converter's own progress output is captured and shown only on failure, because
 a dozen concurrent streams interleave into nonsense.
 
