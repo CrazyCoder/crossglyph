@@ -101,23 +101,45 @@ from scratch, and never run `dos2unix` or `unix2dos` on one.
 
 ## Making a release
 
+Bump the version in `pyproject.toml`, commit it, then tag and push:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The workflow does the rest: it checks that the tag and the version agree,
+builds, publishes the release, and puts the manifest on Pages. A tag that
+disagrees with `pyproject.toml` fails the run rather than shipping a release
+that misdescribes itself.
+
+To build one locally without releasing it:
+
 ```sh
 uv run tools/make-release.py
 ```
 
-It packs `dist/crossglyph-<version>.zip` from HEAD with `git archive`, and
-refuses to run against a dirty working tree, since the archive comes from the
-commit rather than from your files.
+It packs `dist/crossglyph-<version>.zip` from HEAD, and refuses to run against
+a dirty working tree, since the archive comes from the commit rather than from
+your files. Beside the zip it writes `dist/latest.json`, hashed from that very
+file, which is what installs read to learn a newer release exists.
 
-`git archive` is what keeps the wrappers byte exact and carries the executable
-bits. The script then reads the archive back and checks four things: that
-everything a release needs is in it, that no checkout furniture came along,
-that the six executable files still are, and that `tools/uv.cmd` still has its
-mixed line endings. A release that lost one of those unpacks cleanly, runs
-nowhere, and says nothing about why.
+`git archive` does the reading; the tree is then repacked so the launcher, the
+workspace and `update.conf` sit at the root and the code goes under
+`versions/<version>/`. Members are copied as bytes rather than through the
+filesystem, which is what keeps the wrappers exact.
 
-`.gitattributes`, `.gitignore` and `.githooks/` carry `export-ignore`, so they
-stay out of the archive. They mean nothing to somebody unpacking a zip.
+The script then reads the archive back and checks that everything a release
+needs is in it, that no checkout furniture or state file came along, that the
+executable files still are, that every entry carries a Unix mode a POSIX
+`unzip` will apply, and that `tools/uv.cmd` still has its mixed line endings.
+A release that lost one of those unpacks cleanly, runs nowhere, and says
+nothing about why. The mode check is there because losing it is silent on
+Windows and total on Linux: an entry that keeps 0755 but does not say Unix
+extracts unrunnable.
+
+`.gitattributes`, `.gitignore`, `.githooks/` and `.github/` carry
+`export-ignore`, so they stay out of the archive. They mean nothing to
+somebody unpacking a zip.
 
 ## Rebuilding the render core
 

@@ -40,6 +40,10 @@ To build every family in the workspace, with no page in between:
 ./crossglyph.sh build
 ```
 
+CrossGlyph looks for a newer release about once a day and says so when there
+is one. It never downloads or installs anything on its own, and one line in
+`update.conf` turns the looking off. See [docs/updating.md](docs/updating.md).
+
 Windows on ARM is the one platform without ready-made wheels: `freetype-py`
 publishes none, so uv tries to compile it and needs a build toolchain.
 
