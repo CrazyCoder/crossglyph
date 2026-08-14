@@ -29,6 +29,10 @@ folder with the code in it. The launcher runs whichever version `current`
 names, which is how a later release can be added beside this one rather than
 written over it.
 
+CrossGlyph looks for a newer release about once a day and says so when there
+is one. It never downloads or installs anything on its own, and one line in
+`update.conf` turns the looking off. See [docs/updating.md](docs/updating.md).
+
 Step 3 is second on purpose: there is nothing to set up before the first run.
 An empty workspace opens on Literata, which ships with the tool, so the page
 has type on it while you decide what to tune. Add a font of your own and it
@@ -39,10 +43,6 @@ To build every family in the workspace, with no page in between:
 ```sh
 ./crossglyph.sh build
 ```
-
-CrossGlyph looks for a newer release about once a day and says so when there
-is one. It never downloads or installs anything on its own, and one line in
-`update.conf` turns the looking off. See [docs/updating.md](docs/updating.md).
 
 Windows on ARM is the one platform without ready-made wheels: `freetype-py`
 publishes none, so uv tries to compile it and needs a build toolchain.
@@ -113,7 +113,7 @@ a factor of twelve smaller for a narrow face.
 | `src/crossglyph/render/` | the firmware's renderer, compiled to WebAssembly, and the Python that drives it |
 | `src/render/` | the C++ and the build script that produce that module |
 | `src/crossglyph/starter/` | Literata, the family an empty workspace opens on |
-| `docs/` | [fonts.md](docs/fonts.md) for building, [preview.md](docs/preview.md) for the renderer |
+| `docs/` | [fonts.md](docs/fonts.md) for building, [preview.md](docs/preview.md) for the renderer, [updating.md](docs/updating.md) for the update check |
 
 CrossGlyph is MIT licensed. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 for the code it carries, and [CONTRIBUTING.md](CONTRIBUTING.md) to work on it.
