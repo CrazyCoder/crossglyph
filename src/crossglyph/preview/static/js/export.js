@@ -156,8 +156,12 @@ export function showModState() {
   const sizes = joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more);
   const suffix = exportForm.elements.mod_suffix;
   suffix.disabled = !sizes;
+  // Built on the name in the box rather than the one in the picker, so a
+  // rename you have typed but not saved shows what both families would be
+  // called -- they are one build, and the second is named after the first.
+  const family = exportForm.elements.name.value.trim() || familyPicker.value;
   modName.textContent = sizes
-    ? (familyPicker.value || "this family") + (suffix.value || "Mod")
+    ? (family || "this family") + (suffix.value || "Mod")
     : "a second family";
 }
 
@@ -167,6 +171,7 @@ export function showExport(entry) {
   const settings = (entry && entry.export) || null;
   exportForm.hidden = !settings;
   if (!settings) return;
+  exportForm.elements.name.value = settings.name;
   showSizes(settings);
   exportForm.elements.ranges.value = settings.ranges;
   exportForm.elements.fallbacks.checked = settings.fallbacks;
@@ -185,6 +190,10 @@ export function showExport(entry) {
 
 export function exportSettings() {
   return {
+    // Whatever was typed. The strip that makes it a filename is the server's,
+    // and what it made of it comes back from the save, so the panel never has
+    // to keep a second copy of that rule.
+    name: exportForm.elements.name.value.trim(),
     sizes: joinSizeBoxes(SIZE_FIELDS, exportForm.elements.size_more),
     sizes_mod: joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more),
     mod_suffix: exportForm.elements.mod_suffix.value.trim(),

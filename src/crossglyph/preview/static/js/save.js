@@ -1,7 +1,7 @@
 import {form} from "./dom.js";
 import {exportForm, exportSettings} from "./export.js";
-import {familyEntries, familyPicker, shownFamily} from "./family.js";
-import {body} from "./render.js";
+import {familyEntries, familyPicker, renameFamily, shownFamily} from "./family.js";
+import {body, failureText} from "./render.js";
 import {KNOB_KEYS, knobModified, refreshReverts, rememberSaved, stashed} from "./reverts.js";
 import {compare} from "./untuned.js";
 import {WEIGHT_SLOTS, axesDiffer, axisSettings, variableSpec, rememberVariable} from "./variable.js";
@@ -93,7 +93,10 @@ export async function saveKnobs() {
     return false;
   }
   if (!response.ok) {
-    savedNote.textContent = await response.text();
+    // The sentence, not the envelope FastAPI wraps it in. A refusal here is
+    // something to act on -- a name another family has taken, a size the
+    // device could not read -- and it is read in a line under the button.
+    savedNote.textContent = await failureText(response);
     return false;
   }
 
@@ -123,6 +126,15 @@ export async function saveKnobs() {
       };
       rememberVariable(entry.variable);
     }
+  }
+  // The name the file now carries, which is not always the one that was typed:
+  // it reaches a filename, so the server strips it to what one can hold, and
+  // an empty box means the name the files themselves have. Showing what landed
+  // is what keeps the panel honest about the family a build will produce.
+  if (settings) {
+    exportForm.elements.name.value = result.name;
+    if (entry) entry.export.name = result.name;
+    renameFamily(family, result.name);
   }
   savedNote.textContent = result.moved.length
     ? result.moved.join(", ") + " \u2192 " + result.conf

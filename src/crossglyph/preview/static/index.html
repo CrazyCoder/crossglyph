@@ -353,7 +353,17 @@
      between the two rather than at the top of a column twice as long as the
      one next to it. Both panels write the same .conf. -->
 <form id="export">
-    <h2>Export</h2>
+    <div class="head">
+      <h2>Export</h2>
+      <!-- What the family is called once it is on the device, beside the
+           heading rather than in a row of its own: a source family can be
+           called MerriweatherSansCondensed and the reader's Font list is a
+           phone-sized screen. It starts at the name in the picker above, and
+           a save writes it into the same .conf as everything else here. -->
+      <input id="family-name" name="name" type="text" spellcheck="false"
+             aria-label="what the built family is called"
+             title="What the built family is called on the device, and the name its folder takes. Letters, digits, _ and - only.">
+    </div>
 
     <div class="stacked">
       <span class="name">sizes <span class="unit">pt</span></span>

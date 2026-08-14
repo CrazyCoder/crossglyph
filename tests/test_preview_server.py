@@ -380,7 +380,7 @@ def test_the_export_panel_posts_what_the_server_reads():
     names = set(re.findall(r'<(?:input|select)\b[^>]*name="([^"]+)"', html))
     # `out` is all.conf's and posts to an endpoint of its own; the rest ride
     # along with a save, in the shape family_entry reports them.
-    assert names == {"size1", "size2", "size3", "size4", "size_more",
+    assert names == {"name", "size1", "size2", "size3", "size4", "size_more",
                      "mod1", "mod2", "mod3", "mod4", "mod_more", "mod_suffix",
                      "ranges", "fallbacks", "fallback1", "fallback2",
                      "out"}, names
@@ -391,7 +391,7 @@ def test_the_export_panel_posts_what_the_server_reads():
     source = (server.STATIC / "js" / "export.js").read_text(encoding="utf-8")
     body = source[source.index("function exportSettings()"):]
     posted = set(re.findall(r"^\s*(\w+):", body[:body.index("\n}")], re.M))
-    assert posted == {"sizes", "sizes_mod", "mod_suffix", "intervals",
+    assert posted == {"name", "sizes", "sizes_mod", "mod_suffix", "intervals",
                       "ranges", "fallbacks", "fallback1", "fallback2"}, posted
 
 
@@ -706,6 +706,7 @@ def test_the_panel_is_told_what_a_family_builds_as(scratch):
         "fallback_regular = Ledger.ttf\n", encoding="utf-8")
     entry = next(f for f in server.families() if f["name"] == "Alto")
 
+    assert entry["export"]["name"] == "Alto", "the name box would open blank"
     assert entry["export"]["sizes"] == "12 13"
     assert entry["export"]["intervals"] == "cyrillic"
     assert entry["export"]["fallbacks"] is False
@@ -763,6 +764,63 @@ def test_a_second_family_saves_with_the_suffix_that_names_it(scratch):
     _save_export("Alto", sizes_mod="", mod_suffix="Alt")
     text = (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
     assert "sizes_mod" not in text and "mod_suffix" not in text
+
+
+def _alto_says(scratch, key):
+    """What alto.conf sets a key to, or None. Its `name` line arrived with the
+    fixture's own padding, which a substring match would not survive."""
+    from crossglyph import fontconf
+
+    return fontconf.read_values(_conf(scratch) / "alto.conf").get(key)
+
+
+def test_a_family_builds_under_the_name_it_is_given(scratch):
+    """What a family is called on the device is a choice, not whatever its
+    files happen to be called: a source family can be MerriweatherSans-
+    Condensed and the reader's Font list is a phone-sized screen."""
+    from crossglyph.preview import server
+
+    response = _save_export("Alto", name="Alt")
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "Alt"
+    assert _alto_says(scratch, "name") == "Alt"
+
+    entry = next(f for f in server.families() if f["name"] == "Alt")
+    assert entry["export"]["name"] == "Alt", "the name box would open blank"
+    assert entry["conf"] == "alto.conf", \
+        "the file is named after the family, not after what it builds as"
+
+    # And back. A name the family would take anyway is not worth a line, and
+    # the old one no longer addresses anything -- so the save that removes it
+    # has to find the family by the key that never moves.
+    assert _save_export("Alt", name="Alto").json()["name"] == "Alto"
+    assert _alto_says(scratch, "name") is None
+
+
+def test_a_name_that_could_not_be_a_filename_comes_back_stripped(scratch):
+    """It reaches a .cpfont filename, so the converter strips it to what one
+    can hold. The page is told what landed rather than left showing what was
+    typed."""
+    response = _save_export("Alto", name="My Font!")
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "MyFont"
+    assert _alto_says(scratch, "name") == "MyFont"
+
+    # An empty box is "whatever the files are called", not a name of its own --
+    # which is the one answer sanitize_name cannot give, since it makes up
+    # "CustomFont" for a string with nothing usable in it.
+    assert _save_export("Alto", name="  ").json()["name"] == "Alto"
+
+
+def test_two_families_may_not_build_under_one_name(scratch):
+    """They would write over each other size by size in the build folder, and
+    nothing downstream could tell them apart afterwards."""
+    response = _save_export("Alto", name="Ledger")
+    assert response.status_code == 422
+    assert "Ledger" in response.text
+    assert "Ledger" not in \
+        (_conf(scratch) / "alto.conf").read_text(encoding="utf-8"), \
+        "a refused rename still touched the file"
 
 
 def test_a_fallback_family_is_stored_as_its_regular_file(scratch):

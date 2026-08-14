@@ -1,6 +1,6 @@
 import {form, syncLineHeight} from "./dom.js";
 import {fillFallbackPickers, showExport} from "./export.js";
-import {FAMILY, familyEntries, familyPicker, offerSavedThresholds, showFaces, shownFamily, rememberShown} from "./family.js";
+import {FAMILY, familyEntries, familyLabel, familyPicker, offerSavedThresholds, showFaces, shownFamily, rememberShown} from "./family.js";
 import {numericRow} from "./knobs.js";
 import {attempt} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
@@ -142,11 +142,7 @@ export function fillFamilies(d) {
     familyEntries.set("", {faces: d.faces, tuning: null, conf: null});
   }
   for (const family of d.families) {
-    // The family the tool ships is offered only while the workspace is empty.
-    // Saying so on the entry is what keeps it from reading as a font you put
-    // there and forgot, and explains where it goes once you drop yours in.
-    familyPicker.add(new Option(
-      family.bundled ? `${family.name} (bundled)` : family.name, family.name));
+    familyPicker.add(new Option(familyLabel(family), family.name));
     familyEntries.set(family.name, family);
   }
   if (!familyPicker.options.length) return;   // nothing to choose between

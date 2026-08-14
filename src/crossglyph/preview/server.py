@@ -285,6 +285,11 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             # the same file. `sizes` is what the reader's Font Size setting
             # lists, one entry each, not the size on screen.
             "export": {
+                # What the family is called on the device and in the folder a
+                # build writes, which is the picker's own label: a source file
+                # can be named MerriweatherSansCondensed and a reader's Font
+                # list is a phone-sized screen.
+                "name": config.name,
                 "sizes": " ".join(fontconf.size_spelling(size)
                                   for size in config.sizes),
                 # The second family the same faces build, if the config asks
@@ -584,8 +589,8 @@ SAVED_KEYS = ("gamma", "thresholds", "weight", "slant", "letter_spacing",
 #: The export keys, which are not tuning: they decide what a build contains
 #: rather than how a glyph looks. `fallback_regular` and `fallback2_regular`
 #: name one specific file, so they can only ever live in a family's own config.
-EXPORT_KEYS = ("sizes", "sizes_mod", "mod_suffix", "intervals", "ranges",
-               "fallbacks", "fallback_regular", "fallback2_regular")
+EXPORT_KEYS = ("name", "sizes", "sizes_mod", "mod_suffix", "intervals",
+               "ranges", "fallbacks", "fallback_regular", "fallback2_regular")
 
 
 def axis_changes(panel: dict, config: Config) -> dict[str, str | None]:
@@ -632,6 +637,26 @@ class SaveRequest(BaseModel):
     export: dict | None = None
 
 
+def _name_taken(name: str, config: Config) -> str | None:
+    """The family already building under `name`, if another one is.
+
+    Two families with one output name write over each other in the build
+    folder, size by size, and which of them wins is whichever the walk reached
+    last. Nothing downstream can tell them apart afterwards, so a rename onto
+    a taken name is refused here rather than found later.
+    """
+    for other in fontbuild.offered(fontbuild.SOURCE_DIR)[0]:
+        # The same family, reached twice: every family all.conf covers without
+        # naming shares its path, so the family it was discovered under is what
+        # tells those apart.
+        if (other.path, other.family.casefold()) == (config.path,
+                                                     config.family.casefold()):
+            continue
+        if other.name.casefold() == name.casefold():
+            return other.family
+    return None
+
+
 def export_changes(request_export: dict, config: Config,
                    shared: dict[str, str]) -> dict[str, str | None]:
     """The export half of a save, as .conf keys.
@@ -641,6 +666,23 @@ def export_changes(request_export: dict, config: Config,
     stays portable.
     """
     wanted: dict[str, str | None] = {}
+
+    # What the build calls this family, which is a name of its own rather than
+    # the one the files happen to carry. It reaches a filename, so the same
+    # strip the converter does is applied here and the page is told what it
+    # got: sanitize_name answers "CustomFont" for a string with nothing usable
+    # in it, which makes an empty field mean "whatever the files are called"
+    # rather than a name.
+    plain = fontconf.sanitize_name(config.family)
+    raw_name = str(request_export.get("name", "")).strip()
+    chosen = fontconf.sanitize_name(raw_name) if raw_name else plain
+    if chosen.casefold() != config.name.casefold():
+        taken = _name_taken(chosen, config)
+        if taken:
+            raise ValueError(f"the {taken} family already builds as {chosen}, "
+                             f"and two of them would write over each other")
+    wanted["name"] = chosen if chosen != plain else None
+
     sizes = str(request_export.get("sizes", "")).strip()
     if sizes:
         # Validated by the same parser the config uses, so a typo is a 422
@@ -746,8 +788,20 @@ def save(request: SaveRequest) -> dict:
 
     # Read back rather than echo: what the next build will use is what the file
     # now says, which is the only answer worth putting in front of anyone.
-    saved = family_config(request.family)
+    #
+    # By what the file now calls it, not by the name the page arrived with: a
+    # rename is the one save after which the old output name addresses nothing,
+    # and looking it up again would fail on the family that had just been
+    # written. The `family` key never moves, so it is what a rename falls back
+    # to once its own name is gone.
+    asked = request.family
+    if request.export is not None:
+        asked = changes["name"] or config.family
+    saved = family_config(asked)
     return {"conf": path.name, "moved": sorted(moved),
+            # What the strip above made of the name, so the page shows the one
+            # that landed rather than the one that was typed.
+            "name": saved.name,
             "tuning": saved.tuning.as_dict()}
 
 

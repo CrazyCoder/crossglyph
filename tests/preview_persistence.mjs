@@ -226,7 +226,7 @@ const DEFAULTS = {
       conf: "sample.conf", derived: false,
       tuning: { gamma: 1, weight: 0, hinting: "normal",
                 thresholds: [2, 5, 9], line_height: null },
-      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+      export: { name: "Sample", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: true, fallback1: "", fallback2: "" } },
     // A variable family: two files, four slots, and the weights the font's own
@@ -243,7 +243,7 @@ const DEFAULTS = {
         weights: { text: 400, bold: 700 },
         other: { wdth: 100 },
       },
-      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+      export: { name: "Vari", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: false, fallback1: "", fallback2: "" } },
     // Alto is set to something in its config, which is what the knobs have
@@ -252,7 +252,7 @@ const DEFAULTS = {
       conf: "alto.conf", derived: false,
       tuning: { gamma: 1.2, weight: 0.1, hinting: "normal",
                 thresholds: [3, 6, 10], line_height: null },
-      export: { sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
+      export: { name: "Alto", sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading,cyrillic", ranges: "",
                 fallbacks: false, fallback1: "Sample", fallback2: "" } },
   ],
@@ -485,6 +485,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     mod1: { value: "" }, mod2: { value: "" }, mod3: { value: "" },
     mod4: { value: "" }, mod_more: { value: "" },
     mod_suffix: { value: "", disabled: false },
+    // Beside the heading rather than in the panel's grid, but a control of the
+    // same form: what the family is called once it is built.
+    name: { value: "" },
     ranges: { value: "" },
     fallbacks: { type: "checkbox", checked: false },
     fallback1: makeSelect(), fallback2: makeSelect(),
@@ -759,16 +762,27 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         const sent = JSON.parse(options.body);
         fetches.saves.push(sent);
         // A config the server will not write -- a size that does not parse, a
-        // read-only folder. Build leans on this answer, so it has to exist.
+        // name another family has taken, a read-only folder. Build leans on
+        // this answer, so it has to exist. In the envelope FastAPI puts a
+        // refusal in, because what the page has to show is the sentence.
         if (opts.saveFails) {
           return Promise.resolve({
-            ok: false, text: () => Promise.resolve("could not write arial.conf") });
+            ok: false, text: () => Promise.resolve(
+              JSON.stringify({ detail: "could not write arial.conf" })) });
         }
         // The real answer is the config read back, which after a save says
         // what was sent. Echoing a fixed fixture would leave the panel
         // looking dirty the moment a knob was not the one it named.
+        //
+        // The name is the one case where the file does not say what was sent:
+        // it reaches a filename, so the server strips it to what one can hold
+        // and an empty box means the name the files already have. Stripped
+        // here too, or the page would never be told the difference.
+        const typed = (sent.export && sent.export.name) || "";
         return Promise.resolve({ ok: true, json: () => Promise.resolve(
-          { ...SAVED, tuning: { line_height: null, ...sent.tuning } }) });
+          { ...SAVED,
+            name: typed.replace(/[^A-Za-z0-9_-]+/g, "") || sent.family,
+            tuning: { line_height: null, ...sent.tuning } }) });
       }
       return Promise.resolve({ json: () => Promise.resolve(defaults) });
     },
@@ -1274,7 +1288,7 @@ for (const { name, text } of sources) {
       conf: "literata.conf", derived: true, bundled: true,
       tuning: { gamma: 1, weight: 0, hinting: "normal",
                 thresholds: [4, 8, 12], line_height: null },
-      export: { sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
+      export: { name: "Literata", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: true, fallback1: "", fallback2: "" } }] };
   const env = await loaded(fakeStorage(), shipped);
@@ -1623,6 +1637,10 @@ for (const { name, text } of sources) {
         env.fetches.builds.length === 0, JSON.stringify(env.fetches.builds));
   check("and says the build did not happen",
         env.built.textContent.startsWith("not built"), env.built.textContent);
+  check("with the server's own sentence under the button, not the envelope "
+        + "it arrived in",
+        env.note.textContent === "could not write arial.conf",
+        env.note.textContent);
   check("and hands the buttons back",
         env.buildEls.every(one => one.disabled === false),
         env.buildEls.map(one => one.disabled).join());
@@ -1694,6 +1712,54 @@ for (const { name, text } of sources) {
         posted.mod_suffix === "Alt", JSON.stringify(posted));
   check("and the first family's own sizes are untouched",
         posted.sizes === "12 13", posted.sizes);
+}
+
+// 30d. What the family is called once it is built. A source family can be
+//      called whatever its files are called and the reader's Font list is a
+//      phone-sized screen, so the name is a field of its own -- and everything
+//      on this page is keyed by it, which is what a save has to move.
+{
+  const store = fakeStorage();
+  const env = await loaded(store);
+  const nameBox = env.exportForm.elements.name;
+  const modName = env.sandbox.document.getElementById("mod-name");
+  check("the box opens on what the family builds as",
+        nameBox.value === "Alto", nameBox.value);
+
+  nameBox.value = "Alt";
+  env.exportForm.edit("name");
+  check("typing a name offers a save", env.save.disabled === false);
+  env.exportForm.elements.mod1.value = "13";
+  env.exportForm.edit("mod1");
+  check("and the second family is named after it before it is saved",
+        modName.textContent === "AltMod", modName.textContent);
+
+  await env.save.click();
+  check("the save carries the name",
+        env.fetches.saves.at(-1).export.name === "Alt",
+        JSON.stringify(env.fetches.saves.at(-1).export));
+  check("the picker follows it", env.family.value === "Alt", env.family.value);
+  check("under the label it had", env.family.selectedOptions[0].textContent
+        === "Alt", env.family.selectedOptions[0].textContent);
+  const entries = env.modules.get("family.js").familyEntries;
+  check("the entry moves with it, since everything here is keyed by the name",
+        entries.has("Alt") && !entries.has("Alto"),
+        [...entries.keys()].join());
+  check("and it is remembered under the new name, or the next visit asks for "
+        + "a family the server no longer has",
+        store.data["crossglyph.family"] === "Alt",
+        store.data["crossglyph.family"]);
+  check("with nothing left to save", env.save.disabled === true);
+
+  // The strip that makes it a filename is the server's, and the page shows
+  // what landed rather than what was typed.
+  nameBox.value = "My Font!";
+  env.exportForm.edit("name");
+  await env.save.click();
+  check("a name that could not be a filename comes back stripped",
+        nameBox.value === "MyFont", nameBox.value);
+  check("and the picker takes the same one", env.family.value === "MyFont",
+        env.family.value);
 }
 
 // 31. The thresholds control: one list with both presets on it, and a config

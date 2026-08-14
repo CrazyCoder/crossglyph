@@ -374,18 +374,19 @@
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
-  /* The heading and the sample picker share a row. The picker names what is in
-     the box under it, so a row of its own would push the box down for a
-     control most people read once and leave alone. It takes the rest of the
-     width so it lines up with the box rather than floating in the middle of
-     nothing, the same way the family picker fills its own row. */
-  #textbox .head { display: flex; align-items: center; gap: .6rem;
-                   margin: .55rem 0 .5rem; }
+  /* A heading with one control beside it. Both of these name the panel under
+     them rather than setting anything in it, so a row of their own would push
+     the panel down for a control most people read once and leave alone. Each
+     takes the rest of the width, so it lines up with what is below instead of
+     floating in the middle of nothing, the way the family picker fills its
+     own row. */
+  .head { display: flex; align-items: center; gap: .6rem; }
   /* The heading's own margins have to go, and the row carries them instead.
      `center` centres margin boxes, not text, so a heading with 21.6px above it
-     and 8px below rides that much low against the picker beside it -- and its
-     margins set the height of a row the picker is the tallest thing in. */
-  #textbox .head h2 { flex: none; margin: 0; }
+     and 8px below rides that much low against the control beside it -- and its
+     margins set the height of a row that control is the tallest thing in. */
+  .head h2 { flex: none; margin: 0; }
+  #textbox .head { margin: .55rem 0 .5rem; }
   #sample { flex: 1 1 0; min-width: 5rem; }
   /* The specimen and its text stay where they are while a panel scrolls past.
      Only where the whole column fits: sticking a column taller than the window
@@ -405,6 +406,10 @@
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
+  /* The margins the heading carried on its own, so the panel still opens level
+     with the two columns beside it. */
+  #export .head { margin: 1.35rem 0 .5rem; }
+  #family-name { flex: 1 1 0; min-width: 6rem; }
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */
   .row.wide { grid-template-columns: 8.2rem 1fr; }

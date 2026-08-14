@@ -65,8 +65,17 @@ key, or press and hold the page itself. The size stays where it is, since that
 is which size you are working at rather than tuning. Holding is a look and not
 a change: whatever the toggle was set to is what comes back on release.
 
-The export panel holds what a build needs and a page does not: the sizes, the
-coverage intervals, the fallback families.
+The export panel holds what a build needs and a page does not: the name, the
+sizes, the coverage intervals, the fallback families.
+
+The box beside the heading is what the family is called once it is built, which
+is the name the reader picks from on a phone-sized screen rather than whatever
+the source files are called. It reaches a filename, so letters, digits, `_` and
+`-` are all it can keep: the rest is stripped on the way in and the box shows
+what landed. Empty means the name the files already have. Two families may not
+build under one name, since they would write over each other in the output
+folder, so a name another family has taken is refused with a line saying which.
+The picker follows a rename as soon as it is saved.
 
 The coverage presets overlap, and the row says so rather than leaving it to be
 worked out: `reading` is the converter's `default` block and a good deal more,

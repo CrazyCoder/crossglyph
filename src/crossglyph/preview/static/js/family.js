@@ -1,4 +1,5 @@
 import {form} from "./dom.js";
+import {attempt} from "./remember.js";
 import {savedTuning} from "./reverts.js";
 
 // --- the font ------------------------------------------------------------
@@ -46,6 +47,36 @@ export function showFaces() {
   // Naming it here is what makes it readable without opening the list.
   familyPicker.title = (label ? `${label.textContent}\n` : "")
     + "Which family from the font source folder to set the page in";
+}
+
+// What the picker calls a family. The one the tool ships is offered whatever
+// else is in the folder, and saying so on its entry is what keeps it from
+// reading as a font you put there and forgot.
+export function familyLabel(entry) {
+  return entry.bundled ? `${entry.name} (bundled)` : entry.name;
+}
+
+// A save renamed the family under us. Everything here is keyed by the name a
+// build produces, so the entry moves rather than being reloaded: the panel is
+// already showing this family, and re-reading the folder would throw away the
+// knobs it has open for the sake of values it would find unchanged.
+export function renameFamily(from, to) {
+  const entry = familyEntries.get(from);
+  if (!entry || from === to) return;
+  entry.name = to;
+  familyEntries.delete(from);
+  familyEntries.set(to, entry);
+  for (const option of familyPicker.options) {
+    if (option.value !== from) continue;
+    option.value = to;
+    option.textContent = familyLabel(entry);
+  }
+  familyPicker.value = to;
+  rememberShown(to);
+  // Remembered under the new name too, or the next visit asks for a family the
+  // server no longer has and opens on whichever one it started with.
+  attempt(() => localStorage.setItem(FAMILY, to));
+  showFaces();
 }
 
 // Switching font replaces the knobs with what that family is set to: they are
