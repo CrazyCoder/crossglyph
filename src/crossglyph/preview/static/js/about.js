@@ -1,20 +1,17 @@
-// What this install is, in the two places that say so: the version in the top
-// strip, and the sentence at the foot of the export panel. One shape fills
-// both, from start.js at load and from the button after that.
+// What this install is, and whether there is a newer one: the island under
+// the specimen. One row -- the version on the left, the update on the right --
+// over the sentence that says which render core it carries.
 import {streamInto} from "./export.js";
-import {endProgress, showProgress, spellBytes,
-        startProgress} from "./progress.js";
+import {progressBar, spellBytes} from "./progress.js";
 
-const strip = document.getElementById("version-strip");
-const number = document.getElementById("version-number");
-const dot = document.getElementById("version-dot");
-const line = document.getElementById("about-line");
+const island = document.getElementById("about");
+const version = document.getElementById("about-version");
+const state = document.getElementById("about-state");
 const detail = document.getElementById("about-detail");
-const when = document.getElementById("checked-when");
 const button = document.getElementById("check-now");
-const updateRow = document.getElementById("update-row");
 const updateButton = document.getElementById("update-now");
 const updateNote = document.getElementById("updated");
+const progress = progressBar(document.getElementById("update-progress"));
 
 // The same count the CLI uses, in render/stamp.py: the page and `crossglyph
 // --version` report one fact, and two spellings of it is one more thing to
@@ -42,11 +39,16 @@ function checkedLine(about) {
 }
 
 export function showAbout(about) {
-  number.textContent = about.version;
-  dot.hidden = !about.available;
-  line.textContent = about.available
-    ? `CrossGlyph ${about.version}, ${about.available} is available`
-    : `CrossGlyph ${about.version}`;
+  version.textContent = `CrossGlyph ${about.version}`;
+  // One thing on the right, which is what keeps the row to one line. A
+  // release to install is the only answer worth having while there is one, so
+  // it replaces the line about when the asking last happened.
+  state.textContent = about.available
+    ? `${about.available} is available.` : checkedLine(about);
+  // And one button under it, for the one thing worth pressing: asking again
+  // says nothing new once the answer is on screen.
+  updateButton.hidden = !(about.can_self_update && about.available);
+  button.hidden = !updateButton.hidden;
 
   const said = [];
   if (about.firmware) {
@@ -58,13 +60,8 @@ export function showAbout(about) {
   // that should say nothing at all.
   if (about.notice) said.push(about.notice);
   detail.textContent = said.join(" ");
-  when.textContent = checkedLine(about);
-  // The button, only where pressing it would do something: an install that
-  // owns its own files, with a release to install. Everywhere else the
-  // sentence above says what to do instead.
-  updateRow.hidden = !(about.can_self_update && about.available);
 
-  strip.title = [`CrossGlyph ${about.version}`, ...said].join("\n");
+  island.title = [`CrossGlyph ${about.version}`, ...said].join("\n");
 }
 
 // What the install left in the workspace, said the way the command line says
@@ -81,7 +78,7 @@ export function showUpdateStep(step) {
       ? `Converting this install to ${step.version}.`
       : `Installing ${step.version}.`;
   } else if (step.event === "step") {
-    showProgress(step.got, step.bytes, "downloading", spellBytes);
+    progress.show(step.got, step.bytes, "downloading", spellBytes);
   } else if (step.event === "current") {
     updateNote.textContent = `CrossGlyph ${step.version} is up to date.`;
   } else if (step.event === "error") {
@@ -89,7 +86,8 @@ export function showUpdateStep(step) {
   } else if (step.event === "done") {
     // There is nothing more to press here: what is installed does not become
     // what is running until the tool is started again.
-    updateRow.hidden = true;
+    updateButton.hidden = true;
+    button.hidden = false;
     updateNote.textContent =
       `${step.version} installed. Restart CrossGlyph to use it.` +
       keptLine(step.kept) +
@@ -108,25 +106,25 @@ updateButton.addEventListener("click", async () => {
   // still looks pressable is one people press again, mid-swap.
   updateButton.disabled = true;
   updateNote.textContent = "";
-  startProgress("asking for the new release…");
+  progress.start("asking for the new release…");
   try {
     await streamInto("/update", {}, showUpdateStep, updateNote);
   } finally {
     // Whatever ended it, including a dropped connection: a bar left sitting
     // at some fraction says the update is still running.
-    endProgress();
+    progress.end();
     updateButton.disabled = false;
   }
 });
 
 button.addEventListener("click", () => {
   button.disabled = true;
-  when.textContent = "Checking...";
+  state.textContent = "Checking...";
   fetch("/update/check", {method: "POST"})
     .then(r => r.json())
     .then(showAbout)
     // A manual check that says nothing when the answer never comes reads as
     // broken, which is the one thing it must not do.
-    .catch(() => { when.textContent = UNREACHABLE; })
+    .catch(() => { state.textContent = UNREACHABLE; })
     .finally(() => { button.disabled = false; });
 });

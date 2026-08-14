@@ -414,8 +414,9 @@
   /* The specimen and its text stay where they are while a panel scrolls past.
      Only where the whole column fits: sticking a column taller than the window
      puts its own bottom out of reach, which costs more than the scrolling it
-     saves. */
-  @media (min-height: 1150px) {
+     saves. The figure is the sheet, the box, the island under it and the
+     page's own margins, so it moves whenever any of those do. */
+  @media (min-height: 1225px) {
     #middle { position: sticky; top: 1.75rem; }
   }
 
@@ -554,26 +555,26 @@
      of these, so progress drawn in that material belongs to the panel, where a
      bar laid on top would be its loudest element and loudest for the one state
      that ends by itself. */
-  #progress { margin-top: .7rem; }
-  #bar { position: relative; height: 2px; background: var(--rule);
+  .progress { margin-top: .7rem; }
+  .bar { position: relative; height: 2px; background: var(--rule);
          border-radius: 1px; overflow: hidden; }
-  #bar-fill { display: block; height: 100%; width: 0; background: var(--knob);
+  .bar-fill { display: block; height: 100%; width: 0; background: var(--knob);
               transition: width .18s ease-out; }
-  #progress-line {
+  .progress-line {
     display: flex; justify-content: space-between; gap: .55rem;
     margin-top: .4rem; color: var(--muted); font-size: 11.5px;
   }
   /* The family and size in hand, which is the half that can run long. */
-  #progress-what { min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  .progress-what { min-width: 0; overflow: hidden; text-overflow: ellipsis;
                    white-space: nowrap; }
-  #progress-count { flex: none; }
+  .progress-count { flex: none; }
   /* Planning, and the save that may come before it: no total yet, so the rule
      sweeps rather than sitting at nothing.
      Over the fill rather than in it. Sweeping the fill itself would mean the
      first counted step transitions down from wherever the sweep had left its
      width -- a bar that opens a third full and shrinks, which reads as
      progress lost. The fill only ever holds the fraction the build reports. */
-  #bar.waiting::after {
+  .bar.waiting::after {
     content: ""; position: absolute; inset: 0 auto 0 0; width: 30%;
     background: var(--knob); animation: sweep 1.15s ease-in-out infinite;
   }
@@ -581,8 +582,8 @@
     from { transform: translateX(-110%); } to { transform: translateX(440%); }
   }
   @media (prefers-reduced-motion: reduce) {
-    #bar.waiting::after { animation: none; width: 100%; opacity: .4; }
-    #bar-fill { transition: none; }
+    .bar.waiting::after { animation: none; width: 100%; opacity: .4; }
+    .bar-fill { transition: none; }
   }
   #fetch { padding: .3rem .6rem; }
 
@@ -592,20 +593,21 @@
   .row :focus-visible { outline-offset: 1px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
-  /* What this install is. The strip carries the version alone, in the row's
-     own uppercase voice; the panel foot carries the sentence. No colour: the
-     palette is the device's four greys, for the reason at the top of this
-     file. */
-  #version-strip { margin-left: .5rem; letter-spacing: .06em; }
-  #about { margin: .9rem .3rem .2rem; }
-  #about-line { font-size: 12px; font-weight: 600; color: var(--text); }
+  /* What this install is, in the same material as the box above it: it
+     belongs to the page rather than to either panel, and it is the only thing
+     in the column that changes height. No colour anywhere in it: the palette
+     is the device's four greys, for the reason at the top of this file. */
+  #about { background: var(--panel); border: 1px solid var(--line);
+           border-radius: 10px; padding: .5rem .8rem;
+           color: var(--muted); font-size: 11.5px; }
+  #about-line { display: flex; align-items: center; gap: .5rem; }
+  #about-version { color: var(--text); font-weight: 600; }
+  /* Identity on the left, the update on the right, and this between them, so
+     a state that runs long cannot move the version. */
+  #about-line .gap { flex: 1 1 0; }
+  #about-line button { flex: none; padding: .1rem .45rem; font-size: 10.5px; }
+  /* Both of these are empty in the ordinary case, and an empty line in a card
+     this size reads as a card with something wrong with it. */
+  #about .hint:empty { display: none; }
   #about-detail { margin-top: .2rem; }
-
-  /* The update mark. A filled dot rather than a colour: this interface is the
-     device's four grey levels, for the reason at the top of this file. */
-  #version-dot { display: inline-block; width: .38rem; height: .38rem;
-                 border-radius: 50%; background: var(--knob);
-                 margin-left: .3rem; vertical-align: .05rem; }
-  #about-checked { display: flex; align-items: center; gap: .45rem;
-                   margin-top: .25rem; }
-  #check-now { padding: .1rem .45rem; font-size: 10.5px; }
+  #updated { margin-top: .35rem; }

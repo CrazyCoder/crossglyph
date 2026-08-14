@@ -33,10 +33,10 @@ The second sentence depends on how CrossGlyph was installed. A clone is told
 to pull, a container to take the new image, an unpacked release to run the
 command above.
 
-In the preview, a dot appears beside the version at the top of the left panel,
-and the block at the foot of the export panel names the new version. That
-block also says when it last looked, with a **Check now** button beside it,
-and an **Update** button when this install can install one.
+In the preview, the island under the specimen names the new version where it
+otherwise says when it last looked. Beside that is one button: **Check now**
+ordinarily, and **Update** in its place when there is a release this install
+can install.
 
 ## Asking on purpose
 

@@ -1,7 +1,7 @@
 import {form} from "./dom.js";
 import {familyEntries, familyPicker} from "./family.js";
 import {scheduleRender, undrawnCount} from "./render.js";
-import {endProgress, showProgress, spellBytes, startProgress} from "./progress.js";
+import {progressBar, spellBytes} from "./progress.js";
 import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
 
 // --- export ---------------------------------------------------------------
@@ -14,6 +14,9 @@ export const exportForm = document.getElementById("export");
 export const presetList = document.getElementById("presets");
 export const outField = exportForm.elements.out;
 export const builtNote = document.getElementById("built");
+// The panel's own bar. The island under the specimen has another, for the
+// update, and neither run can be told anything by the other's clock.
+const progress = progressBar(document.getElementById("progress"));
 export let presetNames = [];
 
 //: The ranges behind each preset, and the ones every build carries anyway.
@@ -234,22 +237,22 @@ export function showStep(step) {
     // and a run with nothing to do is one.
     if (step.total) {
       builtNote.textContent = "";
-      showProgress(0, step.total, "");
+      progress.show(0, step.total, "");
     } else {
       builtNote.textContent = "everything is already current";
-      endProgress();
+      progress.end();
     }
   } else if (step.event === "size") {
-    showProgress(step.done, step.total, `${step.family} ${step.size}`);
+    progress.show(step.done, step.total, `${step.family} ${step.size}`);
   } else if (step.event === "failed") {
     // One size of many, and the build carries on: the bar keeps running and
     // the note says which one went wrong.
     builtNote.textContent = `${step.family} ${step.size}: ${step.error}`;
   } else if (step.event === "error") {
-    endProgress();
+    progress.end();
     builtNote.textContent = step.error;
   } else if (step.event === "done") {
-    endProgress();
+    progress.end();
     const count = (key) =>
       step.families.reduce((total, one) => total + one[key].length, 0);
     const failed = count("failed");
@@ -309,7 +312,7 @@ export async function buildFamilies(family, force = false) {
     // is only on the page is therefore not in that comparison, so the build
     // finds everything current and says so -- which reads as "your change did
     // nothing" when it means "your change was never seen". Write it first.
-    startProgress(`${force ? "rebuilding" : "planning"} ${label}…`);
+    progress.start(`${force ? "rebuilding" : "planning"} ${label}…`);
     builtNote.textContent = "";
     if (!saveButton.hidden && knobsDiffer() && !(await saveKnobs())) {
       builtNote.textContent = `not built: ${label} could not be saved`;
@@ -322,7 +325,7 @@ export async function buildFamilies(family, force = false) {
     // the buttons come back, or the panel is dead until a reload. The bar
     // goes with them: a dropped connection would otherwise leave it sitting at
     // whatever fraction it had reached, saying a run is still going.
-    endProgress();
+    progress.end();
     for (const button of buildButtons) button.disabled = false;
     // The key may well have been let go while the buttons were out, and a
     // keyup on a disabled button is one nobody hears.
@@ -443,7 +446,7 @@ export function showFetchStep(step) {
     return;
   }
   if (step.event === "start" || step.event === "step") {
-    showProgress(step.got, step.bytes, step.name, spellBytes);
+    progress.show(step.got, step.bytes, step.name, spellBytes);
   }
 }
 
@@ -452,7 +455,7 @@ export async function fetchFallbacks() {
   // button that still looks pressable is one people press again.
   fetchButton.disabled = true;
   fetchNote.textContent = "";
-  startProgress("asking for the fallback faces…");
+  progress.start("asking for the fallback faces…");
   try {
     // The coverage says which scripts a build wants; the text says what this
     // page cannot draw. Either is a reason to bring a CJK face, and the second
@@ -465,7 +468,7 @@ export async function fetchFallbacks() {
   } finally {
     // Whatever happened, the button comes back and the bar goes: a dropped
     // connection would otherwise leave both saying a download is still running.
-    endProgress();
+    progress.end();
     fetchButton.disabled = false;
   }
 }

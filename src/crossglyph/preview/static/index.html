@@ -28,11 +28,6 @@
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6 5.9 5.9 0 1 0 13.4 9.9z"/></svg></button>
   </div>
-  <!-- The version, where it never scrolls away. The panel foot below carries
-       the sentence; this is the glance, and the dot is the whole of what it
-       has to say when a newer release exists. -->
-  <span id="version-strip" title=""><span id="version-number"></span><span
-    id="version-dot" hidden aria-label="an update is available"></span></span>
 </div>
 
 <form id="knobs">
@@ -371,6 +366,37 @@
       regular, as it would on the device.</div>
     <div id="status" class="mono">—</div>
   </div>
+
+  <!-- What this install is, at the foot of the middle column. This is the one
+       column nothing grows in: the sheet is the device's page and the box
+       under it is a fixed height, where both panels beside it carry a
+       progress bar and a result that can run to a paragraph. So the version
+       sits still here, and the update's own bar and sentence grow downwards
+       into space no other column is using. -->
+  <div id="about">
+    <div id="about-line">
+      <span id="about-version"></span>
+      <span class="gap"></span>
+      <span id="about-state"></span>
+      <!-- One at a time. Asking again is pointless once the answer is on
+           screen, and installing is not on offer until there is something to
+           install. -->
+      <button type="button" id="check-now"
+              title="Ask now, whatever the last answer was">Check now</button>
+      <button type="button" id="update-now" hidden
+              title="Download the new release and install it beside this one">Update</button>
+    </div>
+    <div class="hint" id="about-detail"></div>
+    <div id="update-progress" class="progress" hidden>
+      <div class="bar" role="progressbar" aria-label="update progress"
+           aria-valuemin="0"><span class="bar-fill"></span></div>
+      <div class="progress-line">
+        <span class="progress-what"></span>
+        <span class="progress-count mono"></span>
+      </div>
+    </div>
+    <div class="hint" id="updated"></div>
+  </div>
 </div>
 
 <!-- Beside the page rather than under it: the knobs decide how a glyph looks,
@@ -557,38 +583,15 @@
          two buttons and above the sentence they leave behind. The bar says
          how far, the line under it says what is being built and how many are
          left; the note below keeps the outcome, and only the outcome. -->
-    <div id="progress" hidden>
-      <div id="bar" role="progressbar" aria-label="build progress"
-           aria-valuemin="0"><span id="bar-fill"></span></div>
-      <div id="progress-line">
-        <span id="progress-what"></span>
-        <span id="progress-count" class="mono"></span>
+    <div id="progress" class="progress" hidden>
+      <div class="bar" role="progressbar" aria-label="build progress"
+           aria-valuemin="0"><span class="bar-fill"></span></div>
+      <div class="progress-line">
+        <span class="progress-what"></span>
+        <span class="progress-count mono"></span>
       </div>
     </div>
     <div id="built"></div>
-    <!-- What this install is. Inside the export card because it is the short
-         column and stays on screen, and because the page has no chrome of its
-         own to hang it on. -->
-    <div id="about">
-      <div id="about-line"></div>
-      <div class="hint" id="about-detail"></div>
-      <!-- Only for an install that owns its own files and has something to
-           install. Every other kind gets the sentence above instead, which
-           says what to do where the button cannot. -->
-      <div class="actions" id="update-row" hidden>
-        <button type="button" id="update-now"
-                title="Download the new release and install it beside this one">Update</button>
-      </div>
-      <div class="hint" id="updated"></div>
-      <!-- The sentence about checking is also where checking is asked for:
-           one primary action in this card at most, and the secondary one sits
-           in the line that is already about it. -->
-      <div class="hint" id="about-checked">
-        <span id="checked-when"></span>
-        <button type="button" id="check-now"
-                title="Ask now, whatever the last answer was">Check now</button>
-      </div>
-    </div>
 </form>
 
 <script type="module" src="js/app.js"></script>

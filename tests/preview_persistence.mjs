@@ -583,6 +583,32 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     get textContent() { return this._text; },
     set textContent(next) { this._text = next; this.steps.push(next); },
   });
+  // A progress row: the rule that fills and the line under it, reached the way
+  // the module reaches them, by class inside the row it was handed. Two of
+  // these exist -- the build's and the update's -- and every value each part
+  // took is kept, since "it counted its way there" is a sequence and reading
+  // the property afterwards only shows where it stopped.
+  const progressRow = () => {
+    const bar = {
+      attrs: {}, classes: new Set(),
+      classList: {
+        add(name) { bar.classes.add(name); },
+        remove(name) { bar.classes.delete(name); },
+      },
+      setAttribute(name, value) { this.attrs[name] = value; },
+      removeAttribute(name) { delete this.attrs[name]; },
+    };
+    const fill = { widths: [], style: {
+      _width: "",
+      get width() { return this._width; },
+      set width(next) { this._width = next; fill.widths.push(next); },
+    } };
+    const what = recording(), count = recording();
+    const parts = { ".bar": bar, ".bar-fill": fill,
+                    ".progress-what": what, ".progress-count": count };
+    return { hidden: true, bar, fill, what, count,
+             querySelector(selector) { return parts[selector]; } };
+  };
   const saveButton = {
     hidden: false, disabled: true, textContent: "", title: "",
     on: {},
@@ -597,28 +623,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Every value the note took, so the counting can be asserted and not
     // just the last line of it.
     built: recording(),
-    // The build progress: a rule that fills, and the line under it. Every
-    // value each part took, since "it counted its way there" is a sequence and
-    // reading the property afterwards only shows where it stopped.
-    progress: { hidden: true },
-    bar: {
-      attrs: {}, classes: new Set(),
-      classList: {
-        add(name) { stubs.bar.classes.add(name); },
-        remove(name) { stubs.bar.classes.delete(name); },
-      },
-      setAttribute(name, value) { this.attrs[name] = value; },
-      removeAttribute(name) { delete this.attrs[name]; },
-    },
-    // Every width it was set to, in order. The end of a run empties it, so
-    // reading the property afterwards only ever says 0% however full it got.
-    "bar-fill": { widths: [], style: {
-      _width: "",
-      get width() { return this._width; },
-      set width(next) { this._width = next; stubs["bar-fill"].widths.push(next); },
-    } },
-    "progress-what": recording(),
-    "progress-count": recording(),
+    progress: progressRow(),
     "source-note": { textContent: "" },
     // The row of sizes past the four boxes, which most families do not have.
     "more-row": { hidden: false },
@@ -640,18 +645,19 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     fetch: Object.assign(buildButton("fetch"), { hidden: false }),
     fetched: recording(),
     "have-fallbacks": { textContent: "" },
-    // What this install is: the version in the strip, the sentence at the
-    // foot of the export panel, and the line that is also the check button.
-    "version-strip": { textContent: "", title: "" },
-    "version-number": { textContent: "" },
-    "version-dot": { hidden: true },
-    "about-line": { textContent: "" },
+    // What this install is: the island under the specimen. The version, the
+    // state of the asking, and the one button that state offers.
+    about: { title: "" },
+    "about-version": { textContent: "" },
+    "about-state": recording(),
     "about-detail": { textContent: "" },
-    "checked-when": recording(),
-    "check-now": buildButton("check", "Check now"),
-    // The offer to install, which is a row so the button can go away with it.
-    "update-row": { hidden: true },
-    "update-now": buildButton("update", "Update"),
+    // Both carry `hidden`: one of them is on offer at a time, and which one is
+    // the whole of what the row says about updating.
+    "check-now": Object.assign(buildButton("check", "Check now"),
+                               { hidden: false }),
+    "update-now": Object.assign(buildButton("update", "Update"),
+                                { hidden: true }),
+    "update-progress": progressRow(),
     updated: recording(),
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
@@ -914,23 +920,25 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            builtSteps: stubs.built.steps,
-           progress: stubs.progress, bar: stubs.bar,
-           barFill: stubs["bar-fill"],
-           progressWhat: stubs["progress-what"],
-           progressCount: stubs["progress-count"],
+           progress: stubs.progress, bar: stubs.progress.bar,
+           barFill: stubs.progress.fill,
+           progressWhat: stubs.progress.what,
+           progressCount: stubs.progress.count,
            buildEls: [stubs.build, stubs["build-all"]],
            fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
-           about: { strip: stubs["version-strip"], line: stubs["about-line"],
+           about: { island: stubs.about, version: stubs["about-version"],
+                    state: stubs["about-state"],
                     detail: stubs["about-detail"],
-                    number: stubs["version-number"], dot: stubs["version-dot"],
-                    when: stubs["checked-when"], button: stubs["check-now"],
+                    button: stubs["check-now"],
                     press: () => buildButtons.check(),
-                    row: stubs["update-row"], update: stubs["update-now"],
+                    update: stubs["update-now"],
+                    apply: () => buildButtons.update(),
                     updated: stubs.updated,
-                    apply: () => buildButtons.update() },
+                    progress: stubs["update-progress"],
+                    fill: stubs["update-progress"].fill },
            refuse() { answer = false; } };
 }
 
@@ -2214,17 +2222,18 @@ for (const { name, text } of sources) {
 //     rather than that it is working.
 {
   const env = await loaded(fakeStorage());
-  const progress = env.modules.get("progress.js");
+  const {progressBar} = env.modules.get("progress.js");
+  const progress = progressBar(env.progress);
 
   // Before the plan arrives there is no total. A progressbar says that by
   // carrying no aria-valuenow, and the rule sweeps instead of sitting empty.
-  progress.startProgress("planning every family…");
+  progress.start("planning every family…");
   check("planning shows the bar", env.progress.hidden === false);
   check("sweeping rather than claiming a fraction it has not got",
         env.bar.classes.has("waiting") && !("aria-valuenow" in env.bar.attrs),
         JSON.stringify([...env.bar.classes]));
 
-  progress.showProgress(3, 12, "Alto 14");
+  progress.show(3, 12, "Alto 14");
   check("a counted step fills the rule", env.barFill.style.width === "25%",
         env.barFill.style.width);
   check("and stops sweeping", env.bar.classes.has("waiting") === false);
@@ -2233,7 +2242,7 @@ for (const { name, text } of sources) {
         && env.bar.attrs["aria-valuemax"] === "12",
         JSON.stringify(env.bar.attrs));
 
-  progress.endProgress();
+  progress.end();
   check("and it goes when the build does", env.progress.hidden === true);
 }
 
@@ -3138,48 +3147,48 @@ for (const { name, text } of sources) {
         env.byName.grayscale_hinting.title);
 }
 
-// 58. What this install is reaches both surfaces. The strip is the glance and
-//     never scrolls away; the panel foot is the sentence. The commit is there
+// 58. What this install is, in the island under the specimen: the version, the
+//     renderer it carries, and the state of the asking. The commit is there
 //     because two installs on one version can carry different renderers.
 {
   const env = await loaded(fakeStorage());
-  check("the strip carries the version",
-        env.about.number.textContent === "1.2.3",
-        env.about.number.textContent);
-  check("and the panel foot names the product with it",
-        env.about.line.textContent === "CrossGlyph 1.2.3",
-        env.about.line.textContent);
+  check("the island names the product and version",
+        env.about.version.textContent === "CrossGlyph 1.2.3",
+        env.about.version.textContent);
   check("and the renderer's commit, shortened the way the CLI does",
         env.about.detail.textContent.includes("45caec3e76c2"),
         env.about.detail.textContent);
-  check("a release on the newest version wears no dot",
-        env.about.dot.hidden === true, String(env.about.dot.hidden));
-  check("and is not told how to update, having nothing to update to",
+  check("a release on the newest version is not told how to update, having "
+        + "nothing to update to",
         env.about.detail.textContent.endsWith("45caec3e76c2."),
         env.about.detail.textContent);
   check("the line says when it last asked",
-        /^Checked .* ago\.$/.test(env.about.when.textContent),
-        env.about.when.textContent);
-  check("and there is nothing to press",
-        env.about.row.hidden === true, String(env.about.row.hidden));
+        /^Checked .* ago\.$/.test(env.about.state.textContent),
+        env.about.state.textContent);
+  check("and the one press on offer is asking again",
+        env.about.button.hidden === false && env.about.update.hidden === true,
+        `check ${env.about.button.hidden}, update ${env.about.update.hidden}`);
+  check("the whole of it is in the title, where the compact line is not",
+        env.about.island.title.includes("crosspoint-reader 45caec3e76c2"),
+        env.about.island.title);
 }
 
-// 58a. A newer release is the one thing the strip has to carry, because the
-//      panel foot scrolls and the strip does not.
+// 58a. A newer release takes the place of the line about when the asking last
+//      happened. It is the only answer worth having while there is one, and
+//      one thing on the right is what keeps the island to a single line.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, { about: {
     available: "2.0.0", latest: "2.0.0",
     notice: "Run crossglyph update to install it." } });
-  check("the dot appears", env.about.dot.hidden === false,
-        String(env.about.dot.hidden));
-  check("and the foot names the version to move to",
-        env.about.line.textContent.includes("2.0.0"),
-        env.about.line.textContent);
-  check("and says how",
+  check("the state names the version to move to",
+        env.about.state.textContent === "2.0.0 is available.",
+        env.about.state.textContent);
+  check("and the detail says how",
         env.about.detail.textContent.includes("crossglyph update"),
         env.about.detail.textContent);
-  check("and there is a button for it",
-        env.about.row.hidden === false, String(env.about.row.hidden));
+  check("and the press on offer is the one that installs it",
+        env.about.update.hidden === false && env.about.button.hidden === true,
+        `check ${env.about.button.hidden}, update ${env.about.update.hidden}`);
 }
 
 // 58b. A kind that cannot replace its own files says so instead, because the
@@ -3196,7 +3205,7 @@ for (const { name, text } of sources) {
         !env.about.detail.textContent.includes("crosspoint-reader"),
         env.about.detail.textContent);
   check("and no button offers what this install cannot do",
-        env.about.row.hidden === true, String(env.about.row.hidden));
+        env.about.update.hidden === true, String(env.about.update.hidden));
 }
 
 // 58c. Checking turned off is said, rather than the line reading as though
@@ -3205,8 +3214,8 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage(), DEFAULTS,
                            { about: { checking_off: true } });
   check("the line says the checks are off",
-        env.about.when.textContent === "Update checks are off.",
-        env.about.when.textContent);
+        env.about.state.textContent === "Update checks are off.",
+        env.about.state.textContent);
 }
 
 // 58d. A check nobody could complete says so. This is the state an automatic
@@ -3216,8 +3225,8 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage(), DEFAULTS,
                            { about: { error: "no route", checked_at: null } });
   check("the line says it could not ask",
-        env.about.when.textContent === "Could not reach the update server.",
-        env.about.when.textContent);
+        env.about.state.textContent === "Could not reach the update server.",
+        env.about.state.textContent);
 }
 
 // 58e. The button asks, and says so while it is asking.
@@ -3229,8 +3238,8 @@ for (const { name, text } of sources) {
   check("it asked", env.fetches.checks === before + 1,
         `${before} -> ${env.fetches.checks}`);
   check("it said so while it was asking",
-        env.about.when.steps.includes("Checking..."),
-        JSON.stringify(env.about.when.steps));
+        env.about.state.steps.includes("Checking..."),
+        JSON.stringify(env.about.state.steps));
   check("and it went out and came back rather than staying out",
         JSON.stringify(env.about.button.states) === "[true,false]",
         JSON.stringify(env.about.button.states));
@@ -3243,23 +3252,26 @@ for (const { name, text } of sources) {
   env.about.press();
   await settle();
   check("a failed press says what happened",
-        env.about.when.textContent === "Could not reach the update server.",
-        env.about.when.textContent);
+        env.about.state.textContent === "Could not reach the update server.",
+        env.about.state.textContent);
   check("and the button comes back",
         env.about.button.disabled === false,
         String(env.about.button.disabled));
 }
 
-// 58g. What the press learns reaches both surfaces, not just the line it was
-//      pressed from.
+// 58g. What the press learns changes what is on offer, not merely the line it
+//      was pressed from: an install that has just heard about a release has to
+//      offer the button that installs it.
 {
   const env = await loaded(fakeStorage(), DEFAULTS,
                            { checked: { available: "2.0.0" } });
-  check("the dot is not there before", env.about.dot.hidden === true);
+  check("nothing to install before", env.about.update.hidden === true);
   env.about.press();
   await settle();
-  check("and is after", env.about.dot.hidden === false,
-        String(env.about.dot.hidden));
+  check("and the offer after", env.about.update.hidden === false,
+        String(env.about.update.hidden));
+  check("with the asking button out of the way, one press at a time",
+        env.about.button.hidden === true, String(env.about.button.hidden));
 }
 
 // 58h. Pressing Update installs, counting its way there on the panel's own
@@ -3273,16 +3285,19 @@ for (const { name, text } of sources) {
   await settle();
   check("it asked the server to install", env.fetches.applies === 1,
         String(env.fetches.applies));
-  check("the bar filled on the way", env.barFill.widths.includes("50%"),
-        JSON.stringify(env.barFill.widths));
-  check("and is gone at the end", env.progress.hidden === true,
-        String(env.progress.hidden));
+  check("the bar filled on the way", env.about.fill.widths.includes("50%"),
+        JSON.stringify(env.about.fill.widths));
+  check("and is gone at the end", env.about.progress.hidden === true,
+        String(env.about.progress.hidden));
+  check("on the island's own bar, not the panel's",
+        env.progressWhat.steps.length === 0,
+        JSON.stringify(env.progressWhat.steps));
   check("the sentence says what to do next",
         env.about.updated.textContent ===
           "2.0.0 installed. Restart CrossGlyph to use it.",
         env.about.updated.textContent);
   check("and the offer goes, since pressing it again would install nothing",
-        env.about.row.hidden === true, String(env.about.row.hidden));
+        env.about.update.hidden === true, String(env.about.update.hidden));
   check("the button went out and came back",
         JSON.stringify(env.about.update.states) === "[true,false]",
         JSON.stringify(env.about.update.states));
@@ -3337,7 +3352,7 @@ for (const { name, text } of sources) {
         env.about.updated.textContent.includes("does not match"),
         env.about.updated.textContent);
   check("and the offer stays, since nothing was installed",
-        env.about.row.hidden === false, String(env.about.row.hidden));
+        env.about.update.hidden === false, String(env.about.update.hidden));
 }
 
 // 58k. An answer that never comes still ends the run. Without this the bar
@@ -3348,8 +3363,8 @@ for (const { name, text } of sources) {
     about: { available: "2.0.0", latest: "2.0.0" }, applyFails: true });
   env.about.apply();
   await settle();
-  check("the bar is gone", env.progress.hidden === true,
-        String(env.progress.hidden));
+  check("the bar is gone", env.about.progress.hidden === true,
+        String(env.about.progress.hidden));
   check("the button comes back", env.about.update.disabled === false,
         String(env.about.update.disabled));
   check("and the failure is said rather than swallowed",
