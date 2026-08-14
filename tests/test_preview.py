@@ -582,3 +582,33 @@ def test_the_page_remembers_the_readers_own_settings():
         [node, "--experimental-vm-modules", "--no-warnings", str(script)],
         capture_output=True, text=True)
     assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_a_ligature_the_font_cannot_form_is_not_a_hole_in_the_page():
+    """coverage_for asks for the output codepoint of every ligature the faces
+    could form, because a build missing one drops the ligature. Literata names
+    an `ff` glyph with no cmap entry, so three of those are always 'missing' --
+    and none of them is a character anybody typed. Counting them told a reader
+    on the very first page that three characters were blank when none were."""
+    from crossglyph import fontbuild, preview
+
+    config = fontbuild.starter_configs(
+        fontbuild.SOURCE_DIR, {})[0][0]
+    sources = {preview.REGULAR: config.styles["regular"],
+               preview.ITALIC: config.styles["italic"]}
+    text = preview.SAMPLES["en"].text
+
+    build = preview.coverage_for(text, sources)
+    page = preview.on_the_page(text)
+    assert preview.missing_codepoints(sources, build), \
+        "the ligature outputs are gone, so this no longer guards anything"
+    assert not preview.missing_codepoints(sources, page), \
+        "the bundled family cannot draw its own English sample"
+
+    # The space and the hyphen stay in: hyphenation appends a hyphen nobody
+    # typed, so a face without one really does leave a gap.
+    asked = {code for low, high in page for code in range(low, high + 1)}
+    assert set(preview.ESSENTIAL_CODEPOINTS) <= asked
+    # And nothing that is not on the page.
+    plain, _ = preview.markup.parse(text)
+    assert asked - set(preview.ESSENTIAL_CODEPOINTS) <= set(map(ord, plain))

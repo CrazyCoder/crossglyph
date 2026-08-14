@@ -33,7 +33,7 @@ from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
 from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
                PageSpec, build_font, coverage_for, faces_for,
-               fallback_split, preview_page)
+               fallback_split, on_the_page, preview_page)
 
 app = FastAPI(title="CrossGlyph font preview")
 
@@ -518,9 +518,11 @@ def render(request: RenderRequest) -> Response:
             keyed, request.size, coverage, _cache_key(request.tuning),
             useful_fallbacks(keyed, coverage, offered),
             axes_for(request.family, request.size, request.axes))
-        # What nothing on the page can draw. A cache hit, since the same walk
-        # chose the faces above.
-        undrawn = resolved_fallbacks(keyed, coverage, offered)[1]
+        # What nothing can draw of what is on the page -- asked of the text
+        # rather than of the build's coverage, which carries ligature outputs
+        # nobody typed. See on_the_page.
+        undrawn = resolved_fallbacks(
+            keyed, on_the_page(request.text), offered)[1]
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an

@@ -210,6 +210,27 @@ def needed_fallbacks(sources: Mapping[int, pathlib.Path | str],
     return fallback_split(sources, coverage, fallbacks)[0]
 
 
+def on_the_page(text: str) -> tuple[tuple[int, int], ...]:
+    """What the page will actually try to draw, as intervals.
+
+    Not coverage_for: that is what a *build* should carry, and it adds the
+    output codepoint of every ligature the faces could form -- nobody types
+    U+FB00, and a face whose GSUB names an `ff` glyph it has no cmap entry for
+    is not a page with a hole in it. The converter drops the ligature and the
+    two letters draw as themselves.
+
+    Asking what cannot be drawn has to be asked of the characters somebody
+    typed, plus the space and hyphen the layout supplies for itself
+    (ESSENTIAL_CODEPOINTS): a face missing the hyphen really does leave a gap,
+    because hyphenation appends one nobody typed.
+    """
+    plain, _ = markup.parse(text)
+    codepoints = {code for code in map(ord, plain)
+                  if code >= 0x20 and code != 0x7F}
+    codepoints.update(ESSENTIAL_CODEPOINTS)
+    return tuple((code, code) for code in sorted(codepoints))
+
+
 def fallback_split(sources: Mapping[int, pathlib.Path | str],
                    coverage: tuple[tuple[int, int], ...],
                    fallbacks: tuple[pathlib.Path | str, ...],
