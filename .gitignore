@@ -16,3 +16,8 @@ fonts/*
 !fonts/conf/
 fonts/conf/*
 !fonts/conf/all.conf
+
+# Written by the update check, at the install root. A checkout's root is the
+# repo, so without this it turns up in git status and, worse, in the release:
+# a shipped state file would tell a fresh install it had already checked.
+.update-state.json

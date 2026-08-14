@@ -33,7 +33,9 @@ REPO = "CrazyCoder/crossglyph"
 #: What stays outside versions/, because it outlives any one version: the
 #: launcher, which an update cannot replace while cmd.exe is holding it, and
 #: the workspace, which is the user's. `current` is generated, not tracked.
-ROOT_FILES = frozenset({"crossglyph.cmd", "crossglyph.sh"})
+#: update.conf is here for the same reason fonts/ is: it is the user's, and
+#: an update must not write over what they set.
+ROOT_FILES = frozenset({"crossglyph.cmd", "crossglyph.sh", "update.conf"})
 
 #: "Version made by", saying Unix. It is what decides whether a reader honours
 #: the mode at all: an entry claiming DOS carries no mode a POSIX unzip will
@@ -49,7 +51,7 @@ DEFAULT_MODE = 0o100644
 #: directory, filled in per build.
 REQUIRED = [
     "current",
-    "crossglyph.sh", "crossglyph.cmd",
+    "crossglyph.sh", "crossglyph.cmd", "update.conf",
     "fonts/README.md", "fonts/conf/all.conf",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
     "{v}/THIRD-PARTY-NOTICES.md",
@@ -66,10 +68,12 @@ REQUIRED = [
     "{v}/tools/tool-wrapper.cmd", "{v}/tools/tool-wrapper.ps1",
 ]
 
-#: A checkout's own furniture, which means nothing to somebody unpacking a zip.
-#: `export-ignore` in .gitattributes is what keeps them out; this is the check.
+#: A checkout's own furniture, which means nothing to somebody unpacking a
+#: zip, plus what the tool writes for itself: a state file in a release would
+#: tell a fresh install it had already checked, on somebody else's clock.
+#: `export-ignore` and .gitignore are what keep them out; this is the check.
 EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
-            ".github/workflows/release.yml"]
+            ".github/workflows/release.yml", ".update-state.json"]
 
 #: Executed on macOS and Linux, so the bit has to survive the archive and the
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.

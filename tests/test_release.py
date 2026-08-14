@@ -169,3 +169,15 @@ def test_a_release_writes_the_manifest_beside_the_zip(built, tmp_path):
     said = json.loads(out.read_text(encoding="utf-8"))
     assert said["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert said["size"] == path.stat().st_size
+
+
+def test_the_users_own_files_stay_at_the_root():
+    """update.conf is theirs, like fonts/. An update replaces versions/<v>
+    wholesale, so anything of theirs in there would go with it."""
+    assert make_release.release_path("update.conf", "0.2.0") == "update.conf"
+
+
+def test_the_release_carries_no_state_of_its_own(members):
+    """A state file in a release would tell a fresh install it had already
+    checked, on the clock of whoever built it."""
+    assert not [path for path in members if "update-state" in path]
