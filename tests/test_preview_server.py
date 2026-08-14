@@ -2026,5 +2026,5 @@ def test_the_page_is_told_when_checking_is_off(client, monkeypatch):
     from crossglyph.preview import server
 
     monkeypatch.setattr(server.updateconf, "settings",
-                        lambda root: updateconf.Settings(False, 24.0))
+                        lambda root: updateconf.Settings(False, 24.0, 1))
     assert client.get("/update").json()["checking_off"] is True

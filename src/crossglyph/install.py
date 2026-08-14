@@ -22,16 +22,23 @@ UNKNOWN = "unknown"
 #: per packaging route, so adding one is a row here rather than a branch at
 #: every call site.
 INSTRUCTIONS = {
-    # There is no `crossglyph update` that installs anything yet. This says
-    # what somebody can actually do until there is.
-    ZIP: "Download the new release to update.",
+    ZIP: "Run crossglyph update to install it.",
     CONTAINER: "Pull the new image to update.",
     CHECKOUT: "Run git pull to update.",
-    SOURCE: "This is a source download. Get the release zip to update.",
+    SOURCE: "Run crossglyph update to convert this into a release install.",
     UNKNOWN: "Open the release page to update.",
 }
 
 KINDS = tuple(INSTRUCTIONS)
+
+#: What a kind says when there is nothing to update to. A source download is
+#: the one with something worth saying: its version is whatever the last
+#: release set, so a tree taken from master days later reports that release and
+#: compares as up to date while holding something else entirely.
+STANDING = {
+    SOURCE: "This is a source download, so its version may not describe what "
+            "is in the tree.",
+}
 
 #: How a kind is named when something has to say which one it is. Beside the
 #: instructions rather than at the call site, so a new packaging route is one
@@ -40,7 +47,7 @@ KINDS = tuple(INSTRUCTIONS)
 LABELS = {
     CONTAINER: "container",
     CHECKOUT: "checkout",
-    SOURCE: "source download, will not update itself",
+    SOURCE: "source download",
     UNKNOWN: "will not update itself",
 }
 
@@ -93,12 +100,32 @@ def detect(directory: pathlib.Path,
 
 
 def can_self_update(kind: str) -> bool:
-    """Only an unpacked release owns its own files."""
-    return kind == ZIP
+    """Which kinds own the files an update would write.
+
+    A source download does, once: converting it only adds versions/ and
+    current beside a tree it never touches, and after that it is a release
+    like any other. Everything else belongs to an image or a package manager.
+    """
+    return kind in (ZIP, SOURCE)
 
 
 def instruction(kind: str) -> str:
     return INSTRUCTIONS.get(kind, INSTRUCTIONS[UNKNOWN])
+
+
+def notice(kind: str, available: bool) -> str:
+    """The sentence a surface shows about updating, or nothing.
+
+    One place decides this, so the page and the command line cannot come to
+    disagree and neither has to work out for itself when there is something to
+    say. A release with nothing to update to says nothing at all: naming the
+    ordinary case on every run is noise.
+    """
+    if available:
+        return instruction(kind)
+    if kind in STANDING:
+        return STANDING[kind]
+    return "" if can_self_update(kind) else instruction(kind)
 
 
 def label(kind: str) -> str:

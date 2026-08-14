@@ -32,7 +32,7 @@ def test_a_clone_is_a_checkout(tmp_path):
 
 def test_the_same_tree_without_git_is_a_source_download(tmp_path):
     """What the GitHub Code button gives you: the repo, with no versions/ and
-    no .git, so it can never self-update."""
+    no .git. It updates by being converted into a release install."""
     assert install.detect(_tree(tmp_path), {}, NO_DOCKER) == install.SOURCE
 
 
@@ -76,10 +76,12 @@ def test_a_release_layout_that_cannot_be_written_is_unknown(tmp_path,
     assert install.detect(_release(tmp_path), {}, NO_DOCKER) == install.UNKNOWN
 
 
-def test_only_the_zip_kind_can_update_itself():
+def test_the_kinds_that_own_their_own_files_can_update_themselves():
+    """A source download does, once: the conversion only adds versions/ and
+    current beside a tree it never touches."""
     assert install.can_self_update(install.ZIP) is True
-    for kind in (install.CONTAINER, install.CHECKOUT, install.SOURCE,
-                 install.UNKNOWN):
+    assert install.can_self_update(install.SOURCE) is True
+    for kind in (install.CONTAINER, install.CHECKOUT, install.UNKNOWN):
         assert install.can_self_update(kind) is False
 
 
@@ -114,6 +116,31 @@ def test_a_release_is_the_kind_with_nothing_to_say_about_itself():
                                   install.SOURCE, install.UNKNOWN])
 def test_every_other_kind_says_which_it_is(kind):
     assert install.label(kind)
+
+
+@pytest.mark.parametrize("kind", list(install.KINDS))
+def test_a_kind_with_an_update_waiting_says_what_to_do_about_it(kind):
+    assert install.notice(kind, True) == install.instruction(kind)
+
+
+def test_a_release_with_nothing_to_update_to_says_nothing():
+    assert install.notice(install.ZIP, False) == ""
+
+
+def test_a_source_download_says_so_whether_or_not_there_is_an_update():
+    """Standing and passive: its version is whatever the last release set, so
+    a tree taken from master after that reports the release and compares as up
+    to date while holding something else."""
+    said = install.notice(install.SOURCE, False)
+    assert said.startswith("This is a source download")
+
+
+@pytest.mark.parametrize("kind", [install.CONTAINER, install.CHECKOUT,
+                                  install.UNKNOWN])
+def test_a_kind_that_cannot_update_itself_says_so_standing(kind):
+    """Worth saying when there is nothing to act on: what somebody can do here
+    is not what the buttons on this page do."""
+    assert install.notice(kind, False) == install.instruction(kind)
 
 
 def test_a_kind_nobody_declared_is_named_rather_than_hidden():
