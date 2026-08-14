@@ -1,7 +1,7 @@
 # Updating
 
 CrossGlyph looks for a newer release about once a day and tells you when there
-is one. It does not download or install anything.
+is one. It installs nothing until you ask it to.
 
 ## What it does, and when
 
@@ -26,16 +26,17 @@ On the command line, after `crossglyph build` or `crossglyph fetch-fallbacks`,
 one line:
 
 ```
-note: 0.2.0 is available. Download the new release to update.
+note: 0.2.0 is available. Run crossglyph update to install it.
 ```
 
 The second sentence depends on how CrossGlyph was installed. A clone is told
-to pull, a container to take the new image, an unpacked release to download
-the next one.
+to pull, a container to take the new image, an unpacked release to run the
+command above.
 
 In the preview, a dot appears beside the version at the top of the left panel,
 and the block at the foot of the export panel names the new version. That
-block also says when it last looked, with a **Check now** button beside it.
+block also says when it last looked, with a **Check now** button beside it,
+and an **Update** button when this install can install one.
 
 ## Asking on purpose
 
@@ -50,6 +51,92 @@ not reach the server.
 
 **Check now** in the preview does the same thing.
 
+## Installing one
+
+```sh
+crossglyph update
+```
+
+The **Update** button in the preview does the same thing, with a bar for the
+download.
+
+It fetches the manifest, stops if there is nothing newer, downloads the
+release, checks it against the SHA-256 the manifest gave, unpacks it into
+`versions/<new version>`, and writes that version into `current` last of all.
+
+Nothing is replaced in place. The version you were on stays where it is, and
+so does everything at the root: the launcher, `update.conf`, and your `fonts`
+folder. What is installed does not become what is running until you start
+CrossGlyph again.
+
+An update interrupted anywhere leaves an install that still runs. The download
+goes to `versions/.tmp-<version>.zip` and the unpack to
+`versions/.incoming-<version>`, neither of which the launcher will ever start,
+and both of which are swept at the next launch.
+
+Two things stop it before it downloads anything:
+
+- an install that does not own its own files, which is a clone, a container,
+  or a folder nobody can write to. The notice says what to do instead.
+- a release that changes the launcher. cmd.exe reads a batch file as it runs
+  it, so the file that started the update is open, and replacing it would
+  corrupt the run. That release has to be unpacked by hand, and the message
+  links to it.
+
+### Your workspace
+
+An update never writes over a file you edited. For each file it ships into
+`fonts`, today `README.md` and `conf/all.conf`:
+
+- if it is not there, it is written;
+- if it is exactly as it shipped, it is replaced, since you never touched it;
+- otherwise yours is kept, the new one is written beside it as
+  `<name>.new`, and the update says so.
+
+Everything else in `fonts` is yours and is not looked at.
+
+### A source download
+
+A tree from the **Code** button on GitHub has no `versions` folder and no
+`current`, so it runs where it stands. `crossglyph update` converts it: it
+adds those two things and changes nothing else. The launcher already prefers
+the versioned layout, so the next run starts the new version, and the install
+updates normally from then on.
+
+The files at the root are left where they are. They are no longer read, and
+deleting a folder somebody unpacked themselves is a larger act than adding two
+things to it. Delete them yourself if you want the disk back.
+
+The offer only appears when the published release is newer than the version in
+the tree. A snapshot taken from the main branch reports the version of the
+last release while holding rather more than it did, so installing that release
+over the top would be a step backwards.
+
+## Going back
+
+```sh
+crossglyph update --rollback
+```
+
+Puts `current` back to the version before this one and says so. Restart
+CrossGlyph and you are on it.
+
+The version you left is recorded, and the check stays quiet about it until
+something newer than it appears. Otherwise the next check would offer you the
+release you just escaped, and go on offering it every day.
+
+## How many versions are kept
+
+The one in use and one more, which is what rolling back needs. Older ones are
+removed at the next launch, on a background thread in the preview, so a large
+removal never delays the page. `keep_versions` in `update.conf` changes the
+count.
+
+A version costs about 3 MB unpacked, and about 80 MB once it has been run and
+uv has built its environment. Nothing removes the version in use, the version
+`current` names, or the one this process is running from, and a directory that
+will not go is left for the next launch rather than failing anything.
+
 ## Settings
 
 `update.conf` sits beside the launcher, at the top of the folder you unpacked.
@@ -59,6 +146,7 @@ It ships fully commented, so having it changes nothing until you edit a line.
 |---|---|---|
 | `check` | `yes` | Set to `no` to stop it asking on its own. |
 | `interval_hours` | `24` | How long to wait between checks. |
+| `keep_versions` | `1` | Versions kept besides the one in use. Zero keeps none, and leaves nothing to roll back to. |
 
 A value that does not parse leaves the default rather than being guessed at.
 
@@ -72,16 +160,19 @@ so one is enough and a `yes` in the config does not overrule the others:
 - `--no-update-check` on any command, for that run only;
 - the `CI` environment variable, which is set for you on build machines.
 
-None of them touches `crossglyph update --check` or the **Check now** button.
-Those are you asking, which is a different thing from the tool asking.
+None of them touches `crossglyph update --check`, `crossglyph update` or the
+two buttons. Those are you asking, which is a different thing from the tool
+asking. Nothing installs itself either way.
 
 ## What it writes
 
-`.update-state.json`, beside the launcher: when it last looked and what it
-found. Deleting it costs nothing but one more check.
+`.update-state.json`, beside the launcher: when it last looked, what it found,
+and the version a rollback rejected. Deleting it costs one more check, and
+un-rejects a version you rolled back from.
 
 ## What it sends
 
-A plain HTTPS GET for `latest.json` and nothing else. No identifier, no
-version, no count. The server learns what any web server learns from a
-request, and CrossGlyph tells it nothing further.
+A plain HTTPS GET for `latest.json`, and, when you ask for an update, a GET
+for the release zip. No identifier, no version, no count. The server learns
+what any web server learns from a request, and CrossGlyph tells it nothing
+further.

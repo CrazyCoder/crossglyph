@@ -128,6 +128,24 @@ workspace and `update.conf` sit at the root and the code goes under
 `versions/<version>/`. Members are copied as bytes rather than through the
 filesystem, which is what keeps the wrappers exact.
 
+The workspace files are the one thing that lands twice: at the root, which is
+the copy the user edits, and inside the version, which is the record of how
+they shipped. An update compares against that second copy to tell a file
+somebody edited from one that changed between releases, and without it every
+install would look edited.
+
+### Changing the launcher costs a release
+
+`crossglyph.cmd`, `crossglyph.sh` and `update.conf` are the three files an
+update cannot replace: cmd.exe reads a batch file by byte offset while it runs
+it, so the launcher is open at the line that started the update. When a
+release changes one of them the manifest says `launcher_changed: true`, and
+every install refuses to apply it and points at the download page instead.
+
+Nobody is stuck, but everybody has to unpack a zip by hand, so it is worth
+knowing before changing a file at the root rather than after. Keep the shim
+thin and put anything that might need fixing in the versioned tree.
+
 The script then reads the archive back and checks that everything a release
 needs is in it, that no checkout furniture or state file came along, that the
 executable files still are, that every entry carries a Unix mode a POSIX

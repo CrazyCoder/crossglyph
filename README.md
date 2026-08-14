@@ -30,8 +30,11 @@ names, which is how a later release can be added beside this one rather than
 written over it.
 
 CrossGlyph looks for a newer release about once a day and says so when there
-is one. It never downloads or installs anything on its own, and one line in
-`update.conf` turns the looking off. See [docs/updating.md](docs/updating.md).
+is one. `crossglyph update`, or the button in the preview, installs it beside
+the version you are on and leaves your fonts and your settings alone;
+`crossglyph update --rollback` goes back. Nothing is downloaded or installed
+until you ask, and one line in `update.conf` turns the looking off. See
+[docs/updating.md](docs/updating.md).
 
 Step 3 is second on purpose: there is nothing to set up before the first run.
 An empty workspace opens on Literata, which ships with the tool, so the page
@@ -49,8 +52,9 @@ publishes none, so uv tries to compile it and needs a build toolchain.
 
 ## The workspace
 
-The `fonts` folder sits beside the launcher, outside `versions`, so nothing
-that updates the tool can reach it. It holds four things:
+The `fonts` folder sits beside the launcher, outside `versions`, so an update
+only ever adds to it: a file you edited is kept, with the new one written
+beside it as `<name>.new`. It holds four things:
 
 ```
 fonts/
