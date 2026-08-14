@@ -1,6 +1,10 @@
 // What this install is, in the two places that say so: the version in the top
 // strip, and the sentence at the foot of the export panel. One shape fills
 // both, from start.js at load and from the button after that.
+import {streamInto} from "./export.js";
+import {endProgress, showProgress, spellBytes,
+        startProgress} from "./progress.js";
+
 const strip = document.getElementById("version-strip");
 const number = document.getElementById("version-number");
 const dot = document.getElementById("version-dot");
@@ -8,6 +12,9 @@ const line = document.getElementById("about-line");
 const detail = document.getElementById("about-detail");
 const when = document.getElementById("checked-when");
 const button = document.getElementById("check-now");
+const updateRow = document.getElementById("update-row");
+const updateButton = document.getElementById("update-now");
+const updateNote = document.getElementById("updated");
 
 // The same count the CLI uses, in render/stamp.py: the page and `crossglyph
 // --version` report one fact, and two spellings of it is one more thing to
@@ -46,17 +53,68 @@ export function showAbout(about) {
     said.push("Render core built from crosspoint-reader " +
               `${about.firmware.slice(0, SHORT)}.`);
   }
-  // Worth saying when there is something to act on, and when this install
-  // could not act on it anyway.
-  if (about.available || !about.can_self_update) said.push(about.instruction);
+  // Decided by the server, which is where the same rule serves the command
+  // line. Empty for a release with nothing to update to, which is the case
+  // that should say nothing at all.
+  if (about.notice) said.push(about.notice);
   detail.textContent = said.join(" ");
   when.textContent = checkedLine(about);
+  // The button, only where pressing it would do something: an install that
+  // owns its own files, with a release to install. Everywhere else the
+  // sentence above says what to do instead.
+  updateRow.hidden = !(about.can_self_update && about.available);
 
   strip.title = [`CrossGlyph ${about.version}`, ...said].join("\n");
 }
 
+// What the install left in the workspace, said the way the command line says
+// it: one install, one sentence, whichever surface asked for it.
+function keptLine(kept) {
+  return kept.map(name =>
+    ` Kept your fonts/${name}. The new one is beside it as ` +
+    `${name.split("/").pop()}.new.`).join("");
+}
+
+export function showUpdateStep(step) {
+  if (step.event === "plan") {
+    updateNote.textContent = step.converting
+      ? `Converting this install to ${step.version}.`
+      : `Installing ${step.version}.`;
+  } else if (step.event === "step") {
+    showProgress(step.got, step.bytes, "downloading", spellBytes);
+  } else if (step.event === "current") {
+    updateNote.textContent = `CrossGlyph ${step.version} is up to date.`;
+  } else if (step.event === "error") {
+    updateNote.textContent = step.error;
+  } else if (step.event === "done") {
+    // There is nothing more to press here: what is installed does not become
+    // what is running until the tool is started again.
+    updateRow.hidden = true;
+    updateNote.textContent =
+      `${step.version} installed. Restart CrossGlyph to use it.` +
+      keptLine(step.kept) + (step.converting
+        ? " The files at the root are no longer read." : "");
+  }
+}
+
 // Its own button, so this is a handle the module owns rather than a name
 // reaching across modules.
+updateButton.addEventListener("click", async () => {
+  // Out for the duration. It is a download and an extract, and a button that
+  // still looks pressable is one people press again, mid-swap.
+  updateButton.disabled = true;
+  updateNote.textContent = "";
+  startProgress("asking for the new release…");
+  try {
+    await streamInto("/update", {}, showUpdateStep, updateNote);
+  } finally {
+    // Whatever ended it, including a dropped connection: a bar left sitting
+    // at some fraction says the update is still running.
+    endProgress();
+    updateButton.disabled = false;
+  }
+});
+
 button.addEventListener("click", () => {
   button.disabled = true;
   when.textContent = "Checking...";

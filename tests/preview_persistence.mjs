@@ -210,7 +210,7 @@ function makeControl({ name, type = "text", value = "", checked = false, group,
 // version there is, so a block only says what it is changing.
 const ABOUT = {
   version: "1.2.3", firmware: "45caec3e76c2472b", kind: "zip",
-  can_self_update: true, instruction: "Download the new release to update.",
+  can_self_update: true, notice: "",
   latest: "1.2.3", available: null, checked_at: 1000, checking_off: false,
   error: null,
 };
@@ -649,6 +649,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "about-detail": { textContent: "" },
     "checked-when": recording(),
     "check-now": buildButton("check", "Check now"),
+    // The offer to install, which is a row so the button can go away with it.
+    "update-row": { hidden: true },
+    "update-now": buildButton("update", "Update"),
+    updated: recording(),
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
     // shows the page untuned.
@@ -687,8 +691,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
     },
   };
-  const fetches = { render: 0, checks: 0, bodies: [], saves: [], builds: [],
-                    fallbacks: [] };
+  const fetches = { render: 0, checks: 0, applies: 0, bodies: [], saves: [],
+                    builds: [], fallbacks: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
@@ -844,6 +848,31 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         return Promise.resolve({ json: () => Promise.resolve(
           { ...ABOUT, ...(opts.checked ?? {}) }) });
       }
+      // Applying, which is the same path as a build: a line of JSON per step
+      // and a bar that follows it. Only a POST, since the GET below is the
+      // page reading what is already known.
+      if (String(url).includes("/update") && options
+          && options.method === "POST") {
+        fetches.applies++;
+        if (opts.applyFails) {
+          return Promise.reject(new TypeError("connection lost"));
+        }
+        const steps = opts.updateSteps ?? [
+          { event: "plan", version: "2.0.0", bytes: 1600000,
+            notes_url: "https://example.invalid/", converting: false },
+          { event: "step", got: 800000, bytes: 1600000 },
+          { event: "step", got: 1600000, bytes: 1600000 },
+          { event: "done", version: "2.0.0", kept: [], converting: false,
+            where: "versions/2.0.0" },
+        ];
+        const body = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
+        let sent = false;
+        return Promise.resolve({ ok: true, body: { getReader: () => ({
+          read: () => Promise.resolve(sent
+            ? { value: undefined, done: true }
+            : ((sent = true), { value: body, done: false })),
+        }) } });
+      }
       if (String(url).includes("/update")) {
         return Promise.resolve({ json: () => Promise.resolve(
           { ...ABOUT, ...(opts.about ?? {}) }) });
@@ -898,7 +927,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                     detail: stubs["about-detail"],
                     number: stubs["version-number"], dot: stubs["version-dot"],
                     when: stubs["checked-when"], button: stubs["check-now"],
-                    press: () => buildButtons.check() },
+                    press: () => buildButtons.check(),
+                    row: stubs["update-row"], update: stubs["update-now"],
+                    updated: stubs.updated,
+                    apply: () => buildButtons.update() },
            refuse() { answer = false; } };
 }
 
@@ -3123,40 +3155,48 @@ for (const { name, text } of sources) {
   check("a release on the newest version wears no dot",
         env.about.dot.hidden === true, String(env.about.dot.hidden));
   check("and is not told how to update, having nothing to update to",
-        !env.about.detail.textContent.includes("Download"),
+        env.about.detail.textContent.endsWith("45caec3e76c2."),
         env.about.detail.textContent);
   check("the line says when it last asked",
         /^Checked .* ago\.$/.test(env.about.when.textContent),
         env.about.when.textContent);
+  check("and there is nothing to press",
+        env.about.row.hidden === true, String(env.about.row.hidden));
 }
 
 // 58a. A newer release is the one thing the strip has to carry, because the
 //      panel foot scrolls and the strip does not.
 {
-  const env = await loaded(fakeStorage(), DEFAULTS,
-                           { about: { available: "2.0.0", latest: "2.0.0" } });
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    available: "2.0.0", latest: "2.0.0",
+    notice: "Run crossglyph update to install it." } });
   check("the dot appears", env.about.dot.hidden === false,
         String(env.about.dot.hidden));
   check("and the foot names the version to move to",
         env.about.line.textContent.includes("2.0.0"),
         env.about.line.textContent);
-  check("and says how", env.about.detail.textContent.includes("Download"),
+  check("and says how",
+        env.about.detail.textContent.includes("crossglyph update"),
         env.about.detail.textContent);
+  check("and there is a button for it",
+        env.about.row.hidden === false, String(env.about.row.hidden));
 }
 
 // 58b. A kind that cannot replace its own files says so instead, because the
 //      way out differs and the notice is the only place it is said.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, { about: {
-    firmware: null, kind: "source", can_self_update: false,
-    instruction: "This is a source download. Get the release zip to update." },
+    firmware: null, kind: "container", can_self_update: false,
+    available: "2.0.0", notice: "Pull the new image to update." },
   });
-  check("the instruction takes the place of the commit",
-        env.about.detail.textContent.startsWith("This is a source download"),
+  check("the notice takes the place of the commit",
+        env.about.detail.textContent === "Pull the new image to update.",
         env.about.detail.textContent);
   check("and a core with no stamp is left unsaid rather than guessed",
         !env.about.detail.textContent.includes("crosspoint-reader"),
         env.about.detail.textContent);
+  check("and no button offers what this install cannot do",
+        env.about.row.hidden === true, String(env.about.row.hidden));
 }
 
 // 58c. Checking turned off is said, rather than the line reading as though
@@ -3220,6 +3260,82 @@ for (const { name, text } of sources) {
   await settle();
   check("and is after", env.about.dot.hidden === false,
         String(env.about.dot.hidden));
+}
+
+// 58h. Pressing Update installs, counting its way there on the panel's own
+//      bar. It is a megabyte and a half, and a button that says nothing for
+//      the whole of it is indistinguishable from one that did nothing.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    available: "2.0.0", latest: "2.0.0",
+    notice: "Run crossglyph update to install it." } });
+  env.about.apply();
+  await settle();
+  check("it asked the server to install", env.fetches.applies === 1,
+        String(env.fetches.applies));
+  check("the bar filled on the way", env.barFill.widths.includes("50%"),
+        JSON.stringify(env.barFill.widths));
+  check("and is gone at the end", env.progress.hidden === true,
+        String(env.progress.hidden));
+  check("the sentence says what to do next",
+        env.about.updated.textContent ===
+          "2.0.0 installed. Restart CrossGlyph to use it.",
+        env.about.updated.textContent);
+  check("and the offer goes, since pressing it again would install nothing",
+        env.about.row.hidden === true, String(env.about.row.hidden));
+  check("the button went out and came back",
+        JSON.stringify(env.about.update.states) === "[true,false]",
+        JSON.stringify(env.about.update.states));
+}
+
+// 58i. A file the user had edited is kept, and saying so is the only way
+//      anybody learns the .new is there.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [{ event: "done", version: "2.0.0", converting: false,
+                    kept: ["conf/all.conf"], where: "versions/2.0.0" }] });
+  env.about.apply();
+  await settle();
+  check("the file it kept is named",
+        env.about.updated.textContent.includes("fonts/conf/all.conf"),
+        env.about.updated.textContent);
+  check("and so is what was written beside it",
+        env.about.updated.textContent.includes("all.conf.new"),
+        env.about.updated.textContent);
+}
+
+// 58j. A refusal arrives as a step rather than a status, because what the
+//      page has to show is the sentence.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [{ event: "error", error: "the download does not match the "
+                                           + "hash the manifest gave" }] });
+  env.about.apply();
+  await settle();
+  check("the refusal is on the page",
+        env.about.updated.textContent.includes("does not match"),
+        env.about.updated.textContent);
+  check("and the offer stays, since nothing was installed",
+        env.about.row.hidden === false, String(env.about.row.hidden));
+}
+
+// 58k. An answer that never comes still ends the run. Without this the bar
+//      sits part full and the button stays out, which reads as an update
+//      still going.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" }, applyFails: true });
+  env.about.apply();
+  await settle();
+  check("the bar is gone", env.progress.hidden === true,
+        String(env.progress.hidden));
+  check("the button comes back", env.about.update.disabled === false,
+        String(env.about.update.disabled));
+  check("and the failure is said rather than swallowed",
+        env.about.updated.textContent.includes("connection lost"),
+        env.about.updated.textContent);
 }
 
 process.exit(failures ? 1 : 0);

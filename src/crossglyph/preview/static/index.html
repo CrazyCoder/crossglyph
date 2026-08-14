@@ -572,6 +572,14 @@
     <div id="about">
       <div id="about-line"></div>
       <div class="hint" id="about-detail"></div>
+      <!-- Only for an install that owns its own files and has something to
+           install. Every other kind gets the sentence above instead, which
+           says what to do where the button cannot. -->
+      <div class="actions" id="update-row" hidden>
+        <button type="button" id="update-now"
+                title="Download the new release and install it beside this one">Update</button>
+      </div>
+      <div class="hint" id="updated"></div>
       <!-- The sentence about checking is also where checking is asked for:
            one primary action in this card at most, and the secondary one sits
            in the line that is already about it. -->

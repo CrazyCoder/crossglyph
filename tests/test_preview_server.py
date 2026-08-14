@@ -1,5 +1,6 @@
 """The HTTP shim: knobs in as JSON, a PNG out."""
 import io
+import json
 import pathlib
 
 import pytest
@@ -1942,7 +1943,10 @@ def test_the_update_endpoint_says_what_this_install_is(client):
     assert version.parse(said["version"]) is not None
     assert said["kind"] in install.KINDS
     assert said["can_self_update"] is install.can_self_update(said["kind"])
-    assert said["instruction"]
+    # The sentence, already decided: the page renders what it is given rather
+    # than working out for itself when there is one to show.
+    assert said["notice"] == install.notice(said["kind"],
+                                            bool(said["available"]))
 
 
 def test_the_firmware_commit_travels_with_the_version(client, monkeypatch):
@@ -2028,3 +2032,50 @@ def test_the_page_is_told_when_checking_is_off(client, monkeypatch):
     monkeypatch.setattr(server.updateconf, "settings",
                         lambda root: updateconf.Settings(False, 24.0, 1))
     assert client.get("/update").json()["checking_off"] is True
+
+
+# --- applying -------------------------------------------------------------
+
+
+def steps(client, monkeypatch, *given):
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.upgrade, "steps",
+                        lambda root, *a, **kw: iter(given))
+    said = client.post("/update")
+    assert said.status_code == 200
+    return [json.loads(line) for line in said.text.splitlines() if line]
+
+
+def test_applying_streams_a_line_at_a_time(client, monkeypatch):
+    """The same shape /build and /fallbacks answer with, so the page reads it
+    with the reader it already has."""
+    said = steps(client, monkeypatch,
+                 {"event": "plan", "version": "9.9.9", "bytes": 1600000,
+                  "notes_url": "https://example.invalid/", "converting": False},
+                 {"event": "step", "got": 1600000, "bytes": 1600000},
+                 {"event": "done", "version": "9.9.9", "kept": [],
+                  "converting": False, "where": "versions/9.9.9"})
+    assert [step["event"] for step in said] == ["plan", "step", "done"]
+
+
+def test_a_refusal_is_the_first_line_rather_than_a_status(client, monkeypatch):
+    """What the page has to show is the sentence, and a status code is not
+    one."""
+    said = steps(client, monkeypatch,
+                 {"event": "error", "error": "this install cannot update "
+                                             "itself. Run git pull to update."})
+    assert "git pull" in said[0]["error"]
+
+
+def test_the_endpoint_does_not_decide_who_may_apply(client, monkeypatch):
+    """upgrade.steps resolves the kind and refuses as its first step, before
+    it opens the network. A second gate here is a second thing to keep in
+    step with the first."""
+    from crossglyph.preview import server
+
+    seen = []
+    monkeypatch.setattr(server.upgrade, "steps",
+                        lambda root, *a, **kw: seen.append(root) or iter(()))
+    client.post("/update")
+    assert seen == [server.install.root()]

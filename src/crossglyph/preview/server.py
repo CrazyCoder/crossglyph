@@ -27,7 +27,8 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
 
-from .. import fontbuild, fontconf, install, updateconf, updates, version
+from .. import (fontbuild, fontconf, install, layout, updateconf, updates,
+                upgrade, version)
 from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
                               FontBuildError, figure_glyph_overrides,
                               gsub_ligature_sequences)
@@ -1048,13 +1049,18 @@ def _about() -> dict:
     root = install.root()
     kind = install.detect(root)
     state = updates.load_state(root)
+    found = updates.available(state)
     return {"version": version.installed(),
             "firmware": stamp.build_stamp(),
             "kind": kind,
             "can_self_update": install.can_self_update(kind),
-            "instruction": install.instruction(kind),
+            # The sentence, already decided. The page renders what it is given
+            # rather than working out for itself when there is one, which is
+            # the rule that keeps it and the command line saying the same
+            # thing about the same install.
+            "notice": install.notice(kind, bool(found)),
             "latest": state.latest,
-            "available": updates.available(state),
+            "available": found,
             "checked_at": state.checked_at or None,
             "checking_off": not updateconf.settings(root).check,
             "error": state.error}
@@ -1082,6 +1088,33 @@ def update_check() -> dict:
     """
     updates.check(install.root(), force=True)
     return _about()
+
+
+def _startup(root: pathlib.Path) -> None:
+    """What a launch does for itself, off the path the page is waiting on.
+
+    The check first: it is bounded by a two second timeout, and the page shows
+    what it found. Pruning after, because it can be thousands of files.
+    """
+    updates.check(root)
+    layout.tidy(root, updateconf.settings(root).keep_versions)
+
+
+@app.post("/update")
+def update_apply() -> StreamingResponse:
+    """Install the newest release, saying how far it has got.
+
+    A line of JSON at a time, the way /build and /fallbacks answer, so the
+    page reads it with the reader it already has and draws the bar it already
+    has. Nothing here decides whether the update is allowed: upgrade.steps
+    resolves the install kind and refuses as its first step, before it opens
+    the network.
+    """
+    def lines():
+        for step in upgrade.steps(install.root()):
+            yield json.dumps(step) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 class OutRequest(BaseModel):
@@ -1388,10 +1421,13 @@ def main(argv=None) -> int:
 
     import uvicorn
 
-    # On a thread, so a slow or absent network delays nothing anybody is
-    # waiting for. The page reads whatever this has written by the time it
-    # asks, and picks the answer up on the next load if it has not landed yet.
-    threading.Thread(target=updates.check, args=(install.root(),),
+    # On a thread, so a slow or absent network and a large directory removal
+    # delay nothing anybody is waiting for. The page reads whatever the check
+    # has written by the time it asks, and picks the answer up on the next
+    # load if it has not landed yet. Pruning is here rather than in the update
+    # itself: at the moment the button is pressed, the version being replaced
+    # is the one serving the page the press came from.
+    threading.Thread(target=_startup, args=(install.root(),),
                      daemon=True).start()
     address = f"http://{opts.host}:{opts.port}"
     loaded = ", ".join(FACE_NAMES[style] for style in sorted(_sources))
