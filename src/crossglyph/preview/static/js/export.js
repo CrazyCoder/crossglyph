@@ -7,9 +7,9 @@ import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
 // --- export ---------------------------------------------------------------
 // What a build contains and where it goes, which is the same .conf the knobs
 // write: tune here, build here, and the family on the card is what you were
-// looking at. Sizes, coverage and the two fallback families belong to the
-// family; the output folder belongs to all.conf, since it is not a property
-// of any one family.
+// looking at. The name, the sizes, the coverage and the two fallback families
+// belong to the family; the output folder belongs to all.conf, since it is not
+// a property of any one family.
 export const exportForm = document.getElementById("export");
 export const presetList = document.getElementById("presets");
 export const outField = exportForm.elements.out;
@@ -274,8 +274,8 @@ export function showStep(step) {
 }
 
 // Both buttons are out while one of them is working. A build is minutes with
-// the fallbacks on, the server takes them one at a time, and a second press
-// would only queue a run behind the one whose progress is on screen.
+// the fallbacks on, the server runs one at a time, and a second press would
+// only queue a run behind the one whose progress is on screen.
 export const buildButtons = [document.getElementById("build"),
                      document.getElementById("build-all")];
 

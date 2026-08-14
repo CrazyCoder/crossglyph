@@ -470,9 +470,9 @@ not be replaced.
 `--force` ignores the stamps. A failed size is left out of the stamp, so the
 next run retries exactly that one.
 
-Sizes are rasterized in parallel, one process each, defaulting to one worker
-per core up to twelve, less one so the machine stays usable while it runs. `-j`
-changes it. One size on its own skips the pool, since starting an interpreter
+Sizes are rasterized in parallel, one process each. The default is a worker per
+core less one, so the machine stays usable while a build runs, and never more
+than twelve however many cores there are. `-j` changes it. One size on its own skips the pool, since starting an interpreter
 to do a job this process could have done costs more than the job. The
 converter's own progress output is captured and shown only on failure, because
 a dozen concurrent streams interleave into nonsense.

@@ -1,8 +1,8 @@
 // --- how far a build has got ----------------------------------------------
-// A build is minutes with the fallbacks on and the server takes the sizes one
-// at a time, so "building…" and a hung process look identical for the whole of
-// it. The stream carries a count from its first line, which is a fraction the
-// panel actually knows rather than a spinner standing in for one.
+// A build is minutes with the fallbacks on, so "building…" and a hung process
+// look identical for the whole of it. The stream carries a count from its
+// first line, which is a fraction the panel actually knows rather than a
+// spinner standing in for one.
 //
 // It is drawn as one of the panel's own hairlines filling. Every row here is
 // separated by one, so progress in that material reads as part of the panel;
@@ -24,12 +24,15 @@ export function spellDuration(seconds) {
   return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
 }
 
-// What is left, from what the sizes so far have cost.
+// What is left, at the rate the sizes have been landing. Sizes run across a
+// pool, so this is throughput rather than the cost of one of them, which is
+// the number that extrapolates: the pool stays full while there is work.
 //
-// Held back until two are done and five seconds have gone. The first size pays
-// every one-off cost of the run -- opening the fallback faces, the charmap
-// pass -- so an estimate drawn from it alone is out by a factor, and a wrong
-// number is worse than no number on the one screen someone is waiting at.
+// Held back until two are done and five seconds have gone. Nothing has landed
+// while the workers are still starting, and the first to arrive have paid
+// every one-off cost of the run between them -- opening the fallback faces,
+// the charmap pass. A wrong number is worse than no number on the one screen
+// somebody is waiting at.
 export function timeLeft(done, total, elapsed) {
   if (done < 2 || elapsed < 5000 || done >= total) return "";
   const seconds = Math.round((elapsed / done) * (total - done) / 1000);
