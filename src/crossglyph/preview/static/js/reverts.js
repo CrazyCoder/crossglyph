@@ -1,4 +1,4 @@
-import {form, lineHeightAuto, syncLineHeight} from "./dom.js";
+import {form, lineHeightAuto, syncFeatures, syncLineHeight} from "./dom.js";
 import {showSlider} from "./knobs.js";
 import {knobChanged} from "./render.js";
 import {showSaveState} from "./save.js";
@@ -104,6 +104,9 @@ export function putKnob(name, state) {
 export function setKnob(name, state) {
   putKnob(name, state);
   if (name === "line_height") syncLineHeight();
+  // The same for hinting, which decides whether the switch under it can do
+  // anything: a comparison moves knobs with no event for a listener to hear.
+  if (name === "hinting") syncFeatures();
   knobChanged(form.elements[name]);
 }
 

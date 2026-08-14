@@ -77,6 +77,61 @@ def test_the_pool_really_builds_in_other_processes(tmp_path):
         assert (out / "Probe" / f"Probe_{size}.cpfont").is_file()
 
 
+def _darkening_moves(face, hinting):
+    """Whether turning stem darkening on changes a single size of `face`."""
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import build_font
+
+    built = [build_font({0: face}, 13, coverage=((0x41, 0x5A),),
+                        tuning=Tuning(hinting=hinting, stem_darkening=darken))
+             for darken in (False, True)]
+    return built[0] != built[1]
+
+
+def test_a_truetype_face_is_only_darkened_under_light_hinting():
+    """What the preview greys the switch on. FreeType darkens a TrueType face
+    through the auto-hinter's light mode and nowhere else, so under any other
+    hinting the switch draws the identical page.
+
+    A real face, because a synthesized one cannot show this: the darkening is
+    applied to stems the fitter has found, and a fixture drawn as plain boxes
+    is unmoved in every mode -- which would pass the three negatives here
+    while proving nothing.
+    """
+    face = fontbuild.STARTER_DIR / "Literata[opsz,wght].ttf"
+    assert face.is_file(), "the bundled family is what this measures"
+
+    assert _darkening_moves(face, "light"), \
+        "light hinting no longer darkens a TrueType face, so the preview is " \
+        "greying a switch that works"
+    for hinting in ("normal", "none", "auto"):
+        assert not _darkening_moves(face, hinting), \
+            f"hinting={hinting} now darkens a TrueType face, so the preview " \
+            f"is greying a switch that works"
+
+
+def test_a_cff_face_is_darkened_unless_the_auto_hinter_is_in_charge():
+    """The other half of the rule. Only `auto` is greyed for a CFF face: the
+    auto-hinter fits stems itself and the CFF driver's darkening never runs.
+
+    The rest is left alone rather than promised, since a CFF face whose stems
+    fall where FreeType's darkening curve rounds to nothing is unmoved too,
+    and nothing short of rasterizing can know that.
+    """
+    faces = fontbuild.fallback_dir()
+    face = faces / "NotoSansCJKjp-Regular.otf" if faces else None
+    if face is None or not face.is_file():
+        pytest.skip("needs the fetched Noto CJK face, which is the one CFF "
+                    "face this repo can reach")
+
+    assert not _darkening_moves(face, "auto"), \
+        "the auto-hinter now darkens a CFF face, so the preview is greying " \
+        "a switch that works"
+    assert _darkening_moves(face, "normal"), \
+        "the CFF driver stopped darkening, which is the half of the rule " \
+        "that leaves the switch alone"
+
+
 # --- variable fonts -------------------------------------------------------
 # These build a synthetic variable face rather than a real one, so they run
 # without the clones the fixture above needs.

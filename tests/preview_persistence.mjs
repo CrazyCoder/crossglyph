@@ -226,6 +226,7 @@ const DEFAULTS = {
       conf: "sample.conf", derived: false,
       tuning: { gamma: 1, weight: 0, hinting: "normal",
                 thresholds: [2, 5, 9], line_height: null },
+      outlines: "cff",
       features: { ligatures: true, figures: true },
       export: { name: "Sample", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
@@ -244,6 +245,7 @@ const DEFAULTS = {
         weights: { text: 400, bold: 700 },
         other: { wdth: 100 },
       },
+      outlines: "truetype",
       features: { ligatures: true, figures: true },
       export: { name: "Vari", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
@@ -254,6 +256,7 @@ const DEFAULTS = {
       conf: "alto.conf", derived: false,
       tuning: { gamma: 1.2, weight: 0.1, hinting: "normal",
                 thresholds: [3, 6, 10], line_height: null },
+      outlines: "truetype",
       features: { ligatures: false, figures: false },
       export: { name: "Alto", sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading,cyrillic", ranges: "",
@@ -401,7 +404,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // of control that has no `checked` to compare.
     makeControl({
       name: "hinting", value: "normal",
-      options: [{ value: "normal" }, { value: "light" }, { value: "auto" }],
+      options: [{ value: "normal" }, { value: "light" },
+                { value: "none" }, { value: "auto" }],
     }),
     // Two presets in the markup; a config carrying its own triple has to be
     // offered as a third rather than blanking the control.
@@ -409,6 +413,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       name: "thresholds", value: "4,8,12",
       options: [{ value: "4,8,12" }, { value: "3,6,10" }],
     }),
+    // Greyed by the hinting row above rather than by the font alone.
+    makeControl({ name: "stem_darkening", type: "checkbox", checked: false }),
     // A font-side checkbox, so the reverts are exercised on the kind of
     // control whose whole state is `checked`. It is also one of the two the
     // font itself can grey out.
@@ -456,7 +462,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // A checkbox on each side of the font/page line, because a checkbox's state
   // is `checked` alone and everything else about it is a trap.
   const revertList = ["gamma", "margin", "alignment", "line_height",
-                      "ligatures", "hyphenation"].map(name => ({
+                      "ligatures", "hinting", "hyphenation"].map(name => ({
     dataset: { reset: name },
     hidden: true,
     on: {},
@@ -2729,6 +2735,68 @@ for (const { name, text } of sources) {
   env.clicks.font();
   check("and a reset does not hand back a knob the font cannot answer",
         ligatures.disabled === true, String(ligatures.disabled));
+}
+
+// 34. Stem darkening, which the font decides only half of. FreeType applies it
+//     in the CFF driver and in the auto-hinter's light mode, so the hinting row
+//     two above settles it as much as the face does -- and the row has to
+//     follow that knob, not just the family.
+{
+  const env = await loaded(fakeStorage());
+  const {stem_darkening: darkening, hinting} = env.byName;
+  check("the hinting row is listened to, since the rule reads it",
+        typeof hinting.on.change === "function");
+  check("a TrueType family under normal hinting cannot be darkened",
+        darkening.disabled === true, String(darkening.disabled));
+  check("and the row says which half is missing",
+        /TrueType outlines/.test(darkening.title), darkening.title);
+
+  hinting.value = "light";
+  hinting.on.change();
+  check("light hinting hands it back, with no family change at all",
+        darkening.disabled === false && darkening.title === "",
+        `${darkening.disabled} ${darkening.title}`);
+
+  hinting.value = "auto";
+  hinting.on.change();
+  check("the auto-hinter takes it away again",
+        darkening.disabled === true, String(darkening.disabled));
+  check("for a reason of its own",
+        /auto-hinter/.test(darkening.title), darkening.title);
+
+  // A CFF family is darkened under everything but auto. Switching to one
+  // brings its own hinting with it, so the row is worked out again from both:
+  // Sample's config says normal, which for CFF outlines is enough.
+  env.family.choose("Sample");
+  check("a CFF family is darkened under the hinting its config asks for",
+        darkening.disabled === false, String(darkening.disabled));
+  hinting.value = "auto";
+  hinting.on.change();
+  check("and the auto-hinter still takes it away, whatever the outlines",
+        darkening.disabled === true, String(darkening.disabled));
+
+  // Nothing about the font changed, so a reset must not hand it back: it puts
+  // hinting where the config had it, which is what the row follows.
+  env.family.choose("Alto");
+  hinting.value = "light";
+  hinting.on.change();
+  check("light hinting on a TrueType family leaves it reachable",
+        darkening.disabled === false, String(darkening.disabled));
+  env.clicks.font();
+  check("and a reset back to normal hinting takes it away",
+        darkening.disabled === true, String(darkening.disabled));
+
+  // The compare arrow moves hinting with no event for a listener to hear, so
+  // the row has to be worked out from the setter as well.
+  hinting.value = "light";
+  hinting.on.change();
+  const arrow = env.revertList.find(r => r.dataset.reset === "hinting");
+  arrow.click();
+  check("setting hinting aside for a comparison takes the switch with it",
+        darkening.disabled === true, String(darkening.disabled));
+  arrow.click();
+  check("and putting it back hands the switch back too",
+        darkening.disabled === false, String(darkening.disabled));
 }
 
 process.exit(failures ? 1 : 0);

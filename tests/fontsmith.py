@@ -28,9 +28,14 @@ def _glyph_name(codepoint: int) -> str:
 
 
 def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
-             figures: bool = False, family: str = "Probe",
+             figures: bool = False, cff: bool = False, family: str = "Probe",
              style: str = "Regular") -> pathlib.Path:
-    """A TTF carrying exactly `codepoints`, each drawn as the same box.
+    """A font carrying exactly `codepoints`, each drawn as the same box.
+
+    TrueType outlines unless `cff`, which writes the same boxes as CFF
+    charstrings instead. Which of the two a face carries decides more than it
+    looks: FreeType rasterizes them through different drivers, and stem
+    darkening is one of the things only one of those does.
 
     The three optional features are written as real OpenType ones, because the
     tables are what the converter walks and this suite has to be able to
@@ -51,18 +56,20 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
     """
     from fontTools.feaLib.builder import addOpenTypeFeatures
     from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.t2CharStringPen import T2CharStringPen
     from fontTools.pens.ttGlyphPen import TTGlyphPen
 
     codepoints = sorted(set(codepoints))
     names = [_glyph_name(code) for code in codepoints]
 
-    pen = TTGlyphPen(None)
-    pen.moveTo(BOX[0])
-    for point in BOX[1:]:
-        pen.lineTo(point)
-    pen.closePath()
-    box = pen.glyph()
+    def draw(pen):
+        pen.moveTo(BOX[0])
+        for point in BOX[1:]:
+            pen.lineTo(point)
+        pen.closePath()
+        return pen
 
+    box = draw(TTGlyphPen(None)).glyph()
     empty = TTGlyphPen(None).glyph()
 
     # Unmapped alternates, which is what a proportional figure is: reachable
@@ -70,11 +77,18 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
     narrow = [f"{_glyph_name(code)}.pnum" for code in codepoints
               if figures and 0x30 <= code <= 0x39]
 
-    builder = FontBuilder(UPEM, isTTF=True)
+    builder = FontBuilder(UPEM, isTTF=not cff)
     builder.setupGlyphOrder([".notdef", *names, *narrow])
     builder.setupCharacterMap(dict(zip(codepoints, names)))
-    builder.setupGlyf({".notdef": empty,
-                       **{name: box for name in (*names, *narrow)}})
+    if cff:
+        charstrings = {
+            name: draw(T2CharStringPen(ADVANCE, None)).getCharString()
+            for name in (".notdef", *names, *narrow)}
+        builder.setupCFF(f"{family}-{style}".replace(" ", ""), {},
+                         charstrings, {})
+    else:
+        builder.setupGlyf({".notdef": empty,
+                           **{name: box for name in (*names, *narrow)}})
     builder.setupHorizontalMetrics(
         {**{name: (ADVANCE, 80) for name in (".notdef", *names)},
          **{name: (ADVANCE // 2, 40) for name in narrow}})

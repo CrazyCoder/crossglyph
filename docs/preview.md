@@ -60,6 +60,16 @@ regular has ligatures and whose bold does not still has something to turn off.
 A face that will not open is not greyed on, because that is a claim about a
 font nobody could read.
 
+`stem darkening` is greyed by the font and the `hinting` row together, which is
+what makes it the confusing one: FreeType has darkening in the Adobe CFF driver
+and in the auto-hinter's light mode, and in neither place otherwise. So a
+TrueType family is unmoved by the switch except at `hinting = light`, and
+nothing at all is moved under `hinting = auto`. Turn hinting and the row
+follows. Only those two cases are greyed, so the switch may still do nothing
+where it is left alone: a CFF face whose stems fall where the darkening curve
+rounds to nothing is unmoved too, and that cannot be known without rasterizing
+the page both ways.
+
 Night mode is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so
 what changes is which level each pixel lands on: paper and ink swap, and the

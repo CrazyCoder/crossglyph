@@ -756,12 +756,18 @@ def apply_stem_darkening(enabled):
     FORK. A library-global property rather than a per-face one, so it is set
     for the duration of one rasterize call.
 
-    Measured on FreeType 2.13.2, its reach is narrow: it moves a CFF/OTF face
-    rendered through the Adobe CFF driver, and nothing else. A TrueType face is
-    unmoved whatever the hinting mode, and so is a CFF face under the
-    auto-hinter, which does its own fitting. The effect on the final 2-bit
-    bitmap is small either way -- well under a percent of set pixels. It is
-    exposed because it is free, not because it is a big lever.
+    Measured over 132 faces on FreeType 2.13.2, its reach is narrow and in two
+    places: the Adobe CFF driver, which draws a CFF/OTF face under any hinting
+    but `auto`, and the auto-hinter's light mode, which is what draws a
+    TrueType face at `hinting = light`. Nothing else moves. `auto` moves
+    neither format, since the auto-hinter fits stems itself at a normal target.
+
+    The two differ in size as well as in reach. Through the CFF driver the
+    effect on the final 2-bit bitmap is slight, well under a percent of set
+    pixels; through the light auto-hinter it is the largest thing in this
+    file. A CFF face whose stems fall where the darkening curve rounds to
+    nothing is unmoved too, which is why the preview only greys the switch on
+    the two cases above and leaves the rest alone.
 
     A module that does not know the property raises, and that is not an error:
     an older FreeType build simply cannot do this.

@@ -301,6 +301,29 @@ def _face_features(path: str, mtime: int, size: int) -> frozenset[str]:
         return frozenset(FEATURE_KNOBS)
 
 
+def face_outlines(path: pathlib.Path) -> str:
+    """What kind of outlines a face carries, lowercased: truetype, cff, ...
+
+    Empty when FreeType will not say, which is what keeps a file nobody can
+    read from being described. Stated per face because it decides which of
+    FreeType's engines draws it, and stem darkening lives in only one of them.
+    """
+    try:
+        return freetype.Face(str(path)).get_format().decode().casefold()
+    except Exception:                   # noqa: BLE001 -- the build reports it
+        return ""
+
+
+def family_outlines(config: Config) -> str:
+    """The one format every face in the family carries, or "mixed".
+
+    A family drawn by two engines is one the stem darkening rule cannot speak
+    for, so it says so rather than picking the first face's answer.
+    """
+    kinds = {face_outlines(path) for path in set(config.styles.values())}
+    return kinds.pop() if len(kinds) == 1 else "mixed"
+
+
 def family_features(config: Config) -> dict[str, bool]:
     """Which feature knobs this family's faces can answer, by knob name.
 
@@ -342,6 +365,11 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             # set, and a control that cannot do anything should say so rather
             # than invite an experiment with no result.
             "features": family_features(config),
+            # Which of FreeType's engines draws this family, since stem
+            # darkening is in only one of them. Not a knob the font either has
+            # or lacks: the hinting mode decides too, so the page is given the
+            # fact and works the rule out for itself.
+            "outlines": family_outlines(config),
             # None for a static family, which is what hides the axis controls.
             "variable": variable_entry(config),
             "conf": (config.path.name if not config.derived
@@ -601,7 +629,7 @@ def render(request: RenderRequest) -> Response:
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
-    # advanceY the .cpfont format cannot hold (convert.py:1232-1237), which a
+    # advanceY the .cpfont format cannot hold (convert.py:1238-1243), which a
     # large `size` can reach on a loose-hhea face. SystemExit is a
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
@@ -613,7 +641,7 @@ def render(request: RenderRequest) -> Response:
             422, reason or "the converter rejected this combination; "
                            "see the server log") from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
-    # and the one this path can raise is the converter's (convert.py:1055,
+    # and the one this path can raise is the converter's (convert.py:1061,
     # from rasterize_font_style on a malformed face). The fontbuild one comes
     # from the family builder, which the preview never calls.
     #

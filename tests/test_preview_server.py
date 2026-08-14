@@ -459,6 +459,32 @@ def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch)
     assert server.face_features(face) == frozenset({"ligatures"})
 
 
+def test_a_family_says_which_engine_draws_it(tmp_path, monkeypatch):
+    """Stem darkening lives in FreeType's CFF driver and in the auto-hinter's
+    light mode, so the page needs to know which outlines it is looking at to
+    say whether the switch can do anything."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Quill-Regular.ttf", range(0x41, 0x5B), family="Quill")
+    box_font(tmp_path / "Inky-Regular.otf", range(0x41, 0x5B), family="Inky",
+             cff=True)
+    # One family drawn by both engines, which no single rule speaks for.
+    box_font(tmp_path / "Mixed-Regular.ttf", range(0x41, 0x5B), family="Mixed")
+    box_font(tmp_path / "Mixed-Bold.otf", range(0x41, 0x5B), family="Mixed",
+             style="Bold", cff=True)
+    (_conf(tmp_path) / "all.conf").write_text("sizes = 12\n", encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    outlines = {f["name"]: f["outlines"] for f in server.families()}
+
+    assert outlines["Quill"] == "truetype"
+    assert outlines["Inky"] == "cff"
+    assert outlines["Mixed"] == "mixed"
+
+
 def test_every_greyable_knob_is_a_knob_the_page_has():
     """The reasons are keyed by control name, and a name the markup does not
     carry is a row that silently never greys."""

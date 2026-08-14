@@ -1,4 +1,4 @@
-import {form, syncFeatures, syncLineHeight} from "./dom.js";
+import {form, showFeatures, syncLineHeight} from "./dom.js";
 import {fillFallbackPickers, showExport} from "./export.js";
 import {FAMILY, familyEntries, familyLabel, familyPicker, offerSavedThresholds, showFaces, shownFamily, rememberShown} from "./family.js";
 import {numericRow} from "./knobs.js";
@@ -125,7 +125,7 @@ export function loadFamily() {
   // After the knobs are put back, since it is the family and not the values
   // that decides these: a reset restores what a knob is set to, never whether
   // the font can act on it.
-  syncFeatures(entry && entry.features);
+  showFeatures(entry);
   savedNote.textContent = "";
   showFaces();
   // Options first: a <select> refuses a value none of its options carries, so

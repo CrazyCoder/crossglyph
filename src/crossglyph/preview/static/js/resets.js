@@ -1,4 +1,5 @@
-import {form, lineHeightAuto, syncHyphenation, syncLineHeight} from "./dom.js";
+import {form, lineHeightAuto, syncFeatures, syncHyphenation,
+        syncLineHeight} from "./dom.js";
 import {syncSliders} from "./knobs.js";
 import {STORE, attempt, pageControls} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
@@ -18,6 +19,9 @@ export function afterReset() {
   syncSliders();
   syncLineHeight();
   syncHyphenation();
+  // Resetting the font knobs puts hinting back, and that is half of
+  // what decides whether stem darkening can do anything.
+  syncFeatures();
   refreshReverts();
   scheduleRender();
 }

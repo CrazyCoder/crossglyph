@@ -72,7 +72,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
 | `slant` | `0` | shear as a tangent. `0.25` is about 14 degrees, for synthesizing an oblique a family lacks |
 | `hinting` | `normal` | `normal`, `light` (vertical only, softer), `none`, or `auto` (FreeType's auto-hinter, worth trying when a font looks muddy at small sizes) |
-| `stem_darkening` | `no` | FreeType stem darkening. Narrow: it reaches CFF and OTF faces only, and not under `hinting = auto` |
+| `stem_darkening` | `no` | FreeType stem darkening. Narrow: a CFF or OTF face under any hinting but `auto`, and a TrueType face only under `hinting = light`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `line_height` | the font's own | line pitch. `1.15` is em relative, `0.9x` is a multiple of the font's own, `26px` is absolute. See [Line spacing](#line-spacing) |
 | `letter_spacing` | `0` | tracking in pixels, added to every glyph's advance. Stored at 1/16 px, and negatives tighten |
 | `word_spacing` | `0` | added to the space on top of `letter_spacing`, as CSS word-spacing is |
@@ -241,11 +241,20 @@ quantizer then sees. Two of them are worth a note.
 the advance width. Text gets heavier at unchanged spacing, which is right at
 reading sizes but is not a substitute for a real bold face.
 
-`stem_darkening` is much narrower than its name suggests. On FreeType 2.13 it
-moves a CFF or OTF face rendered through the Adobe CFF driver and nothing else.
-A TrueType face is unmoved whatever the hinting mode, and so is a CFF face
-under `hinting = auto`, which does its own fitting. It is exposed because it is
-free, not because it is a big lever.
+`stem_darkening` is narrower than its name suggests, and where it applies
+depends on `hinting` as much as on the font. FreeType has it in two places:
+the Adobe CFF driver, which draws a CFF or OTF face under any hinting but
+`auto`, and the auto-hinter's light mode, which is what draws a TrueType face
+at `hinting = light`. Nothing else moves. Under `auto` neither format does,
+since the auto-hinter fits stems itself at a normal target.
+
+The two are not the same size either. Through the CFF driver the effect is
+slight, well under a percent of the set pixels; through the light auto-hinter
+it is substantial. Measured over 132 faces on FreeType 2.13, and the preview
+greys the switch when the pair you have chosen is one of the cases that cannot
+move. It leaves the rest alone rather than promising anything, because a CFF
+face whose stems fall where the darkening curve rounds to nothing is unmoved
+as well, and nothing short of rasterizing both ways would know.
 
 ## Line spacing
 
