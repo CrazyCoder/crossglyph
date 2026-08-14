@@ -10,8 +10,14 @@ root="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -f "$root/current" ] && [ -d "$root/versions" ]; then
     version="$(head -n 1 "$root/current" | tr -d ' \t\r\n')"
-    dir="$root/versions/$version"
-    if [ ! -d "$dir" ]; then
+    # Both halves of this matter. An empty `current` is what an interrupted
+    # write leaves, and it names versions/ itself -- a directory that does
+    # exist, so testing only for one would find it and hand uv a project that
+    # is really the folder the projects live in.
+    dir=""
+    if [ -n "$version" ] && [ -d "$root/versions/$version" ]; then
+        dir="$root/versions/$version"
+    else
         # Recovery, not selection: `current` should always name a directory
         # that is there. Plain sort rather than sort -V, which older BSD sort
         # does not have -- with two versions present this can pick 0.9 over
@@ -21,7 +27,8 @@ if [ -f "$root/current" ] && [ -d "$root/versions" ]; then
             echo "no version is installed under $root/versions" >&2
             exit 1
         fi
-        echo "warning: current names $version, which is not there. Using $dir" >&2
+        echo "warning: current names ${version:-nothing}, which is not there." \
+             "Using $dir" >&2
     fi
     CROSSGLYPH_HOME="$root"
     export CROSSGLYPH_HOME

@@ -146,6 +146,26 @@ def test_a_current_that_names_nothing_falls_back_and_warns(tmp_path):
 
 
 @needs_sh
+def test_an_empty_current_falls_back_rather_than_running_versions_itself(
+        tmp_path):
+    """What an interrupted write leaves. The trap is that versions/<nothing>
+    is versions/, which exists, so a naive check finds a directory and hands
+    uv the wrong project instead of recovering."""
+    root = _release(tmp_path, "0.2.0")
+    (root / "current").write_text("", encoding="utf-8")
+    said = _said(_sh(root))
+    assert said["PROJECT"].endswith("versions/0.2.0")
+
+
+@needs_windows
+def test_the_batch_launcher_survives_an_empty_current(tmp_path):
+    root = _release(tmp_path)
+    (root / "current").write_text("", encoding="utf-8")
+    said = _said(_cmd(root))
+    assert said["PROJECT"].endswith("versions/0.2.0")
+
+
+@needs_sh
 def test_neither_layout_fails_with_a_message_naming_the_problem(tmp_path):
     done = _sh(tmp_path)
     assert done.returncode != 0

@@ -116,6 +116,20 @@ def check_polyglot(data: bytes, name: str) -> list[str]:
     return problems
 
 
+def set_mode(info: zipfile.ZipInfo, mode: int) -> None:
+    """Give an entry a Unix mode a POSIX unzip will actually apply."""
+    if not mode & 0o170000:          # a DOS entry, carrying no mode at all
+        mode = DEFAULT_MODE
+    info.create_system = UNIX
+    info.external_attr = mode << 16
+
+
+def unusable_mode(info: zipfile.ZipInfo) -> bool:
+    """Whether a reader would ignore this entry's mode, or find none."""
+    return (info.create_system != UNIX
+            or not (info.external_attr >> 16) & 0o170000)
+
+
 def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
            version: str) -> None:
     """The archive git produced, restructured into the release tree.
@@ -148,14 +162,6 @@ def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
                                   date_time=(1980, 1, 1, 0, 0, 0))
         set_mode(current, DEFAULT_MODE)
         archive.writestr(current, f"{version}\n")
-
-
-def set_mode(info: zipfile.ZipInfo, mode: int) -> None:
-    """Give an entry a Unix mode a POSIX unzip will actually apply."""
-    if not mode & 0o170000:          # a DOS entry, carrying no mode at all
-        mode = DEFAULT_MODE
-    info.create_system = UNIX
-    info.external_attr = mode << 16
 
 
 def main() -> int:
@@ -197,13 +203,14 @@ def main() -> int:
                 problems.append(f"not executable: {path.format(v=where)}")
         # A mode is only honoured on an entry that says Unix, so checking the
         # bits alone passes on an archive that extracts unexecutable anyway.
-        # Every entry is checked, not just the executable ones: an entry with
-        # no mode at all is how a source file lands 0600 and unreadable.
-        for path, info in sorted(members.items()):
-            mode = info.external_attr >> 16
-            if info.create_system != UNIX or not mode & 0o170000:
-                problems.append(f"carries no mode a POSIX unzip will apply: "
-                                f"{path}")
+        # Every entry, not just the listed few: one with no mode at all is how
+        # a source file lands 0600 and unreadable. Counted rather than listed,
+        # because when this goes wrong it goes wrong for the whole archive.
+        blank = sorted(path for path, info in members.items()
+                       if unusable_mode(info))
+        if blank:
+            problems.append(f"{len(blank)} entries carry no mode a POSIX "
+                            f"unzip will apply, starting at {blank[0]}")
         uv = f"{where}/tools/uv.cmd"
         if uv in members:
             problems.extend(check_polyglot(archive.read(f"{name}/{uv}"),

@@ -25,10 +25,18 @@ for %%I in ("%~dp0.") do set "CG_ROOT=%%~fI"
 if not exist "%CG_ROOT%\current" goto :inplace
 if not exist "%CG_ROOT%\versions\" goto :inplace
 
+REM Cleared first: set /p leaves the variable alone when the file is empty,
+REM which is what an interrupted write leaves behind. Undefined then expands
+REM to nothing, naming versions\ itself -- a directory that does exist, so
+REM without the guard the check below would pass and hand uv the folder the
+REM versions live in rather than a version.
+set "CG_VERSION="
 set /p CG_VERSION=<"%CG_ROOT%\current"
+if not defined CG_VERSION goto :recover
 set "CG_DIR=%CG_ROOT%\versions\%CG_VERSION%"
 if exist "%CG_DIR%\" goto :release
 
+:recover
 REM Recovery only, as in crossglyph.sh: take whichever version is there.
 set "CG_DIR="
 for /d %%D in ("%CG_ROOT%\versions\*") do set "CG_DIR=%%~fD"
