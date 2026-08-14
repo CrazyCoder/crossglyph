@@ -557,6 +557,29 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_every_asset_the_page_asks_for_is_one_the_server_will_serve():
+    """A stylesheet, a script or an icon the route refuses is a 404 the page
+    never mentions: the browser asks quietly and draws without it. The route
+    serves an allowlist of suffixes, so adding a file of a new kind to the
+    markup is exactly when that goes wrong.
+    """
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    refs = set(re.findall(r'(?:href|src)="([^"#:]+)"', html))
+    assert "favicon.svg" in refs, "the page asks for no icon"
+
+    client = TestClient(server.app)
+    for ref in sorted(refs):
+        assert (server.STATIC / ref).is_file(), f"{ref} is not in static/"
+        assert client.get(f"/{ref}").status_code == 200, \
+            f"the server will not serve {ref}"
+
+
 def test_a_checkbox_knob_is_marked_rather_than_given_an_arrow():
     """The arrow sets a value aside so you can flick back to it. A switch has
     nothing to set aside -- the value it is not showing is the other one, one

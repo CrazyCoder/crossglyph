@@ -1174,7 +1174,7 @@ def index() -> FileResponse:
 #: What the page is allowed to ask for beside itself. A whitelist of suffixes
 #: rather than a static mount: this serves one directory of hand-written files,
 #: and a path that escapes it is a bug worth a 404 rather than a file.
-ASSET_SUFFIXES = {".css", ".js"}
+ASSET_SUFFIXES = {".css", ".js", ".svg"}
 
 
 @app.get("/{asset:path}")
