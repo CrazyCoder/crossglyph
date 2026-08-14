@@ -101,8 +101,7 @@ export function followLanguage(tag) {
 export function sampleChosen() {
   const tag = samplePicker.value;
   rememberChoice(tag);
-  form.elements.text.value = samples.has(tag) ? samples.get(tag).text
-                                              : customText();
+  showSample(tag);
   followLanguage(tag);
 }
 
@@ -137,5 +136,4 @@ export function restoreSample(languages) {
   // before this picker existed -- moving it would overwrite a choice somebody
   // made. start.js sets it only when there are no page settings at all.
   if (first) rememberChoice(samplePicker.value);
-  return first;
 }
