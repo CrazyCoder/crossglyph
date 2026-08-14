@@ -66,16 +66,47 @@ export function darkeningReason(outlines, hinting) {
   return "";
 }
 
-//: What the family showing can answer. Kept, because the rule above reads a
-//: knob as well as the font, so the row has to be worked out again whenever
+// Why grayscale hinting would do nothing as the panel stands, or "".
+//
+// It picks the other TrueType bytecode interpreter, so everything that keeps
+// the bytecode from running takes it away: CFF outlines have none, a face
+// without instructions goes to the auto-hinter whichever is chosen, and so
+// does any face under light, auto or none. A tricky font is FreeType's own
+// exception to that last one -- it is never handed to the auto-hinter, so its
+// bytecode runs in every mode that hints at all.
+export function grayscaleReason(outlines, bytecode, tricky, hinting) {
+  if (outlines && outlines !== "truetype" && outlines !== "mixed") {
+    return "These are not TrueType outlines, so there is no bytecode for "
+      + "either interpreter to run.";
+  }
+  if (!bytecode) {
+    return "This family carries no hinting bytecode, so FreeType fits it with "
+      + "the auto-hinter whichever interpreter is chosen.";
+  }
+  if (hinting === "none") {
+    return "Nothing is hinted while hinting is none, so no interpreter runs.";
+  }
+  if ((hinting === "light" || hinting === "auto") && !tricky) {
+    return "The auto-hinter draws it under " + hinting + " hinting, so the "
+      + "bytecode interpreter has nothing to do.";
+  }
+  return "";
+}
+
+//: What the family showing can answer. Kept, because the rules above read a
+//: knob as well as the font, so the rows have to be worked out again whenever
 //: that knob moves and there is no family to hand then.
 let supported = null;
 let outlines = "";
+let bytecode = false;
+let tricky = false;
 
 // The family changed. Everything a knob can be greyed on is a property of it.
 export function showFeatures(entry) {
   supported = (entry && entry.features) || null;
   outlines = (entry && entry.outlines) || "";
+  bytecode = Boolean(entry && entry.bytecode);
+  tricky = Boolean(entry && entry.tricky);
   syncFeatures();
 }
 
@@ -94,9 +125,13 @@ export function syncFeatures() {
   }
   const darkening = form.elements.stem_darkening;
   const hinting = form.elements.hinting;
-  if (!darkening || !hinting) return;
+  const grayscale = form.elements.grayscale_hinting;
+  if (!darkening || !hinting || !grayscale) return;
   const why = darkeningReason(outlines, hinting.value);
   darkening.disabled = Boolean(why);
   darkening.title = why;
+  const whyNot = grayscaleReason(outlines, bytecode, tricky, hinting.value);
+  grayscale.disabled = Boolean(whyNot);
+  grayscale.title = whyNot;
 }
 form.elements.hinting.addEventListener("change", syncFeatures);

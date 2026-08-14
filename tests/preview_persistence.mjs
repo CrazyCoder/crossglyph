@@ -228,6 +228,7 @@ const DEFAULTS = {
                 thresholds: [2, 5, 9], line_height: null },
       outlines: "cff",
       features: { ligatures: true, figures: true },
+      bytecode: false, tricky: false,
       export: { name: "Sample", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: true, fallback1: "", fallback2: "" } },
@@ -247,6 +248,10 @@ const DEFAULTS = {
       },
       outlines: "truetype",
       features: { ligatures: true, figures: true },
+      // TrueType with nothing for the interpreter to run, which is what the
+      // bundled Literata is: a stub `prep` and no instructions, so FreeType
+      // fits it with the auto-hinter instead.
+      bytecode: false, tricky: false,
       export: { name: "Vari", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: false, fallback1: "", fallback2: "" } },
@@ -258,6 +263,7 @@ const DEFAULTS = {
                 thresholds: [3, 6, 10], line_height: null },
       outlines: "truetype",
       features: { ligatures: false, figures: false },
+      bytecode: true, tricky: false,
       export: { name: "Alto", sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading,cyrillic", ranges: "",
                 fallbacks: false, fallback1: "Sample", fallback2: "" } },
@@ -415,6 +421,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     }),
     // Greyed by the hinting row above rather than by the font alone.
     makeControl({ name: "stem_darkening", type: "checkbox", checked: false }),
+    // Greyed by the hinting row and by two facts about the face.
+    makeControl({ name: "grayscale_hinting", type: "checkbox", checked: false }),
     // A font-side checkbox, so the reverts are exercised on the kind of
     // control whose whole state is `checked`. It is also one of the two the
     // font itself can grey out.
@@ -462,12 +470,19 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // A checkbox on each side of the font/page line, because a checkbox's state
   // is `checked` alone and everything else about it is a trap.
   const revertList = ["gamma", "margin", "alignment", "line_height",
-                      "ligatures", "hinting", "hyphenation"].map(name => ({
+                      "hinting"].map(name => ({
     dataset: { reset: name },
     hidden: true,
     on: {},
     addEventListener(kind, fn) { this.on[kind] = fn; },
     click() { this.on.click(); },
+  }));
+  // A checkbox knob carries a mark instead: it says the knob differs and from
+  // what, and offers no press, a switch being its own way back.
+  const markList = ["ligatures", "hyphenation"].map(name => ({
+    dataset: { mark: name },
+    hidden: true,
+    title: "",
   }));
   const form = {
     elements: Object.assign(controls, byName),
@@ -475,6 +490,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     querySelectorAll: (selector) => {
       if (selector === "[data-slider-for]") return sliderList;
       if (selector === ".revert") return revertList;
+      if (selector === ".mark") return markList;
       if (selector === "button.step") return stepList;
       const named = [...selector.matchAll(/data-(?:slider-)?for="([\w_]+)"/g)]
         .map(m => m[1]);
@@ -831,7 +847,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     console,
   };
   return { form, listeners, sandbox, byName, clicks, sliderList, fetches,
-           revertList, compare: stubs.compare, keys, stepList, family, sample,
+           revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            builtSteps: stubs.built.steps,
@@ -1036,18 +1052,24 @@ for (const { name, text } of sources) {
         env.byName.alignment.value === "justify", env.byName.alignment.value);
 }
 
-// 8. The arrow marks only what has actually been changed, which is what makes
-//    the column readable as "here is what I have touched".
+// 8. The arrow marks a knob that differs from a baseline it can offer, which
+//    is what makes the column readable: what you have touched, and under that,
+//    what this font changes from stock.
 {
   const env = await run(fakeStorage());
   const arrow = name => env.revertList.find(r => r.dataset.reset === name);
-  check("nothing is marked at rest",
-        env.revertList.every(r => r.hidden === true));
+  check("a knob its config leaves at stock is unmarked at rest",
+        arrow("hinting").hidden === true, arrow("hinting").title);
+  check("one its config moves is marked, offering stock",
+        arrow("gamma").hidden === false && /stock value/.test(arrow("gamma").title),
+        arrow("gamma").title);
 
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
-  check("a changed knob is marked", arrow("gamma").hidden === false);
-  check("an untouched one is not", arrow("margin").hidden === true);
+  check("changing it marks it against the config instead",
+        arrow("gamma").hidden === false &&
+          /what the config has/.test(arrow("gamma").title), arrow("gamma").title);
+  check("an untouched one is not marked", arrow("margin").hidden === true);
 }
 
 // 9. The arrow is a bypass toggle, not a one-way reset: click to see the
@@ -1327,8 +1349,13 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage());
   check("a knob opens at what the config says",
         env.byName.gamma.value === "1.2", env.byName.gamma.value);
-  check("and is not marked as changed, since nobody changed it",
-        env.revertList.find(r => r.dataset.reset === "gamma").hidden === true);
+  // Marked, but against stock rather than against the config: nobody has
+  // changed it, and what the arrow has left to offer is the value the
+  // converter would use if this config did not exist.
+  const gammaArrow = env.revertList.find(r => r.dataset.reset === "gamma");
+  check("and is marked against stock, which is what it differs from",
+        gammaArrow.hidden === false && /stock value/.test(gammaArrow.title),
+        gammaArrow.title);
   check("so there is nothing to save yet", env.save.disabled === true);
   check("and the button names the file it would write",
         env.save.textContent === "Save to alto.conf", env.save.textContent);
@@ -1375,6 +1402,27 @@ for (const { name, text } of sources) {
         env.save.disabled === true);
   check("and the note says what moved where",
         env.note.textContent === "gamma \u2192 alto.conf", env.note.textContent);
+
+  // Saving is what makes every knob agree with the config at once. The arrow
+  // has to survive that: without somewhere else to point it would empty the
+  // column exactly when the font became worth reading, and stock would be
+  // reachable only by resetting the whole panel.
+  const arrow = env.revertList.find(r => r.dataset.reset === "gamma");
+  check("the arrow stays after a save, now offering stock",
+        arrow.hidden === false && /stock value/.test(arrow.title), arrow.title);
+
+  arrow.click();
+  check("pressing it shows the stock value, not the value just saved",
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("and says so while it is held there",
+        /Showing the stock value/.test(arrow.title), arrow.title);
+  check("which is a change against the file, so it can be saved",
+        env.save.disabled === false, String(env.save.disabled));
+
+  arrow.click();
+  check("pressing again brings the saved value back",
+        env.byName.gamma.value === "2", env.byName.gamma.value);
+  check("leaving nothing to save again", env.save.disabled === true);
 }
 
 // 25. Save writes the page, comparison or no comparison. The page is the only
@@ -1881,6 +1929,21 @@ for (const { name, text } of sources) {
   env.byName.axis_text.on.change();
   await settle();
   check("moving it back to what the config says offers nothing",
+        env.save.disabled === true, String(env.save.disabled));
+
+  // Reset is one of the ways it can get there. The pickers are filled from the
+  // font's instances rather than declared in the markup, so resetting them to
+  // a markup default would land on the lightest weight the font has.
+  env.byName.axis_text.value = "900";
+  env.byName.axis_text.on.change();
+  await settle();
+  env.clicks.font();
+  await settle();
+  check("resetting the font knobs puts the weights back too",
+        env.byName.axis_text.value === "400" &&
+        env.byName.axis_bold.value === "700",
+        `${env.byName.axis_text.value}/${env.byName.axis_bold.value}`);
+  check("and leaves nothing to save",
         env.save.disabled === true, String(env.save.disabled));
 
   env.byName.axis_text.value = "900";
@@ -2392,6 +2455,62 @@ for (const { name, text } of sources) {
         env.byName.language.value === "ru", env.byName.language.value);
 }
 
+// 57a. Your own text is in a language too, and a preset drags `hyphenate as`
+//      along with it. Coming back to Custom has to return the language the way
+//      it returns the words, or your text is hyphenated as the last specimen
+//      you happened to look at.
+{
+  const storage = fakeStorage({ "crossglyph.text": "eigener Text",
+                                "crossglyph.sample": "" });
+  const env = await loaded(storage, DEFAULTS, { languages: ["en"] });
+
+  env.byName.language.value = "de";
+  env.listeners.input({ target: env.byName.language });
+  check("a language chosen for your own text is written down",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+
+  env.sample.choose("ru");
+  check("a preset still carries its own patterns in",
+        env.byName.language.value === "ru", env.byName.language.value);
+  check("and does not overwrite the one your text is in",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+
+  // Nor does hyphenating a specimen some other way. That is a fact about the
+  // specimen on screen, and the only reason it is not caught by the line above
+  // is that choosing a preset moves the language without an event: this moves
+  // it by hand, which is the way somebody actually does it.
+  env.byName.language.value = "fr";
+  env.listeners.input({ target: env.byName.language });
+  check("hyphenating a preset by hand is not a choice about your own text",
+        storage.data["crossglyph.language"] === "de",
+        storage.data["crossglyph.language"]);
+
+  env.sample.choose("");
+  check("coming back to Custom returns your text",
+        env.form.elements.text.value === "eigener Text",
+        env.form.elements.text.value);
+  check("and the language you were reading it in",
+        env.byName.language.value === "de", env.byName.language.value);
+  check("which is a page setting, so it is remembered as one",
+        JSON.parse(storage.data["crossglyph.page"]).language === "de",
+        storage.data["crossglyph.page"]);
+}
+
+// 57b. Nothing stored for Custom means nothing to put back: whoever has never
+//      chosen a language for their own text keeps whatever is showing rather
+//      than being sent somewhere they never asked for.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, DEFAULTS, { languages: ["en"] });
+  env.sample.choose("ru");
+  check("the preset's patterns are in force", env.byName.language.value === "ru");
+  env.sample.choose("");
+  check("and Custom leaves them alone, having nothing of its own to say",
+        env.byName.language.value === "ru", env.byName.language.value);
+}
+
 // 58. A detected language is a default and not a decision: Reset page settings
 //     goes back to the language you read, not to whatever the markup declared.
 {
@@ -2672,22 +2791,25 @@ for (const { name, text } of sources) {
 // 77. A checkbox nobody has touched is not a changed knob. Its `value` reads
 //     "on" and its `defaultValue` reads "" -- the markup sets neither -- so
 //     anything comparing those two calls every checkbox on the page modified,
-//     for good, and hangs an arrow on it that never goes away.
+//     for good, and marks it for ever.
 {
   const env = await loaded(fakeStorage());
-  const arrow = (name) => env.revertList.find(b => b.dataset.reset === name);
+  const mark = (name) => env.markList.find(m => m.dataset.mark === name);
 
-  check("an untouched font checkbox has no arrow",
-        arrow("ligatures").hidden === true, String(arrow("ligatures").hidden));
-  check("nor does an untouched page checkbox",
-        arrow("hyphenation").hidden === true,
-        String(arrow("hyphenation").hidden));
+  check("an untouched font checkbox is unmarked",
+        mark("ligatures").hidden === true, String(mark("ligatures").hidden));
+  check("nor is an untouched page checkbox marked",
+        mark("hyphenation").hidden === true,
+        String(mark("hyphenation").hidden));
 
   // And it still appears when the box really is off its default.
   env.byName.ligatures.checked = false;
   env.listeners.input({ target: env.byName.ligatures });
   check("and it appears once the box is actually moved",
-        arrow("ligatures").hidden === false, String(arrow("ligatures").hidden));
+        mark("ligatures").hidden === false, String(mark("ligatures").hidden));
+  check("saying which way the baseline has it, since the box cannot",
+        /has this on|stock, which is on/.test(mark("ligatures").title),
+        mark("ligatures").title);
 }
 
 // 78. Untuned compares against the factory, so a knob already at the factory
@@ -2695,16 +2817,31 @@ for (const { name, text } of sources) {
 //     comparison that is not happening.
 {
   const env = await loaded(fakeStorage());
-  const arrow = (name) => env.revertList.find(b => b.dataset.reset === name);
+  const mark = (name) => env.markList.find(m => m.dataset.mark === name);
   env.compare.fire();
   check("a checkbox already at the factory is left alone by untuned",
-        arrow("ligatures").hidden === true, String(arrow("ligatures").hidden));
+        mark("ligatures").hidden === true, String(mark("ligatures").hidden));
   check("and the page checkbox is not in this comparison at all",
-        arrow("hyphenation").hidden === true,
-        String(arrow("hyphenation").hidden));
+        mark("hyphenation").hidden === true,
+        String(mark("hyphenation").hidden));
   env.compare.fire();
   check("and it is still where it was afterwards",
         env.byName.ligatures.checked === true,
+        String(env.byName.ligatures.checked));
+
+  // A checkbox that has moved does go back, though, and that is worth its own
+  // check: untuned walks the knob list rather than the arrows, and a checkbox
+  // has no arrow to be walked. Driving it off the arrows would quietly leave
+  // every switch on the page out of the comparison.
+  env.byName.ligatures.checked = false;
+  env.listeners.input({ target: env.byName.ligatures });
+  env.compare.fire();
+  check("a checkbox off the factory is put back by untuned",
+        env.byName.ligatures.checked === true,
+        String(env.byName.ligatures.checked));
+  env.compare.fire();
+  check("and comes back to where you left it",
+        env.byName.ligatures.checked === false,
         String(env.byName.ligatures.checked));
 }
 
@@ -2798,6 +2935,60 @@ for (const { name, text } of sources) {
   arrow.click();
   check("and putting it back hands the switch back too",
         darkening.disabled === false, String(darkening.disabled));
+}
+
+// 35. Grayscale hinting, which three separate facts can take away: the
+//     outlines, whether the face carries bytecode at all, and the hinting mode.
+{
+  const env = await loaded(fakeStorage());
+  const {grayscale_hinting: grayscale, hinting} = env.byName;
+
+  // Alto is TrueType and hinted, which is the one combination that reaches it.
+  env.family.choose("Alto");
+  check("a hinted TrueType family under normal hinting can turn it on",
+        grayscale.disabled === false, String(grayscale.disabled));
+
+  for (const mode of ["light", "auto"]) {
+    hinting.value = mode;
+    hinting.on.change();
+    check(`the auto-hinter draws it under ${mode}, so the row goes`,
+          grayscale.disabled === true &&
+            /auto-hinter/.test(grayscale.title), grayscale.title);
+  }
+  hinting.value = "none";
+  hinting.on.change();
+  check("and with no hinting at all there is no interpreter to pick",
+        grayscale.disabled === true && /hinting is none/.test(grayscale.title),
+        grayscale.title);
+  hinting.value = "normal";
+  hinting.on.change();
+  check("back at normal hinting the row returns",
+        grayscale.disabled === false, String(grayscale.disabled));
+
+  // The other two facts are the font's, and switching family brings them.
+  env.family.choose("Sample");
+  check("a CFF family has no bytecode for either interpreter",
+        grayscale.disabled === true &&
+          /not TrueType outlines/.test(grayscale.title), grayscale.title);
+  env.family.choose("Vari");
+  check("and neither has a TrueType family that carries none",
+        grayscale.disabled === true &&
+          /no hinting bytecode/.test(grayscale.title), grayscale.title);
+
+  // Tricky fonts are FreeType's own exception: they never reach the
+  // auto-hinter, so their bytecode runs under light and auto as well. No
+  // fixture family is tricky, so the rule itself is asked directly.
+  const {grayscaleReason} = env.modules.get("dom.js");
+  check("a tricky face keeps the row under light hinting",
+        grayscaleReason("truetype", true, true, "light") === "");
+  check("and under auto",
+        grayscaleReason("truetype", true, true, "auto") === "");
+  check("but not when nothing is hinted",
+        grayscaleReason("truetype", true, true, "none") !== "");
+  check("a non-tricky face loses it under light",
+        grayscaleReason("truetype", true, false, "light") !== "");
+  check("a family whose faces disagree on format is judged on its bytecode",
+        grayscaleReason("mixed", true, false, "normal") === "");
 }
 
 process.exit(failures ? 1 : 0);

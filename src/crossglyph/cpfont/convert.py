@@ -618,6 +618,7 @@ def gsub_ligature_sequences(font_path):
 
     font = TTFont(font_path, lazy=True)
     cmap = font.getBestCmap() or {}
+    dropped = 0
 
     # Build glyph_name -> codepoint and codepoint -> glyph_name maps
     glyph_to_cp = {}
@@ -669,14 +670,18 @@ def gsub_ligature_sequences(font_path):
                         elif seq in STANDARD_LIGATURE_MAP:
                             lig_cp = STANDARD_LIGATURE_MAP[seq]
                         else:
-                            seq_str = ', '.join(f'U+{cp:04X}' for cp in seq)
-                            print(f"ligatures: WARNING: dropping ligature ({seq_str}) -> "
-                                  f"glyph '{lig.LigGlyph}': output glyph has no cmap entry "
-                                  f"and input sequence is not in STANDARD_LIGATURE_MAP",
-                                  file=sys.stderr)
+                            dropped += 1
                             continue
                         raw_ligatures[seq] = lig_cp
 
+    # FORK: one line rather than one per rule. A face with a full `liga` set
+    # drops dozens here -- every f-ligature a designer drew and gave no
+    # codepoint -- and none of them is actionable: the format addresses a
+    # ligature by codepoint, so one without is unreachable however the font is
+    # rebuilt. At a page redraw that is fifty lines of log per keystroke.
+    if dropped:
+        print(f"ligatures: {dropped} not reachable by codepoint, skipped",
+              file=sys.stderr)
     font.close()
     return raw_ligatures
 
@@ -779,8 +784,10 @@ def apply_stem_darkening(enabled):
     nothing is unmoved too, which is why the preview greys the switch on the
     two cases above and leaves the rest alone.
 
-    A module that does not know the property raises, and that is not an error:
-    an older FreeType build simply cannot do this.
+    freetype-py binds FT_Property_Set without an error check, so a property a
+    build does not carry is set silently and does nothing at all. The guard is
+    for a freetype-py old enough not to bind the call: FreeType gained it in
+    2.7, and the binding is behind a try/except that leaves the name undefined.
     """
     import freetype
 
@@ -792,6 +799,34 @@ def apply_stem_darkening(enabled):
                                      freetype.byref(value))
         except Exception:      # noqa: BLE001 -- see the docstring
             pass
+
+
+def apply_interpreter(grayscale):
+    """Pick the TrueType bytecode interpreter: version 35 when `grayscale`.
+
+    FORK. Library-global like stem darkening above, and set for the duration of
+    one rasterize call. crengine-ng offers the same choice for the same reason
+    (lvfreetypefontman.cpp SetTrueTypeInterpreterVersion).
+
+    It only reaches a face whose own bytecode is what draws it. CFF has no
+    bytecode at all; a TrueType face with no glyph instructions, no `fpgm` and
+    no `prep` goes to the auto-hinter whatever is set here (base/ftobjs.c); and
+    so does any face under `light`, `auto` or `none`, unless FreeType calls it
+    tricky, which exempts it from that dispatch entirely.
+
+    Nothing reports a build that does not carry the property: the binding
+    discards FreeType's error, so the call does nothing and the page is drawn
+    with whichever interpreter the build defaults to. See apply_stem_darkening.
+    """
+    import freetype
+
+    handle = freetype.get_handle()
+    value = freetype.c_int(35 if grayscale else 40)
+    try:
+        freetype.FT_Property_Set(handle, b"truetype", b"interpreter-version",
+                                 freetype.byref(value))
+    except Exception:          # noqa: BLE001 -- see the docstring
+        pass
 
 
 def set_design_coords(face, axes):
@@ -878,6 +913,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     aa_thresholds = tuning.thresholds
     lut = tuning.coverage_lut()
     apply_stem_darkening(tuning.stem_darkening)
+    apply_interpreter(tuning.grayscale_hinting)
 
     # FORK: advanceX is 12.4 fixed point, so a pixel of tracking is 16 units
     # and the smallest step is 1/16 px.

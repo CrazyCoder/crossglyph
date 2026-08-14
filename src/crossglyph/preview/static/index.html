@@ -184,17 +184,27 @@
   </div>
 
 
-  <label class="row">
-    <span class="name">stem darkening</span>
-    <input name="stem_darkening" type="checkbox">
-    <button type="button" class="revert" data-reset="stem_darkening" title="Compare with the value the config has" aria-label="compare stem darkening" hidden>&#8634;</button>
-  </label>
+  <!-- FreeType's interpreter version 35, which fits stems on both axes rather
+       than hinting for a subpixel display this panel does not have. Only
+       reaches a TrueType face whose own bytecode is what draws it. -->
+  <div class="row check">
+    <label class="name" for="grayscale_hinting">grayscale hinting</label>
+    <input id="grayscale_hinting" name="grayscale_hinting" type="checkbox">
+    <span class="mark" data-mark="grayscale_hinting" aria-hidden="true" hidden>&#8226;</span>
+  </div>
 
-  <label class="row">
-    <span class="name">ligatures</span>
-    <input name="ligatures" type="checkbox" checked>
-    <button type="button" class="revert" data-reset="ligatures" title="Compare with the value the config has" aria-label="compare ligatures" hidden>&#8634;</button>
-  </label>
+
+  <div class="row check">
+    <label class="name" for="stem_darkening">stem darkening</label>
+    <input id="stem_darkening" name="stem_darkening" type="checkbox">
+    <span class="mark" data-mark="stem_darkening" aria-hidden="true" hidden>&#8226;</span>
+  </div>
+
+  <div class="row check">
+    <label class="name" for="ligatures">ligatures</label>
+    <input id="ligatures" name="ligatures" type="checkbox" checked>
+    <span class="mark" data-mark="ligatures" aria-hidden="true" hidden>&#8226;</span>
+  </div>
 
 
   <!-- Only moves a font whose designer drew a pnum feature, and then only the
@@ -266,26 +276,26 @@
     <button type="button" class="revert" data-reset="language" title="Compare with the value the config has" aria-label="compare hyphenate as" hidden>&#8634;</button>
   </div>
 
-  <label class="row">
-    <span class="name">hyphenation</span>
-    <input name="hyphenation" type="checkbox" data-group="page">
-    <button type="button" class="revert" data-reset="hyphenation" title="Compare with the value the config has" aria-label="compare hyphenation" hidden>&#8634;</button>
-  </label>
-  <label class="row">
-    <span class="name">paragraph spacing</span>
-    <input name="extra_paragraph_spacing" type="checkbox" checked data-group="page">
-    <button type="button" class="revert" data-reset="extra_paragraph_spacing" title="Compare with the value the config has" aria-label="compare paragraph spacing" hidden>&#8634;</button>
-  </label>
-  <label class="row">
-    <span class="name">anti-aliasing</span>
-    <input name="antialiased" type="checkbox" checked data-group="page">
-    <button type="button" class="revert" data-reset="antialiased" title="Compare with the value the config has" aria-label="compare anti-aliasing" hidden>&#8634;</button>
-  </label>
-  <label class="row">
-    <span class="name">night mode</span>
-    <input name="inverted" type="checkbox" data-group="page">
-    <button type="button" class="revert" data-reset="inverted" title="Compare with the value the config has" aria-label="compare night mode" hidden>&#8634;</button>
-  </label>
+  <div class="row check">
+    <label class="name" for="hyphenation">hyphenation</label>
+    <input id="hyphenation" name="hyphenation" type="checkbox" data-group="page">
+    <span class="mark" data-mark="hyphenation" aria-hidden="true" hidden>&#8226;</span>
+  </div>
+  <div class="row check">
+    <label class="name" for="extra_paragraph_spacing">paragraph spacing</label>
+    <input id="extra_paragraph_spacing" name="extra_paragraph_spacing" type="checkbox" checked data-group="page">
+    <span class="mark" data-mark="extra_paragraph_spacing" aria-hidden="true" hidden>&#8226;</span>
+  </div>
+  <div class="row check">
+    <label class="name" for="antialiased">anti-aliasing</label>
+    <input id="antialiased" name="antialiased" type="checkbox" checked data-group="page">
+    <span class="mark" data-mark="antialiased" aria-hidden="true" hidden>&#8226;</span>
+  </div>
+  <div class="row check">
+    <label class="name" for="inverted">night mode</label>
+    <input id="inverted" name="inverted" type="checkbox" data-group="page">
+    <span class="mark" data-mark="inverted" aria-hidden="true" hidden>&#8226;</span>
+  </div>
 
   <div class="hint">Anti-aliasing off is the device's 1-bit mode: every
     non-white level is painted solid black.</div>

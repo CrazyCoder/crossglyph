@@ -185,6 +185,13 @@
     display: grid; place-items: center;
   }
   .revert:hover { color: var(--text); background: var(--hover); }
+  /* The same column, saying the same thing, without offering a press: a switch
+     is already its own way back. Never a click target, so the arrow's column
+     stays inert on these rows. */
+  .mark {
+    width: 1.5rem; height: 1.5rem; color: var(--muted); font-size: 14px;
+    display: grid; place-items: center; pointer-events: none;
+  }
   /* Set aside rather than reset: the knob is showing its default and your
      value is waiting. Filled, because this is a state you are currently in
      rather than an action available to you. */
@@ -278,14 +285,15 @@
      it reads as on. These are greyed because the font cannot answer them, so
      they have to look as out of force as the fields above do. */
   input[type=checkbox]:disabled { opacity: .4; cursor: default; }
-  /* The whole row is the target for a checkbox, so the row has to stop
-     offering itself when the box in it will not move. */
-  label.row:has(:disabled) { cursor: default; }
+  /* The words are the target for a checkbox, so they have to stop offering
+     themselves when the box beside them will not move. */
+  .row.check:has(:disabled) .name { cursor: default; }
 
-  /* A checkbox row is a whole-row target: the label is the control. Where the
-     row carries a button as well it is a div and the label is the words alone,
-     since a press inside a label would toggle the box under it. */
-  label.row { cursor: pointer; }
+  /* A checkbox row is a div and its label is the words alone, never the row:
+     a press anywhere inside a label toggles the box under it, which would make
+     the arrow's column and every gap in the row a switch with nothing drawn on
+     it. The words are a wide enough target on their own. */
+  .row.check .name { cursor: pointer; }
   .row input[type=checkbox] { justify-self: start; width: 1rem; height: 1rem;
                               accent-color: var(--l2); cursor: pointer; }
 

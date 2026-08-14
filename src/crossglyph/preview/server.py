@@ -25,7 +25,7 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
         f"with:\n  uv sync") from exc
 
 import freetype
-from fontTools.ttLib import TTLibError
+from fontTools.ttLib import TTFont, TTLibError
 
 from .. import fontbuild, fontconf
 from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
@@ -326,6 +326,51 @@ def _face_outlines(path: str, mtime: int, size: int) -> str:
         return ""
 
 
+def face_hinting(path: pathlib.Path) -> tuple[bool, bool]:
+    """Whether the TrueType interpreter draws this face: (bytecode, tricky).
+
+    `bytecode` is FreeType's own test for it, which is not "has a `prep`": a
+    face with no glyph instructions, no `fpgm` and a `prep` of 7 bytes or fewer
+    goes to the auto-hinter whatever the interpreter is set to (base/ftobjs.c,
+    the `num_locations` clause). `tricky` is the face flag that exempts a font
+    from that dispatch entirely, so its bytecode runs under `light` and `auto`
+    too.
+
+    The 7 is FreeType's own threshold and the reason this is not simply
+    "non-empty": a `prep` that short is a stub that cannot do anything, and the
+    bundled Literata is exactly that case. 2.13.2, which the wheel links, still
+    hands such a face to the interpreter and gets an identical page out of both
+    versions; a later FreeType skips it outright. Taking the newer rule greys
+    the switch on the one family every new user opens, which is where a switch
+    that draws the same page twice is least welcome.
+
+    Both true when the face will not open, since greying is a claim and there
+    is nothing to claim about a font nobody could read.
+    """
+    known = stamp(path)
+    return _face_hinting(*known) if known else (True, True)
+
+
+@functools.lru_cache(maxsize=128)
+def _face_hinting(path: str, mtime: int, size: int) -> tuple[bool, bool]:
+    del mtime, size                 # in the key, not the body
+    try:
+        tricky = freetype.Face(path).is_tricky
+    except (OSError, freetype.FT_Exception):
+        return (True, True)
+    try:
+        with TTFont(path, lazy=True) as font:
+            reader = font.reader
+            if "glyf" not in reader:
+                return (False, tricky)      # CFF: no interpreter involved
+            bytecode = bool(font["maxp"].maxSizeOfInstructions
+                            or len(reader["fpgm"] if "fpgm" in reader else b"")
+                            or len(reader["prep"] if "prep" in reader else b"") > 7)
+    except (OSError, TTLibError, KeyError):
+        return (True, tricky)
+    return (bytecode, tricky)
+
+
 def family_outlines(config: Config) -> str:
     """The one format every face in the family carries, or "mixed".
 
@@ -334,6 +379,18 @@ def family_outlines(config: Config) -> str:
     """
     kinds = {face_outlines(path) for path in set(config.styles.values())}
     return kinds.pop() if len(kinds) == 1 else "mixed"
+
+
+def family_hinting(config: Config) -> dict[str, bool]:
+    """face_hinting over a whole family, as the panel needs it.
+
+    Any face counts, for the reason family_features gives: a family whose
+    regular carries bytecode and whose bold does not still draws a different
+    page when the interpreter changes.
+    """
+    flags = [face_hinting(path) for path in set(config.styles.values())]
+    return {"bytecode": any(bytecode for bytecode, _ in flags),
+            "tricky": any(tricky for _, tricky in flags)}
 
 
 def family_features(config: Config) -> dict[str, bool]:
@@ -382,6 +439,10 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             # or lacks: the hinting mode decides too, so the page is given the
             # fact and works the rule out for itself.
             "outlines": family_outlines(config),
+            # The same shape again, for the interpreter knob: whether any face
+            # carries bytecode for it to run, and whether any is tricky, which
+            # is what keeps that face off the auto-hinter in every mode.
+            **family_hinting(config),
             # None for a static family, which is what hides the axis controls.
             "variable": variable_entry(config),
             "conf": (config.path.name if not config.derived
@@ -641,7 +702,7 @@ def render(request: RenderRequest) -> Response:
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
-    # advanceY the .cpfont format cannot hold (convert.py:1248-1253), which a
+    # advanceY the .cpfont format cannot hold (convert.py:1279-1284), which a
     # large `size` can reach on a loose-hhea face. SystemExit is a
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
@@ -653,7 +714,7 @@ def render(request: RenderRequest) -> Response:
             422, reason or "the converter rejected this combination; "
                            "see the server log") from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
-    # and the one this path can raise is the converter's (convert.py:1071,
+    # and the one this path can raise is the converter's (convert.py:1107,
     # from rasterize_font_style on a malformed face). The fontbuild one comes
     # from the family builder, which the preview never calls.
     #
@@ -695,7 +756,7 @@ def render(request: RenderRequest) -> Response:
 #: which one you are working at.
 SAVED_KEYS = ("gamma", "thresholds", "weight", "slant", "letter_spacing",
               "word_spacing", "kerning", "ligatures", "hinting",
-              "stem_darkening", "figures", "line_height")
+              "grayscale_hinting", "stem_darkening", "figures", "line_height")
 
 
 #: The export keys, which are not tuning: they decide what a build contains

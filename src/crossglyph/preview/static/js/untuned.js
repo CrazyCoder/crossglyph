@@ -1,13 +1,17 @@
 import {form, img} from "./dom.js";
-import {bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, reverts, stashed} from "./reverts.js";
+import {KNOB_KEYS, bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, stashed} from "./reverts.js";
 
 // --- comparing the whole tuning -------------------------------------------
 // The same toggle over every font knob at once: what does this face look like
-// before I touched it? Size is deliberately not in it. It is not tuning -- it
-// is which size you are working at -- and 13 is this page's default rather
-// than anything the device believes, so dropping to it would change the whole
-// page and make the comparison say nothing.
-export const UNTUNED_SKIP = new Set(["size"]);
+// before I touched it? Driven from KNOB_KEYS rather than from the arrows,
+// because not every knob has one: a checkbox carries a mark instead, its value
+// being one click from wherever it is, and it has to go back for this
+// comparison like everything else.
+//
+// Size is deliberately not among them. It is not tuning -- it is which size
+// you are working at -- and 13 is this page's default rather than anything the
+// device believes, so dropping to it would change the whole page and make the
+// comparison say nothing.
 export const compare = document.getElementById("compare");
 
 export function comparing() {
@@ -17,10 +21,8 @@ export function comparing() {
 export function toggleCompare() {
   const on = !comparing();
   compare.setAttribute("aria-pressed", String(on));
-  for (const button of reverts) {
-    const name = button.dataset.reset;
-    if (UNTUNED_SKIP.has(name)) continue;
-    if (form.elements[name].dataset.group === "page") continue;
+  for (const name of KNOB_KEYS) {
+    if (!form.elements[name]) continue;
     if (on) {
       // Against factory, not against the config: untuned answers "what did
       // this face look like before anyone touched it", which includes what

@@ -463,6 +463,33 @@ def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch)
     assert server.face_outlines(face) == "cff"
 
 
+def test_a_family_says_whether_its_own_bytecode_draws_it(tmp_path):
+    """Grayscale hinting picks between two bytecode interpreters, so the panel
+    needs to know there is bytecode. fontsmith draws outlines and writes no
+    instructions, which is the same case as the bundled Literata: TrueType, and
+    fitted by the auto-hinter whichever interpreter is set."""
+    import fontpaths
+    from fontsmith import box_font
+
+    from crossglyph.preview import server
+
+    plain = box_font(tmp_path / "Plain-Regular.ttf", range(0x41, 0x5B),
+                     family="Plain")
+    cff = box_font(tmp_path / "Curvy-Regular.otf", range(0x41, 0x5B),
+                   family="Curvy", cff=True)
+    assert server.face_hinting(plain) == (False, False)
+    assert server.face_hinting(cff) == (False, False)
+    # A face nobody can read claims nothing, so nothing is greyed on it.
+    missing = tmp_path / "Gone-Regular.ttf"
+    assert server.face_hinting(missing) == (True, True)
+
+    real = fontpaths.truetype()
+    if real is not None:
+        bytecode, _tricky = server.face_hinting(real)
+        assert bytecode, f"{real.name} carries no bytecode, so it is the " \
+                         f"wrong face for the tests that assume one"
+
+
 def test_a_family_says_which_engine_draws_it(tmp_path, monkeypatch):
     """Stem darkening lives in FreeType's CF2 interpreter and in the
     auto-hinter, and which one draws a face depends on its outlines, so the
@@ -508,7 +535,46 @@ def test_every_greyable_knob_is_a_knob_the_page_has():
     # rule quietly doing nothing.
     reached = set(re.findall(r"form\.elements\.(\w+)", source))
     assert reached <= set(_controls()), reached - set(_controls())
-    assert {"stem_darkening", "hinting"} <= reached, reached
+    assert {"stem_darkening", "hinting", "grayscale_hinting"} <= reached, reached
+
+
+def test_no_compare_arrow_sits_inside_a_label():
+    """A press anywhere inside a label toggles the control it names, so an
+    arrow within one is two actions on one click -- and the row's every empty
+    gap, the arrow's column included, becomes a switch with nothing drawn on
+    it. The stylesheet has always said so; this is what holds the markup to it.
+
+    The probe cannot: it builds its own controls and never reads this file.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    for opened in re.finditer(r"<label\b[^>]*>", html):
+        end = html.index("</label>", opened.end())
+        assert "class=\"revert\"" not in html[opened.end():end], \
+            f"a revert arrow sits inside {opened.group(0)}"
+
+
+def test_a_checkbox_knob_is_marked_rather_than_given_an_arrow():
+    """The arrow sets a value aside so you can flick back to it. A switch has
+    nothing to set aside -- the value it is not showing is the other one, one
+    click away on the box itself -- so an arrow there is a second control for
+    the same flip, plus a set-aside state that survives neither the flip nor a
+    reload. The mark says the same thing and offers no press.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    rows = re.findall(r'<div class="row check">(.*?)</div>', html, re.S)
+    assert len(rows) >= 7, len(rows)
+    for row in rows:
+        name = re.search(r'name="(\w+)"', row)
+        assert 'class="revert"' not in row, f"{name.group(1)} still has an arrow"
+        assert f'data-mark="{name.group(1)}"' in row, f"{name.group(1)} has no mark"
 
 
 def test_the_page_offers_every_page_knob():

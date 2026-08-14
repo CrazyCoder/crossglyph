@@ -4,7 +4,7 @@ import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage} from "./remember.js";
 import {refreshReverts, stashed} from "./reverts.js";
-import {typedInBox} from "./text.js";
+import {languageChosen, typedInBox} from "./text.js";
 import {axisSettings} from "./variable.js";
 
 export function body() {
@@ -158,6 +158,10 @@ export function scheduleRender() {
 export function knobChanged(el) {
   if (el.dataset.group === "page") savePage();
   if (el.name === "text") typedInBox();
+  // The same idea for the language: while your own text is showing, which
+  // language to hyphenate it as is a fact about that text, and it has to come
+  // back with it.
+  if (el.name === "language") languageChosen();
   // Typing goes straight into the field, so without this the slider sits
   // wherever it was until the field loses focus and `change` finally fires.
   if (el.type === "number" && el.value !== "") showSlider(el);

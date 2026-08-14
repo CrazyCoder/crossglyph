@@ -100,6 +100,16 @@ export function axesDiffer() {
       tag => Number(spec.other[tag] ?? NaN) !== now[tag]);
 }
 
+// What a reset puts the axis controls back to. Not the markup, whose first
+// option is the lightest weight the font has: the value a slot resets to is
+// the one the family declares, which is its config's if it has one and the
+// font's own named instance if it has not. The same value the compare arrows
+// measure against, so a reset lands on a panel that reads as clean.
+export function resetAxes() {
+  const entry = familyEntries.get(shownFamily);
+  if (entry) showVariable(entry);
+}
+
 // The two pickers. The sliders beside them are numericRow's business and go
 // through knobChanged like every other field, which is where the save state
 // and the coalesced redraw already come from.

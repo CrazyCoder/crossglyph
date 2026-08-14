@@ -671,7 +671,8 @@ def test_a_tuning_round_trips_through_the_files_own_spelling(tmp_path):
     from crossglyph.cpfont.tuning import LineHeight, Tuning
 
     tuning = Tuning(gamma=1.35, weight=0.2, slant=-0.1, hinting="light",
-                    stem_darkening=True, line_height=LineHeight.parse("1.15x"),
+                    grayscale_hinting=True, stem_darkening=True,
+                    line_height=LineHeight.parse("1.15x"),
                     letter_spacing=0.25, word_spacing=-0.5, kerning=0.5,
                     ligatures=False, figures="proportional")
     values = {key: value

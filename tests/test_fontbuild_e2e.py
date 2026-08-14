@@ -88,6 +88,56 @@ def _darkening_moves(face, hinting):
     return built[0] != built[1]
 
 
+def _grayscale_moves(face, hinting):
+    """Whether grayscale hinting changes a single size of `face`."""
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import build_font
+
+    built = [build_font({0: face}, 13, coverage=((0x41, 0x5A),),
+                        tuning=Tuning(hinting=hinting, grayscale_hinting=on))
+             for on in (False, True)]
+    return built[0] != built[1]
+
+
+def test_grayscale_hinting_only_reaches_a_face_the_bytecode_draws():
+    """What the preview greys that switch on. It picks FreeType's interpreter
+    version 35, so it moves a TrueType face carrying bytecode under `normal`
+    hinting and nothing else: `light` and `auto` hand the face to the
+    auto-hinter, and `none` hints not at all.
+
+    A real face again, and a hinted one -- the fixtures carry no bytecode, so
+    every mode would pass the negatives here while proving nothing. The bundled
+    Literata is that case rather than the exception: it is hinted for the
+    auto-hinter, and this switch is dead for it in every mode, which is why the
+    gate asks the font and not only the hinting row.
+    """
+    import fontpaths
+
+    face = fontpaths.truetype()
+    if face is None:
+        pytest.skip("needs CROSSGLYPH_TEST_FONT pointed at a hinted face")
+
+    assert _grayscale_moves(face, "normal"), \
+        f"{face.name} no longer answers the interpreter under normal hinting, " \
+        f"so either it lost its bytecode or the preview greys a switch that works"
+    for hinting in ("light", "auto", "none"):
+        assert not _grayscale_moves(face, hinting), \
+            f"hinting={hinting} now reaches the interpreter, so the preview " \
+            f"is greying a switch that works"
+
+
+def test_the_bundled_family_is_the_case_the_font_side_gate_is_for():
+    """Literata carries a 7-byte `prep` and nothing else, which is a stub: both
+    interpreters draw it identically, so the switch is dead for it whatever the
+    hinting row says. A gate that read only the hinting mode would offer it on
+    the one family every new user opens. This is what pins that, since the
+    stub is also what server.face_hinting reads to grey it."""
+    face = fontbuild.STARTER_DIR / "Literata[opsz,wght].ttf"
+    assert face.is_file(), "the bundled family is what this measures"
+    for hinting in ("normal", "light", "auto", "none"):
+        assert not _grayscale_moves(face, hinting), hinting
+
+
 def test_a_truetype_face_is_only_darkened_under_light_hinting():
     """What the preview greys the switch on. FreeType darkens a TrueType face
     through the auto-hinter's light mode and nowhere else, so under any other

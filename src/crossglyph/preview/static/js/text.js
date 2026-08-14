@@ -10,6 +10,7 @@ import {attempt, savePage} from "./remember.js";
 // it, which one shared slot cannot do.
 export const TEXT = "crossglyph.text";       // your own words, if you have any
 export const CHOICE = "crossglyph.sample";   // which entry the picker is on
+export const LANGUAGE = "crossglyph.language";  // what to hyphenate them as
 
 //: The entry that holds your own text. First in the list, and the value the
 //: markup declares, so a page whose /defaults never answered still has one.
@@ -98,11 +99,38 @@ export function followLanguage(tag) {
   savePage();
 }
 
+//: The hyphenation language chosen while your own text was showing.
+export function customLanguage() {
+  return attempt(() => localStorage.getItem(LANGUAGE), null);
+}
+
+// Your own text is in some language, and a preset's is not it. A preset drags
+// `hyphenate as` along with it, so without this the trip back would leave your
+// words hyphenated as whichever specimen you last looked at. Recorded only
+// while Custom is showing: that is the only time the choice is about your text
+// rather than about the specimen on screen.
+export function languageChosen() {
+  if (samplePicker.value !== CUSTOM) return;
+  const el = form.elements.language;
+  if (el) attempt(() => localStorage.setItem(LANGUAGE, el.value));
+}
+
+// And carried back, the way your text is. Nothing stored means nothing to
+// restore: whatever is showing stays, which is right for somebody who has
+// never set one.
+export function restoreLanguage() {
+  const el = form.elements.language;
+  const saved = customLanguage();
+  if (!el || !saved || ![...el.options].some(o => o.value === saved)) return;
+  el.value = saved;
+  savePage();
+}
+
 export function sampleChosen() {
   const tag = samplePicker.value;
   rememberChoice(tag);
   showSample(tag);
-  followLanguage(tag);
+  if (tag === CUSTOM) restoreLanguage(); else followLanguage(tag);
 }
 
 export function typedInBox() {

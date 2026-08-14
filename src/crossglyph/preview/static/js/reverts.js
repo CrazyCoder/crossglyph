@@ -14,14 +14,20 @@ import {showSaveState} from "./save.js";
 export const reverts = [...form.querySelectorAll(".revert")];
 export const stashed = new Map();
 
+//: A checkbox says the same thing without a button. Setting a value aside is
+//: what the arrow is for, and a switch has nothing to set aside: the value it
+//: is not showing is the other one, which is the click you would have spent on
+//: the arrow anyway. So a binary knob gets a mark that says it differs and
+//: from what, and no second way to flip it.
+export const marks = [...form.querySelectorAll(".mark")];
+
 // Three values a knob can have, and each control here needs all three:
 //   factory  what the converter does with no config at all
 //   saved    what the family's .conf says today, all.conf underneath it
 //   current  what the panel is showing
-// The arrow compares against saved -- "undo what I just did to this knob" is
-// what you reach for constantly, and the column then reads as what you have
-// changed since you opened this font. `untuned` and Reset go to factory, which
-// is the only thing they have ever meant.
+// The arrow offers whichever of the first two the panel is not already
+// showing -- see compareTarget. `untuned` and Reset go to factory, which is
+// the only thing they have ever meant.
 //
 // A state carries all three controls a knob can involve, because line_height
 // is a field and a checkbox saying to ignore it.
@@ -30,7 +36,8 @@ export const stashed = new Map();
 // check when a knob is added.
 export const KNOB_KEYS = ["gamma", "weight", "line_height", "letter_spacing",
                    "word_spacing", "kerning", "slant", "thresholds", "hinting",
-                   "stem_darkening", "ligatures", "figures"];
+                   "grayscale_hinting", "stem_darkening", "ligatures",
+                   "figures"];
 export let savedTuning = null;             // the selected family's, null for a file
 
 //: What the family's config says, for everything that compares with it.
@@ -83,6 +90,25 @@ export function baseState(name) {
   return savedState(name) ?? factoryState(name);
 }
 
+// Which baseline this knob's arrow offers, and null when it has none left.
+//
+// The config, while what is shown differs from it: "undo what I just did to
+// this knob" is what you reach for constantly. Saving makes the two agree on
+// every knob at once, and an arrow that only knew that question would empty
+// the whole column at the moment the font became worth reading -- so it falls
+// through to factory, which is the other question worth asking of a saved
+// font: what does this config change from stock. Leave a knob on factory and
+// it differs from the config again, so the arrow points back the other way and
+// the pair oscillates.
+export function compareTarget(name) {
+  const now = currentState(name);
+  const saved = savedState(name);
+  if (saved && !sameState(now, saved)) return {state: saved, source: "config"};
+  const factory = factoryState(name);
+  if (sameState(now, factory)) return null;
+  return {state: factory, source: "stock"};
+}
+
 export function sameState(one, other) {
   if (one.checked !== other.checked || one.auto !== other.auto) return false;
   // Both on "the font's own" means equal whatever the field is parked at.
@@ -120,14 +146,25 @@ export function refreshReverts() {
   for (const button of reverts) {
     const name = button.dataset.reset;
     const off = stashed.has(name);
-    button.hidden = !(off || knobModified(name));
+    const target = compareTarget(name);
+    button.hidden = !(off || target);
     button.dataset.state = off ? "on" : "off";
+    const source = off ? stashed.get(name).source : target && target.source;
+    const what = source === "stock" ? "the stock value" : "what the config has";
     // What pressing it does, in both states. It is a comparison rather than a
     // reset: your value is set aside, not thrown away.
     button.title = off
-      ? "Showing what the config has. Click to put your value back."
-      : "Set your value aside and show what the config has. Click again to "
-        + "bring it back.";
+      ? `Showing ${what}. Click to put your value back.`
+      : `Set your value aside and show ${what}. Click again to bring it back.`;
+  }
+  for (const mark of marks) {
+    const target = compareTarget(mark.dataset.mark);
+    mark.hidden = !target;
+    if (!target) continue;
+    const was = target.state.checked ? "on" : "off";
+    mark.title = target.source === "config"
+      ? `Changed. The config has this ${was}.`
+      : `Changed from stock, which is ${was}.`;
   }
   showSaveState();
 }
@@ -139,11 +176,20 @@ export function restoreKnob(name) {
   setKnob(name, held);
 }
 
-export function bypassKnob(name, target) {
+export function bypassKnob(name, target, source) {
+  // A caller naming a target has already said which baseline it wants; untuned
+  // is the one that does, and factory is what it means.
+  const pick = target ? {state: target, source: source ?? "stock"}
+                      : compareTarget(name);
+  if (!pick) return;
   // Stash before setting: setKnob renders, and the render has to already see
-  // this knob as set aside or the arrow would hide itself.
-  stashed.set(name, currentState(name));
-  setKnob(name, target ?? baseState(name));
+  // this knob as set aside or the arrow would hide itself. Which baseline is
+  // being shown rides along in the same entry, so the arrow can name it while
+  // it is pressed and the two cannot be dropped separately -- five places drop
+  // a stash, and a second map beside it would have to be right in all of them.
+  // setKnob reads value, checked and auto, and ignores the rest.
+  stashed.set(name, {...currentState(name), source: pick.source});
+  setKnob(name, pick.state);
 }
 
 for (const button of reverts) {

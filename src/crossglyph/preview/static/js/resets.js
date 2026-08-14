@@ -4,6 +4,7 @@ import {syncSliders} from "./knobs.js";
 import {STORE, attempt, pageControls} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
 import {refreshReverts} from "./reverts.js";
+import {resetAxes} from "./variable.js";
 
 export function resetControl(el) {
   if (el.type === "checkbox") { el.checked = el.defaultChecked; return; }
@@ -41,11 +42,8 @@ export function wireResets() {
     // neither button touches it -- an empty box already means "use the
     // shipped sample".
     //
-    // The axis controls are not knobs either. They say which face each slot
-    // is, and a variable font's own named instances are the only answer to
-    // that -- there is no factory value to go back to. Left in, this would
-    // reset them to the first option in each picker, which is the lightest
-    // weight the font has.
+    // The axis controls go back too, but not to the markup: their factory
+    // value is the family's own, so resetAxes is what puts them there.
     for (const el of form.elements) {
       if (el.name && el.dataset.group !== "page" && el.dataset.group !== "axes"
           && el.name !== "text") {
@@ -53,6 +51,7 @@ export function wireResets() {
       }
     }
     lineHeightAuto.checked = lineHeightAuto.defaultChecked;
+    resetAxes();
     afterReset();
   });
 

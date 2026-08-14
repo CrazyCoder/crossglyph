@@ -22,6 +22,7 @@ import dataclasses
 
 HINTING = ("normal", "light", "none", "auto")
 
+
 #: Figure styles. "default" is whatever the cmap gives; "proportional" applies
 #: the font's GSUB `pnum` feature. Named rather than boolean so `tabular`
 #: (`tnum`) and `oldstyle` (`onum`) can join without a schema change.
@@ -91,6 +92,22 @@ class Tuning:
     # Shear, as a tangent. 0.25 is about 14 degrees.
     slant: float = 0.0
     hinting: str = "normal"
+    # Which TrueType bytecode interpreter runs the font's own hinting.
+    # FreeType's default is version 40, "roughly equivalent to the hinting
+    # provided by DirectWrite ClearType" (ftdriver.h), which hints vertically
+    # only: on a subpixel display, snapping a stem sideways costs more than it
+    # buys. This picks version 35 instead, of which the same page says "only
+    # grayscale and B/W rasterizing is supported" -- which is this panel. It
+    # fits both axes, so a stem lands on a pixel instead of straddling two and
+    # being drawn twice in grey. Measured over the 303 hinted faces here it
+    # leaves 3.8% fewer midtone pixels, and a third fewer on faces like DejaVu.
+    #
+    # Version 38 is not a third choice: FreeType documents it as the same as 40
+    # now that the Infinality code is gone, which is why this is a switch.
+    #
+    # Only reaches a TrueType face carrying bytecode, and only while that
+    # bytecode is what draws it -- see convert.apply_interpreter.
+    grayscale_hinting: bool = False
     stem_darkening: bool = False
 
     # --- advance metrics, not rasterization ---------------------------------
@@ -181,7 +198,9 @@ class Tuning:
         """
         return {"gamma": self.gamma, "thresholds": list(self.thresholds),
                 "weight": self.weight, "slant": self.slant,
-                "hinting": self.hinting, "stem_darkening": self.stem_darkening,
+                "hinting": self.hinting,
+                "grayscale_hinting": self.grayscale_hinting,
+                "stem_darkening": self.stem_darkening,
                 "line_height": (str(self.line_height)
                                 if self.line_height else None),
                 "letter_spacing": self.letter_spacing,
