@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write        # create the release
+  pages: write           # publish the manifest
+  id-token: write        # what deploy-pages authenticates with
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # launcher_changed compares against the previous tag, which a
+          # shallow clone does not have.
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+
+      # The tag is what people install; pyproject.toml is what the tool
+      # reports as its version. A release where they disagree misdescribes
+      # itself for as long as it exists, and the manifest built from it points
+      # at a file named after the other one.
+      - name: The tag and the version agree
+        run: |
+          tagged="${GITHUB_REF_NAME#v}"
+          declared="$(uv run python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          if [ "$tagged" != "$declared" ]; then
+            echo "tag $GITHUB_REF_NAME does not match version $declared" >&2
+            exit 1
+          fi
+
+      # Builds the zip and the manifest, and refuses if the archive has lost a
+      # line ending, an executable bit or a file it cannot run without.
+      - name: Build the release
+        run: uv run tools/make-release.py
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/crossglyph-*.zip
+          --title "$GITHUB_REF_NAME" --generate-notes
+
+      # Pages serves the manifest: CDN backed and unmetered, where the REST
+      # API is 60 requests an hour per address and shared behind a NAT.
+      - name: Stage the manifest
+        run: mkdir -p site && cp dist/latest.json site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: pages
+        uses: actions/deploy-pages@v4

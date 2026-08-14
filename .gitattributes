@@ -12,3 +12,4 @@
 .gitattributes export-ignore
 .gitignore     export-ignore
 .githooks/     export-ignore
+.github/       export-ignore

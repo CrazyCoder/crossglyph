@@ -68,7 +68,8 @@ REQUIRED = [
 
 #: A checkout's own furniture, which means nothing to somebody unpacking a zip.
 #: `export-ignore` in .gitattributes is what keeps them out; this is the check.
-EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit"]
+EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
+            ".github/workflows/release.yml"]
 
 #: Executed on macOS and Linux, so the bit has to survive the archive and the
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.
