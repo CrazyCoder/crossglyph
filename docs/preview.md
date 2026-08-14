@@ -61,14 +61,21 @@ A face that will not open is not greyed on, because that is a claim about a
 font nobody could read.
 
 `stem darkening` is greyed by the font and the `hinting` row together, which is
-what makes it the confusing one: FreeType has darkening in the Adobe CFF driver
-and in the auto-hinter's light mode, and in neither place otherwise. So a
-TrueType family is unmoved by the switch except at `hinting = light`, and
-nothing at all is moved under `hinting = auto`. Turn hinting and the row
-follows. Only those two cases are greyed, so the switch may still do nothing
-where it is left alone: a CFF face whose stems fall where the darkening curve
-rounds to nothing is unmoved too, and that cannot be known without rasterizing
-the page both ways.
+what makes it the confusing one. FreeType darkens in two engines, the Adobe CF2
+interpreter that draws CFF and Type 1 faces and the auto-hinter, and each puts
+a condition of its own on top: CF2 darkens a scaled load, the auto-hinter
+darkens at a light target. So a TrueType family, which has no CF2 path, is
+unmoved by the switch except at `hinting = light`, the one setting that hands
+it to the auto-hinter. And nothing is moved under `hinting = auto`, which
+targets normal hinting and reloads the glyph unscaled, failing both conditions
+at once. Turn hinting and the row follows.
+
+Only those two cases are greyed, so the switch may still do nothing where it is
+left alone. A CFF face whose stems fall where the darkening curve rounds to
+nothing is unmoved too, and that cannot be known without rasterizing the page
+both ways. A face FreeType calls tricky never reaches the auto-hinter at all,
+so `light` does nothing for it either. Both are left live, because greying a
+switch that works is the one mistake worth avoiding here.
 
 Night mode is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so

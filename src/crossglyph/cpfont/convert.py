@@ -756,18 +756,28 @@ def apply_stem_darkening(enabled):
     FORK. A library-global property rather than a per-face one, so it is set
     for the duration of one rasterize call.
 
-    Measured over 132 faces on FreeType 2.13.2, its reach is narrow and in two
-    places: the Adobe CFF driver, which draws a CFF/OTF face under any hinting
-    but `auto`, and the auto-hinter's light mode, which is what draws a
-    TrueType face at `hinting = light`. Nothing else moves. `auto` moves
-    neither format, since the auto-hinter fits stems itself at a normal target.
+    Its reach is narrower than the four module names suggest. The code is in
+    two engines: the Adobe CF2 interpreter in psaux, which the cff, type1 and
+    t1cid drivers share, and the auto-hinter. Each puts a condition of its own
+    on top of the property. CF2 darkens a scaled load; the auto-hinter darkens
+    at a light target.
 
-    The two differ in size as well as in reach. Through the CFF driver the
-    effect on the final 2-bit bitmap is slight, well under a percent of set
-    pixels; through the light auto-hinter it is the largest thing in this
-    file. A CFF face whose stems fall where the darkening curve rounds to
-    nothing is unmoved too, which is why the preview only greys the switch on
-    the two cases above and leaves the rest alone.
+    So a CFF face moves under any hinting but `auto`. A TrueType face has no
+    CF2 path at all, and reaches the auto-hinter only at `light`, the TrueType
+    driver being the one that does not claim to hint lightly. And `auto` moves
+    neither format: it targets normal hinting, and the auto-hinter reloads the
+    glyph with FT_LOAD_NO_SCALE, which fails both conditions at once. That
+    second half is the load-bearing one -- without it a CFF face would still
+    darken underneath the auto-hinter.
+
+    The two differ in size as well as in reach. Through CF2 the effect on the
+    final 2-bit bitmap is slight, well under a percent of set pixels; through
+    the light auto-hinter it is the largest thing in this file.
+
+    Measured over 132 faces on FreeType 2.13.2, and read against that version's
+    source. A CFF face whose stems fall where the darkening curve rounds to
+    nothing is unmoved too, which is why the preview greys the switch on the
+    two cases above and leaves the rest alone.
 
     A module that does not know the property raises, and that is not an error:
     an older FreeType build simply cannot do this.

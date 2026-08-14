@@ -242,19 +242,22 @@ the advance width. Text gets heavier at unchanged spacing, which is right at
 reading sizes but is not a substitute for a real bold face.
 
 `stem_darkening` is narrower than its name suggests, and where it applies
-depends on `hinting` as much as on the font. FreeType has it in two places:
-the Adobe CFF driver, which draws a CFF or OTF face under any hinting but
-`auto`, and the auto-hinter's light mode, which is what draws a TrueType face
-at `hinting = light`. Nothing else moves. Under `auto` neither format does,
-since the auto-hinter fits stems itself at a normal target.
+depends on `hinting` as much as on the font. FreeType has the code in two
+engines, and each puts a condition of its own on top of the setting: the Adobe
+CF2 interpreter, which draws CFF and Type 1 faces, darkens a scaled load, and
+the auto-hinter darkens at a light target. So a CFF or OTF face moves under any
+hinting but `auto`, and a TrueType face, having no CF2 path, moves only at
+`hinting = light`, which is the one setting that hands it to the auto-hinter.
+Under `auto` neither format moves: it targets normal hinting, and the
+auto-hinter reloads the glyph unscaled, which fails both conditions at once.
 
-The two are not the same size either. Through the CFF driver the effect is
-slight, well under a percent of the set pixels; through the light auto-hinter
-it is substantial. Measured over 132 faces on FreeType 2.13, and the preview
-greys the switch when the pair you have chosen is one of the cases that cannot
-move. It leaves the rest alone rather than promising anything, because a CFF
-face whose stems fall where the darkening curve rounds to nothing is unmoved
-as well, and nothing short of rasterizing both ways would know.
+The two are not the same size either. Through CF2 the effect is slight, well
+under a percent of the set pixels; through the light auto-hinter it is
+substantial. Measured over 132 faces on FreeType 2.13, and the preview greys
+the switch when the pair you have chosen is one of the cases that cannot move.
+It leaves the rest alone rather than promising anything, because a CFF face
+whose stems fall where the darkening curve rounds to nothing is unmoved as
+well, and nothing short of rasterizing both ways would know.
 
 ## Line spacing
 

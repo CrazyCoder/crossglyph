@@ -2737,10 +2737,10 @@ for (const { name, text } of sources) {
         ligatures.disabled === true, String(ligatures.disabled));
 }
 
-// 34. Stem darkening, which the font decides only half of. FreeType applies it
-//     in the CFF driver and in the auto-hinter's light mode, so the hinting row
-//     two above settles it as much as the face does -- and the row has to
-//     follow that knob, not just the family.
+// 34. Stem darkening, which the font decides only half of. FreeType darkens in
+//     the CF2 interpreter, on a scaled load, and in the auto-hinter, at a light
+//     target, so the hinting row two above settles it as much as the face does
+//     -- and the row has to follow that knob, not just the family.
 {
   const env = await loaded(fakeStorage());
   const {stem_darkening: darkening, hinting} = env.byName;
@@ -2761,8 +2761,9 @@ for (const { name, text } of sources) {
   hinting.on.change();
   check("the auto-hinter takes it away again",
         darkening.disabled === true, String(darkening.disabled));
-  check("for a reason of its own",
-        /auto-hinter/.test(darkening.title), darkening.title);
+  check("for a reason of its own, not the one the outlines gave",
+        /auto hinting/.test(darkening.title) &&
+          !/TrueType/.test(darkening.title), darkening.title);
 
   // A CFF family is darkened under everything but auto. Switching to one
   // brings its own hinting with it, so the row is worked out again from both:

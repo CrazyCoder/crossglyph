@@ -311,7 +311,7 @@ def face_outlines(path: pathlib.Path) -> str:
 
     Empty when FreeType will not say, which is what keeps a file nobody can
     read from being described. Stated per face because it decides which of
-    FreeType's engines draws it, and stem darkening lives in only one of them.
+    FreeType's engines draws it, and only some of them darken stems.
     """
     known = stamp(path)
     return _face_outlines(*known) if known else ""
@@ -378,7 +378,7 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             # than invite an experiment with no result.
             "features": family_features(config),
             # Which of FreeType's engines draws this family, since stem
-            # darkening is in only one of them. Not a knob the font either has
+            # darkening is not in all of them. Not a knob the font either has
             # or lacks: the hinting mode decides too, so the page is given the
             # fact and works the rule out for itself.
             "outlines": family_outlines(config),
@@ -641,7 +641,7 @@ def render(request: RenderRequest) -> Response:
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
-    # advanceY the .cpfont format cannot hold (convert.py:1238-1243), which a
+    # advanceY the .cpfont format cannot hold (convert.py:1248-1253), which a
     # large `size` can reach on a loose-hhea face. SystemExit is a
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
@@ -653,7 +653,7 @@ def render(request: RenderRequest) -> Response:
             422, reason or "the converter rejected this combination; "
                            "see the server log") from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
-    # and the one this path can raise is the converter's (convert.py:1061,
+    # and the one this path can raise is the converter's (convert.py:1071,
     # from rasterize_font_style on a malformed face). The fontbuild one comes
     # from the family builder, which the preview never calls.
     #

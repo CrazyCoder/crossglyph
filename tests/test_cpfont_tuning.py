@@ -187,8 +187,9 @@ needs_cff = pytest.mark.skipif(CFF is None, reason="set CROSSGLYPH_TEST_OTF to a
 
 @needs_cff
 def test_stem_darkening_reaches_a_cff_face(tmp_path):
-    """Its whole reach is the Adobe CFF driver: a TrueType face is unmoved,
-    and so is a CFF face under the auto-hinter, which does its own fitting."""
+    """Here its whole reach is the Adobe CF2 interpreter: a TrueType face is
+    unmoved, and so is a CFF face under the auto-hinter, which reloads the
+    glyph unscaled and so misses the one condition CF2 darkens on."""
     def build(name, **kwargs):
         path = tmp_path / f"{name}.cpfont"
         cpfont.generate_cpfont_multistyle(

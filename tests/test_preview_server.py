@@ -464,9 +464,9 @@ def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch)
 
 
 def test_a_family_says_which_engine_draws_it(tmp_path, monkeypatch):
-    """Stem darkening lives in FreeType's CFF driver and in the auto-hinter's
-    light mode, so the page needs to know which outlines it is looking at to
-    say whether the switch can do anything."""
+    """Stem darkening lives in FreeType's CF2 interpreter and in the
+    auto-hinter, and which one draws a face depends on its outlines, so the
+    page needs them to say whether the switch can do anything."""
     from fontsmith import box_font
 
     from crossglyph import fontbuild

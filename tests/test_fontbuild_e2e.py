@@ -111,8 +111,9 @@ def test_a_truetype_face_is_only_darkened_under_light_hinting():
 
 
 def test_a_cff_face_is_darkened_unless_the_auto_hinter_is_in_charge():
-    """The other half of the rule. Only `auto` is greyed for a CFF face: the
-    auto-hinter fits stems itself and the CFF driver's darkening never runs.
+    """The other half of the rule. Only `auto` is greyed for a CFF face, and
+    the reason is not the auto-hinter's own fitting: it reloads the glyph
+    unscaled, and CF2 darkens a scaled load only, so neither engine darkens.
 
     The rest is left alone rather than promised, since a CFF face whose stems
     fall where FreeType's darkening curve rounds to nothing is unmoved too,

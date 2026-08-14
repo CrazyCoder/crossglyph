@@ -40,20 +40,24 @@ export const FEATURE_REASON = {
 
 // Why stem darkening would do nothing as the panel currently stands, or "".
 //
-// Not a property of the font alone, which is why it is not in the table above:
-// FreeType applies darkening in the CFF driver and in the auto-hinter's light
-// mode, so the hinting row two above decides it as much as the face does.
-// Measured over 132 faces -- `auto` moves none of them, and a TrueType face
-// moves under nothing but `light`.
+// Not a property of the font alone, which is why it is not in the table above.
+// FreeType darkens in two engines -- the Adobe CF2 interpreter that draws CFF
+// and Type 1 faces, and the auto-hinter -- and each puts a condition of its own
+// on top: CF2 darkens a scaled load, the auto-hinter darkens at a light target.
+// So the hinting row two above decides this as much as the face does. `auto`
+// fails both at once, since it targets normal hinting and the auto-hinter
+// reloads the glyph unscaled. Measured over 132 faces on FreeType 2.13.2.
 //
 // Only those two are said. A CFF face whose stems fall where the darkening
 // curve rounds to nothing is unmoved as well, and nothing short of rasterizing
-// both ways could know that -- so it is left alone. Greying is a claim, and
-// the one thing this must never do is make it about a knob that works.
+// both ways could know that; a face FreeType calls tricky never reaches the
+// auto-hinter, so `light` does nothing for it either. Both are left alone.
+// Greying is a claim, and the one thing this must never do is make it about a
+// knob that works.
 export function darkeningReason(outlines, hinting) {
   if (hinting === "auto") {
-    return "The auto-hinter fits stems itself, so darkening does nothing "
-      + "while hinting is auto.";
+    return "FreeType darkens at a light target or on a scaled load, and auto "
+      + "hinting is neither, so the switch does nothing here.";
   }
   if (outlines === "truetype" && hinting !== "light") {
     return "These are TrueType outlines, which FreeType darkens only under "
