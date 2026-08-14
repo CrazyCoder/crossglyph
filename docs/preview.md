@@ -114,10 +114,15 @@ looking at is the other one, a click away on the box itself, so a checkbox
 carries a mark instead: it says the row differs, and the tooltip says which way
 the baseline has it.
 
-**Reset font knobs** puts the whole section back, including the weight
-pickers of a variable family. Those go to what the family declares, which is
-its config's weight if it has one and the font's own named instance if it has
-not, rather than to the first entry in the picker.
+**Reset font knobs**, in the foot of the card beside **Save**, puts the whole
+section back, including the weight pickers of a variable family. Those go to
+what the family declares, which is its config's weight if it has one and the
+font's own named instance if it has not, rather than to the first entry in the
+picker. The cross on the **Page** heading does the same for the section under
+it.
+
+The foot of the card is where **Save** is, rather than either panel, because it
+writes the whole `.conf`: a coverage tick lights it exactly as a slider does.
 
 The export panel holds what a build needs and a page does not: the name, the
 sizes, the coverage intervals, the fallback families.
@@ -129,7 +134,7 @@ page stays where it is either way. A build running behind the Export tab marks
 it, since a build is minutes and the panel it reports in may not be the one
 you are looking at.
 
-The box beside the heading is what the family is called once it is built, which
+The box at the top of the panel is what the family is called once it is built, which
 is the name the reader picks from on a phone-sized screen rather than whatever
 the source files are called. It reaches a filename, so letters, digits, `_` and
 `-` are all it can keep: the rest is stripped on the way in and the box shows
@@ -286,7 +291,8 @@ nothing of its own recorded leaves whatever is showing alone.
 
 On a first visit only, the browser's languages also pick `hyphenate as`,
 English when none of them has patterns. That is a default rather than a
-decision: it is not written down, and **Reset page settings** goes back to it.
+decision: it is not written down, and the cross on the **Page** heading goes
+back to it.
 
 If the family and its fallbacks have no glyph for something on the page, a line
 under the box says how many characters that is. It is worth saying because the

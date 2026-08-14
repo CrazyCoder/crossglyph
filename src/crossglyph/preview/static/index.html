@@ -240,11 +240,16 @@
     <button type="button" class="revert" data-reset="figures" title="Compare with the value the config has" aria-label="compare figures" hidden>&#8634;</button>
   </div>
 
-  <div class="actions">
-    <button type="button" class="reset" id="reset-font">Reset font knobs</button>
+  <!-- The heading carries the section's own way back, in the column every
+       other way-back on the panel is in. A cross rather than the rows' arrow:
+       that one is a comparison you can press again, and this throws the
+       section away. -->
+  <div class="section">
+    <h2>Page</h2>
+    <button type="button" class="clear" id="reset-page"
+            title="Put every page setting back to what the device ships with"
+            aria-label="reset page settings">&#215;</button>
   </div>
-
-  <h2>Page</h2>
 
   <div class="row num">
     <label class="name" for="margin">margin <span class="unit">px</span></label>
@@ -325,16 +330,16 @@
   <div class="hint">Remembered in this browser, so they survive while you turn
     font knobs.</div>
 
-  <div class="actions">
-    <button type="button" class="reset" id="reset-page">Reset page settings</button>
-  </div>
 </form>
 
-<!-- Under the card rather than in it. This writes the whole .conf, the export
-     panel's half of it included, so it belongs to the column and not to either
-     panel: where the two share one, it has to be on screen whichever of them
-     is showing. -->
+<!-- The card's own foot rather than a bar under it. Save writes the whole
+     .conf, the export panel's half of it included, so it belongs to the column
+     and not to either panel: where the two share one, it has to be on screen
+     whichever of them is showing. Reset is beside it because these are the two
+     ends of the same thing -- one throws the knobs back to the converter's
+     defaults, the other writes them where a build will read them. -->
 <div id="savebar">
+  <button type="button" class="reset" id="reset-font">Reset font knobs</button>
   <button type="button" class="reset" id="save" disabled>Save</button>
   <span id="saved"></span>
 </div>

@@ -272,12 +272,21 @@
      stays quiet and running an eye down the column answers "what have I
      actually changed?" -- which after twenty minutes of tuning is the harder
      question of the two. */
-  .revert {
+  /* A section's own way back, in the column the rows keep theirs in, and on
+     the heading so it costs no row of its own. A cross rather than the rows'
+     arrow: that arrow is a comparison, pressed again to come back, and this
+     throws the section's settings away. Same size and weight, since they are
+     the same family of thing; different mark, since one of them is not
+     reversible. */
+  .section { display: flex; align-items: center; margin: 1.35rem 0 .5rem; }
+  .section h2 { flex: 1 1 auto; margin: 0; }
+
+  .revert, .clear {
     width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: none;
     color: var(--muted); font-size: 14px; line-height: 1; border-radius: 4px;
     display: grid; place-items: center;
   }
-  .revert:hover { color: var(--text); background: var(--hover); }
+  .revert:hover, .clear:hover { color: var(--text); background: var(--hover); }
   /* The same column, saying the same thing, without offering a press: a switch
      is already its own way back. It has to be hoverable even so, since what it
      says beyond "this differs" is in its tooltip, and an element excluded from
@@ -415,14 +424,29 @@
   #save:not(:disabled):hover {
     background: var(--text); border-color: var(--text);
   }
-  /* The bar under the panel: the button, and beside it whatever the last save
-     had to say. Nothing sits below it, so the note can come and go without
-     moving anything, and it reads on the line it belongs to rather than in a
-     reserved gap under the card. */
-  #savebar { display: flex; align-items: center; gap: .6rem;
-             padding: 0 .3rem; }
-  #savebar #save { min-height: 1.85rem; padding: .3rem .8rem; flex: none; }
-  #saved { min-width: 0; color: var(--muted); font-size: 11.5px; }
+  /* The card's foot: the two presses side by side and, under them, whatever
+     the last save had to say. Drawn in the tone the panel already divides
+     itself with, so it reads as the bottom of the card rather than as a second
+     surface -- and it takes the card's bottom corners, overlapping its border
+     by a pixel the way the tabs take the top ones.
+
+     Nothing sits below it, so the note can come and go without moving
+     anything, which is why it needs no reserved line. */
+  #savebar {
+    margin-top: calc(-.55rem - 1px);
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem; padding: .6rem .8rem;
+    background: var(--rule); border: 1px solid var(--line);
+    border-radius: 0 0 10px 10px;
+  }
+  #savebar button {
+    min-height: 2rem; padding: .35rem .7rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #saved { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
+  /* An empty note is not a short line, it is no line: left in, the grid gap
+     above it adds half a row of nothing to the foot of every card. */
+  #saved:empty { display: none; }
 
   textarea {
     width: 100%; height: 7rem; margin-top: .3rem; padding: .45rem .5rem;
@@ -534,10 +558,22 @@
      matches the knobs, since under a tab these are two faces of one card and
      the heading's margin was for standing level with columns that are not
      there. */
+  /* The card and its foot are one shape. Said here rather than beside the
+     layout for the same reason as the block below: #knobs and #export state
+     border-radius further up, and a media query adds no specificity to beat
+     it with. */
+  #knobs, #export {
+    border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  }
+
   @media (max-width: 1609px) {
     #knobs, #export { border-top-left-radius: 0; border-top-right-radius: 0; }
     #export { padding-top: .9rem; }
     #export .head { margin-top: 0; }
+    /* The knobs are not on screen, so neither is the press that resets them.
+       Out of sight rather than out of the grid: Save stays in the half it was
+       in, and the foot is the same shape on either tab. */
+    :root[data-panel="export"] #reset-font { visibility: hidden; }
     /* The tab an inch above already says Export. The field keeps the row, and
        its own label is on the field. */
     #export .head h2 { display: none; }

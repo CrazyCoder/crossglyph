@@ -577,6 +577,27 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_save_is_reachable_from_either_panel():
+    """It writes the whole .conf, the export panel's half of it included, so it
+    cannot live inside the knobs form. Below the width where all three columns
+    fit the two panels share one, and a Save in the knobs goes away with them
+    -- leaving the export panel with unsaved settings and no way to say so.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    knobs = html[html.index('<form id="knobs">'):html.index("</form>")]
+    for part in ('id="save"', 'id="saved"'):
+        assert part not in knobs, f"{part} is inside the knobs panel"
+
+    foot = re.search(r'<div id="savebar">(.*?)</div>', html, re.S)
+    assert foot, "there is no save bar"
+    for part in ('id="save"', 'id="saved"'):
+        assert part in foot.group(1), f"{part} is not in the save bar"
+
+
 def test_the_three_column_breakpoint_fits_what_it_lays_out():
     """The page shows three columns above a width and folds the export panel
     behind a tab below it. That width is arithmetic -- two panels, the sheet
