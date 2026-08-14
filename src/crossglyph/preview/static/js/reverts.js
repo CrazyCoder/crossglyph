@@ -36,7 +36,7 @@ export const marks = [...form.querySelectorAll(".mark")];
 // check when a knob is added.
 export const KNOB_KEYS = ["gamma", "weight", "line_height", "letter_spacing",
                    "word_spacing", "kerning", "slant", "thresholds", "hinting",
-                   "grayscale_hinting", "stem_darkening", "ligatures",
+                   "grayscale_hinting", "mono", "stem_darkening", "ligatures",
                    "figures"];
 export let savedTuning = null;             // the selected family's, null for a file
 
@@ -132,7 +132,7 @@ export function setKnob(name, state) {
   if (name === "line_height") syncLineHeight();
   // The same for hinting, which decides whether the switch under it can do
   // anything: a comparison moves knobs with no event for a listener to hear.
-  if (name === "hinting") syncFeatures();
+  if (name === "hinting" || name === "mono") syncFeatures();
   knobChanged(form.elements[name]);
 }
 

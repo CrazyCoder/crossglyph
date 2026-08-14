@@ -702,7 +702,7 @@ def render(request: RenderRequest) -> Response:
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
-    # advanceY the .cpfont format cannot hold (convert.py:1279-1284), which a
+    # advanceY the .cpfont format cannot hold (convert.py:1292-1297), which a
     # large `size` can reach on a loose-hhea face. SystemExit is a
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
@@ -714,7 +714,7 @@ def render(request: RenderRequest) -> Response:
             422, reason or "the converter rejected this combination; "
                            "see the server log") from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
-    # and the one this path can raise is the converter's (convert.py:1107,
+    # and the one this path can raise is the converter's (convert.py:1120,
     # from rasterize_font_style on a malformed face). The fontbuild one comes
     # from the family builder, which the preview never calls.
     #
@@ -756,7 +756,8 @@ def render(request: RenderRequest) -> Response:
 #: which one you are working at.
 SAVED_KEYS = ("gamma", "thresholds", "weight", "slant", "letter_spacing",
               "word_spacing", "kerning", "ligatures", "hinting",
-              "grayscale_hinting", "stem_darkening", "figures", "line_height")
+              "grayscale_hinting", "mono", "stem_darkening", "figures",
+              "line_height")
 
 
 #: The export keys, which are not tuning: they decide what a build contains

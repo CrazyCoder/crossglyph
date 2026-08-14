@@ -99,6 +99,71 @@ def _grayscale_moves(face, hinting):
     return built[0] != built[1]
 
 
+def _greys_on_page(font_bytes, text="Hamburgefonstiv illustration"):
+    """The distinct grey levels a built font actually draws.
+
+    Off the rendered page rather than out of the file: a .cpfont's bytes are
+    header, tables and bitmaps together, and two bits read anywhere in them
+    land on all four values whatever the glyphs use.
+    """
+    from crossglyph.preview import PageSpec, preview_page
+
+    page = preview_page(font_bytes, text, PageSpec(margin=6))
+    return set(page.convert("L").getdata())
+
+
+def test_mono_rasterizing_builds_a_font_with_two_levels():
+    """The point of the switch. FreeType's 1-bit rasterizer decides each pixel
+    with dropout control rather than by thresholding coverage, so what lands in
+    the .cpfont is empty or full and nothing between.
+
+    A real face: a synthesized one is drawn as boxes whose edges fall on the
+    pixel grid, so its coverage is already two-valued and the switch would
+    prove nothing.
+    """
+    import fontpaths
+
+    face = fontpaths.truetype()
+    if face is None:
+        pytest.skip("needs CROSSGLYPH_TEST_FONT")
+
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import build_font
+
+    coverage = ((0x41, 0x7A),)
+    grey = build_font({0: face}, 12, coverage=coverage, tuning=Tuning())
+    mono = build_font({0: face}, 12, coverage=coverage, tuning=Tuning(mono=True))
+
+    assert grey != mono, "mono rasterizing changed nothing"
+    # The greyscale build draws the middle levels; the mono one cannot.
+    on_grey, on_mono = _greys_on_page(grey), _greys_on_page(mono)
+    assert len(on_grey) > 2, f"the greyscale build drew no midtones: {on_grey}"
+    assert len(on_mono) == 2, f"a mono build drew midtones: {sorted(on_mono)}"
+    assert on_mono <= on_grey, "mono drew a level the four-level palette lacks"
+
+
+def test_mono_rasterizing_is_not_the_thresholds_in_disguise():
+    """Thresholding coverage to two levels is what the device already does with
+    anti-aliasing off, and it is the thing mono is meant to beat. Pushing every
+    cut point to the bottom gives a two-level build too, so the switch has to
+    differ from that as well or it is an elaborate way to set thresholds.
+    """
+    import fontpaths
+
+    face = fontpaths.truetype()
+    if face is None:
+        pytest.skip("needs CROSSGLYPH_TEST_FONT")
+
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import build_font
+
+    coverage = ((0x41, 0x7A),)
+    thresholded = build_font({0: face}, 12, coverage=coverage,
+                             tuning=Tuning(thresholds=(1, 2, 3)))
+    mono = build_font({0: face}, 12, coverage=coverage, tuning=Tuning(mono=True))
+    assert thresholded != mono
+
+
 def test_grayscale_hinting_only_reaches_a_face_the_bytecode_draws():
     """What the preview greys that switch on. It picks FreeType's interpreter
     version 35, so it moves a TrueType face carrying bytecode under `normal`

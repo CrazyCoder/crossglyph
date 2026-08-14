@@ -125,6 +125,27 @@ export function syncFeatures() {
   }
   const darkening = form.elements.stem_darkening;
   const hinting = form.elements.hinting;
+  // Mono rasterizing leaves a pixel either empty or full, so the two knobs
+  // that shape coverage in between have nothing to shape: the curve maps 0 and
+  // 255 to themselves, and any triple of cut points sorts two values into the
+  // same two levels.
+  const mono = form.elements.mono;
+  if (mono) {
+    const why = mono.checked
+      ? "Mono rasterizing leaves a pixel empty or full, so there is no "
+        + "coverage in between for this to act on."
+      : "";
+    for (const name of ["gamma", "thresholds"]) {
+      const el = form.elements[name];
+      if (!el) continue;
+      el.disabled = Boolean(why);
+      el.title = why;
+      for (const control of form.querySelectorAll(
+          `[data-for="${name}"], [data-slider-for="${name}"]`)) {
+        control.disabled = Boolean(why);
+      }
+    }
+  }
   const grayscale = form.elements.grayscale_hinting;
   if (!darkening || !hinting || !grayscale) return;
   const why = darkeningReason(outlines, hinting.value);
@@ -134,4 +155,7 @@ export function syncFeatures() {
   grayscale.disabled = Boolean(whyNot);
   grayscale.title = whyNot;
 }
+// Both rows the rules above read. A comparison or a reset moves them with no
+// event at all, which is why reverts.js and resets.js call syncFeatures too.
 form.elements.hinting.addEventListener("change", syncFeatures);
+form.elements.mono.addEventListener("change", syncFeatures);

@@ -108,6 +108,24 @@ class Tuning:
     # Only reaches a TrueType face carrying bytecode, and only while that
     # bytecode is what draws it -- see convert.apply_interpreter.
     grayscale_hinting: bool = False
+    # Rasterize each glyph as one bit per pixel rather than as coverage.
+    #
+    # The reader's Anti-Aliasing switch, off, paints every non-white level
+    # solid black (GfxRenderer.cpp:449), and the first threshold sits at 4 of
+    # 15 -- so a pixel a quarter covered goes black, and at 12px that fattens
+    # strokes into each other. FreeType's own 1-bit rasterizer decides the
+    # same question with dropout control instead, and keeps the strokes apart:
+    # measured on DejaVu Serif at 12px, a third less ink and none of it the
+    # ink that was holding the letters open.
+    #
+    # Not tied to that switch. A font built this way draws in two levels
+    # whatever the page is set to, which is the only way to see what it does
+    # to a face without changing the page underneath it.
+    #
+    # It is a build rather than a view: mono hinting rounds advances to whole
+    # pixels, so between 2 and 12 of 26 lowercase advances move, and the text
+    # sets to different lines.
+    mono: bool = False
     stem_darkening: bool = False
 
     # --- advance metrics, not rasterization ---------------------------------
@@ -181,6 +199,11 @@ class Tuning:
         outline before rendering.
         """
         flags = freetype.FT_LOAD_NO_BITMAP
+        # Sets the hinting target and the render mode together: FreeType reads
+        # both from FT_LOAD_TARGET_MODE, so the glyph is fitted for a bilevel
+        # grid and then rasterized onto one.
+        if self.mono:
+            flags |= freetype.FT_LOAD_TARGET_MONO
         if self.hinting == "light":
             flags |= freetype.FT_LOAD_TARGET_LIGHT
         elif self.hinting == "none":
@@ -200,7 +223,7 @@ class Tuning:
                 "weight": self.weight, "slant": self.slant,
                 "hinting": self.hinting,
                 "grayscale_hinting": self.grayscale_hinting,
-                "stem_darkening": self.stem_darkening,
+                "mono": self.mono, "stem_darkening": self.stem_darkening,
                 "line_height": (str(self.line_height)
                                 if self.line_height else None),
                 "letter_spacing": self.letter_spacing,

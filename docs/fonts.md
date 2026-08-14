@@ -72,6 +72,8 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
 | `slant` | `0` | shear as a tangent. `0.25` is about 14 degrees, for synthesizing an oblique a family lacks |
 | `hinting` | `normal` | `normal`, `light` (vertical only, softer), `none`, or `auto` (FreeType's auto-hinter, worth trying when a font looks muddy at small sizes) |
+| `grayscale_hinting` | `no` | run FreeType's interpreter version 35, which fits stems on both axes rather than hinting for a subpixel display. Only reaches a TrueType face carrying bytecode, under `hinting = normal`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
+| `mono` | `no` | rasterize each glyph as one bit per pixel, with FreeType's dropout control, instead of thresholding coverage. The font then draws in two levels whatever the reader's anti-aliasing setting is. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `stem_darkening` | `no` | FreeType stem darkening. Narrow: a CFF or OTF face under any hinting but `auto`, and a TrueType face only under `hinting = light`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `line_height` | the font's own | line pitch. `1.15` is em relative, `0.9x` is a multiple of the font's own, `26px` is absolute. See [Line spacing](#line-spacing) |
 | `letter_spacing` | `0` | tracking in pixels, added to every glyph's advance. Stored at 1/16 px, and negatives tighten |
@@ -258,6 +260,22 @@ the switch when the pair you have chosen is one of the cases that cannot move.
 It leaves the rest alone rather than promising anything, because a CFF face
 whose stems fall where the darkening curve rounds to nothing is unmoved as
 well, and nothing short of rasterizing both ways would know.
+
+`mono` changes what a pixel is decided by. Normally the converter takes
+FreeType's coverage and cuts it at the three thresholds, and the reader with
+anti-aliasing off then paints every non-white level solid black: a pixel a
+quarter covered goes black, which at 12px fattens strokes into each other.
+With `mono` on, FreeType rasterizes at one bit per pixel and decides each one
+with dropout control instead. Measured on DejaVu Serif at 12px that is a third
+less ink, and none of the ink that was holding the letters open.
+
+It is not tied to the reader's setting. A font built this way draws in two
+levels whatever the page is set to, which is the only way to see what it does
+to a face without changing the page underneath it. It is a build rather than a
+view, though: mono hinting rounds advances to whole pixels, so between 2 and 12
+of 26 lowercase advances move and the text sets to different lines. `gamma` and
+the thresholds have nothing to act on while it is on, and the preview greys
+them.
 
 ## Line spacing
 

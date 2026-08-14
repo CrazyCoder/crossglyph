@@ -194,6 +194,15 @@
   </div>
 
 
+  <!-- One bit per pixel, decided by FreeType's dropout control rather than by
+       a coverage threshold. Not tied to the reader's anti-aliasing switch: the
+       font draws in two levels whatever the page is set to. -->
+  <div class="row check">
+    <label class="name" for="mono">mono rasterizing</label>
+    <input id="mono" name="mono" type="checkbox">
+    <span class="mark" data-mark="mono" aria-hidden="true" hidden>&#8226;</span>
+  </div>
+
   <div class="row check">
     <label class="name" for="stem_darkening">stem darkening</label>
     <input id="stem_darkening" name="stem_darkening" type="checkbox">

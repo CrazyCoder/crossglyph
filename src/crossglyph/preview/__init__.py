@@ -309,7 +309,7 @@ def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],
             {style: str(source) for style, source in sources.items()},
             size, list(coverage), str(path), tuning=tuning,
             # Style 0's list is appended to all four styles by the converter
-            # (convert.py:1244-1247), which is how a regular-only fallback
+            # (convert.py:1257-1260), which is how a regular-only fallback
             # covers a bold word too -- and what the build does.
             fallback_style_fonts={0: [str(face) for face in fallbacks]}
             if fallbacks else None,

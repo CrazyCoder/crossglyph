@@ -43,8 +43,8 @@ Get-NetTCPConnection -LocalPort 8000 -State Listen |
 ## What the controls do
 
 Font controls (`gamma`, `weight`, `line_height`, the spacings, `kerning`,
-`slant`, `thresholds`, `hinting`, `stem_darkening`, `ligatures`, `figures`)
-rebuild the `.cpfont` behind the page. Page controls (margin, alignment,
+`slant`, `thresholds`, `hinting`, `grayscale_hinting`, `mono`,
+`stem_darkening`, `ligatures`, `figures`) rebuild the `.cpfont` behind the page. Page controls (margin, alignment,
 hyphenation and the language its patterns come from, line spacing, paragraph
 spacing, antialiasing) are the reader's own settings, and they only
 re-lay-out. The language list is every one the firmware carries patterns for;
@@ -76,6 +76,14 @@ nothing is unmoved too, and that cannot be known without rasterizing the page
 both ways. A face FreeType calls tricky never reaches the auto-hinter at all,
 so `light` does nothing for it either. Both are left live, because greying a
 switch that works is the one mistake worth avoiding here.
+
+`grayscale hinting` and `mono` are greyed on facts of their own.
+The first picks FreeType's other bytecode interpreter, so it is out of reach
+for a face that has no bytecode to run: a CFF family, a TrueType family with no
+instructions, and any family under `light`, `auto` or `none`, since the
+auto-hinter draws those instead. The second leaves a pixel empty or full, so
+while it is on there is no coverage in between for `gamma` or the thresholds to
+act on and those two rows are greyed instead.
 
 Night mode is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so

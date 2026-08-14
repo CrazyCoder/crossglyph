@@ -423,6 +423,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     makeControl({ name: "stem_darkening", type: "checkbox", checked: false }),
     // Greyed by the hinting row and by two facts about the face.
     makeControl({ name: "grayscale_hinting", type: "checkbox", checked: false }),
+    // Greys the two coverage knobs above when it is on.
+    makeControl({ name: "mono", type: "checkbox", checked: false }),
     // A font-side checkbox, so the reverts are exercised on the kind of
     // control whose whole state is `checked`. It is also one of the two the
     // font itself can grey out.
@@ -479,7 +481,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   }));
   // A checkbox knob carries a mark instead: it says the knob differs and from
   // what, and offers no press, a switch being its own way back.
-  const markList = ["ligatures", "hyphenation"].map(name => ({
+  const markList = ["ligatures", "hyphenation", "mono"].map(name => ({
     dataset: { mark: name },
     hidden: true,
     title: "",
@@ -494,8 +496,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       if (selector === "button.step") return stepList;
       const named = [...selector.matchAll(/data-(?:slider-)?for="([\w_]+)"/g)]
         .map(m => m[1]);
+      // Sliders and steppers both: the page greys a knob by walking every
+      // control that drives it, and a stub that returned only one of them
+      // would let half of that go untested.
       return named.length
-        ? sliderList.filter(s => named.includes(s.dataset.sliderFor)) : [];
+        ? [...sliderList.filter(s => named.includes(s.dataset.sliderFor)),
+           ...stepList.filter(s => named.includes(s.dataset.for))] : [];
     },
   };
   const clicks = {};
@@ -2989,6 +2995,42 @@ for (const { name, text } of sources) {
         grayscaleReason("truetype", true, false, "light") !== "");
   check("a family whose faces disagree on format is judged on its bytecode",
         grayscaleReason("mixed", true, false, "normal") === "");
+}
+
+// 36. Mono rasterizing leaves a pixel empty or full, so the two knobs that
+//     shape coverage in between have nothing left to shape.
+{
+  const env = await loaded(fakeStorage());
+  const {mono, gamma, thresholds} = env.byName;
+  check("the coverage knobs start reachable",
+        gamma.disabled === false && thresholds.disabled === false,
+        `${gamma.disabled}/${thresholds.disabled}`);
+
+  mono.checked = true;
+  mono.on.change();
+  check("turning mono on takes gamma away",
+        gamma.disabled === true && /empty or full/.test(gamma.title), gamma.title);
+  check("and the thresholds with it",
+        thresholds.disabled === true, String(thresholds.disabled));
+  check("and the steppers beside gamma, which are a second way in",
+        env.stepList.filter(s => s.dataset.for === "gamma")
+          .every(s => s.disabled === true));
+
+  mono.checked = false;
+  mono.on.change();
+  check("turning it off hands both back",
+        gamma.disabled === false && thresholds.disabled === false,
+        `${gamma.disabled}/${thresholds.disabled}`);
+
+  // A reset moves the switch with no event for a listener to hear, so the two
+  // rows have to be worked out from there as well.
+  mono.checked = true;
+  mono.on.change();
+  env.clicks.font();
+  await settle();
+  check("a reset turns mono off and hands the coverage knobs back",
+        mono.checked === false && gamma.disabled === false,
+        `${mono.checked}/${gamma.disabled}`);
 }
 
 process.exit(failures ? 1 : 0);

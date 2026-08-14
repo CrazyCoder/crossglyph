@@ -948,8 +948,10 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 # Rendering is ours to do, since FT_LOAD_RENDER was withheld.
                 freetype.FT_Outline_Embolden(
                     target_face.glyph.outline._FT_Outline, embolden)
-                freetype.FT_Render_Glyph(target_face.glyph._FT_GlyphSlot,
-                                         freetype.FT_RENDER_MODE_NORMAL)
+                freetype.FT_Render_Glyph(
+                    target_face.glyph._FT_GlyphSlot,
+                    freetype.FT_RENDER_MODE_MONO if tuning.mono
+                    else freetype.FT_RENDER_MODE_NORMAL)
             return target_face
         return None
 
@@ -998,10 +1000,21 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             px = 0
             buf = bitmap.buffer
             abs_pitch = abs(bitmap.pitch)
+            # FORK: a mono render is one bit per pixel, most significant first,
+            # so a row has to be unpacked before it can be read by column.
+            # Done per row rather than per pixel: the loop below runs once for
+            # every pixel of every glyph in the coverage set.
+            mono = bitmap.pixel_mode == freetype.FT_PIXEL_MODE_MONO
             for y in range(bitmap.rows):
                 row_offset = y * abs_pitch if bitmap.pitch >= 0 else (bitmap.rows - 1 - y) * abs_pitch
+                if mono:
+                    row, base = bytes(
+                        255 if buf[row_offset + (i >> 3)] & (0x80 >> (i & 7))
+                        else 0 for i in range(bitmap.width)), 0
+                else:
+                    row, base = buf, row_offset
                 for x in range(bitmap.width):
-                    v = buf[row_offset + x]
+                    v = row[base + x]
                     # FORK: curve the coverage before it is truncated to 4
                     # bits, so the LUT has all 256 levels to work with.
                     if lut is not None:

@@ -86,7 +86,7 @@ DEFAULT_INTERVALS = "reading"
 DEFAULT_SIZES = [12, 14, 16, 18]
 
 BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "grayscale_hinting",
-             "ligatures"}
+             "mono", "ligatures"}
 TUNING_KEYS = {"gamma", "thresholds", "weight", "slant", "hinting",
                "line_height", "letter_spacing", "word_spacing", "kerning",
                "figures"}
@@ -709,6 +709,7 @@ def tuning_from(values: dict[str, str], where: str) -> Tuning:
             hinting=hinting,
             grayscale_hinting=_bool(values.get("grayscale_hinting", "no"),
                                     "grayscale_hinting", where),
+            mono=_bool(values.get("mono", "no"), "mono", where),
             stem_darkening=_bool(values.get("stem_darkening", "no"),
                                  "stem_darkening", where),
             line_height=line_height,
@@ -778,6 +779,7 @@ def tuning_values(tuning: Tuning) -> dict[str, str | None]:
         "slant": number(tuning.slant),
         "hinting": tuning.hinting,
         "grayscale_hinting": "yes" if tuning.grayscale_hinting else "no",
+        "mono": "yes" if tuning.mono else "no",
         "stem_darkening": "yes" if tuning.stem_darkening else "no",
         "line_height": str(tuning.line_height) if tuning.line_height else None,
         "letter_spacing": number(tuning.letter_spacing),
