@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from . import install, updates, version
+from . import install, layout, updateconf, updates, upgrade, version
 from .render import stamp
 
 USAGE = """usage: crossglyph [preview|build|fetch-fallbacks|update] [options]
@@ -11,7 +11,9 @@ USAGE = """usage: crossglyph [preview|build|fetch-fallbacks|update] [options]
   preview            tune a font against the device's own renderer (default)
   build              build .cpfont families from the workspace
   fetch-fallbacks    download the bundled Noto faces and build nothing
-  update --check     ask now whether a newer release exists
+  update             install the newest release
+  update --check     ask whether a newer release exists, and install nothing
+  update --rollback  go back to the version before this one
 
   --version          what this install is, and the renderer it carries
   --no-update-check  skip the update check for this run
@@ -69,6 +71,10 @@ def _checked(code: int, quiet: bool) -> int:
     The code is passed through untouched: a build that failed stays failed,
     however cheerful the note is.
     """
+    root = install.root()
+    # Housekeeping rather than a check, so it happens whatever the flags say.
+    # It early-outs on every launch but the first after an update.
+    layout.tidy(root, updateconf.settings(root).keep_versions)
     if not quiet:
         note = update_note()
         if note:
@@ -76,19 +82,13 @@ def _checked(code: int, quiet: bool) -> int:
     return code
 
 
-def _update(argv: list[str]) -> int:
-    """Checking is all this version does. Applying is the next one.
+def _check_only(root) -> int:
+    """Ask now, and install nothing.
 
-    A bare `update` is refused rather than quietly treated as `--check`: a
-    command that half works is harder to trust than one that says what it is.
+    Both of the states it can report are ones the automatic check keeps to
+    itself, and both are why somebody asked by hand.
     """
-    if argv != ["--check"]:
-        print("usage: crossglyph update --check", file=sys.stderr)
-        return 2
-    root = install.root()
     state = updates.check(root, force=True)
-    # Both of these are states the automatic check never says out loud, and
-    # both are why somebody asked by hand.
     if state.error:
         print(f"could not reach the update server: {state.error}",
               file=sys.stderr)
@@ -100,6 +100,71 @@ def _update(argv: list[str]) -> int:
     else:
         print(f"crossglyph {version.installed()} is up to date.")
     return 0
+
+
+def _rollback(root) -> int:
+    try:
+        gone = upgrade.rollback(root)
+    except upgrade.Refused as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(f"back on {gone}. Restart CrossGlyph to use it.\n"
+          f"Update checks will stay quiet until something newer than the "
+          f"version you left appears.")
+    return 0
+
+
+def _apply(root) -> int:
+    """Install the newest release, saying how far it has got.
+
+    The percentage rewrites one line, and only when somebody is watching it: a
+    log file wants the two sentences either side of it, not two hundred of
+    these.
+    """
+    watching = sys.stdout.isatty()
+    shown = -1
+    for step in upgrade.steps(root):
+        event = step["event"]
+        if event == "plan":
+            doing = "converting this install to" if step["converting"] \
+                else "updating to"
+            print(f"{doing} {step['version']} ({step['bytes'] / 1e6:.1f} MB)")
+        elif event == "step" and watching:
+            percent = step["got"] * 100 // max(step["bytes"], 1)
+            if percent != shown:
+                shown = percent
+                print(f"\r  {percent}%", end="", flush=True)
+        elif event == "current":
+            print(f"crossglyph {step['version']} is up to date.")
+        elif event == "error":
+            if watching and shown >= 0:
+                print()
+            print(step["error"], file=sys.stderr)
+            return 1
+        elif event == "done":
+            if watching and shown >= 0:
+                print()
+            for kept in step["kept"]:
+                print(f"kept your fonts/{kept}. The new one is beside it as "
+                      f"{kept.rsplit('/', 1)[-1]}{upgrade.SUFFIX}.")
+            if step["converting"]:
+                print("The files at the root are no longer read. Deleting "
+                      "them is safe, and leaving them costs disk.")
+            print(f"{step['version']} installed. Restart CrossGlyph to use "
+                  f"it.")
+    return 0
+
+
+def _update(argv: list[str]) -> int:
+    root = install.root()
+    if not argv:
+        return _apply(root)
+    if argv == ["--check"]:
+        return _check_only(root)
+    if argv == ["--rollback"]:
+        return _rollback(root)
+    print("usage: crossglyph update [--check|--rollback]", file=sys.stderr)
+    return 2
 
 
 def main(argv: list[str] | None = None) -> int:

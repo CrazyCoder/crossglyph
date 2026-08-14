@@ -183,8 +183,93 @@ def test_update_check_names_the_newer_release(capsys, monkeypatch):
     assert "0.2.0" in capsys.readouterr().out
 
 
-def test_bare_update_says_what_this_version_can_do(capsys):
-    """Applying lands in the next phase. Until then the command exists only to
-    check, and saying so beats a command that half works."""
-    assert cli.main(["update"]) == 2
+def test_an_argument_update_does_not_know_is_refused(capsys):
+    assert cli.main(["update", "--yes-please"]) == 2
     assert "--check" in capsys.readouterr().err
+
+
+# --- applying -------------------------------------------------------------
+
+
+def steps(*given):
+    """Stand in for the pipeline, which has its own tests."""
+    return lambda root, *args, **kwargs: iter(given)
+
+
+def test_a_bare_update_installs(capsys, monkeypatch):
+    monkeypatch.setattr(cli.upgrade, "steps", steps(
+        {"event": "plan", "version": "0.2.0", "bytes": 1600000,
+         "notes_url": "https://example.invalid/", "converting": False},
+        {"event": "step", "got": 1600000, "bytes": 1600000},
+        {"event": "done", "version": "0.2.0", "kept": [], "converting": False,
+         "where": "versions/0.2.0"}))
+    assert cli.main(["update"]) == 0
+    said = capsys.readouterr().out
+    assert "updating to 0.2.0" in said
+    assert "Restart CrossGlyph" in said
+
+
+def test_a_refusal_is_an_error_and_says_why(capsys, monkeypatch):
+    monkeypatch.setattr(cli.upgrade, "steps", steps(
+        {"event": "error", "error": "this install cannot update itself. "
+                                    "Run git pull to update."}))
+    assert cli.main(["update"]) == 1
+    assert "git pull" in capsys.readouterr().err
+
+
+def test_being_up_to_date_is_not_a_failure(capsys, monkeypatch):
+    monkeypatch.setattr(cli.upgrade, "steps",
+                        steps({"event": "current", "version": "0.2.0"}))
+    assert cli.main(["update"]) == 0
+    assert "up to date" in capsys.readouterr().out
+
+
+def test_a_file_that_was_kept_is_named(capsys, monkeypatch):
+    """A .new sitting in the workspace that nobody was told about is a file
+    nobody ever reads."""
+    monkeypatch.setattr(cli.upgrade, "steps", steps(
+        {"event": "done", "version": "0.2.0", "kept": ["conf/all.conf"],
+         "converting": False, "where": "versions/0.2.0"}))
+    cli.main(["update"])
+    said = capsys.readouterr().out
+    assert "fonts/conf/all.conf" in said and "all.conf.new" in said
+
+
+def test_a_conversion_says_the_old_files_are_no_longer_read(capsys,
+                                                            monkeypatch):
+    monkeypatch.setattr(cli.upgrade, "steps", steps(
+        {"event": "plan", "version": "0.2.0", "bytes": 1600000,
+         "notes_url": "https://example.invalid/", "converting": True},
+        {"event": "done", "version": "0.2.0", "kept": [], "converting": True,
+         "where": "versions/0.2.0"}))
+    cli.main(["update"])
+    said = capsys.readouterr().out
+    assert "converting this install" in said
+    assert "no longer read" in said
+
+
+def test_rollback_says_where_it_landed(capsys, monkeypatch):
+    monkeypatch.setattr(cli.upgrade, "rollback", lambda root: "0.1.0")
+    assert cli.main(["update", "--rollback"]) == 0
+    assert "back on 0.1.0" in capsys.readouterr().out
+
+
+def test_a_rollback_with_nowhere_to_go_says_so(capsys, monkeypatch):
+    def refuse(root):
+        raise cli.upgrade.Refused("there is no version older than 0.1.0 to "
+                                  "go back to")
+
+    monkeypatch.setattr(cli.upgrade, "rollback", refuse)
+    assert cli.main(["update", "--rollback"]) == 1
+    assert "no version older" in capsys.readouterr().err
+
+
+def test_housekeeping_runs_whatever_the_check_flags_say(monkeypatch):
+    """Retention is not a check. Skipping it with --no-update-check would
+    leave every old version on disk for anybody who uses the flag."""
+    tidied = []
+    monkeypatch.setattr(cli, "_build", lambda argv: 0)
+    monkeypatch.setattr(cli.layout, "tidy",
+                        lambda root, keep: tidied.append(keep))
+    cli.main(["build", "--no-update-check"])
+    assert tidied == [1]
