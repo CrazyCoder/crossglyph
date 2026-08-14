@@ -1,5 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 12 12">
   <!-- Icon frame adapted from Dinkie Icons by atelierAnchor.
        https://github.com/atelier-anchor/dinkie-icons/blob/main/LICENSE -->
-  <path fill="#44484a" d="M10 12h1V1H0v1h10ZM0 12h9V3H0Zm1-1V4h8v7ZM4 5h3v1H4ZM3 6h1v3H3ZM5 7h2v1H5Zm1 1h1v1H6ZM4 9h3v1H4Z"/>
+  <!-- The plate under the mark is what keeps it legible on a dark tab strip.
+       A single-colour glyph has to pick a side: dark enough to read on a light
+       strip is dark on dark, and a `prefers-color-scheme` rule inside the file
+       only helps where the icon is rendered live. Carrying its own paper means
+       the contrast is the icon's own and never the browser theme's. -->
+  <rect x="0" y="1" width="10" height="11" rx="1.2" fill="#f6f4ee"/>
+  <path fill="#2b2f31" d="M10 12h1V1H0v1h10ZM0 12h9V3H0Zm1-1V4h8v7ZM4 5h3v1H4ZM3 6h1v3H3ZM5 7h2v1H5Zm1 1h1v1H6ZM4 9h3v1H4Z"/>
 </svg>
