@@ -3332,11 +3332,35 @@ for (const { name, text } of sources) {
         env.about.updated.textContent ===
           "2.0.0 installed. Restart CrossGlyph to use it.",
         env.about.updated.textContent);
-  check("and the offer goes, since pressing it again would install nothing",
-        env.about.update.hidden === true, String(env.about.update.hidden));
+  check("the line beside the version says it landed",
+        env.about.state.textContent === "2.0.0 installed.",
+        env.about.state.textContent);
+  check("and there is nothing left to press: what is installed is not what "
+        + "is running until the tool is started again",
+        env.about.update.hidden === true && env.about.button.hidden === true,
+        `update ${env.about.update.hidden}, check ${env.about.button.hidden}`);
   check("the button went out and came back",
         JSON.stringify(env.about.update.states) === "[true,false]",
         JSON.stringify(env.about.update.states));
+}
+
+// 58h0. And a check afterwards does not offer it again. This process is still
+//       the old version, so the manifest goes on looking newer to it for as
+//       long as it runs -- the page is the only thing that knows the release
+//       is already on the disk.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    available: "2.0.0", latest: "2.0.0" } });
+  env.about.apply();
+  await settle();
+  const {showAbout} = env.modules.get("about.js");
+
+  showAbout({ ...ABOUT, available: "2.0.0", latest: "2.0.0" });
+  check("the answer that would have offered it says it is installed",
+        env.about.state.textContent === "2.0.0 installed.",
+        env.about.state.textContent);
+  check("and offers nothing", env.about.update.hidden === true,
+        String(env.about.update.hidden));
 }
 
 // 58i0. A launcher an update could not replace is left beside the live one,

@@ -39,18 +39,36 @@ function checkedLine(about) {
   return `Checked ${ago(Date.now() / 1000 - about.checked_at)}.`;
 }
 
+// What this run of the page has installed, and the one thing the server
+// cannot tell it: the process answering is still the old version, so every
+// check it makes finds the release already sitting on disk and calls it new.
+let installed = null;
+
+// Which leaves nothing to press. What is installed does not become what is
+// running until the tool is started again, and asking again can only find the
+// same release a second time.
+function showInstalled() {
+  state.textContent = `${installed} installed.`;
+  updateButton.hidden = true;
+  button.hidden = true;
+}
+
 export function showAbout(about) {
   number.textContent = about.version;
   if (about.home) home.href = about.home;
-  // One thing on the right, which is what keeps the row to one line. A
-  // release to install is the only answer worth having while there is one, so
-  // it replaces the line about when the asking last happened.
-  state.textContent = about.available
-    ? `${about.available} is available.` : checkedLine(about);
-  // And one button under it, for the one thing worth pressing: asking again
-  // says nothing new once the answer is on screen.
-  updateButton.hidden = !(about.can_self_update && about.available);
-  button.hidden = !updateButton.hidden;
+  if (installed) {
+    showInstalled();
+  } else {
+    // One thing on the right, which is what keeps the row to one line. A
+    // release to install is the only answer worth having while there is one,
+    // so it replaces the line about when the asking last happened.
+    state.textContent = about.available
+      ? `${about.available} is available.` : checkedLine(about);
+    // And one button under it, for the one thing worth pressing: asking again
+    // says nothing new once the answer is on screen.
+    updateButton.hidden = !(about.can_self_update && about.available);
+    button.hidden = !updateButton.hidden;
+  }
 
   const said = [];
   if (about.firmware) {
@@ -86,10 +104,8 @@ export function showUpdateStep(step) {
   } else if (step.event === "error") {
     updateNote.textContent = step.error;
   } else if (step.event === "done") {
-    // There is nothing more to press here: what is installed does not become
-    // what is running until the tool is started again.
-    updateButton.hidden = true;
-    button.hidden = false;
+    installed = step.version;
+    showInstalled();
     updateNote.textContent =
       `${step.version} installed. Restart CrossGlyph to use it.` +
       keptLine(step.kept) +
