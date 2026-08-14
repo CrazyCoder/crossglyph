@@ -89,8 +89,9 @@ export function syncFeatures() {
     el.title = missing ? why : "";
   }
   const darkening = form.elements.stem_darkening;
-  if (!darkening) return;
-  const why = darkeningReason(outlines, form.elements.hinting.value);
+  const hinting = form.elements.hinting;
+  if (!darkening || !hinting) return;
+  const why = darkeningReason(outlines, hinting.value);
   darkening.disabled = Boolean(why);
   darkening.title = why;
 }

@@ -265,26 +265,31 @@ FEATURE_KNOBS = {"ligatures": gsub_ligature_sequences,
                  "figures": figure_glyph_overrides}
 
 
-def face_features(path: pathlib.Path) -> frozenset[str]:
-    """Which of the feature knobs one face can answer.
+def stamp(path: pathlib.Path) -> tuple[str, int, int] | None:
+    """A file's identity for a cache key, or None when it is not there.
 
-    One stat per call, as fontconf.variable_font does and for the same reason:
-    the stamp goes in the cache key, so a file replaced under a running
-    preview is read again rather than answered for out of the old one.
+    Everything asked about a face here is cached, because every family in the
+    folder is asked on the way to the picker. Keyed on the stamp rather than
+    on the path alone, as fontconf.variable_font is and for the same reason:
+    a file replaced under a running preview is a new key, so it is read again
+    rather than answered for out of the old one.
     """
     try:
         stat = path.stat()
     except OSError:
-        return frozenset(FEATURE_KNOBS)
-    return _face_features(str(path), stat.st_mtime_ns, stat.st_size)
+        return None
+    return str(path), stat.st_mtime_ns, stat.st_size
+
+
+def face_features(path: pathlib.Path) -> frozenset[str]:
+    """Which of the feature knobs one face can answer."""
+    known = stamp(path)
+    return _face_features(*known) if known else frozenset(FEATURE_KNOBS)
 
 
 @functools.lru_cache(maxsize=128)
 def _face_features(path: str, mtime: int, size: int) -> frozenset[str]:
-    """Cached by identity: it opens the face with fontTools twice, and every
-    family in the folder is asked on the way to the picker.
-
-    A face that will not open makes no claim either way, so it answers with
+    """A face that will not open makes no claim either way, so it answers with
     all of them: greying a knob says the font cannot act on it, and that is
     not something to say about a file nobody could read. Whatever is wrong
     with it will be said properly by the build.
@@ -308,9 +313,16 @@ def face_outlines(path: pathlib.Path) -> str:
     read from being described. Stated per face because it decides which of
     FreeType's engines draws it, and stem darkening lives in only one of them.
     """
+    known = stamp(path)
+    return _face_outlines(*known) if known else ""
+
+
+@functools.lru_cache(maxsize=128)
+def _face_outlines(path: str, mtime: int, size: int) -> str:
+    del mtime, size                 # in the key, not the body
     try:
-        return freetype.Face(str(path)).get_format().decode().casefold()
-    except Exception:                   # noqa: BLE001 -- the build reports it
+        return freetype.Face(path).get_format().decode().casefold()
+    except (OSError, freetype.FT_Exception):
         return ""
 
 

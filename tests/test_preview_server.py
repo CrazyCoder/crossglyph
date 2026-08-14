@@ -439,9 +439,9 @@ def test_a_feature_any_face_carries_keeps_its_knob(tmp_path, monkeypatch):
 
 
 def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch):
-    """The whole workspace is walked for these on the way to the picker, so
-    they are cached. A font swapped in place has to move the answer, the way
-    it moves which instances a variable file offers."""
+    """The whole workspace is walked for both of these on the way to the
+    picker, so both are cached. A font swapped in place has to move both
+    answers, the way it moves which instances a variable file offers."""
     from fontsmith import box_font
 
     from crossglyph import fontbuild
@@ -453,10 +453,14 @@ def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch)
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
     server.forget_families()
     assert server.face_features(face) == frozenset()
+    assert server.face_outlines(face) == "truetype"
 
+    # Same path, another font: ligature rules it did not have, and drawn by
+    # the other of FreeType's two engines.
     box_font(face, list(range(0x20, 0x7F)) + [0xFB01], family="Swap",
-             ligatures={(0x66, 0x69): 0xFB01})
+             ligatures={(0x66, 0x69): 0xFB01}, cff=True)
     assert server.face_features(face) == frozenset({"ligatures"})
+    assert server.face_outlines(face) == "cff"
 
 
 def test_a_family_says_which_engine_draws_it(tmp_path, monkeypatch):
@@ -497,6 +501,14 @@ def test_every_greyable_knob_is_a_knob_the_page_has():
     named = set(re.findall(r"^  (\w+):", block[:block.index("\n};")], re.M))
     assert named == set(server.FEATURE_KNOBS), named
     assert named <= set(_controls()), "greyed a knob the page does not have"
+
+    # Every knob this module reaches for outright, which the table above does
+    # not cover: stem darkening is greyed by a rule of its own, and reads the
+    # hinting row to decide. Renaming either in the markup would leave that
+    # rule quietly doing nothing.
+    reached = set(re.findall(r"form\.elements\.(\w+)", source))
+    assert reached <= set(_controls()), reached - set(_controls())
+    assert {"stem_darkening", "hinting"} <= reached, reached
 
 
 def test_the_page_offers_every_page_knob():
