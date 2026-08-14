@@ -127,6 +127,85 @@ def test_one_call_builds_one_size(config, tmp_path):
     assert kw["output_path"].endswith("Alto_16.cpfont")
 
 
+def test_the_worker_count_leaves_a_core_for_whoever_asked(monkeypatch):
+    """A build that takes every core makes the machine it runs on unusable
+    for as long as it lasts, and the preview is one of the things on it."""
+    for cores, want in ((1, 1), (2, 1), (8, 7), (32, 12)):
+        monkeypatch.setattr(fontbuild.os, "cpu_count", lambda n=cores: n)
+        assert fontbuild.default_jobs() == want, cores
+
+
+def _plans(tmp_path, sizes="12 14", mod=""):
+    """Two families' worth of jobs, without building anything."""
+    text = f"sizes = {sizes}\n" + (f"sizes_mod = {mod}\n" if mod else "")
+    (tmp_path / "alto.conf").write_text(text, encoding="utf-8")
+    parsed = fontconf.parse_config(tmp_path / "alto.conf")
+    return [job for variant in parsed.variants()
+            for job in fontbuild.plan_variant(variant, tmp_path / "out")[1]]
+
+
+def test_a_build_reports_sizes_in_whatever_order_they_land(config, tmp_path):
+    """The pool answers as each size finishes, not in the order they were
+    submitted, so the run has to be reported from what comes back."""
+    jobs = _plans(tmp_path, sizes="12 14", mod="9 10")
+    assert len(jobs) == 4
+
+    def scrambled(js, out_dir, workers=None):
+        for job in reversed(js):
+            yield fontbuild.Landed(job, 1.0, None, fontbuild.Built(100, 5))
+
+    import unittest.mock
+    with unittest.mock.patch.object(fontbuild, "run_jobs", scrambled):
+        steps = list(fontbuild.build_families(
+            [fontconf.parse_config(tmp_path / "alto.conf")], tmp_path / "out"))
+
+    sizes = [s for s in steps if s["event"] == "size"]
+    assert [s["done"] for s in sizes] == [1, 2, 3, 4], "the bar has to count up"
+    assert {(s["family"], s["size"]) for s in sizes} == \
+        {("Alto", 12), ("Alto", 14), ("AltoMod", 9), ("AltoMod", 10)}
+    done = steps[-1]
+    assert done["bytes"] == 400
+    assert sorted(f["built"] for f in done["families"]) == [[9, 10], [12, 14]]
+
+
+def test_a_family_that_fails_is_counted_once_however_many_sizes_land(config, tmp_path):
+    """Its other sizes are written off the moment one fails, so a result that
+    arrives for them afterwards must not be counted twice -- the bar would
+    run past its own total."""
+    jobs = _plans(tmp_path, sizes="12 14 16")
+
+    def one_bad(js, out_dir, workers=None):
+        yield fontbuild.Landed(js[0], 1.0, "no regular face", fontbuild.Built(0, 0))
+        for job in js[1:]:
+            yield fontbuild.Landed(job, 1.0, None, fontbuild.Built(100, 5))
+
+    import unittest.mock
+    with unittest.mock.patch.object(fontbuild, "run_jobs", one_bad):
+        steps = list(fontbuild.build_families(
+            [fontconf.parse_config(tmp_path / "alto.conf")], tmp_path / "out"))
+
+    assert [s["event"] for s in steps] == ["plan", "failed", "done"]
+    assert steps[1]["done"] == steps[0]["total"] == len(jobs)
+    family = steps[-1]["families"][0]
+    assert family["failed"] == [12, 14, 16] and family["built"] == []
+
+
+def test_a_second_space_font_never_writes_over_the_first(tmp_path):
+    """Several workers reach a fresh output folder together, and each finds
+    the file missing. Whoever loses writes its own copy and drops it rather
+    than replacing one the converter may already have open."""
+    out = tmp_path / "out"
+    first = fontbuild.ensure_space_font(out)
+    marked = first.read_bytes()
+    first.write_bytes(marked + b"\0")           # tell this copy from another
+
+    again = fontbuild.ensure_space_font(out)
+    assert again == first
+    assert first.read_bytes() == marked + b"\0", "it was written over"
+    assert [p.name for p in out.iterdir() if p.name.startswith(first.name)] \
+        == [first.name], "a temporary copy was left behind"
+
+
 def test_a_renamed_family_leaves_an_orphan_directory(tmp_path):
     out = tmp_path / "out"
     for name in ("Alto", "AltoMod", "ByHand"):

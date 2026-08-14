@@ -6,16 +6,20 @@ the refresh procedure.
 
 It is imported and called, not run as a subprocess: a preview cannot afford an
 interpreter start per keystroke, and once the script is our own code there is
-nothing to sandbox. Parallelism comes from the process pool in the CLI instead.
+nothing to sandbox. A build is the other case, and gets a process pool: one
+size of one family is the unit of work, and there are usually more of those
+than there are cores.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import dataclasses
 import io
 import os
 import pathlib
 import struct
+import time
 import typing
 
 from . import cpfont, fontconf, fontstamp, spacefont
@@ -316,10 +320,26 @@ def space_font_path(out_dir: pathlib.Path) -> pathlib.Path:
 
 def ensure_space_font(out_dir: pathlib.Path,
                       widths: dict[int, float] | None = None) -> pathlib.Path:
-    """Generate the space-only fallback font if it is not already there."""
+    """Generate the space-only fallback font if it is not already there.
+
+    Written under a name of this process's own and moved into place, because
+    "is it there yet" and "write it" are two steps and several builds reach
+    them together: on a fresh output folder every worker finds the file
+    missing, and the second to open it for writing gets an OSError from
+    Windows while the first still has it.
+    """
     path = space_font_path(out_dir)
-    if not path.is_file():
-        spacefont.build(path, widths)
+    if path.is_file():
+        return path
+    temporary = path.with_name(f"{path.name}.{os.getpid()}")
+    spacefont.build(temporary, widths)
+    if path.is_file():
+        # Somebody else finished first. Theirs is as good as this one, and
+        # replacing a file the converter may already have open would only
+        # trade this race for another.
+        temporary.unlink(missing_ok=True)
+    else:
+        os.replace(temporary, path)
     return path
 
 
@@ -402,9 +422,10 @@ class Job:
 
 def default_jobs() -> int:
     """Worker count. Rasterizing is CPU-bound and each job is its own process,
-    so this scales with cores; the cap keeps a big family from opening a dozen
-    copies of a CJK font at once."""
-    return max(1, min(os.cpu_count() or 4, 12))
+    so this scales with cores; one is left for whatever asked for the build,
+    and the cap keeps a big family from opening a dozen copies of a CJK font
+    at once."""
+    return max(1, min((os.cpu_count() or 4) - 1, 12))
 
 
 class Metrics(typing.NamedTuple):
@@ -519,6 +540,69 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
         and fontstamp.cpfont_path(directory, variant, size).is_file()})
 
 
+class Landed(typing.NamedTuple):
+    """One job's outcome. `error` is None when it built."""
+    job: Job
+    seconds: float
+    error: str | None
+    built: Built
+
+
+def _run(job: Job, out_dir: pathlib.Path) -> tuple[float, str | None, Built]:
+    """Run one job, returning (seconds, error or None, Built).
+
+    Module-level and picklable, because the pool spawns processes on Windows.
+    """
+    started = time.monotonic()
+    try:
+        built = build_size(job, out_dir)
+    except FontBuildError as exc:
+        return time.monotonic() - started, str(exc), Built(0, 0)
+    return time.monotonic() - started, None, built
+
+
+def run_jobs(jobs: list[Job], out_dir: pathlib.Path,
+             workers: int | None = None) -> typing.Iterator[Landed]:
+    """Rasterize every job, yielding each as it lands.
+
+    In the order they finish, which is what lets a caller report a long run
+    rather than going quiet until the last size is done.
+
+    Processes, not threads: rasterizing is CPU-bound Python, so threads would
+    serialize on the GIL. One size alone skips the pool, since spawning an
+    interpreter to do a job this process could have done costs more than the
+    job.
+    """
+    if not jobs:
+        return
+    # Here rather than in each worker. build_size() asks for it too, and that
+    # is the call several workers reach together on a fresh output folder --
+    # doing it once up front means they all find it already written.
+    for job in jobs:
+        if job.variant.config.space_glyphs:
+            ensure_space_font(out_dir, job.variant.config.space_widths)
+
+    count = max(1, min(workers or default_jobs(), len(jobs)))
+    if count == 1:
+        for job in jobs:
+            seconds, error, built = _run(job, out_dir)
+            yield Landed(job, seconds, error, built)
+        return
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=count) as pool:
+        futures = {pool.submit(_run, job, out_dir): job for job in jobs}
+        try:
+            for future in concurrent.futures.as_completed(futures):
+                seconds, error, built = future.result()
+                yield Landed(futures[future], seconds, error, built)
+        finally:
+            # A caller that stops reading -- a browser that went away
+            # mid-build -- would otherwise hold the pool open until every
+            # queued size had been rasterized for nobody.
+            for future in futures:
+                future.cancel()
+
+
 def build_variant(variant: Variant, out_dir: pathlib.Path,
                   force: bool = False) -> Report:
     """Build one variant serially. The CLI parallelizes across variants; this
@@ -541,12 +625,14 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
     size and answers "how many is this going to be" -- without which a progress
     line can only count upwards and hope.
 
-    Serial on purpose: the CLI parallelises across a process pool, which cannot
-    report until a whole family is finished, and this exists to report.
+    Every outstanding size of every family goes through one pool, so a family
+    with fewer stale sizes than there are cores does not leave workers idle.
+    They land in whatever order they finish, which is what the step events are
+    for: the bar counts completions rather than assuming an order.
 
-    A size that fails is recorded and the rest of that family is skipped -- the
-    next one usually fails the same way -- but the other families carry on, so
-    a folder-wide build is not lost to one bad face.
+    A size that fails is recorded and the rest of that family is written off --
+    the next one usually fails the same way -- but the other families carry on,
+    so a folder-wide build is not lost to one bad face.
 
     `prune` is for a build of everything, and only that: a family that no
     config produces any more leaves a whole directory behind that per-size
@@ -574,25 +660,35 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
            "removed": removed}
 
     done = 0
+    reports = {variant.name: report for variant, report, _ in plans}
+    written_off = set()
+    for job, _seconds, error, made in run_jobs(
+            [job for _, _, jobs in plans for job in jobs], out_dir):
+        variant = job.variant
+        report = reports[variant.name]
+        # A family whose first failure has already been reported. Its other
+        # sizes were counted then, so whatever they came back with here is a
+        # result nobody is waiting for.
+        if variant.name in written_off:
+            continue
+        if error:
+            written_off.add(variant.name)
+            report.error = error
+            report.failed = [size for size in variant.sizes
+                             if size not in report.built
+                             and size not in report.skipped]
+            done += len(report.failed)
+            yield {"event": "failed", "family": variant.name,
+                   "size": job.size, "done": done, "total": total,
+                   "error": error}
+            continue
+        report.built.append(job.size)
+        report.written += made.bytes
+        done += 1
+        yield {"event": "size", "family": variant.name, "size": job.size,
+               "done": done, "total": total, "bytes": made.bytes}
+
     for variant, report, jobs in plans:
-        for job in jobs:
-            try:
-                made = build_size(job, out_dir)
-            except FontBuildError as exc:
-                report.error = str(exc)
-                report.failed = [size for size in variant.sizes
-                                 if size not in report.built
-                                 and size not in report.skipped]
-                done += len(jobs) - len(report.built)
-                yield {"event": "failed", "family": variant.name,
-                       "size": job.size, "done": done, "total": total,
-                       "error": str(exc)}
-                break
-            report.built.append(job.size)
-            report.written += made.bytes
-            done += 1
-            yield {"event": "size", "family": variant.name, "size": job.size,
-                   "done": done, "total": total, "bytes": made.bytes}
         if jobs:
             finalize_variant(variant, out_dir, failed=set(report.failed))
 

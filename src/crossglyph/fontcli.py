@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import pathlib
 import shutil
 import sys
@@ -147,27 +146,20 @@ def main(argv=None) -> int:
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
     started = time.monotonic()
-    # Processes, not threads: rasterizing is CPU-bound Python, so threads would
-    # serialize on the GIL. This used to be a subprocess per size, which paid a
-    # whole interpreter start plus a uv resolve for the same parallelism.
-    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_run, job, out_dir): job for job in jobs}
-        for future in concurrent.futures.as_completed(futures):
-            job = futures[future]
-            elapsed, error, built = future.result()
-            if error:
-                reports[job.variant.name].failed.append(job.size)
-                print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
-                      file=sys.stderr, flush=True)
-            else:
-                reports[job.variant.name].built.append(job.size)
-                # Glyph count alongside the size: it is what distinguishes a
-                # genuinely wide family from a narrow one padded out by the
-                # bundled fallbacks.
-                print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
-                      f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
-                for warning in built.warnings:
-                    print(f"    warning: {warning}", file=sys.stderr, flush=True)
+    for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir, workers):
+        if error:
+            reports[job.variant.name].failed.append(job.size)
+            print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
+                  file=sys.stderr, flush=True)
+        else:
+            reports[job.variant.name].built.append(job.size)
+            # Glyph count alongside the size: it is what distinguishes a
+            # genuinely wide family from a narrow one padded out by the
+            # bundled fallbacks.
+            print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
+                  f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
+            for warning in built.warnings:
+                print(f"    warning: {warning}", file=sys.stderr, flush=True)
 
     for variant in variants:
         report = reports[variant.name]
@@ -183,19 +175,6 @@ def main(argv=None) -> int:
     elif not failures:
         print("\neverything up to date")
     return 1 if failures else 0
-
-
-def _run(job, out_dir: pathlib.Path):
-    """Run one job, returning (seconds, error or None, Built).
-
-    Module-level and picklable, because the pool spawns processes on Windows.
-    """
-    started = time.monotonic()
-    try:
-        built = fontbuild.build_size(job, out_dir)
-    except fontbuild.FontBuildError as exc:
-        return time.monotonic() - started, str(exc), fontbuild.Built(0, 0)
-    return time.monotonic() - started, None, built
 
 
 if __name__ == "__main__":

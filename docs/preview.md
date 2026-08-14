@@ -91,6 +91,10 @@ family's config, and Build then runs the same build the command line runs.
 Save first, then build: the build reads the config from disk, so anything you
 have not saved is not in it.
 
+A build runs its sizes across a process pool, the same one the command line
+uses, so a family with four sizes takes about as long as its slowest one rather
+than all four end to end. They finish in whatever order they finish in.
+
 A build reports as it goes, which matters because one with the fallbacks on
 runs for minutes: the bar under the two buttons fills with the sizes done, and
 the line under it names the family and size in hand, the count, and once there

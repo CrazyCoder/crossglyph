@@ -460,9 +460,15 @@ output directory by hand is safe.
 next run retries exactly that one.
 
 Sizes are rasterized in parallel, one process each, defaulting to one worker
-per core up to twelve. `-j` changes it. The converter's own progress output is
-captured and shown only on failure, because a dozen concurrent streams
-interleave into nonsense.
+per core up to twelve, less one so the machine stays usable while it runs. `-j`
+changes it. One size on its own skips the pool, since starting an interpreter
+to do a job this process could have done costs more than the job. The
+converter's own progress output is captured and shown only on failure, because
+a dozen concurrent streams interleave into nonsense.
+
+The preview's Build button runs the same pool, so both take about the same
+time: eight sizes of Literata are 17s one at a time and 3s across eight
+workers.
 
 ## Which converter this drives
 
