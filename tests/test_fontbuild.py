@@ -482,3 +482,24 @@ def test_saving_the_bundled_family_makes_it_one_of_yours(tmp_path):
     assert built == ["Literata", "Probe"], "a saved config joins the workspace"
     # And it is not offered twice for having a config of its own now.
     assert [c.name for c in fontbuild.offered(tmp_path)[0]] == built
+
+
+def test_renaming_the_bundled_family_does_not_offer_it_again(tmp_path):
+    """A config renames what it builds as, never the family it was written
+    for. Asking after the name alone offered the same faces a second time,
+    under the family the rename had just moved off -- and the second entry
+    then held the old name against getting it back."""
+    import fontsmith
+
+    from crossglyph import fontbuild, fontconf
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    conf = fontbuild.conf_dir(tmp_path)
+    conf.mkdir(parents=True, exist_ok=True)
+    fontconf.write_values(conf / "literata.conf",
+                          {"family": "Literata", "dir": str(fontbuild.STARTER_DIR),
+                           "name": "Literata2"})
+
+    assert [c.name for c in fontbuild.offered(tmp_path)[0]] \
+        == ["Literata2", "Probe"]

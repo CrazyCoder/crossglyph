@@ -730,15 +730,23 @@ def starter_configs(source: pathlib.Path,
 
 def unclaimed_starter(source: pathlib.Path, defaults: dict[str, str],
                       configs: list[Config]) -> tuple[list[Config], list[str]]:
-    """The bundled family, unless one of `configs` already answers to its name.
+    """The bundled family, unless one of `configs` already answers for it.
 
     Which happens two ways: the workspace was empty so gather() already took
     it, or a Save wrote it a config of its own and it is a family like any
     other now. Either way it belongs in the list once.
+
+    By family as well as by name, the pair discovery matches on everywhere
+    else. A config renames only what it builds as, so one that has been given
+    a name of its own still answers for the family it was written for -- and
+    asking after the name alone would offer the same faces a second time, as
+    the family the rename had just moved off.
     """
-    known = {config.name.casefold() for config in configs}
+    known = {value for config in configs
+             for value in (config.name.casefold(), config.family.casefold())}
     more, errors = starter_configs(source, defaults)
-    return [c for c in more if c.name.casefold() not in known], errors
+    return [c for c in more
+            if not {c.name.casefold(), c.family.casefold()} & known], errors
 
 
 def offered(source: pathlib.Path | str | None = None,
