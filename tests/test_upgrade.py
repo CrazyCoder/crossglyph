@@ -234,6 +234,21 @@ def test_a_zip_that_names_a_path_outside_itself_is_refused(release, served,
     assert not (release.parent / "escaped.txt").exists()
 
 
+@pytest.mark.parametrize("named", [
+    "../../../escaped.txt",
+    # Three components to Windows and one to a POSIX path, which is how a
+    # check that split on forward slashes alone would wave it through.
+    "..\\..\\..\\escaped.txt",
+    "/etc/passwd",
+])
+def test_a_member_that_climbs_out_of_the_tree_is_refused(named):
+    assert not upgrade._safe(named)
+
+
+def test_an_ordinary_member_is_not(release):
+    assert upgrade._safe("src/crossglyph/cli.py")
+
+
 def test_a_zip_with_no_version_directory_is_refused(release, served,
                                                     monkeypatch):
     raw = make_zip(version="0.9.9")          # not the version it claims to be

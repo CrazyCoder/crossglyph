@@ -65,8 +65,13 @@ def _safe(name: str) -> bool:
 
     A zip can name ../../anything, and Python's extract is the one that guards
     against it. This module writes members itself, so it guards for itself.
+
+    A backslash is refused rather than interpreted. The format says separators
+    are forward slashes, so a name carrying one is malformed at best; and it
+    is the way past a check like this one, since `..\\..\\x` is a single
+    innocent-looking component to a POSIX path and three to Windows.
     """
-    if not name or name.startswith("/") or name.startswith("\\"):
+    if not name or name[0] in "/\\" or "\\" in name:
         return False
     parts = pathlib.PurePosixPath(name).parts
     return ".." not in parts and not any(":" in part for part in parts)

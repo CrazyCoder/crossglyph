@@ -62,12 +62,12 @@ download.
 
 It fetches the manifest, stops if there is nothing newer, downloads the
 release, checks it against the SHA-256 the manifest gave, unpacks it into
-`versions/<new version>`, and writes that version into `current` last of all.
+`versions/<new version>`, and writes that version into `current`.
 
 Nothing is replaced in place. The version you were on stays where it is, and
-so does everything at the root: the launcher, `update.conf`, and your `fonts`
-folder. What is installed does not become what is running until you start
-CrossGlyph again.
+so does everything at the root: `update.conf`, your `fonts` folder, and the
+launcher, which is dealt with below. What is installed does not become what is
+running until you start CrossGlyph again.
 
 An update interrupted anywhere leaves an install that still runs. The download
 goes to `versions/.tmp-<version>.zip` and the unpack to
@@ -86,11 +86,11 @@ POSIX shell read a script as they execute it and resume at the offset they had
 reached, so a file that changed length underneath them is read from the middle
 of a word.
 
-So a release that changes the launcher leaves the new one beside it as
-`crossglyph.cmd.staged`, and the launcher applies it at the next launch,
-before it does anything else. The one it replaces is kept as
-`crossglyph.cmd.previous`: if a launcher ever ships broken, renaming that back
-undoes it without reinstalling anything.
+So a release that changes the launcher leaves the new one beside it, as
+`crossglyph.sh.staged` or `crossglyph.cmd.staged`, and the launcher applies it
+at the next launch before it does anything else. The one it replaces is kept
+with `.previous` on the end: if a launcher ever ships broken, renaming that
+back undoes it without reinstalling anything.
 
 Nothing about this needs doing by hand, and nothing is left half applied: an
 install whose launcher is one release behind still runs, because what the
