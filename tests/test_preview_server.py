@@ -395,6 +395,63 @@ def test_the_export_panel_posts_what_the_server_reads():
                       "ranges", "fallbacks", "fallback1", "fallback2"}, posted
 
 
+def test_a_family_says_which_feature_knobs_it_can_answer(tmp_path, monkeypatch):
+    """Turning ligatures off on a face with no ligature rules draws the
+    identical page. The panel greys those knobs, so it has to be told."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Plain-Regular.ttf", range(0x20, 0x7F), family="Plain")
+    box_font(tmp_path / "Rich-Regular.ttf",
+             list(range(0x20, 0x7F)) + [0xFB01], family="Rich",
+             ligatures={(0x66, 0x69): 0xFB01}, figures=True)
+    (_conf(tmp_path) / "all.conf").write_text("sizes = 12\n", encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    entries = {f["name"]: f["features"] for f in server.families()}
+
+    assert entries["Plain"] == {"ligatures": False, "figures": False}
+    assert entries["Rich"] == {"ligatures": True, "figures": True}
+
+
+def test_a_feature_any_face_carries_keeps_its_knob(tmp_path, monkeypatch):
+    """A family whose bold has no ligatures but whose regular does still
+    draws a different page with the switch off."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Mixed-Regular.ttf",
+             list(range(0x20, 0x7F)) + [0xFB01], family="Mixed",
+             ligatures={(0x66, 0x69): 0xFB01})
+    box_font(tmp_path / "Mixed-Bold.ttf", range(0x20, 0x7F), family="Mixed",
+             style="Bold")
+    (_conf(tmp_path) / "all.conf").write_text("sizes = 12\n", encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    entry = next(f for f in server.families() if f["name"] == "Mixed")
+
+    assert entry["faces"] == ["bold", "regular"], entry["faces"]
+    assert entry["features"]["ligatures"] is True
+
+
+def test_every_greyable_knob_is_a_knob_the_page_has():
+    """The reasons are keyed by control name, and a name the markup does not
+    carry is a row that silently never greys."""
+    import re
+
+    from crossglyph.preview import server
+
+    source = (server.STATIC / "js" / "dom.js").read_text(encoding="utf-8")
+    block = source[source.index("FEATURE_REASON = {"):]
+    named = set(re.findall(r"^  (\w+):", block[:block.index("\n};")], re.M))
+    assert named == set(server.FEATURE_KNOBS), named
+    assert named <= set(_controls()), "greyed a knob the page does not have"
+
+
 def test_the_page_offers_every_page_knob():
     """The other direction: a knob the server takes but the panel never shows
     is one nobody can turn."""

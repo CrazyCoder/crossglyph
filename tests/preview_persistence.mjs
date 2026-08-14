@@ -226,6 +226,7 @@ const DEFAULTS = {
       conf: "sample.conf", derived: false,
       tuning: { gamma: 1, weight: 0, hinting: "normal",
                 thresholds: [2, 5, 9], line_height: null },
+      features: { ligatures: true, figures: true },
       export: { name: "Sample", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: true, fallback1: "", fallback2: "" } },
@@ -243,6 +244,7 @@ const DEFAULTS = {
         weights: { text: 400, bold: 700 },
         other: { wdth: 100 },
       },
+      features: { ligatures: true, figures: true },
       export: { name: "Vari", sizes: "12 14 16 18", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading", ranges: "",
                 fallbacks: false, fallback1: "", fallback2: "" } },
@@ -252,6 +254,7 @@ const DEFAULTS = {
       conf: "alto.conf", derived: false,
       tuning: { gamma: 1.2, weight: 0.1, hinting: "normal",
                 thresholds: [3, 6, 10], line_height: null },
+      features: { ligatures: false, figures: false },
       export: { name: "Alto", sizes: "12 13", sizes_mod: "", mod_suffix: "Mod",
                 intervals: "reading,cyrillic", ranges: "",
                 fallbacks: false, fallback1: "Sample", fallback2: "" } },
@@ -407,8 +410,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       options: [{ value: "4,8,12" }, { value: "3,6,10" }],
     }),
     // A font-side checkbox, so the reverts are exercised on the kind of
-    // control whose whole state is `checked`.
+    // control whose whole state is `checked`. It is also one of the two the
+    // font itself can grey out.
     makeControl({ name: "ligatures", type: "checkbox", checked: true }),
+    makeControl({
+      name: "figures", value: "default",
+      options: [{ value: "default" }, { value: "proportional" }],
+    }),
     makeControl({ name: "hyphenation", type: "checkbox", checked: false, group: "page" }),
     makeControl({ name: "antialiased", type: "checkbox", checked: true, group: "page" }),
     makeControl({ name: "inverted", type: "checkbox", checked: false, group: "page" }),
@@ -2692,6 +2700,35 @@ for (const { name, text } of sources) {
   check("and it is still where it was afterwards",
         env.byName.ligatures.checked === true,
         String(env.byName.ligatures.checked));
+}
+
+// 33. Knobs the font cannot answer. A face with no ligature rules and no pnum
+//     draws the identical page whichever way those two are set, so the rows
+//     are greyed rather than left inviting an experiment with no result.
+{
+  const env = await loaded(fakeStorage());
+  const {ligatures, figures} = env.byName;
+  check("a family without the features has both knobs out of reach",
+        ligatures.disabled === true && figures.disabled === true,
+        `${ligatures.disabled} ${figures.disabled}`);
+  check("each saying which feature is missing",
+        /ligature rules/.test(ligatures.title) && /proportional/.test(figures.title),
+        ligatures.title + " | " + figures.title);
+
+  env.family.choose("Sample");
+  check("a family that has them gets them back",
+        ligatures.disabled === false && figures.disabled === false,
+        `${ligatures.disabled} ${figures.disabled}`);
+  check("with nothing left to explain",
+        ligatures.title === "" && figures.title === "",
+        ligatures.title + " | " + figures.title);
+
+  // Greyed is about the font, not about the value: a reset puts every knob
+  // back to what the config says and cannot make a face grow a feature.
+  env.family.choose("Alto");
+  env.clicks.font();
+  check("and a reset does not hand back a knob the font cannot answer",
+        ligatures.disabled === true, String(ligatures.disabled));
 }
 
 process.exit(failures ? 1 : 0);

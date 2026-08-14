@@ -7,6 +7,7 @@ the wasm module directly from the browser. See docs/preview.md.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import io
 import json
@@ -24,10 +25,12 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
         f"with:\n  uv sync") from exc
 
 import freetype
+from fontTools.ttLib import TTLibError
 
 from .. import fontbuild, fontconf
 from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
-                              FontBuildError)
+                              FontBuildError, figure_glyph_overrides,
+                              gsub_ligature_sequences)
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing
@@ -247,6 +250,50 @@ def _axis_note(config: Config, style: str) -> str:
                               for tag, value in sorted(coords.items()))
 
 
+#: The knobs that only do something when the font has the feature behind them.
+#: Each answers with what the converter would actually apply, rather than with
+#: the feature tag: a font can declare `liga` over rules whose glyphs have no
+#: cmap entry, and those are dropped on the way into a .cpfont.
+FEATURE_KNOBS = {"ligatures": gsub_ligature_sequences,
+                 "figures": figure_glyph_overrides}
+
+
+@functools.lru_cache(maxsize=128)
+def _face_features(path: str) -> frozenset[str]:
+    """Which of the feature knobs one face can answer.
+
+    Keyed on the path and cached, because it opens the face with fontTools
+    twice and every family in the folder is asked on the way to the picker.
+
+    A face that will not open makes no claim either way, so it answers with
+    all of them: greying a knob says the font cannot act on it, and that is
+    not something to say about a file nobody could read. Whatever is wrong
+    with it will be said properly by the build.
+    """
+    try:
+        # The ligature walk names the rules it drops on stderr, which is worth
+        # having during a build and is noise when the question is only whether
+        # there are any.
+        with contextlib.redirect_stderr(io.StringIO()):
+            return frozenset(name for name, carries in FEATURE_KNOBS.items()
+                             if carries(path))
+    except (OSError, TTLibError):
+        return frozenset(FEATURE_KNOBS)
+
+
+def family_features(config: Config) -> dict[str, bool]:
+    """Which feature knobs this family's faces can answer, by knob name.
+
+    Any face counts: a family whose bold has no ligatures but whose regular
+    does still draws a different page with the switch off, and a knob greyed
+    on the strength of one face would be a lie about the other three.
+    """
+    have: frozenset[str] = frozenset()
+    for path in set(config.styles.values()):
+        have |= _face_features(str(path))
+    return {name: name in have for name in FEATURE_KNOBS}
+
+
 def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict:
     """One family as the picker and the panel need it.
 
@@ -270,6 +317,11 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
                       for style, path in config.styles.items()
                       if style in STYLE_IDS},
             "tuning": config.tuning.as_dict(),
+            # Which knobs this family can answer. A font with no ligature rules
+            # and no `pnum` draws the same page whichever way those two are
+            # set, and a control that cannot do anything should say so rather
+            # than invite an experiment with no result.
+            "features": family_features(config),
             # None for a static family, which is what hides the axis controls.
             "variable": variable_entry(config),
             "conf": (config.path.name if not config.derived

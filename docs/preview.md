@@ -52,6 +52,14 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
+The font decides two of them. `ligatures` needs GSUB rules the converter can
+read, and `figures` needs a `pnum` feature; a family with neither draws the
+same page whichever way those are set, so both rows are greyed for it and say
+which feature is missing. It is asked of every face, since a family whose
+regular has ligatures and whose bold does not still has something to turn off.
+A face that will not open is not greyed on, because that is a claim about a
+font nobody could read.
+
 Night mode is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so
 what changes is which level each pixel lands on: paper and ink swap, and the

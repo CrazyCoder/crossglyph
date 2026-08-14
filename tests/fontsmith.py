@@ -27,14 +27,27 @@ def _glyph_name(codepoint: int) -> str:
     return f"u{codepoint:04X}"
 
 
-def box_font(path: pathlib.Path, codepoints, *, kern=None,
-             family: str = "Probe", style: str = "Regular") -> pathlib.Path:
+def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
+             figures: bool = False, family: str = "Probe",
+             style: str = "Regular") -> pathlib.Path:
     """A TTF carrying exactly `codepoints`, each drawn as the same box.
 
-    `kern` is an optional {(left_codepoint, right_codepoint): units} mapping,
-    written as a real GPOS `kern` feature -- which is the table the converter
-    walks and the one this suite has to be able to produce without asking the
-    machine for a font that happens to have one.
+    The three optional features are written as real OpenType ones, because the
+    tables are what the converter walks and this suite has to be able to
+    produce them without asking the machine for a font that happens to have
+    one.
+
+    `kern` is {(left_codepoint, right_codepoint): units}, as GPOS `kern`.
+
+    `ligatures` is {(codepoint, ...): codepoint}, as GSUB `liga`. Every
+    codepoint named has to be in `codepoints`, output included: the converter
+    reads the substitute back through the cmap, and a rule it cannot name that
+    way is one it drops.
+
+    `figures` adds a narrower alternate for each digit present and a GSUB
+    `pnum` feature reaching it. The alternates deliberately have no cmap entry
+    of their own, which is how a real face draws them and why the converter
+    can only address them by glyph index.
     """
     from fontTools.feaLib.builder import addOpenTypeFeatures
     from fontTools.fontBuilder import FontBuilder
@@ -52,12 +65,19 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None,
 
     empty = TTGlyphPen(None).glyph()
 
+    # Unmapped alternates, which is what a proportional figure is: reachable
+    # through the pnum lookup and by glyph index, and by nothing else.
+    narrow = [f"{_glyph_name(code)}.pnum" for code in codepoints
+              if figures and 0x30 <= code <= 0x39]
+
     builder = FontBuilder(UPEM, isTTF=True)
-    builder.setupGlyphOrder([".notdef", *names])
+    builder.setupGlyphOrder([".notdef", *names, *narrow])
     builder.setupCharacterMap(dict(zip(codepoints, names)))
-    builder.setupGlyf({".notdef": empty, **{name: box for name in names}})
+    builder.setupGlyf({".notdef": empty,
+                       **{name: box for name in (*names, *narrow)}})
     builder.setupHorizontalMetrics(
-        {name: (ADVANCE, 80) for name in (".notdef", *names)})
+        {**{name: (ADVANCE, 80) for name in (".notdef", *names)},
+         **{name: (ADVANCE // 2, 40) for name in narrow}})
     builder.setupHorizontalHeader(ascent=800, descent=-200)
     builder.setupOS2(sTypoAscender=800, sTypoDescender=-200,
                      usWinAscent=800, usWinDescent=200)
@@ -65,13 +85,24 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None,
                             "psName": f"{family}-{style}".replace(" ", "")})
     builder.setupPost()
 
+    blocks = []
     if kern:
-        rules = "\n".join(
-            f"    pos {_glyph_name(left)} {_glyph_name(right)} {value};"
-            for (left, right), value in kern.items())
+        blocks.append(("kern", [
+            f"pos {_glyph_name(left)} {_glyph_name(right)} {value};"
+            for (left, right), value in kern.items()]))
+    if ligatures:
+        blocks.append(("liga", [
+            "sub " + " ".join(_glyph_name(code) for code in sequence)
+            + f" by {_glyph_name(output)};"
+            for sequence, output in ligatures.items()]))
+    if narrow:
+        blocks.append(("pnum", [f"sub {name.removesuffix('.pnum')} by {name};"
+                                for name in narrow]))
+    if blocks:
         feature = path.with_suffix(".fea")
-        feature.write_text(f"feature kern {{\n{rules}\n}} kern;\n",
-                           encoding="utf-8")
+        feature.write_text("\n".join(
+            f"feature {tag} {{\n" + "\n".join(f"    {rule}" for rule in rules)
+            + f"\n}} {tag};\n" for tag, rules in blocks), encoding="utf-8")
         addOpenTypeFeatures(builder.font, str(feature))
         feature.unlink()
 

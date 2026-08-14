@@ -28,3 +28,27 @@ export function syncHyphenation() {
   form.elements.language.disabled = !form.elements.hyphenation.checked;
 }
 form.elements.hyphenation.addEventListener("change", syncHyphenation);
+
+//: Why a knob is out of reach, when it is the font rather than another knob
+//: holding it there. Keyed by control name, as /defaults reports them.
+export const FEATURE_REASON = {
+  ligatures: "This family carries no ligature rules, so there is nothing for "
+    + "the switch to turn off.",
+  figures: "This family has no proportional figures, so every setting here "
+    + "draws the same digits.",
+};
+
+// Knobs the font itself cannot answer. Turning one of these on a face with no
+// such feature draws the identical page, so the row says so before it is
+// turned rather than leaving somebody to wonder what they are looking for.
+export function syncFeatures(features) {
+  for (const [name, why] of Object.entries(FEATURE_REASON)) {
+    const el = form.elements[name];
+    if (!el) continue;
+    // A family the app was started on as a bare file reports nothing, and a
+    // knob is only ever greyed on an answer.
+    const missing = features ? features[name] === false : false;
+    el.disabled = missing;
+    el.title = missing ? why : "";
+  }
+}

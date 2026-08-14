@@ -274,6 +274,13 @@
      control that looks merely faint; both is a row that is plainly not in
      force, which is what makes the switch under it the thing to press. */
   .row:has(:disabled) .name { color: var(--muted); }
+  /* A browser fades a disabled checkbox by so little that in a column of them
+     it reads as on. These are greyed because the font cannot answer them, so
+     they have to look as out of force as the fields above do. */
+  input[type=checkbox]:disabled { opacity: .4; cursor: default; }
+  /* The whole row is the target for a checkbox, so the row has to stop
+     offering itself when the box in it will not move. */
+  label.row:has(:disabled) { cursor: default; }
 
   /* A checkbox row is a whole-row target: the label is the control. Where the
      row carries a button as well it is a div and the label is the words alone,
