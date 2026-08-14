@@ -6,7 +6,10 @@ const line = document.getElementById("about-line");
 const detail = document.getElementById("about-detail");
 
 // Enough of a commit to recognise, and short enough to sit in a sentence.
-const SHORT = 7;
+// The same count the CLI uses, in render/stamp.py: the page and `crossglyph
+// --version` report one fact, and two spellings of it is one more thing to
+// reconcile when somebody quotes it in a report.
+const SHORT = 12;
 
 export function showAbout(about) {
   strip.textContent = about.version;

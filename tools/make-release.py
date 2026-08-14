@@ -28,6 +28,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: the workspace, which is the user's. `current` is generated, not tracked.
 ROOT_FILES = frozenset({"crossglyph.cmd", "crossglyph.sh"})
 
+#: "Version made by", saying Unix. It is what decides whether a reader honours
+#: the mode at all: an entry claiming DOS carries no mode a POSIX unzip will
+#: apply, so 0755 on one is advice nobody takes and the file lands unexecutable.
+UNIX = 3
+
+#: What an entry gets when git recorded no mode of its own. git only bothers
+#: for the files that need the executable bit and leaves the rest as DOS
+#: entries; every entry here carries a mode, so the rest need one to carry.
+DEFAULT_MODE = 0o100644
+
 #: Without any one of these the release does not run. `{v}` is the version
 #: directory, filled in per build.
 REQUIRED = [
@@ -110,10 +120,17 @@ def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
            version: str) -> None:
     """The archive git produced, restructured into the release tree.
 
-    Each member's bytes and its external_attr are copied straight across
-    rather than extracted to disk and re-added: the executable bits and the
-    mixed line endings in tools/uv.cmd both live in the archive, and a round
-    trip through the filesystem is where either of them would quietly be lost.
+    Each member's bytes are copied straight across rather than extracted to
+    disk and re-added: the mixed line endings in tools/uv.cmd live in the
+    archive, and a round trip through the filesystem is where they would
+    quietly be lost.
+
+    The mode is rewritten rather than copied, and every entry is marked Unix.
+    Copying external_attr alone is not enough and fails silently: the mode
+    only means anything when "version made by" says Unix, so an entry that
+    kept 0755 but lost that field extracts unexecutable. Writing a mode on
+    every entry also keeps zipfile from filling a blank one in as 0600, which
+    is how a source file ends up unreadable by anyone but the unpacker.
     """
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
         for info in source.infolist():
@@ -122,15 +139,23 @@ def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
             inner = info.filename[len(name) + 1:]
             moved = zipfile.ZipInfo(f"{name}/{release_path(inner, version)}",
                                     date_time=info.date_time)
-            moved.external_attr = info.external_attr
             moved.compress_type = zipfile.ZIP_DEFLATED
+            set_mode(moved, info.external_attr >> 16)
             archive.writestr(moved, source.read(info))
         # Generated rather than tracked: a checkout has no live version, and a
         # file saying one would be wrong the moment it was committed.
         current = zipfile.ZipInfo(f"{name}/current",
                                   date_time=(1980, 1, 1, 0, 0, 0))
-        current.external_attr = 0o644 << 16
+        set_mode(current, DEFAULT_MODE)
         archive.writestr(current, f"{version}\n")
+
+
+def set_mode(info: zipfile.ZipInfo, mode: int) -> None:
+    """Give an entry a Unix mode a POSIX unzip will actually apply."""
+    if not mode & 0o170000:          # a DOS entry, carrying no mode at all
+        mode = DEFAULT_MODE
+    info.create_system = UNIX
+    info.external_attr = mode << 16
 
 
 def main() -> int:
@@ -170,6 +195,15 @@ def main() -> int:
                 continue                      # already reported, if required
             if not (info.external_attr >> 16) & 0o111:
                 problems.append(f"not executable: {path.format(v=where)}")
+        # A mode is only honoured on an entry that says Unix, so checking the
+        # bits alone passes on an archive that extracts unexecutable anyway.
+        # Every entry is checked, not just the executable ones: an entry with
+        # no mode at all is how a source file lands 0600 and unreadable.
+        for path, info in sorted(members.items()):
+            mode = info.external_attr >> 16
+            if info.create_system != UNIX or not mode & 0o170000:
+                problems.append(f"carries no mode a POSIX unzip will apply: "
+                                f"{path}")
         uv = f"{where}/tools/uv.cmd"
         if uv in members:
             problems.extend(check_polyglot(archive.read(f"{name}/{uv}"),

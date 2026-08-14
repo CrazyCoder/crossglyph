@@ -77,9 +77,24 @@ def test_the_built_archive_has_the_release_shape():
 
         # The bit survives the repack. crossglyph.sh is executed directly and
         # uv.cmd is exec'd by it, so both matter.
+        #
+        # create_system as well as the bits, and this is the half that is easy
+        # to lose: a mode is only applied by a POSIX unzip when the entry says
+        # Unix, so an archive that kept 0755 and dropped that field extracts
+        # unexecutable while every assertion about the bits still passes.
         for path in ("crossglyph.sh", f"versions/{version}/tools/uv.cmd"):
-            assert (members[path].external_attr >> 16) & 0o111, \
+            info = members[path]
+            assert (info.external_attr >> 16) & 0o111, \
                 f"not executable after the repack: {path}"
+            assert info.create_system == make_release.UNIX, \
+                f"executable but not marked Unix, so the bit is ignored: {path}"
+
+        # And nothing is left without a mode at all, which zipfile fills in as
+        # 0600: readable by whoever unpacked it and by nobody else.
+        blank = [path for path, info in members.items()
+                 if info.create_system != make_release.UNIX
+                 or not (info.external_attr >> 16) & 0o170000]
+        assert not blank, f"entries with no usable mode: {blank[:5]}"
 
         # And so do the mixed line endings, which a repack that went through
         # text mode would quietly normalise.

@@ -16,15 +16,6 @@ USAGE = """usage: crossglyph [preview|build|fetch-fallbacks] [options]
 
 `crossglyph <command> --help` lists that command's own options."""
 
-#: What a kind is called in the report. Only the ones worth naming: an
-#: ordinary release says nothing, because a line on every run is noise.
-KIND_NOTES = {
-    install.CHECKOUT: "checkout",
-    install.SOURCE: "source download, will not update itself",
-    install.CONTAINER: "container",
-    install.UNKNOWN: "will not update itself",
-}
-
 
 def _preview(argv: list[str]) -> int:
     # Imported here rather than at the top, so `build` does not pay for a web
@@ -45,9 +36,8 @@ def version_report() -> str:
     running": the preview draws with the renderer that was compiled in, and
     two installs on the same version can carry different ones.
     """
-    kind = install.detect(install.root())
-    note = "" if install.can_self_update(kind) \
-        else f" ({KIND_NOTES.get(kind, kind)})"
+    said = install.label(install.detect(install.root()))
+    note = f" ({said})" if said else ""
     return (f"crossglyph {version.installed()}{note}\n"
             f"render core built from "
             f"{stamp.FIRMWARE.name} {stamp.short(stamp.build_stamp())}")

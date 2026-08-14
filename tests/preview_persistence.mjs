@@ -3097,8 +3097,8 @@ for (const { name, text } of sources) {
   check("and the panel foot names the product with it",
         env.about.line.textContent === "CrossGlyph 1.2.3",
         env.about.line.textContent);
-  check("and the renderer's commit, shortened",
-        env.about.detail.textContent.includes("45caec3"),
+  check("and the renderer's commit, shortened the way the CLI does",
+        env.about.detail.textContent.includes("45caec3e76c2"),
         env.about.detail.textContent);
   check("a release that can update itself says nothing about how",
         !env.about.detail.textContent.includes("crossglyph update"),

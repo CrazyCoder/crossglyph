@@ -31,6 +31,17 @@ INSTRUCTIONS = {
 
 KINDS = tuple(INSTRUCTIONS)
 
+#: How a kind is named when something has to say which one it is. Beside the
+#: instructions rather than at the call site, so a new packaging route is one
+#: place to edit and not two that can drift. A release is absent on purpose:
+#: it is the ordinary case, and naming it on every run is noise.
+LABELS = {
+    CONTAINER: "container",
+    CHECKOUT: "checkout",
+    SOURCE: "source download, will not update itself",
+    UNKNOWN: "will not update itself",
+}
+
 #: Docker writes this; other runtimes do not, which is why it is only a hint.
 #: What the image says in CROSSGLYPH_INSTALL_KIND is the signal that counts.
 DOCKERENV = pathlib.Path("/.dockerenv")
@@ -59,14 +70,19 @@ def detect(directory: pathlib.Path,
     named = environ.get("CROSSGLYPH_INSTALL_KIND", "").strip()
     if named in INSTRUCTIONS:
         return named
+    # Before the layout, not after it. Being in a container is a fact about
+    # where this is running, which no arrangement of directories overrides: an
+    # image built by unpacking a release has the layout, and self-updating
+    # inside one writes to a filesystem that goes away on restart. That
+    # failure is silent, which is what makes it worth the ordering.
+    if dockerenv.exists():
+        return CONTAINER
     if (directory / "current").is_file() and (directory / "versions").is_dir():
         # An install nobody can write to is not a special failure, it is
         # simply not a kind that can replace its own files. On Windows this
         # sees only the read-only attribute, so a directory that is unwritable
         # for another reason still resolves to ZIP and fails at apply time.
         return ZIP if os.access(directory, os.W_OK) else UNKNOWN
-    if dockerenv.exists():
-        return CONTAINER
     if (directory / ".git").exists():
         return CHECKOUT
     if (directory / "pyproject.toml").is_file():
@@ -81,3 +97,8 @@ def can_self_update(kind: str) -> bool:
 
 def instruction(kind: str) -> str:
     return INSTRUCTIONS.get(kind, INSTRUCTIONS[UNKNOWN])
+
+
+def label(kind: str) -> str:
+    """What to call this kind, or nothing when there is nothing to say."""
+    return LABELS.get(kind, "" if kind == ZIP else kind)

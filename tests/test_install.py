@@ -42,6 +42,15 @@ def test_a_dockerenv_marker_makes_it_a_container(tmp_path):
     assert install.detect(_tree(tmp_path), {}, marker) == install.CONTAINER
 
 
+def test_a_container_wins_over_a_release_layout(tmp_path):
+    """An image built by unpacking a release has the layout, and self-updating
+    inside one writes to a filesystem that goes away on restart. Being in a
+    container is a fact about where this runs; a directory cannot outvote it."""
+    marker = tmp_path / "dockerenv"
+    marker.touch()
+    assert install.detect(_release(tmp_path), {}, marker) == install.CONTAINER
+
+
 def test_an_empty_directory_is_unknown(tmp_path):
     assert install.detect(tmp_path, {}, NO_DOCKER) == install.UNKNOWN
 
@@ -93,3 +102,21 @@ def test_the_root_follows_the_environment_when_the_shim_names_it(monkeypatch):
 def test_without_it_the_root_is_the_project_directory(monkeypatch):
     monkeypatch.delenv("CROSSGLYPH_HOME", raising=False)
     assert (install.root() / "pyproject.toml").is_file()
+
+
+def test_a_release_is_the_kind_with_nothing_to_say_about_itself():
+    """The ordinary case. A note on every run is noise, so label() is empty
+    and the caller leaves it out rather than printing an empty bracket."""
+    assert install.label(install.ZIP) == ""
+
+
+@pytest.mark.parametrize("kind", [install.CONTAINER, install.CHECKOUT,
+                                  install.SOURCE, install.UNKNOWN])
+def test_every_other_kind_says_which_it_is(kind):
+    assert install.label(kind)
+
+
+def test_a_kind_nobody_declared_is_named_rather_than_hidden():
+    """A route added to the instructions and forgotten here should still
+    report something, not silently look like an ordinary release."""
+    assert install.label("flatpak") == "flatpak"
