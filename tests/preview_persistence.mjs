@@ -206,6 +206,15 @@ function makeControl({ name, type = "text", value = "", checked = false, group,
 
 // What /defaults answers. The picker is built from it, so a test that changes
 // what the folder holds changes this rather than the page.
+// What /update answers with. A release that can update itself, on the newest
+// version there is, so a block only says what it is changing.
+const ABOUT = {
+  version: "1.2.3", firmware: "45caec3e76c2472b", kind: "zip",
+  can_self_update: true, instruction: "Download the new release to update.",
+  latest: "1.2.3", available: null, checked_at: 1000, checking_off: false,
+  error: null,
+};
+
 const DEFAULTS = {
   text: "Съешь ещё этих мягких французских булок.",
   // A few presets, keyed and ordered as /defaults serves them. Short on
@@ -632,10 +641,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     fetched: recording(),
     "have-fallbacks": { textContent: "" },
     // What this install is: the version in the strip, the sentence at the
-    // foot of the export panel.
+    // foot of the export panel, and the line that is also the check button.
     "version-strip": { textContent: "", title: "" },
+    "version-number": { textContent: "" },
+    "version-dot": { hidden: true },
     "about-line": { textContent: "" },
     "about-detail": { textContent: "" },
+    "checked-when": recording(),
+    "check-now": buildButton("check", "Check now"),
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
     // shows the page untuned.
@@ -674,7 +687,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
     },
   };
-  const fetches = { render: 0, bodies: [], saves: [], builds: [],
+  const fetches = { render: 0, checks: 0, bodies: [], saves: [], builds: [],
                     fallbacks: [] };
   let lastTimer = 0;
   const cancelled = new Set();
@@ -825,12 +838,15 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
             name: typed.replace(/[^A-Za-z0-9_-]+/g, "") || sent.family,
             tuning: { line_height: null, ...sent.tuning } }) });
       }
+      if (String(url).includes("/update/check")) {
+        fetches.checks++;
+        if (opts.checkThrows) return Promise.reject(new TypeError("no route"));
+        return Promise.resolve({ json: () => Promise.resolve(
+          { ...ABOUT, ...(opts.checked ?? {}) }) });
+      }
       if (String(url).includes("/update")) {
         return Promise.resolve({ json: () => Promise.resolve(
-          opts.about ?? { version: "1.2.3", firmware: "45caec3e76c2472b",
-                          kind: "zip", can_self_update: true,
-                          instruction: "Run crossglyph update to install it." })
-        });
+          { ...ABOUT, ...(opts.about ?? {}) }) });
       }
       return Promise.resolve({ json: () => Promise.resolve(defaults) });
     },
@@ -879,7 +895,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
            about: { strip: stubs["version-strip"], line: stubs["about-line"],
-                    detail: stubs["about-detail"] },
+                    detail: stubs["about-detail"],
+                    number: stubs["version-number"], dot: stubs["version-dot"],
+                    when: stubs["checked-when"], button: stubs["check-now"],
+                    press: () => buildButtons.check() },
            refuse() { answer = false; } };
 }
 
@@ -3093,23 +3112,43 @@ for (const { name, text } of sources) {
 {
   const env = await loaded(fakeStorage());
   check("the strip carries the version",
-        env.about.strip.textContent === "1.2.3", env.about.strip.textContent);
+        env.about.number.textContent === "1.2.3",
+        env.about.number.textContent);
   check("and the panel foot names the product with it",
         env.about.line.textContent === "CrossGlyph 1.2.3",
         env.about.line.textContent);
   check("and the renderer's commit, shortened the way the CLI does",
         env.about.detail.textContent.includes("45caec3e76c2"),
         env.about.detail.textContent);
-  check("a release that can update itself says nothing about how",
-        !env.about.detail.textContent.includes("crossglyph update"),
+  check("a release on the newest version wears no dot",
+        env.about.dot.hidden === true, String(env.about.dot.hidden));
+  check("and is not told how to update, having nothing to update to",
+        !env.about.detail.textContent.includes("Download"),
+        env.about.detail.textContent);
+  check("the line says when it last asked",
+        /^Checked .* ago\.$/.test(env.about.when.textContent),
+        env.about.when.textContent);
+}
+
+// 58a. A newer release is the one thing the strip has to carry, because the
+//      panel foot scrolls and the strip does not.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { about: { available: "2.0.0", latest: "2.0.0" } });
+  check("the dot appears", env.about.dot.hidden === false,
+        String(env.about.dot.hidden));
+  check("and the foot names the version to move to",
+        env.about.line.textContent.includes("2.0.0"),
+        env.about.line.textContent);
+  check("and says how", env.about.detail.textContent.includes("Download"),
         env.about.detail.textContent);
 }
 
-// 58a. A kind that cannot replace its own files says so instead, because the
+// 58b. A kind that cannot replace its own files says so instead, because the
 //      way out differs and the notice is the only place it is said.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, { about: {
-    version: "1.2.3", firmware: null, kind: "source", can_self_update: false,
+    firmware: null, kind: "source", can_self_update: false,
     instruction: "This is a source download. Get the release zip to update." },
   });
   check("the instruction takes the place of the commit",
@@ -3118,6 +3157,69 @@ for (const { name, text } of sources) {
   check("and a core with no stamp is left unsaid rather than guessed",
         !env.about.detail.textContent.includes("crosspoint-reader"),
         env.about.detail.textContent);
+}
+
+// 58c. Checking turned off is said, rather than the line reading as though
+//      the answer were merely old.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { about: { checking_off: true } });
+  check("the line says the checks are off",
+        env.about.when.textContent === "Update checks are off.",
+        env.about.when.textContent);
+}
+
+// 58d. A check nobody could complete says so. This is the state an automatic
+//      check swallows and a manual one must not: a button that goes quiet
+//      reads as broken, which is the one thing it cannot do.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { about: { error: "no route", checked_at: null } });
+  check("the line says it could not ask",
+        env.about.when.textContent === "Could not reach the update server.",
+        env.about.when.textContent);
+}
+
+// 58e. The button asks, and says so while it is asking.
+{
+  const env = await loaded(fakeStorage());
+  const before = env.fetches.checks;
+  env.about.press();
+  await settle();
+  check("it asked", env.fetches.checks === before + 1,
+        `${before} -> ${env.fetches.checks}`);
+  check("it said so while it was asking",
+        env.about.when.steps.includes("Checking..."),
+        JSON.stringify(env.about.when.steps));
+  check("and it went out and came back rather than staying out",
+        JSON.stringify(env.about.button.states) === "[true,false]",
+        JSON.stringify(env.about.button.states));
+}
+
+// 58f. An answer that never comes still ends the sentence. Without this the
+//      line sits on "Checking..." and the button looks stuck.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { checkThrows: true });
+  env.about.press();
+  await settle();
+  check("a failed press says what happened",
+        env.about.when.textContent === "Could not reach the update server.",
+        env.about.when.textContent);
+  check("and the button comes back",
+        env.about.button.disabled === false,
+        String(env.about.button.disabled));
+}
+
+// 58g. What the press learns reaches both surfaces, not just the line it was
+//      pressed from.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { checked: { available: "2.0.0" } });
+  check("the dot is not there before", env.about.dot.hidden === true);
+  env.about.press();
+  await settle();
+  check("and is after", env.about.dot.hidden === false,
+        String(env.about.dot.hidden));
 }
 
 process.exit(failures ? 1 : 0);

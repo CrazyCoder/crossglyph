@@ -27,7 +27,7 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
 
-from .. import fontbuild, fontconf, install, version
+from .. import fontbuild, fontconf, install, updateconf, updates, version
 from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
                               FontBuildError, figure_glyph_overrides,
                               gsub_ligature_sequences)
@@ -1038,20 +1038,50 @@ def defaults() -> dict:
             "family": _family}
 
 
+def _about() -> dict:
+    """What this install is, and what the last check found.
+
+    Reading only. The page renders what is already known; the thread at
+    startup and the button are the two things that ask, which is what keeps a
+    page load off the network.
+    """
+    root = install.root()
+    kind = install.detect(root)
+    state = updates.load_state(root)
+    return {"version": version.installed(),
+            "firmware": stamp.build_stamp(),
+            "kind": kind,
+            "can_self_update": install.can_self_update(kind),
+            "instruction": install.instruction(kind),
+            "latest": state.latest,
+            "available": updates.available(state),
+            "checked_at": state.checked_at or None,
+            "checking_off": not updateconf.settings(root).check,
+            "error": state.error}
+
+
 @app.get("/update")
 def update_state() -> dict:
     """What this install is, and how it would be updated.
 
     Separate from /defaults, which carries facts about the workspace that the
-    page reads once. This one grows fields as the check lands, and the page
-    renders whatever it is given rather than deciding anything itself.
+    page reads once. This one grows fields as the update work lands, and the
+    page renders whatever it is given rather than deciding anything itself.
     """
-    kind = install.detect(install.root())
-    return {"version": version.installed(),
-            "firmware": stamp.build_stamp(),
-            "kind": kind,
-            "can_self_update": install.can_self_update(kind),
-            "instruction": install.instruction(kind)}
+    return _about()
+
+
+@app.post("/update/check")
+def update_check() -> dict:
+    """Ask now, ignoring the throttle and the opt-outs.
+
+    A failure travels in the body rather than as a 500: the page has to be
+    able to say what went wrong, and a status code is not a sentence. Kept
+    apart from applying, so a forced check is never one mis-wired handler away
+    from installing something.
+    """
+    updates.check(install.root(), force=True)
+    return _about()
 
 
 class OutRequest(BaseModel):
@@ -1357,6 +1387,12 @@ def main(argv=None) -> int:
     import webbrowser
 
     import uvicorn
+
+    # On a thread, so a slow or absent network delays nothing anybody is
+    # waiting for. The page reads whatever this has written by the time it
+    # asks, and picks the answer up on the next load if it has not landed yet.
+    threading.Thread(target=updates.check, args=(install.root(),),
+                     daemon=True).start()
     address = f"http://{opts.host}:{opts.port}"
     loaded = ", ".join(FACE_NAMES[style] for style in sorted(_sources))
     print(f"preview on {address}  ({source.name}: {loaded})")

@@ -1960,3 +1960,71 @@ def test_a_core_with_no_stamp_reports_null_rather_than_a_guess(client,
 
     monkeypatch.setattr(server.stamp, "build_stamp", lambda: None)
     assert client.get("/update").json()["firmware"] is None
+
+
+def test_the_update_endpoint_carries_what_the_check_found(client, monkeypatch):
+    from crossglyph import updates
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(1000.0, "9.9.9", None))
+    said = client.get("/update").json()
+    assert said["latest"] == "9.9.9"
+    assert said["available"] == "9.9.9"
+    assert said["checked_at"] == 1000.0
+    assert said["error"] is None
+
+
+def test_reading_the_state_never_fetches(client, monkeypatch):
+    """GET is the page rendering what is already known. The thread at startup
+    and the button are the only two things that ask."""
+    from crossglyph.preview import server
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("GET /update went to the network")
+
+    monkeypatch.setattr(server.updates, "check", forbidden)
+    assert client.get("/update").status_code == 200
+
+
+def test_a_forced_check_asks_and_answers(client, monkeypatch):
+    from crossglyph import updates
+    from crossglyph.preview import server
+
+    asked = []
+
+    def check(root, **kw):
+        asked.append(kw)
+        return updates.State(2000.0, "9.9.9", None)
+
+    monkeypatch.setattr(server.updates, "check", check)
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(2000.0, "9.9.9", None))
+    said = client.post("/update/check").json()
+    assert asked and asked[0]["force"] is True
+    assert said["latest"] == "9.9.9"
+
+
+def test_a_forced_check_that_fails_says_so_rather_than_erroring(client,
+                                                                monkeypatch):
+    """A 500 would show the page nothing to explain. The failure is the
+    answer, so it travels in the body."""
+    from crossglyph import updates
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.updates, "check",
+                        lambda root, **kw: updates.State(1.0, None, "no route"))
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(1.0, None, "no route"))
+    said = client.post("/update/check")
+    assert said.status_code == 200
+    assert said.json()["error"] == "no route"
+
+
+def test_the_page_is_told_when_checking_is_off(client, monkeypatch):
+    from crossglyph import updateconf
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.updateconf, "settings",
+                        lambda root: updateconf.Settings(False, 24.0))
+    assert client.get("/update").json()["checking_off"] is True

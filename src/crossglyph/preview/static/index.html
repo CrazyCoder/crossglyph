@@ -29,8 +29,10 @@
         <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6 5.9 5.9 0 1 0 13.4 9.9z"/></svg></button>
   </div>
   <!-- The version, where it never scrolls away. The panel foot below carries
-       the sentence; this is the glance. -->
-  <span id="version-strip" title=""></span>
+       the sentence; this is the glance, and the dot is the whole of what it
+       has to say when a newer release exists. -->
+  <span id="version-strip" title=""><span id="version-number"></span><span
+    id="version-dot" hidden aria-label="an update is available"></span></span>
 </div>
 
 <form id="knobs">
@@ -570,6 +572,14 @@
     <div id="about">
       <div id="about-line"></div>
       <div class="hint" id="about-detail"></div>
+      <!-- The sentence about checking is also where checking is asked for:
+           one primary action in this card at most, and the secondary one sits
+           in the line that is already about it. -->
+      <div class="hint" id="about-checked">
+        <span id="checked-when"></span>
+        <button type="button" id="check-now"
+                title="Ask now, whatever the last answer was">Check now</button>
+      </div>
     </div>
 </form>
 

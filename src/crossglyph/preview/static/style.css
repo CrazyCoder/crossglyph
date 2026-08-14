@@ -600,3 +600,12 @@
   #about { margin: .9rem .3rem .2rem; }
   #about-line { font-size: 12px; font-weight: 600; color: var(--text); }
   #about-detail { margin-top: .2rem; }
+
+  /* The update mark. A filled dot rather than a colour: this interface is the
+     device's four grey levels, for the reason at the top of this file. */
+  #version-dot { display: inline-block; width: .38rem; height: .38rem;
+                 border-radius: 50%; background: var(--knob);
+                 margin-left: .3rem; vertical-align: .05rem; }
+  #about-checked { display: flex; align-items: center; gap: .45rem;
+                   margin-top: .25rem; }
+  #check-now { padding: .1rem .45rem; font-size: 10.5px; }
