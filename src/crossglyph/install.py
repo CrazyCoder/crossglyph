@@ -22,7 +22,9 @@ UNKNOWN = "unknown"
 #: per packaging route, so adding one is a row here rather than a branch at
 #: every call site.
 INSTRUCTIONS = {
-    ZIP: "Run crossglyph update to install it.",
+    # There is no `crossglyph update` that installs anything yet. This says
+    # what somebody can actually do until there is.
+    ZIP: "Download the new release to update.",
     CONTAINER: "Pull the new image to update.",
     CHECKOUT: "Run git pull to update.",
     SOURCE: "This is a source download. Get the release zip to update.",
