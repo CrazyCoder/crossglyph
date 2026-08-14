@@ -281,6 +281,44 @@
   .section { display: flex; align-items: center; margin: 1.35rem 0 .5rem; }
   .section h2 { flex: 1 1 auto; margin: 0; }
 
+  /* The heading is the press that folds the section. A button inside the h2
+     rather than instead of it: the section keeps its heading, and what opens
+     it is a control rather than a word people have to guess is clickable. */
+  #page-toggle {
+    /* Each of these is a property a button does not inherit on its own, and
+       the heading beside it in the next panel does: `font` misses
+       text-transform, and the UA sets that one to none, so the word came out
+       in mixed case beside two headings in capitals. */
+    font: inherit; color: inherit; letter-spacing: inherit;
+    text-transform: inherit;
+    display: flex; align-items: center; gap: .4rem;
+    padding: .1rem .3rem .1rem 0; margin-left: -.15rem;
+    background: none; border: 0; border-radius: 4px;
+  }
+  #page-toggle:hover { color: var(--text); background: none; }
+  /* A drawn chevron rather than a glyph. At the heading's 10px a text triangle
+     is a comma with ideas, and this is the one mark on the panel that has to
+     read as "there is more under here" at a glance. Stroked like the
+     appearance icons, which is the page's other set of drawn marks. */
+  .twist { width: 11px; height: 11px; flex: none; display: block;
+           fill: none; stroke: currentColor; stroke-width: 2.1;
+           stroke-linecap: round; stroke-linejoin: round;
+           transition: transform .15s ease-out; }
+  #page-toggle[aria-expanded="true"] .twist { transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
+  :root[data-page="closed"] #page-settings { display: none; }
+
+  /* Folded, and something under it is not what the device ships with. The same
+     dot the rows carry, in the same column, said for the whole section because
+     the rows that would say it are out of sight. Nothing sets it: it is the
+     rows' own marks, read through the fold. */
+  #page-dot { width: 1.5rem; height: 1.5rem; display: none;
+              place-items: center; color: var(--muted); font-size: 14px; }
+  :root[data-page="closed"]
+    .section:has(+ #page-settings .mark:not([hidden])) #page-dot {
+    display: grid;
+  }
+
   .revert, .clear {
     width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: none;
     color: var(--muted); font-size: 14px; line-height: 1; border-radius: 4px;

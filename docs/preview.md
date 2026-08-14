@@ -53,6 +53,14 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
+The **Page** section folds, and starts folded. These are settings you match to
+the device you are judging against once and then leave, where everything above
+them is what a session is actually for. They are remembered in this browser, so
+they survive a reload and every font you try; the fold is remembered with them.
+A dot on the folded heading says one of them is not what the device ships with,
+which is the same dot the rows carry, said for the section while the rows are
+out of sight.
+
 The font decides two of them. `ligatures` needs GSUB rules the converter can
 read, and `figures` needs a `pnum` feature; a family with neither draws the
 same page whichever way those are set, so both rows are greyed for it and say

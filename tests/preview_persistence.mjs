@@ -609,13 +609,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     return { hidden: true, bar, fill, what, count,
              querySelector(selector) { return parts[selector]; } };
   };
-  // The panel tabs. What a press leaves on the element is asserted as well as
+  // A press whose element carries state: the panel tabs and the fold on the
+  // Page heading. What the press leaves on the element is asserted as well as
   // what it does, so this keeps the attribute rather than dropping it.
-  const tabPress = {};
-  const tabStub = (name) => ({
+  const presses = {};
+  const pressStub = (name) => ({
     attrs: {},
     setAttribute(key, value) { this.attrs[key] = value; },
-    addEventListener(kind, fn) { if (kind === "click") tabPress[name] = fn; },
+    addEventListener(kind, fn) { if (kind === "click") presses[name] = fn; },
   });
   const saveButton = {
     hidden: false, disabled: true, textContent: "", title: "",
@@ -632,8 +633,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // just the last line of it.
     built: recording(),
     progress: progressRow(),
-    "tab-tune": tabStub("tune"),
-    "tab-export": tabStub("export"),
+    "tab-tune": pressStub("tune"),
+    "tab-export": pressStub("export"),
+    // The Page heading, which is the press that folds the section under it.
+    "page-toggle": pressStub("page"),
     // What a build leaves on the tab it ran behind.
     "tab-busy": { hidden: true },
     "source-note": { textContent: "" },
@@ -935,7 +938,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            root: sandbox.document.documentElement,
            tabs: { tune: stubs["tab-tune"], export: stubs["tab-export"],
                    busy: stubs["tab-busy"],
-                   press: (which) => tabPress[which]() },
+                   press: (which) => presses[which]() },
+           fold: { toggle: stubs["page-toggle"],
+                   press: () => presses.page() },
            progress: stubs.progress, bar: stubs.progress.bar,
            barFill: stubs.progress.fill,
            progressWhat: stubs.progress.what,
@@ -3454,6 +3459,37 @@ for (const { name, text } of sources) {
   await settle();
   check("an update marks no tab", env.tabs.busy.hidden === true,
         String(env.tabs.busy.hidden));
+}
+
+// 60. The page settings fold away. They are the reader's own device settings,
+//     set once to match the device being judged against and then left, where
+//     everything above them is what a tuning session is for. The fold is
+//     written down: one that opens again on the next reload has saved nobody
+//     anything. Like the tabs, the attribute is on the root and the stylesheet
+//     does the folding -- which is what lets boot.js put it there before the
+//     first paint, rather than the section opening and shutting on every load.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage);
+  check("the button says what the root says",
+        env.fold.toggle.attrs["aria-expanded"] === "false",
+        env.fold.toggle.attrs["aria-expanded"]);
+
+  env.fold.press();
+  check("a press opens it", env.root.dataset.page === "open",
+        env.root.dataset.page);
+  check("and says so where a screen reader hears it",
+        env.fold.toggle.attrs["aria-expanded"] === "true",
+        env.fold.toggle.attrs["aria-expanded"]);
+  check("and it is written down", storage.data["crossglyph.page-open"] === "yes",
+        storage.data["crossglyph.page-open"]);
+
+  env.fold.press();
+  check("and closes again", env.root.dataset.page === "closed",
+        env.root.dataset.page);
+  check("with that written down too, rather than left to the default",
+        storage.data["crossglyph.page-open"] === "no",
+        storage.data["crossglyph.page-open"]);
 }
 
 process.exit(failures ? 1 : 0);

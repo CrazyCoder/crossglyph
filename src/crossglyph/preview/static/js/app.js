@@ -14,6 +14,7 @@ import "./family.js";
 import "./variable.js";
 import "./progress.js";
 import "./tabs.js";
+import "./fold.js";
 import "./export.js";
 import "./theme.js";
 import "./about.js";

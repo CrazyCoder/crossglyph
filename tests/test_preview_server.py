@@ -577,6 +577,26 @@ def test_no_compare_arrow_sits_inside_a_label():
             f"a revert arrow sits inside {opened.group(0)}"
 
 
+def test_what_boot_reads_is_what_the_modules_write():
+    """boot.js restores both of these before the first paint, and a module
+    writes each one after a press. Two files per key, and the failure when they
+    drift is silent: the choice is still saved, nothing reads it back, and the
+    page opens on the default every time.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    js = server.STATIC / "js"
+    boot = (js / "boot.js").read_text(encoding="utf-8")
+    for module, name in (("theme.js", "THEME"), ("fold.js", "PAGE_OPEN")):
+        source = (js / module).read_text(encoding="utf-8")
+        key = re.search(rf'{name} = "([^"]+)"', source)
+        assert key, f"{module} names no key for {name}"
+        assert f'"{key.group(1)}"' in boot, \
+            f"boot.js does not read {key.group(1)}, which {module} writes"
+
+
 def test_save_is_reachable_from_either_panel():
     """It writes the whole .conf, the export panel's half of it included, so it
     cannot live inside the knobs form. Below the width where all three columns

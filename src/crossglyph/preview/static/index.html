@@ -5,7 +5,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 
-<script src="js/theme-boot.js"></script>
+<script src="js/boot.js"></script>
 
 <div id="chrome">
   <label for="family">font</label>
@@ -245,16 +245,30 @@
     <button type="button" class="revert" data-reset="figures" title="Compare with the value the config has" aria-label="compare figures" hidden>&#8634;</button>
   </div>
 
-  <!-- The heading carries the section's own way back, in the column every
+  <!-- These are the reader's own device settings: set once to match the
+       device you are judging against, then left alone, where everything above
+       them is what a tuning session is actually for. So the section folds, and
+       stays folded until it is wanted.
+
+       The heading also carries the section's own way back, in the column every
        other way-back on the panel is in. A cross rather than the rows' arrow:
        that one is a comparison you can press again, and this throws the
        section away. -->
   <div class="section">
-    <h2>Page</h2>
+    <h2><button type="button" id="page-toggle" aria-expanded="false"
+                aria-controls="page-settings"><svg class="twist"
+      viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.2 11.2 8 6 12.8"/>
+      </svg>Page</button></h2>
+    <!-- Closed, and something under it is not what the device ships with.
+         Open, the rows say that for themselves. -->
+    <span id="page-dot" aria-hidden="true"
+          title="A page setting differs from what the device ships with">&#8226;</span>
     <button type="button" class="clear" id="reset-page"
             title="Put every page setting back to what the device ships with"
             aria-label="reset page settings">&#215;</button>
   </div>
+
+  <div id="page-settings">
 
   <div class="row num">
     <label class="name" for="margin">margin <span class="unit">px</span></label>
@@ -317,26 +331,23 @@
       <input id="extra_paragraph_spacing" name="extra_paragraph_spacing" type="checkbox" checked data-group="page">
       <span class="mark" data-mark="extra_paragraph_spacing" aria-hidden="true" hidden>&#8226;</span>
     </div>
+    <!-- What these two do is on their labels rather than under the section.
+         A paragraph apiece is a screenful for two switches whose behaviour you
+         want once, when you first wonder what they are. -->
     <div class="row check">
-      <label class="name" for="antialiased">anti-aliasing</label>
+      <label class="name" for="antialiased"
+             title="Off is the device's 1-bit mode: every non-white level is painted solid black.">anti-aliasing</label>
       <input id="antialiased" name="antialiased" type="checkbox" checked data-group="page">
       <span class="mark" data-mark="antialiased" aria-hidden="true" hidden>&#8226;</span>
     </div>
     <div class="row check">
-      <label class="name" for="inverted">night mode</label>
+      <label class="name" for="inverted"
+             title="Inverts the page on its way to the panel, so the two greys swap as well as the paper and the ink. The reader applies it to the book and not to the menus over it.">night mode</label>
       <input id="inverted" name="inverted" type="checkbox" data-group="page">
       <span class="mark" data-mark="inverted" aria-hidden="true" hidden>&#8226;</span>
     </div>
   </div>
-
-  <div class="hint">Anti-aliasing off is the device's 1-bit mode: every
-    non-white level is painted solid black.</div>
-  <div class="hint">Night mode inverts the page on its way to the panel, so
-    the two greys swap as well as the paper and the ink. The reader applies it
-    to the book and not to the menus over it.</div>
-  <div class="hint">Remembered in this browser, so they survive while you turn
-    font knobs.</div>
-
+  </div>
 </form>
 
 <!-- The card's own foot rather than a bar under it. Save writes the whole
