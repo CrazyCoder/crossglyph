@@ -190,6 +190,27 @@ def test_a_family_that_fails_is_counted_once_however_many_sizes_land(config, tmp
     assert family["failed"] == [12, 14, 16] and family["built"] == []
 
 
+def test_a_second_family_declared_in_all_conf_is_still_claimed(tmp_path):
+    """`sizes_mod` is shareable, so a family can build two directories while
+    its own config says nothing about the second. Read the file alone and the
+    next build takes that one for an orphan."""
+    import fontsmith
+
+    from crossglyph import fontbuild
+
+    fontsmith.box_font(tmp_path / "Probe-Regular.ttf", [ord("A")],
+                       family="Probe", style="Regular")
+    conf = fontbuild.conf_dir(tmp_path)
+    conf.mkdir(parents=True, exist_ok=True)
+    (conf / "all.conf").write_text("sizes_mod = 9 10\n", encoding="utf-8")
+    (conf / "probe.conf").write_text("sizes = 12\n", encoding="utf-8")
+
+    # Spelled as the config spells it, which is why orphan_dirs compares
+    # without case: the directory took its capitals from the font file.
+    assert {name.casefold() for name in fontbuild.claimed_names(tmp_path)} == \
+        {"probe", "probemod"}
+
+
 def test_a_second_space_font_never_writes_over_the_first(tmp_path):
     """Several workers reach a fresh output folder together, and each finds
     the file missing. Whoever loses writes its own copy and drops it rather

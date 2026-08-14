@@ -920,11 +920,20 @@ def claimed_names(source: pathlib.Path) -> set[str]:
     faces have gone missing produces nothing and would otherwise look like a
     family nobody wants: its output would be swept up as an orphan for the one
     reason it cannot be rebuilt. A name it claims is a name it keeps.
+
+    Spelled as the config spells it, which is not always how the directory is:
+    a resolved family takes its capitals from the font file, and an unresolved
+    one has no file to take them from. Only orphan_dirs consumes this, and it
+    compares without case for exactly that reason.
     """
     names = set()
+    # all.conf underneath each file, because a second family can be declared
+    # there: `sizes_mod` shared across the folder means every family has one,
+    # and a config that says nothing about it still builds the directory.
+    defaults = load_defaults(source)
     for path in discover_configs(source):
         try:
-            values = fontconf.read_values(path)
+            values = {**defaults, **fontconf.read_values(path)}
         except FontConfigError:
             # Unreadable, so it claims whatever it is called. A file nobody can
             # parse is a worse reason still to delete something.

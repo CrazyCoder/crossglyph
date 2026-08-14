@@ -438,6 +438,27 @@ def test_a_feature_any_face_carries_keeps_its_knob(tmp_path, monkeypatch):
     assert entry["features"]["ligatures"] is True
 
 
+def test_a_face_replaced_under_the_preview_is_asked_again(tmp_path, monkeypatch):
+    """The whole workspace is walked for these on the way to the picker, so
+    they are cached. A font swapped in place has to move the answer, the way
+    it moves which instances a variable file offers."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    face = tmp_path / "Swap-Regular.ttf"
+    box_font(face, range(0x20, 0x7F), family="Swap")
+    (_conf(tmp_path) / "all.conf").write_text("sizes = 12\n", encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server.forget_families()
+    assert server.face_features(face) == frozenset()
+
+    box_font(face, list(range(0x20, 0x7F)) + [0xFB01], family="Swap",
+             ligatures={(0x66, 0x69): 0xFB01})
+    assert server.face_features(face) == frozenset({"ligatures"})
+
+
 def test_every_greyable_knob_is_a_knob_the_page_has():
     """The reasons are keyed by control name, and a name the markup does not
     carry is a row that silently never greys."""
