@@ -518,11 +518,19 @@ def render(request: RenderRequest) -> Response:
             keyed, request.size, coverage, _cache_key(request.tuning),
             useful_fallbacks(keyed, coverage, offered),
             axes_for(request.family, request.size, request.axes))
-        # What nothing can draw of what is on the page -- asked of the text
-        # rather than of the build's coverage, which carries ligature outputs
-        # nobody typed. See on_the_page.
-        undrawn = resolved_fallbacks(
-            keyed, on_the_page(request.text), offered)[1]
+        # What nothing can draw, narrowed to what is actually on the page: the
+        # build's coverage carries the output codepoint of every ligature the
+        # faces could form, and a face whose GSUB names an `ff` it has no cmap
+        # entry for is not a page with a hole in it (see on_the_page).
+        #
+        # Narrowed rather than asked again, because asking again is a second
+        # walk of every fallback face. on_the_page is a subset of the coverage,
+        # and whether a face supplies a codepoint does not depend on what else
+        # was asked for, so the two give the same answer over the same
+        # codepoints.
+        undrawn = resolved_fallbacks(keyed, coverage, offered)[1] & {
+            code for low, high in on_the_page(request.text)
+            for code in range(low, high + 1)}
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an

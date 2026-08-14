@@ -53,7 +53,12 @@ export function currentState(name) {
 
 export function factoryState(name) {
   const el = form.elements[name];
-  return {value: declaredValue(el),
+  return {// A checkbox's `value` is not its state and none of these markup
+          // boxes sets one, so `value` reads "on" while `defaultValue` reads
+          // "" -- and comparing those two calls every checkbox on the page
+          // changed, for good. `checked` is the whole of a checkbox's state,
+          // and both sides have to agree on what is not being compared.
+          value: el.type === "checkbox" ? el.value : declaredValue(el),
           checked: el.type === "checkbox" && el.defaultChecked,
           auto: name === "line_height" && lineHeightAuto.defaultChecked};
 }

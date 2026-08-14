@@ -152,6 +152,14 @@ function makeControl({ name, type = "text", value = "", checked = false, group,
   const el = { name, type, value, checked, dataset: {}, options, min, max, step };
   el.defaultValue = value;
   el.defaultChecked = checked;
+  // A checkbox carries "on" whether or not the markup gives it a value, while
+  // defaultValue reflects the attribute and so stays empty. The two differ in
+  // every browser and none of these boxes sets one, so anything comparing them
+  // has to face that here rather than only on the page.
+  if (type === "checkbox") {
+    el.value = "on";
+    el.defaultValue = "";
+  }
   if (group) el.dataset.group = group;
   if (options) {
     el.tagName = "SELECT";
@@ -398,6 +406,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       name: "thresholds", value: "4,8,12",
       options: [{ value: "4,8,12" }, { value: "3,6,10" }],
     }),
+    // A font-side checkbox, so the reverts are exercised on the kind of
+    // control whose whole state is `checked`.
+    makeControl({ name: "ligatures", type: "checkbox", checked: true }),
     makeControl({ name: "hyphenation", type: "checkbox", checked: false, group: "page" }),
     makeControl({ name: "antialiased", type: "checkbox", checked: true, group: "page" }),
     makeControl({ name: "inverted", type: "checkbox", checked: false, group: "page" }),
@@ -434,7 +445,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     press() { this.on.pointerdown({ shiftKey: false }); },
   })));
   // One arrow per knob, shown only when that knob is off its default.
-  const revertList = ["gamma", "margin", "alignment", "line_height"].map(name => ({
+  // A checkbox on each side of the font/page line, because a checkbox's state
+  // is `checked` alone and everything else about it is a trap.
+  const revertList = ["gamma", "margin", "alignment", "line_height",
+                      "ligatures", "hyphenation"].map(name => ({
     dataset: { reset: name },
     hidden: true,
     on: {},
@@ -2555,6 +2569,45 @@ for (const { name, text } of sources) {
   check("a small build reads in kilobytes",
         env.built.textContent.startsWith("1 built (41 kB),"),
         env.built.textContent);
+}
+
+// 77. A checkbox nobody has touched is not a changed knob. Its `value` reads
+//     "on" and its `defaultValue` reads "" -- the markup sets neither -- so
+//     anything comparing those two calls every checkbox on the page modified,
+//     for good, and hangs an arrow on it that never goes away.
+{
+  const env = await loaded(fakeStorage());
+  const arrow = (name) => env.revertList.find(b => b.dataset.reset === name);
+
+  check("an untouched font checkbox has no arrow",
+        arrow("ligatures").hidden === true, String(arrow("ligatures").hidden));
+  check("nor does an untouched page checkbox",
+        arrow("hyphenation").hidden === true,
+        String(arrow("hyphenation").hidden));
+
+  // And it still appears when the box really is off its default.
+  env.byName.ligatures.checked = false;
+  env.listeners.input({ target: env.byName.ligatures });
+  check("and it appears once the box is actually moved",
+        arrow("ligatures").hidden === false, String(arrow("ligatures").hidden));
+}
+
+// 78. Untuned compares against the factory, so a knob already at the factory
+//     has nothing to set aside. Stashing it anyway leaves an arrow claiming a
+//     comparison that is not happening.
+{
+  const env = await loaded(fakeStorage());
+  const arrow = (name) => env.revertList.find(b => b.dataset.reset === name);
+  env.compare.fire();
+  check("a checkbox already at the factory is left alone by untuned",
+        arrow("ligatures").hidden === true, String(arrow("ligatures").hidden));
+  check("and the page checkbox is not in this comparison at all",
+        arrow("hyphenation").hidden === true,
+        String(arrow("hyphenation").hidden));
+  env.compare.fire();
+  check("and it is still where it was afterwards",
+        env.byName.ligatures.checked === true,
+        String(env.byName.ligatures.checked));
 }
 
 process.exit(failures ? 1 : 0);
