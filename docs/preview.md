@@ -319,8 +319,8 @@ this repository and has moved past that commit, the preview says so once and
 draws anyway:
 
 ```
-warning: the render core was built from crosspoint-reader 45caec3e76c2, and
-         D:\...\crosspoint-reader is now at 9f1c0a2b4d31.
+warning: the render core was built from crosspoint-reader develop 45caec3e76c2,
+         and D:\...\crosspoint-reader-engine is now at 9f1c0a2b4d31.
          The preview draws with the older renderer until you rebuild it:
   bash D:\...\src\render\build.sh
 ```

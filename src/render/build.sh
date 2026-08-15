@@ -23,7 +23,9 @@ if [ -z "${FW:-}" ]; then
   for candidate in crosspoint-reader-engine crosspoint-reader; do
     [ -d "$ROOT/../$candidate" ] && { FW="$ROOT/../$candidate"; break; }
   done
-  FW="${FW:-$ROOT/../crosspoint-reader}"
+  # Nothing beside us: the last candidate, which the loop left in $candidate.
+  # Naming it again here would be a third copy of the list to keep in step.
+  FW="${FW:-$ROOT/../$candidate}"
 fi
 EMSDK="${EMSDK:-$ROOT/../emsdk}"
 OUT="$ROOT/src/crossglyph/render"

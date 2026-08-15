@@ -7,7 +7,7 @@ import sys
 from . import install, layout, updateconf, updates, upgrade, version
 from .render import stamp
 
-USAGE = """usage: crossglyph [preview|start|build|fetch-fallbacks|update] [options]
+USAGE = """usage: crossglyph [command] [options]
 
   preview            tune a font against the device's own renderer (default)
   start              the same, in the background, and open a browser on it

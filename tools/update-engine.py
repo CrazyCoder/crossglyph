@@ -146,11 +146,11 @@ def main(argv: list[str] | None = None) -> int:
         git("checkout", "--quiet", "--detach", target, at=DIRECTORY)
 
     print()
-    warranted = report(DIRECTORY, built_from(), target)
-    if warranted:
+    if report(DIRECTORY, built_from(), target):
         print(f"\nrebuild it with:\n  bash {BUILD}")
-        print("and run the suite after: a renderer change moves what the "
-              "preview draws, and the layout tests are the ones that say so.")
+        print("and run the suite after, with CROSSGLYPH_TEST_FONT pointing at "
+              "a real face: what draws pages is skipped without one, and a "
+              "run that skipped it looks exactly like a run that passed it.")
     return 0
 
 
