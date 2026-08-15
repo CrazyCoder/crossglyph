@@ -40,6 +40,13 @@ STANDING = {
             "is in the tree.",
 }
 
+#: Kinds whose instruction says only what an Update button already does, so a
+#: surface carrying that button says nothing at all. A source download can
+#: self-update too and is deliberately not here: its instruction says the
+#: update converts the install, which is a thing to know before pressing
+#: rather than after.
+BUTTON_SAYS_IT = (ZIP,)
+
 #: How a kind is named when something has to say which one it is. Beside the
 #: instructions rather than at the call site, so a new packaging route is one
 #: place to edit and not two that can drift. A release is absent on purpose:
@@ -113,7 +120,7 @@ def instruction(kind: str) -> str:
     return INSTRUCTIONS.get(kind, INSTRUCTIONS[UNKNOWN])
 
 
-def notice(kind: str, available: bool) -> str:
+def notice(kind: str, available: bool, *, offering: bool = False) -> str:
     """The sentence a surface shows about updating, or nothing.
 
     One place decides this, so the page and the command line cannot come to
@@ -128,9 +135,16 @@ def notice(kind: str, available: bool) -> str:
     not is left alone. What that cannot see is a clone level with the release
     and behind it in commits, which is the caveat a source download carries
     below and a clone is expected to know about itself.
+
+    `offering` is a surface that is itself offering to do it: the preview,
+    which puts an Update button on this very line. Telling somebody to run a
+    command beside a button that runs it is noise, so the kinds in
+    BUTTON_SAYS_IT say nothing there. Every other kind is told, including the
+    two the button cannot help -- a container still has to be sent to pull the
+    image, and that is the one thing the page cannot do for it.
     """
     if available:
-        return instruction(kind)
+        return "" if offering and kind in BUTTON_SAYS_IT else instruction(kind)
     return STANDING.get(kind, "")
 
 

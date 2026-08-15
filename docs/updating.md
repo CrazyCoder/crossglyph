@@ -51,6 +51,11 @@ can install. The name at the left of that line links the project, and the
 address comes from the same constant the updater fetches from, so the two
 cannot come to point at different places.
 
+Where that button can do the whole job, the line below says nothing about how
+to update: a command beside a button that runs it is only noise. The kinds the
+button cannot help still say what would, and so does a source download, whose
+answer is not the command but what pressing it would do to the install.
+
 ## Asking on purpose
 
 ```sh

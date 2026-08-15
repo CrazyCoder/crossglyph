@@ -1099,7 +1099,8 @@ def _about(asked: bool = False) -> dict:
             # thing about the same install. Nothing to say once the release is
             # installed and waiting: telling somebody how to fetch what they
             # have already fetched is the nag this exists to avoid.
-            "notice": install.notice(kind, bool(found) and not pending),
+            "notice": install.notice(kind, bool(found) and not pending,
+                                     offering=True),
             "latest": state.latest,
             "available": found,
             # Named, so the island can say why it is offering a release the

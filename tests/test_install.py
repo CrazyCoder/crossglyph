@@ -151,6 +151,30 @@ def test_a_kind_that_cannot_update_itself_is_told_how_when_there_is_a_release(
     assert install.notice(kind, False) == ""
 
 
+def test_a_surface_offering_to_do_it_does_not_also_say_the_command():
+    """The preview puts an Update button on this very line, and a command
+    beside a button that runs it is noise."""
+    assert install.notice(install.ZIP, True, offering=True) == ""
+
+
+@pytest.mark.parametrize("kind", [install.CONTAINER, install.CHECKOUT,
+                                  install.UNKNOWN])
+def test_but_a_kind_it_cannot_offer_for_is_still_told(kind):
+    """There is no button for these, so the page is the only place the way out
+    gets said at all."""
+    assert install.notice(kind, True, offering=True) == \
+        install.instruction(kind)
+
+
+def test_and_a_source_download_is_told_what_pressing_it_would_do():
+    """It can self-update, so the button is there -- but its instruction is
+    not the button's own caption restated. Converting the install is a thing
+    to know before pressing rather than after."""
+    said = install.notice(install.SOURCE, True, offering=True)
+    assert said == install.instruction(install.SOURCE)
+    assert "convert" in said
+
+
 def test_a_kind_nobody_declared_is_named_rather_than_hidden():
     """A route added to the instructions and forgotten here should still
     report something, not silently look like an ordinary release."""

@@ -2158,7 +2158,8 @@ def test_the_update_endpoint_says_what_this_install_is(client):
     # The sentence, already decided: the page renders what it is given rather
     # than working out for itself when there is one to show.
     assert said["notice"] == install.notice(said["kind"],
-                                            bool(said["available"]))
+                                            bool(said["available"]),
+                                            offering=True)
 
 
 def test_an_installed_release_waiting_for_a_restart_is_said(client,
@@ -2182,7 +2183,25 @@ def test_an_installed_release_waiting_for_a_restart_is_said(client,
     assert said["available"] == "9.9.9"
     # But nothing says how to fetch what has already been fetched: the notice
     # is the one for an install with nothing to install.
-    assert said["notice"] == install.notice(said["kind"], False)
+    assert said["notice"] == install.notice(said["kind"], False,
+                                            offering=True)
+
+
+def test_a_release_it_can_install_itself_is_not_also_told_the_command(
+        client, monkeypatch):
+    """The page puts an Update button on this very line, so the sentence
+    beside it would say only what the button already does."""
+    from crossglyph.preview import server
+
+    from crossglyph import install, updates
+
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(1000.0, "9.9.9", None))
+    monkeypatch.setattr(server.install, "detect", lambda root: install.ZIP)
+    said = client.get("/update").json()
+    assert said["available"] == "9.9.9"
+    assert said["can_self_update"] is True
+    assert said["notice"] == ""
 
 
 def test_nothing_is_pending_while_what_runs_is_what_is_current(client,
