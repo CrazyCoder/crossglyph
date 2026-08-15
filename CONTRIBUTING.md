@@ -99,6 +99,32 @@ back.
 Two more rules for that file. Copy an existing wrapper rather than writing one
 from scratch, and never run `dos2unix` or `unix2dos` on one.
 
+## Updating uv
+
+```sh
+uv run tools/bump-uv.py            # to uv's latest release
+uv run tools/bump-uv.py 0.12.4     # to a named one
+uv run tools/bump-uv.py --commit   # and commit the result
+```
+
+The version and its six checksums appear in the wrapper twice, once in each
+half, and a hash copied wrong lands on the one platform nobody bumping it is
+running. The script reads uv's newest tag off the redirect from its releases
+page, takes the SHA-256 that astral publishes beside each archive, and swaps
+those fourteen strings and nothing else. Replacing fixed substrings is what
+keeps the line endings exact, and it refuses to write a file whose two halves
+have come to say different things.
+
+Then it runs the wrapper once, which downloads one archive and checks its hash
+for real. A published checksum cannot do that: it says what the archive should
+hash to, not that the file at that address is the one it describes. `--verify`
+does the same across all six platforms, about 120 MB, and is worth the wait
+before a release.
+
+`--commit` writes `chore(tools): bump uv to <version>` for that path alone, and
+refuses to start if the wrapper already has uncommitted changes, so a bump
+cannot carry an unrelated edit along with it.
+
 ## Making a release
 
 Bump the version in `pyproject.toml`, commit it, then tag and push:
