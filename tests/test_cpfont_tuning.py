@@ -5,7 +5,7 @@ import pytest
 import fontpaths
 
 from crossglyph import cpfont
-from crossglyph.cpfont.tuning import LineHeight, Tuning
+from crossglyph.cpfont.tuning import HINTING, LineHeight, Tuning
 
 SRC = fontpaths.truetype()
 needs_font = pytest.mark.skipif(SRC is None,
@@ -70,6 +70,59 @@ def test_gamma_must_be_positive():
 def test_an_unknown_hinting_mode_is_rejected():
     with pytest.raises(ValueError, match="hinting"):
         Tuning(hinting="subpixel")
+
+
+# --- what FreeType is asked for -------------------------------------------
+
+def _target(flags: int) -> int:
+    """The FT_Render_Mode packed into the FT_LOAD_TARGET_* field."""
+    return (flags >> 16) & 15
+
+
+@pytest.mark.parametrize("mono", [False, True])
+@pytest.mark.parametrize("hinting", HINTING)
+def test_nothing_ever_asks_for_a_subpixel_raster(hinting, mono):
+    """FT_LOAD_TARGET_* is one enum in one four-bit field, not one bit each,
+    so two of them or-ed together are a third mode: LIGHT is 1, MONO is 2, and
+    3 is FT_LOAD_TARGET_LCD. FreeType then returns a subpixel bitmap three
+    times too wide for the advance beside it, and the page is a smear."""
+    import freetype
+
+    assert _target(Tuning(hinting=hinting, mono=mono).load_flags(freetype)) \
+        in (freetype.FT_RENDER_MODE_NORMAL, freetype.FT_RENDER_MODE_LIGHT,
+            freetype.FT_RENDER_MODE_MONO)
+
+
+def test_light_hinting_with_a_bilevel_raster_takes_two_calls():
+    """One field holds the hinting algorithm and the render mode both, so a
+    load can name only one of them. FT_Render_Glyph names the other."""
+    import freetype
+
+    tuning = Tuning(hinting="light", mono=True)
+    assert _target(tuning.load_flags(freetype)) == freetype.FT_RENDER_MODE_LIGHT
+    assert tuning.render_mode(freetype) == freetype.FT_RENDER_MODE_MONO
+    assert not tuning.renders_on_load()
+
+
+@pytest.mark.parametrize("hinting", ["normal", "none", "auto"])
+def test_every_other_pairing_is_one_call(hinting):
+    import freetype
+
+    tuning = Tuning(hinting=hinting, mono=True)
+    assert _target(tuning.load_flags(freetype)) == freetype.FT_RENDER_MODE_MONO
+    assert tuning.renders_on_load()
+
+
+@pytest.mark.parametrize("hinting, flag", [("none", "FT_LOAD_NO_HINTING"),
+                                           ("auto", "FT_LOAD_FORCE_AUTOHINT")])
+def test_a_bilevel_target_does_not_displace_the_hinting_flags(hinting, flag):
+    """These two are bits of their own rather than targets, so they have to
+    survive beside one. Chaining them off the same branch would quietly turn
+    `none` with mono into ordinary hinting."""
+    import freetype
+
+    flags = Tuning(hinting=hinting, mono=True).load_flags(freetype)
+    assert flags & getattr(freetype, flag)
 
 
 def test_as_dict_is_json_stable():

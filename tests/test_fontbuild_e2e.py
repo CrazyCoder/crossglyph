@@ -142,6 +142,35 @@ def test_mono_rasterizing_builds_a_font_with_two_levels():
     assert on_mono <= on_grey, "mono drew a level the four-level palette lacks"
 
 
+def test_mono_rasterizing_survives_light_hinting():
+    """Both switches at once asked FreeType for FT_LOAD_TARGET_LCD, since LIGHT
+    and MONO are 1 and 2 in one four-bit field and 3 is LCD. Every glyph came
+    back a subpixel bitmap three times too wide for its advance, so the letters
+    piled into each other and the page was unreadable, on every face.
+    """
+    import fontpaths
+
+    face = fontpaths.truetype()
+    if face is None:
+        pytest.skip("needs CROSSGLYPH_TEST_FONT")
+
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import build_font
+
+    coverage = ((0x41, 0x7A),)
+    plain = build_font({0: face}, 12, coverage=coverage,
+                       tuning=Tuning(mono=True))
+    light = build_font({0: face}, 12, coverage=coverage,
+                       tuning=Tuning(mono=True, hinting="light"))
+
+    levels = _greys_on_page(light)
+    assert len(levels) == 2, f"a mono build drew midtones: {sorted(levels)}"
+    # Same glyphs at the same size, so a build carrying three times the pixels
+    # is the LCD bitmap and nothing else.
+    assert len(light) < 2 * len(plain)
+    assert light != plain, "light hinting changed nothing under mono"
+
+
 def test_mono_rasterizing_is_not_the_thresholds_in_disguise():
     """Thresholding coverage to two levels is what the device already does with
     anti-aliasing off, and it is the thing mono is meant to beat. Pushing every

@@ -296,6 +296,16 @@ of 26 lowercase advances move and the text sets to different lines. `gamma` and
 the thresholds have nothing to act on while it is on, and the preview greys
 them.
 
+It combines with every hinting mode, but `light` is a special case worth
+knowing about. FreeType carries the hinting algorithm and the raster in the
+same field, so asking for both in one call is not possible: a glyph is loaded
+under light hinting and then rasterized bilevel in a second step. Light
+hinting fits vertically only, on purpose, so the stems it leaves are not on
+the pixel grid sideways. Made bilevel they come out a pixel wider here and
+narrower there, where `hinting = normal` with `mono` gives you stems of one
+width. That is a look, not a fault, and the two are worth comparing on a face
+before choosing.
+
 ## Line spacing
 
 Line pitch is stored in the font, not decided on the device. `getLineHeight()`

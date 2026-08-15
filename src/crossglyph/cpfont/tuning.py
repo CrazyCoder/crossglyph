@@ -195,22 +195,49 @@ class Tuning:
     def load_flags(self, freetype) -> int:
         """FreeType load flags, without FT_LOAD_RENDER.
 
-        The caller adds that itself, and omits it when it has to embolden the
-        outline before rendering.
+        The caller adds that itself, and omits it when the outline has work to
+        do first, or when the raster it wants is not the one this asks for --
+        see renders_on_load().
         """
         flags = freetype.FT_LOAD_NO_BITMAP
-        # Sets the hinting target and the render mode together: FreeType reads
-        # both from FT_LOAD_TARGET_MODE, so the glyph is fitted for a bilevel
-        # grid and then rasterized onto one.
-        if self.mono:
-            flags |= freetype.FT_LOAD_TARGET_MONO
+        # FT_LOAD_TARGET_* is one enum in bits 16-19, not one bit each:
+        # FT_LOAD_TARGET_(x) is (x & 15) << 16 over FT_Render_Mode, where LIGHT
+        # is 1 and MONO is 2. So two of them or-ed together are a third mode --
+        # LIGHT|MONO asks for 3, which is FT_LOAD_TARGET_LCD, and FreeType duly
+        # returns a subpixel bitmap three times too wide for the advance beside
+        # it. Only one of these may be set.
+        #
+        # Light wins it, because it is the only one of the two that a load can
+        # express: it names the hinting algorithm, while a bilevel raster is
+        # something FT_Render_Glyph can be asked for afterwards.
         if self.hinting == "light":
             flags |= freetype.FT_LOAD_TARGET_LIGHT
-        elif self.hinting == "none":
+        elif self.mono:
+            # Fitted for a bilevel grid, and rasterized onto one by the same
+            # call: FreeType reads the render mode from the target too.
+            flags |= freetype.FT_LOAD_TARGET_MONO
+        # These two are bits of their own rather than targets, so they stand
+        # beside whichever target was chosen above.
+        if self.hinting == "none":
             flags |= freetype.FT_LOAD_NO_HINTING
         elif self.hinting == "auto":
             flags |= freetype.FT_LOAD_FORCE_AUTOHINT
         return flags
+
+    def render_mode(self, freetype) -> int:
+        """The raster to ask FT_Render_Glyph for."""
+        return (freetype.FT_RENDER_MODE_MONO if self.mono
+                else freetype.FT_RENDER_MODE_NORMAL)
+
+    def renders_on_load(self) -> bool:
+        """Whether FT_LOAD_RENDER would give the raster render_mode names.
+
+        It would not for light hinting with a bilevel raster: one field holds
+        the hinting algorithm and the render mode both, load_flags has spent
+        it on the algorithm, and a glyph loaded that way renders grey. Two
+        calls say what one cannot.
+        """
+        return not (self.mono and self.hinting == "light")
 
     def as_dict(self) -> dict:
         """JSON-stable form, for the build stamp and the preview API.

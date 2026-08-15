@@ -905,10 +905,14 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     if force_autohint:
         load_flags |= freetype.FT_LOAD_FORCE_AUTOHINT
     # Emboldening needs the outline, which FT_LOAD_RENDER would have consumed,
-    # so that flag is added only when there is no outline work to do.
+    # so that flag is added only when there is no outline work to do -- and
+    # only when the load can ask for the raster that is wanted, which light
+    # hinting with a bilevel one cannot.
     embolden = round(tuning.weight * 64)
-    if not embolden:
+    two_step = bool(embolden) or not tuning.renders_on_load()
+    if not two_step:
         load_flags |= freetype.FT_LOAD_RENDER
+    render_mode = tuning.render_mode(freetype)
 
     aa_thresholds = tuning.thresholds
     lut = tuning.coverage_lut()
@@ -945,7 +949,6 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             if embolden:
                 # FORK: FT_Outline_Embolden fattens the outline without moving
                 # linearHoriAdvance, so text gets heavier at unchanged spacing.
-                # Rendering is ours to do, since FT_LOAD_RENDER was withheld.
                 #
                 # byref, and it segfaults without it. The function takes an
                 # FT_Outline*, and freetype-py declares no argtypes for it, so
@@ -959,10 +962,10 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 freetype.FT_Outline_Embolden(
                     freetype.byref(target_face.glyph.outline._FT_Outline),
                     embolden)
-                freetype.FT_Render_Glyph(
-                    target_face.glyph._FT_GlyphSlot,
-                    freetype.FT_RENDER_MODE_MONO if tuning.mono
-                    else freetype.FT_RENDER_MODE_NORMAL)
+            if two_step:
+                # FT_LOAD_RENDER was withheld, so rendering is ours to do.
+                freetype.FT_Render_Glyph(target_face.glyph._FT_GlyphSlot,
+                                         render_mode)
             return target_face
         return None
 
