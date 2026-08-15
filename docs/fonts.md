@@ -65,7 +65,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `mod_suffix` | `Mod` | suffix for that second family |
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
-| `fallbacks` | `yes` | append the twelve bundled Noto faces |
+| `fallbacks` | `yes` | append the twelve bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
@@ -104,7 +104,9 @@ way to keep two lists apart.
 Two sizes are special. The built-in interface fonts render at 8, 10 and 12 pt,
 and CJK text in the interface is drawn by borrowing the selected family at the
 matching size. A CJK family therefore wants `sizes = 8 10 12 14 16 18`, or book
-titles keep showing boxes. For Latin and Cyrillic this does not apply.
+titles keep showing boxes. For Latin and Cyrillic this does not apply. The
+website appends those two sizes to a CJK build for you; here they are yours to
+list, since a size list of any length is yours to write.
 
 ### Fractional point sizes
 
@@ -235,9 +237,9 @@ already produced rather than changing it:
 | `4 8 12` (default) | 6.03 | 2950 | 608 | 414 | 1866 |
 | `3 6 10` (the built-in fonts') | 6.03 | 2866 | 234 | 689 | 2049 |
 
-`weight`, `slant`, `hinting` and `stem_darkening` act earlier, on the outline
-and on how FreeType fits it to the pixel grid, so they change the coverage the
-quantizer then sees. Two of them are worth a note.
+`weight`, `slant`, `hinting`, `grayscale_hinting` and `stem_darkening` act
+earlier, on the outline and on how FreeType fits it to the pixel grid, so they
+change the coverage the quantizer then sees. Three of them are worth a note.
 
 `weight` uses `FT_Outline_Embolden`, which fattens the outline without moving
 the advance width. Text gets heavier at unchanged spacing, which is right at
@@ -260,6 +262,23 @@ the switch when the pair you have chosen is one of the cases that cannot move.
 It leaves the rest alone rather than promising anything, because a CFF face
 whose stems fall where the darkening curve rounds to nothing is unmoved as
 well, and nothing short of rasterizing both ways would know.
+
+`grayscale_hinting` chooses which of FreeType's two TrueType bytecode
+interpreters runs a font's own hinting. The default is version 40, which
+FreeType calls roughly equivalent to DirectWrite ClearType and which hints
+vertically only, since on a subpixel display snapping a stem sideways costs
+more than it buys. Version 35 fits both axes, and FreeType documents it as
+supporting grayscale and black and white rasterizing only, which is exactly
+what this device has. A stem then lands on a pixel instead of straddling two
+and being drawn twice in grey. Measured over 303 hinted faces it leaves 3.8%
+fewer midtone pixels, and a third fewer on a face like DejaVu.
+
+It is narrow in the same way `stem_darkening` is, and for a different reason:
+it reaches a face only while that face's own bytecode is what draws it. A CFF
+family has none, a TrueType family with no glyph instructions goes to the
+auto-hinter anyway, and so does any family under `light`, `auto` or `none`. So
+it is a `hinting = normal` control, on a TrueType face, and the preview greys
+the row everywhere else.
 
 `mono` changes what a pixel is decided by. Normally the converter takes
 FreeType's coverage and cuts it at the three thresholds, and the reader with
@@ -524,13 +543,28 @@ that:
 | path | `lib/EpdFont/scripts/` | `scripts/font-builder/` | forked from the website's |
 | base coverage | none implicit | `base` always injected | as the website |
 | presets | `ascii`, `latin1`, `cjk`, `builtin`, `punctuation` | `default`, `arabic`, `thai`, `bengali`, `cjk-sc`, `cjk-tc`, `cjk-jp` | as the website |
-| fallbacks | one per style | two user families and twelve bundled Noto | as the website, plus the space font |
-| rendering controls | `--force-autohint`, `--pnum` | `--darken-aa`, `--force-autohint` | gamma, thresholds, weight, slant, hinting, stem darkening |
+| fallbacks | one per style | two user families and twelve bundled Noto | as the website, plus the space font and the pan-CJK face on demand |
+| sizes | whole points | four whole points, with 8 and 10 appended to a CJK build | as many as you like, `13.5` included, and a second family at other sizes |
+| variable fonts | the file's default instance | the file's default instance | the instance the designer named for the slot, `opsz` following the size, coordinates pinnable per slot |
+| quantizer | fixed | `--darken-aa`, one darker preset | `gamma` and all three `thresholds` |
+| outline and pixel grid | `--force-autohint` | `--force-autohint` | `weight`, `slant`, `hinting` in four modes, `grayscale_hinting`, `mono`, `stem_darkening` |
+| metrics | the font's own | the font's own | `line_height` in three units, `letter_spacing`, `word_spacing` |
+| pair tables | always on | always on | `kerning` as a factor, `ligatures` off, `figures = proportional` |
+
+The fourteen in the last four rows are what the fork is for. One of them came
+from upstream and the rest are new here: `figures` is the firmware's `--pnum`,
+and that flag sits in the script for the built-in fonts, not in the SD card
+script the other two columns are, so the website never had it either.
 
 With default settings the fork produces byte identical output to the website's.
-It exists to add the rendering controls above, which upstream has no place for.
-`figures = proportional` is the one control that came from the firmware's own
-converter (`--pnum`) rather than the website's.
+
+The converter is one layer of this. Everything the workspace puts around it is
+also ours: [config files with shared defaults](#allconf-the-shared-defaults),
+[discovery rules the website's picker does not have](#auto-discovery),
+[the fixed width spaces](#the-fixed-width-spaces),
+[content-hashed rebuild stamps and a process per size](#rebuilds), and the
+[preview](preview.md), which draws a page with the firmware's own renderer
+while you move a knob.
 
 `uv run tools/refresh_cpfont.py` pulls upstream and prints a diff to merge by
 hand. It never overwrites, since the fork has diverged deliberately.

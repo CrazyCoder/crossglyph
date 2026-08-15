@@ -6,8 +6,11 @@ commit: 759ce9a26993f9c969211859a6218aa755e5803e
 
 MIT, Copyright (c) 2025 SoFriendly.
 
-This is a fork, not a vendored copy: crossglyph adds rasterization knobs upstream
-does not have (gamma, AA thresholds, weight, slant, hinting, stem darkening).
+This is a fork, not a vendored copy. crossglyph adds fourteen knobs upstream does
+not have: gamma, AA thresholds, weight, slant, hinting, grayscale hinting, mono
+rasterizing, stem darkening, line height, letter and word spacing, kerning as a
+factor, ligatures and proportional figures. It also rasterizes a variable font
+at a chosen instance, where upstream takes the file's default.
 `uv run tools/refresh_cpfont.py` fetches upstream and shows a diff against the
 fork so changes can be merged by hand. Do not overwrite.
 

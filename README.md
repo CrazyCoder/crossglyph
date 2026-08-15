@@ -24,8 +24,9 @@ the point size.
 - fourteen rasterizing controls: size, weight, slant, hinting mode, grayscale
   hinting, stem darkening, gamma, the three grey thresholds, line height,
   letter and word spacing, kerning strength, ligatures, proportional figures
-- four page controls: hyphenation, paragraph spacing, anti-aliasing and night
-  mode
+- eight page controls, so the page you judge is set up like the device you are
+  judging for: margin, alignment, line spacing, hyphenation and the language
+  its patterns come from, paragraph spacing, anti-aliasing and night mode
 - four sizes of a four-style family, 795 glyphs each with kerning, built in
   about a second, one process per size
 - twelve Noto faces on request, so a missing arrow or Greek letter is not a
