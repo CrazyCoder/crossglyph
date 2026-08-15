@@ -76,7 +76,7 @@ reports is what is actually serving:
 
 ```
 preview on http://127.0.0.1:8000
-  pid 41288, crossglyph 0.2.1, up 2h
+  pid 41288, crossglyph X.Y.Z, up 2h
   fonts /home/you/crossglyph/fonts
   log /home/you/crossglyph/preview.log
 ```
@@ -107,7 +107,7 @@ to run at the moment it starts one. So `crossglyph update` and then
 Between the two, `status` says so as well:
 
 ```
-  0.1.3 is installed; a restart would run it
+  X.Y.Z is installed; a restart would run it
 ```
 
 Starting one that is already running is not an error: it says where it is and

@@ -135,10 +135,11 @@ cannot carry an unrelated edit along with it.
 
 ## Making a release
 
-Bump the version in `pyproject.toml`, commit it, then tag and push:
+Bump the version in `pyproject.toml`, commit it, then tag and push. `X.Y.Z` in
+this command stands for the version just set:
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 The workflow does the rest: it checks that the tag and the version agree,
