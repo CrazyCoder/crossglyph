@@ -10,13 +10,14 @@ import argparse
 import contextlib
 import functools
 import io
+import ipaddress
 import json
 import os
 import pathlib
 import sys
 
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import FileResponse, Response, StreamingResponse
     from pydantic import BaseModel, Field
 except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
@@ -1066,6 +1067,10 @@ def _about(asked: bool = False) -> dict:
     pending = live if live and live != running else None
     return {"version": running,
             "firmware": stamp.build_stamp(),
+            # Which workspace this one is serving, since --fonts and
+            # $CROSSGLYPH_FONTS both move it and a background server is not
+            # somewhere you can see the command that started it.
+            "workspace": str(fontbuild.SOURCE_DIR),
             # Sent rather than written into the page, so the link and the
             # place the updater fetches from cannot come to disagree.
             "home": updates.HOME,
@@ -1122,6 +1127,49 @@ def _startup(root: pathlib.Path) -> None:
     """
     updates.check(root)
     layout.tidy(root, updateconf.settings(root).keep_versions)
+
+
+#: The running uvicorn, so /shutdown has something to ask. Set by main(),
+#: which is why it is None under the test client and in --png runs.
+_server = None
+
+
+def _loopback(client: str) -> bool:
+    try:
+        return ipaddress.ip_address(client).is_loopback
+    except ValueError:
+        return False
+
+
+@app.post("/shutdown")
+def shutdown(request: Request) -> dict:
+    """Stop serving, which is how `crossglyph stop` stops this.
+
+    Loopback only, and no token. A token could not do the job anyway: a
+    browser on another machine can only learn one if the page carries it, and
+    a page that carries it hands it to everyone who can load the page. Where
+    the request comes from is a fact the server already has, so a preview
+    bound to 0.0.0.0 serves its pages to the network and takes this from
+    nobody but the machine it runs on.
+
+    An endpoint rather than a signal because of Windows: a detached child has
+    no console for a Ctrl+Break to reach it through, and everything else
+    there is a kill rather than a shutdown.
+    """
+    client = request.client.host if request.client else ""
+    if not _loopback(client):
+        raise HTTPException(
+            status_code=403,
+            detail="the preview only takes a shutdown from the machine it "
+                   "runs on")
+    if _server is None:
+        raise HTTPException(
+            status_code=409,
+            detail="this preview was not started as a server")
+    # uvicorn finishes the response and then leaves its loop, so the answer to
+    # this request is the last thing it serves.
+    _server.should_exit = True
+    return {"stopping": True}
 
 
 @app.post("/update")
@@ -1384,11 +1432,24 @@ def main(argv=None) -> int:
                         help="point size for --png (default: %(default)s)")
     parser.add_argument("--png", metavar="PATH",
                         help="write one page and exit, instead of serving")
+    parser.add_argument("--fonts", default=None,
+                        help=f"the workspace to read families from "
+                             f"(default: {fontbuild.SOURCE_DIR}, or "
+                             f"$CROSSGLYPH_FONTS)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-open", dest="open_browser", action="store_false",
                         help="serve without opening a browser")
     opts = parser.parse_args(argv)
+
+    if opts.fonts:
+        # The module attribute rather than a value threaded through: every
+        # reader here looks it up on fontbuild at the time it asks, which is
+        # what lets the picker, a build and a save all follow one move.
+        fontbuild.SOURCE_DIR = pathlib.Path(opts.fonts).expanduser().resolve()
+        if not fontbuild.SOURCE_DIR.is_dir():
+            print(f"no such workspace: {opts.fonts}", file=sys.stderr)
+            return 2
 
     if not opts.font and not opts.family:
         opts.family = _first_family()
@@ -1460,5 +1521,10 @@ def main(argv=None) -> int:
         # On a timer, so the browser asks for the page after uvicorn is
         # listening rather than racing it.
         threading.Timer(0.5, webbrowser.open, [address]).start()
-    uvicorn.run(app, host=opts.host, port=opts.port, log_level="warning")
+    # Config and Server rather than uvicorn.run, which is the two of them and
+    # keeps neither: /shutdown needs the object to ask.
+    global _server
+    _server = uvicorn.Server(uvicorn.Config(
+        app, host=opts.host, port=opts.port, log_level="warning"))
+    _server.run()
     return 0

@@ -12,8 +12,13 @@
 ./crossglyph.sh preview --family notosans  # a family by name
 ./crossglyph.sh preview --font one.ttf     # a file that is in no family
 ./crossglyph.sh preview --no-open --host 0.0.0.0          # for a container
+./crossglyph.sh preview --fonts ~/other-fonts             # another workspace
 ./crossglyph.sh preview --family notosans --png page.png  # one page, no server
 ```
+
+`--fonts` is the same flag `build` takes and answers the same question: which
+folder holds the families. Unset, it is `$CROSSGLYPH_FONTS`, and unset again
+it is the `fonts` folder beside the launcher.
 
 `--family` takes a name from the workspace and resolves the four faces exactly
 as a build does: from the family's own `.conf` if it has one, from `all.conf`
@@ -46,6 +51,65 @@ a change to the source needs a restart. On Windows, free the port first:
 Get-NetTCPConnection -LocalPort 8000 -State Listen |
   ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
+
+## In the background
+
+Tuning a font is a thing you come back to for days, and the terminal window
+that is holding the server open is doing nothing else. So it can run without
+one:
+
+```sh
+./crossglyph.sh start                 # start it, and open a browser on it
+./crossglyph.sh start --port 8123 --no-open
+./crossglyph.sh status                # what is running, and which version
+./crossglyph.sh restart               # same address, same family
+./crossglyph.sh stop
+```
+
+`start` takes every option `preview` takes, so `--family`, `--font`, `--host`
+and `--port` mean the same things. It waits for the page to answer before it
+says anything, so a start that failed says so here rather than opening a
+browser on nothing, and the reason is in `preview.log` beside the launcher.
+
+`status` asks the server rather than guessing from a process list, so what it
+reports is what is actually serving:
+
+```
+preview on http://127.0.0.1:8000
+  pid 41288, crossglyph 0.1.2, up 2h
+  fonts /home/you/crossglyph/fonts
+  log /home/you/crossglyph/preview.log
+```
+
+The workspace comes from the server rather than from what was typed, since
+`--fonts` and `$CROSSGLYPH_FONTS` both move it and a background process is not
+somewhere you can read the command back.
+
+`restart` takes what it is not told from the start it replaces: bare, it comes
+back on the same address showing the same family, and `restart --port 9000`
+moves only the port. It also picks up an update, since it resolves the version
+to run at the moment it starts one. So `crossglyph update` and then
+`crossglyph restart` is the whole of installing a release and running it, and
+`status` names the version afterwards so there is no doubt which one answered.
+Between the two, `status` says so as well:
+
+```
+  0.1.3 is installed; a restart would run it
+```
+
+Starting one that is already running is not an error: it says where it is and
+opens the browser, which is what you asked for. It refuses only when something
+that is not CrossGlyph holds the port, or when a preview is running on a
+different address than the one you named.
+
+Stopping goes through the server rather than a signal, because Windows has
+neither a SIGTERM nor a console for a detached process to receive Ctrl+Break
+through. `POST /shutdown` is that request, and it answers a loopback client
+only: a preview on `--host 0.0.0.0` serves its pages to the network and takes
+a shutdown from nobody but the machine it runs on. There is no token, because
+a token cannot help here. A browser elsewhere could only learn one if the page
+carried it, and a page that carries it hands it to everyone who can load the
+page.
 
 ## What the controls do
 

@@ -1713,10 +1713,19 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
     from crossglyph.preview import server
 
     served = {}
-    monkeypatch.setattr("uvicorn.run",
-                        lambda app, **kw: served.update(kw))
+
+    class Uvicorn:
+        """uvicorn.Server, which main() builds itself so /shutdown can ask it."""
+
+        def __init__(self, config):
+            served["config"] = config
+
+        def run(self):
+            served["ran"] = True
+
+    monkeypatch.setattr("uvicorn.Server", Uvicorn)
     assert server.main(["--no-open"]) == 0
-    assert served["host"] == "127.0.0.1"
+    assert served["ran"] and served["config"].host == "127.0.0.1"
     assert server._family in {"Probe", "Filler"}
 
 

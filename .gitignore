@@ -21,3 +21,8 @@ fonts/conf/*
 # repo, so without this it turns up in git status and, worse, in the release:
 # a shipped state file would tell a fresh install it had already checked.
 .update-state.json
+
+# The same, for a preview started in the background: where it is listening,
+# and what it printed while it ran.
+.preview-state.json
+preview.log

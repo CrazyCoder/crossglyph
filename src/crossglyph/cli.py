@@ -7,9 +7,13 @@ import sys
 from . import install, layout, updateconf, updates, upgrade, version
 from .render import stamp
 
-USAGE = """usage: crossglyph [preview|build|fetch-fallbacks|update] [options]
+USAGE = """usage: crossglyph [preview|start|build|fetch-fallbacks|update] [options]
 
   preview            tune a font against the device's own renderer (default)
+  start              the same, in the background, and open a browser on it
+  stop               stop the background preview
+  status             say whether one is running, and which version
+  restart            stop and start again, on whatever version is current
   build              build .cpfont families from the workspace
   fetch-fallbacks    download the bundled Noto faces and build nothing
   update             install the newest release
@@ -28,6 +32,9 @@ NO_CHECK_FLAG = "--no-update-check"
 #: for these and not for --help or --version: those answer without doing
 #: anything, and a diagnostic that deletes a directory is a surprise.
 TIDIES = ("build", "fetch-fallbacks", "update")
+
+#: The background commands, all of which are one module's business.
+SERVICE = ("start", "stop", "status", "restart")
 
 
 def _preview(argv: list[str]) -> int:
@@ -196,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "preview":
         return _preview(rest)
+    if command in SERVICE:
+        # Imported here for the reason _preview is: the background commands
+        # talk to a server over HTTP and never load one.
+        from . import daemon
+        return _checked(daemon.main(command, rest), quiet)
     # Before the work rather than after it, so a build that fails still leaves
     # the install tidy, and so it is never tied to the update-check flags:
     # retention is housekeeping and not a check. The preview does the same on
