@@ -1,14 +1,15 @@
 name: test
 
-# Off for now, and runnable from the Actions tab while the first release is
-# being shaken out. Turning it on is two edits: uncomment the triggers below,
-# and add `needs: test` to the release job in release.yml, so a tag cannot
-# publish something the suite has not passed.
+# release.yml runs this through workflow_call, so a tag cannot publish
+# something the suite has not passed. It has to be a call and not a
+# dependency: `needs` only names jobs within one workflow, so a release job
+# cannot wait on a job declared over here.
 on:
+  push:
+    branches: [master]
+  pull_request:
   workflow_dispatch:
-  # push:
-  #   branches: [master]
-  # pull_request:
+  workflow_call:
 
 jobs:
   test:

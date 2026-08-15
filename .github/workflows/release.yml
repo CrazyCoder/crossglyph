@@ -10,7 +10,14 @@ permissions:
   id-token: write        # what deploy-pages authenticates with
 
 jobs:
+  # The gate. A tag is the one push nobody reviews, and it is the one that
+  # reaches other people, so the suite runs against both platforms before
+  # anything is built or published.
+  test:
+    uses: ./.github/workflows/test.yml
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

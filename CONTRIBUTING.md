@@ -147,10 +147,16 @@ disagrees with `pyproject.toml` fails the run rather than shipping a release
 that misdescribes itself.
 
 A second workflow, `test.yml`, runs the suite and the page against Ubuntu and
-Windows. It is off while the first release is being shaken out, so only the
-Actions tab starts it. Turning it on is two edits: uncomment the triggers at
-the top of that file, and add `needs: test` to the release job, after which a
-tag cannot publish what the suite has not passed.
+Windows on every push and pull request. The release calls it before it builds
+anything, so a tag cannot publish what the suite has not passed. That is a
+`workflow_call` rather than a `needs:` on the job over there, because `needs`
+only names jobs inside one workflow.
+
+It drives the pinned uv through `tools/uv.cmd`, so each run verifies that
+checksum on both platforms and tests on the interpreter `.python-version`
+names. Two steps guard what the suite cannot say for itself: the wrappers keep
+their line endings, and the faces the rendering tests need are present, since
+a third of the suite skips without them and says nothing while doing it.
 
 To build one locally without releasing it:
 
