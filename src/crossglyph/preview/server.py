@@ -1448,13 +1448,14 @@ def main(argv=None) -> int:
     opts = parser.parse_args(argv)
 
     if opts.fonts:
+        workspace = pathlib.Path(opts.fonts).expanduser().resolve()
+        if not workspace.is_dir():
+            print(f"no such workspace: {opts.fonts}", file=sys.stderr)
+            return 2
         # The module attribute rather than a value threaded through: every
         # reader here looks it up on fontbuild at the time it asks, which is
         # what lets the picker, a build and a save all follow one move.
-        fontbuild.SOURCE_DIR = pathlib.Path(opts.fonts).expanduser().resolve()
-        if not fontbuild.SOURCE_DIR.is_dir():
-            print(f"no such workspace: {opts.fonts}", file=sys.stderr)
-            return 2
+        fontbuild.SOURCE_DIR = workspace
 
     if not opts.font and not opts.family:
         opts.family = _first_family()
