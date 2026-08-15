@@ -5,6 +5,7 @@ on:
 
 env:
   CANDIDATE_IMAGE: ghcr.io/crazycoder/crossglyph-testing:candidate-${{ github.sha }}
+  BOOTSTRAP_IMAGE: ghcr.io/crazycoder/crossglyph-testing:bootstrap
 
 jobs:
   test:
@@ -32,6 +33,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A source label on the first image links the package to this public
+      # repository while GHCR creates it. Seed it without that label, prove
+      # anonymous clients cannot read it, then publish the real candidate.
+      - name: Bootstrap the private package
+        shell: bash
+        run: |
+          directory="$(mktemp -d)"
+          trap 'rm -rf "$directory"' EXIT
+          printf 'private CrossGlyph candidate package\n' >"$directory/marker"
+          printf 'FROM scratch\nCOPY marker /crossglyph-private-candidate\n' \
+            >"$directory/Dockerfile"
+          docker buildx build --platform linux/amd64 --push \
+            --tag "$BOOTSTRAP_IMAGE" "$directory"
+
+      - name: Refuse a public bootstrap package
+        shell: bash
+        run: |
+          credentials="$(mktemp -d)"
+          trap 'rm -rf "$credentials"' EXIT
+          if DOCKER_CONFIG="$credentials" \
+            docker manifest inspect "$BOOTSTRAP_IMAGE" >/dev/null 2>&1; then
+            echo "::error::crossglyph-testing is public; delete the package before publishing a candidate"
+            exit 1
+          fi
+
       - name: Push the private candidate
         uses: docker/build-push-action@v6
         with:
@@ -46,6 +72,17 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+
+      - name: Refuse a public candidate package
+        shell: bash
+        run: |
+          credentials="$(mktemp -d)"
+          trap 'rm -rf "$credentials"' EXIT
+          if DOCKER_CONFIG="$credentials" \
+            docker manifest inspect "$CANDIDATE_IMAGE" >/dev/null 2>&1; then
+            echo "::error::crossglyph-testing became public while linking the source repository"
+            exit 1
+          fi
 
       - name: Verify the remote manifest
         shell: bash
