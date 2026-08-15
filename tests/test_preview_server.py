@@ -124,6 +124,14 @@ def test_the_family_list_is_read_from_the_folder_every_time(client,
     assert "Newcomer" in named()
 
 
+def test_the_folder_listing_is_not_something_a_browser_may_keep(client,
+                                                                two_families):
+    """The page asks this again precisely because the answer changes. A copy
+    held from before a font arrived would go on answering the old way through
+    every reload, which is the page's own modules' problem and the same fix."""
+    assert client.get("/defaults").headers["cache-control"] == "no-store"
+
+
 def test_a_config_edited_by_hand_reaches_the_next_render(client, two_families):
     """What a family resolves to *is* remembered, and it is what the next page
     is drawn with. Left cached, an edit in an editor shows in the picker while

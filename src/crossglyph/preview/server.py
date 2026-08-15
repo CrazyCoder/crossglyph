@@ -18,7 +18,8 @@ import sys
 
 try:
     from fastapi import FastAPI, HTTPException, Request
-    from fastapi.responses import FileResponse, Response, StreamingResponse
+    from fastapi.responses import (FileResponse, JSONResponse, Response,
+                                   StreamingResponse)
     from pydantic import BaseModel, Field
 except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
     raise SystemExit(
@@ -1001,7 +1002,7 @@ def save(request: SaveRequest) -> dict:
 
 
 @app.get("/defaults")
-def defaults() -> dict:
+def defaults() -> JSONResponse:
     """What the page starts from, so the sample text lives in one place.
 
     `families` is the picker's list and `family` the entry to select. When the
@@ -1012,7 +1013,7 @@ def defaults() -> dict:
     a font dropped into the folder, or a config edited beside it, is noticed.
     """
     rescan()
-    return {"text": SAMPLE_TEXT,
+    payload = {"text": SAMPLE_TEXT,
             # Every preset, in picker order, so switching between them is a
             # dropdown rather than a round trip. The page picks one of these
             # from the browser's own languages the first time it is opened.
@@ -1043,6 +1044,11 @@ def defaults() -> dict:
             "faces": sorted(FACE_NAMES[style] for style in _sources),
             "families": families(),
             "family": _family}
+    # Explicitly uncacheable, like the page and its modules: this is the
+    # answer to "what is in the folder", the page asks it again precisely
+    # because that changes, and a browser holding a copy from before a font
+    # arrived would keep answering the old way through every reload.
+    return JSONResponse(payload, headers=NO_STORE)
 
 
 def _about(asked: bool = False) -> dict:

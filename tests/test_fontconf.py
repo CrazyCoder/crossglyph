@@ -133,6 +133,19 @@ def test_a_family_split_across_folders_is_still_one_family(tmp_path):
     assert set(styles) >= {"regular", "bold", "italic"}
 
 
+def test_the_bundled_fallbacks_are_not_families_of_their_own(tmp_path):
+    """The twelve Noto faces a fetch puts in `fallbacks` fill holes in other
+    families. Walked as sources, they turn a picker of your own fonts into a
+    list with NotoSansTifinagh and NotoEmoji in it, which is what recursion
+    did the first time it shipped."""
+    bundled = tmp_path / "fallbacks"
+    bundled.mkdir()
+    _touch(bundled, "NotoSans-Regular.ttf", "NotoSansTifinagh-Regular.ttf",
+           "NotoEmoji-Regular.ttf")
+    _touch(tmp_path, *ALTO)
+    assert set(fontconf.discover_families(tmp_path)) == {"Alto"}
+
+
 @pytest.mark.parametrize("folder", ["conf", "cpfonts", ".git"])
 def test_the_folders_that_are_not_sources_are_not_walked(tmp_path, folder):
     """conf holds configs, cpfonts holds builds, and a dot folder is somebody

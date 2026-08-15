@@ -434,13 +434,20 @@ def _short_style(stem: str, wanted: str) -> str | None:
     return None
 
 
-#: Folders a walk does not enter. `conf` holds configs and `cpfonts` is where
-#: builds land, so neither has a source face in it; a dot folder is somebody
-#: else's business. Named rather than resolved, because an `out` pointed
-#: somewhere else still holds no fonts -- .cpfont is not a font suffix, so
-#: walking a build folder finds nothing either way and this only saves the
-#: walking.
-SKIP_DIRS = ("conf", "cpfonts")
+#: Folders a walk does not enter, and the one place recursion has to be told
+#: rather than left to work it out.
+#:
+#: `fallbacks` is the load-bearing one: it holds the twelve Noto faces a fetch
+#: puts there to fill holes in *other* families, and they are not families to
+#: build. Walked, they turn a picker of your fonts into a list with
+#: NotoSansTifinagh in it. `conf` holds configs and `cpfonts` holds builds, so
+#: neither has a source face; a dot folder is somebody else's business.
+#:
+#: Named rather than resolved, which is exact for the first three -- we create
+#: all of them -- and leaves one gap: `fallback_dir` in all.conf can point a
+#: set somewhere else. Pointed outside the workspace, which is what that key is
+#: for, it is never walked anyway.
+SKIP_DIRS = ("conf", "cpfonts", "fallbacks")
 
 
 def font_files(directory: pathlib.Path) -> list[pathlib.Path]:
