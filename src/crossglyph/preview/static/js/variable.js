@@ -212,8 +212,8 @@ export function refreshFamilies(d) {
 
   if (JSON.stringify(before && before.tuning)
       === JSON.stringify(entry.tuning)) {
-    // The knobs are still what the file has, but something else about the
-    // family did move: most often the file behind a slot was replaced. Re-show
+    // The file's tuning did not move, but something else about the family did:
+    // most often the file behind a slot was replaced. Re-show
     // what is read off the font, and draw again, because the page in front of
     // you was drawn with the face as it was. Not showExport -- it writes into
     // fields you may have typed in, which have nowhere else to live either.
