@@ -85,6 +85,21 @@ def test_stop_kills_a_preview_that_is_not_answering(tmp_path, monkeypatch):
     assert not daemon.state_path(tmp_path).exists()
 
 
+def test_a_kill_that_did_not_free_the_port_keeps_the_state(tmp_path,
+                                                           monkeypatch):
+    """Something is still serving there, and dropping the state would leave no
+    command able to name it: the next one would say nothing is running."""
+    monkeypatch.setattr(daemon, "STOP_TIMEOUT", 0.0)
+    monkeypatch.setattr(daemon.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(daemon, "alive", lambda pid: True)
+    monkeypatch.setattr(daemon, "terminate", lambda pid: None)
+    monkeypatch.setattr(daemon, "probe", lambda *a, **k: {"version": "0.1.2"})
+    monkeypatch.setattr(daemon, "ask", lambda *a, **k: None)
+    daemon.save(tmp_path, a_state(pid=4321))
+    assert daemon.stop(tmp_path) == 1
+    assert daemon.load(tmp_path).pid == 4321
+
+
 def test_status_says_a_preview_is_wedged_rather_than_gone(tmp_path, capsys,
                                                           monkeypatch):
     monkeypatch.setattr(daemon, "alive", lambda pid: True)
@@ -217,7 +232,7 @@ def test_a_foreground_page_render_has_nothing_to_shut_down():
 
 
 @needs_wasm
-def test_a_real_server_starts_reports_and_stops(tmp_path, monkeypatch):
+def test_a_real_server_starts_reports_and_stops(tmp_path, capsys, monkeypatch):
     """The one test that spawns the thing, since that is the feature.
 
     Runs against the checkout rather than a release, so `command()` resolves
@@ -236,6 +251,7 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, monkeypatch):
     daemon.settle(opts, None)
 
     assert daemon.start(REPO, opts) == 0
+    said = capsys.readouterr().out
     try:
         state, body = daemon.look(REPO)
         assert state.port == port
@@ -244,6 +260,9 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, monkeypatch):
         # venv python is a trampoline, so those differ and killing the wrong
         # one would leave the port held.
         assert state.pid == body["pid"] and daemon.alive(state.pid)
+        # And the one the start printed, or `status` names a different process
+        # a moment later and neither line can be trusted.
+        assert f"pid {state.pid}" in said
         assert daemon.status(REPO) == 0
     finally:
         assert daemon.stop(REPO) == 0

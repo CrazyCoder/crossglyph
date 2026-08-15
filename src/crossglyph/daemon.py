@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import functools
 import json
 import os
 import pathlib
@@ -157,6 +158,31 @@ def taken(host: str, port: int) -> bool:
         return False
 
 
+QUERY_LIMITED_INFORMATION = 0x1000
+STILL_ACTIVE = 259
+
+
+@functools.cache
+def _kernel32():
+    """kernel32, with the signatures of what is called on it spelled out.
+
+    Not `ctypes.windll.kernel32`, which is one object shared by everything in
+    the process: a restype set on it is set for every other caller too. And a
+    restype has to be set, because the default is c_int while a HANDLE is a
+    pointer -- an opened handle narrowed into an int and widened back out of
+    one is not certain to be the handle that was opened.
+    """
+    import ctypes
+
+    lib = ctypes.WinDLL("kernel32", use_last_error=True)
+    lib.OpenProcess.restype = ctypes.c_void_p
+    lib.OpenProcess.argtypes = (ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong)
+    lib.GetExitCodeProcess.argtypes = (ctypes.c_void_p,
+                                       ctypes.POINTER(ctypes.c_ulong))
+    lib.CloseHandle.argtypes = (ctypes.c_void_p,)
+    return lib
+
+
 def alive(pid: int) -> bool:
     """Whether a pid is a live process. Not whether it is ours."""
     if pid <= 0:
@@ -167,14 +193,16 @@ def alive(pid: int) -> bool:
         # TerminateProcess. Asking whether a process is alive would kill it.
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.OpenProcess(0x1000, False, pid)   # QUERY_LIMITED
+        kernel32 = _kernel32()
+        handle = kernel32.OpenProcess(QUERY_LIMITED_INFORMATION, False, pid)
         if not handle:
             return False
         code = ctypes.c_ulong()
-        got = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-        kernel32.CloseHandle(handle)
-        return bool(got) and code.value == 259              # STILL_ACTIVE
+        try:
+            got = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        finally:
+            kernel32.CloseHandle(handle)
+        return bool(got) and code.value == STILL_ACTIVE
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -287,6 +315,15 @@ def look(root: pathlib.Path) -> tuple[State | None, dict | None]:
     return state, body
 
 
+def announce(said: str, where: str, pid: int, running: str,
+             open_browser: bool) -> int:
+    """Say what is serving and open a browser on it. Always a success."""
+    print(f"{said} {where}  (pid {pid}, crossglyph {running})")
+    if open_browser:
+        webbrowser.open(where)
+    return 0
+
+
 def start(root: pathlib.Path, opts: argparse.Namespace) -> int:
     """Start the preview in the background and wait until it draws.
 
@@ -297,27 +334,25 @@ def start(root: pathlib.Path, opts: argparse.Namespace) -> int:
     """
     state, body = look(root)
     if state is not None:
-        where = url(state.host, state.port)
+        running = url(state.host, state.port)
         if body is None:
-            print(f"a preview on {where} (pid {state.pid}) is not answering. "
-                  f"Stop it first.", file=sys.stderr)
+            print(f"a preview on {running} (pid {state.pid}) is not "
+                  f"answering. Stop it first.", file=sys.stderr)
             return 1
         if (state.host, state.port) != (opts.host, opts.port):
-            print(f"a preview is already running on {where}. Stop it first, "
-                  f"or ask for that address.", file=sys.stderr)
+            print(f"a preview is already running on {running}. Stop it "
+                  f"first, or ask for that address.", file=sys.stderr)
             return 1
         # Already what was asked for, so this is the answer to the question
         # rather than an error: say where it is and open it.
-        print(f"preview already on {where}  "
-              f"(pid {state.pid}, crossglyph {body['version']})")
-        if opts.open_browser:
-            webbrowser.open(where)
-        return 0
+        return announce("preview already on", running, state.pid,
+                        body["version"], opts.open_browser)
     if taken(opts.host, opts.port):
         print(f"something that is not CrossGlyph is listening on port "
               f"{opts.port}.", file=sys.stderr)
         return 1
 
+    where = url(opts.host, opts.port)
     argv = ["--no-open", "--host", opts.host, "--port", str(opts.port),
             *opts.rest]
     child = spawn(root, argv)
@@ -334,13 +369,13 @@ def start(root: pathlib.Path, opts: argparse.Namespace) -> int:
         if body is not None:
             # What the server says about itself, rather than what this process
             # knows: after an update the versions differ, and the pid differs
-            # whenever something stood between the spawn and the server.
-            record(body["version"], body.get("pid") or child.pid)
-            print(f"preview on {url(opts.host, opts.port)}  "
-                  f"(pid {child.pid}, crossglyph {body['version']})")
-            if opts.open_browser:
-                webbrowser.open(url(opts.host, opts.port))
-            return 0
+            # whenever something stood between the spawn and the server. The
+            # same pid is printed as is recorded, or `status` would name a
+            # different process a moment later.
+            pid = body.get("pid") or child.pid
+            record(body["version"], pid)
+            return announce("preview on", where, pid, body["version"],
+                            opts.open_browser)
         if child.poll() is not None:
             clear(root)
             print(f"the preview exited at once. {root / LOG_NAME} ends:\n"
@@ -402,11 +437,13 @@ def stop(root: pathlib.Path) -> int:
 
     terminate(state.pid)
     time.sleep(1.0)
-    clear(root)
     if probe(state.host, state.port, timeout=1.0) is not None:
+        # The state stays: something is still serving on that port, and
+        # forgetting it here would leave no command able to name it again.
         print(f"the preview on {where} did not stop. Its pid is {state.pid}.",
               file=sys.stderr)
         return 1
+    clear(root)
     reason = "did not stop when asked" if asked else "would not take the ask"
     print(f"stopped the preview on {where}, which {reason}.")
     return 0
