@@ -744,12 +744,7 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
         for path in orphan_dirs(out_dir, keep):
             shutil.rmtree(path)
             removed.append(path.name)
-    # The space face that builds up to now left in here, which is ours and not
-    # a font to read with. Unreported: a line saying a hidden file went would
-    # need more explaining than the file was ever worth. Whatever the folder is
-    # on, a build that cannot delete from it is not a build worth failing.
-    with contextlib.suppress(OSError):
-        (out_dir / spacefont.STRAY_NAME).unlink(missing_ok=True)
+    sweep_stray(out_dir)
 
     total = sum(len(plan.jobs) for plan in plans)
     yield {"event": "plan", "total": total, "out": str(out_dir),
@@ -804,6 +799,22 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
                          "removed": sorted(str(p) for p in plan.report.removed),
                          "error": plan.report.error}
                         for plan in plans]}
+
+
+def sweep_stray(out_dir: pathlib.Path) -> None:
+    """Remove the space face that builds up to now left in the output folder.
+
+    Ours and not a font to read with, so a card copied from here does not carry
+    it. Every surface that builds has to do this, not just the one the fix was
+    written for: an install that has only ever been built from the command line
+    is the one most likely to still have the file.
+
+    Unreported: a line saying a hidden file went would need more explaining
+    than the file was ever worth. Whatever the folder is on, a build that
+    cannot delete from it is not a build worth failing.
+    """
+    with contextlib.suppress(OSError):
+        (out_dir / spacefont.STRAY_NAME).unlink(missing_ok=True)
 
 
 def orphan_dirs(out_dir: pathlib.Path, wanted: set[str]) -> list[pathlib.Path]:

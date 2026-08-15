@@ -126,6 +126,7 @@ def main(argv=None) -> int:
                                       fontbuild.wanted_families(source)):
         shutil.rmtree(path)
         print(f"removed {path.name}/ (no config produces it any more)")
+    fontbuild.sweep_stray(out_dir)
 
     for plan in plans:
         for path in plan.report.removed:
@@ -139,21 +140,31 @@ def main(argv=None) -> int:
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
     started = time.monotonic()
-    for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir, workers):
-        report = reports[id(job.variant)]
-        if error:
-            report.failed.append(job.size)
-            print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
-                  file=sys.stderr, flush=True)
-        else:
-            report.built.append(job.size)
-            # Glyph count alongside the size: it is what distinguishes a
-            # genuinely wide family from a narrow one padded out by the
-            # bundled fallbacks.
-            print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
-                  f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
-            for warning in built.warnings:
-                print(f"    warning: {warning}", file=sys.stderr, flush=True)
+    try:
+        for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir,
+                                                             workers):
+            report = reports[id(job.variant)]
+            if error:
+                report.failed.append(job.size)
+                print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
+                      file=sys.stderr, flush=True)
+            else:
+                report.built.append(job.size)
+                # Glyph count alongside the size: it is what distinguishes a
+                # genuinely wide family from a narrow one padded out by the
+                # bundled fallbacks.
+                print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
+                      f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
+                for warning in built.warnings:
+                    print(f"    warning: {warning}", file=sys.stderr, flush=True)
+    except fontbuild.FallbacksMissing as exc:
+        # Not one size's failure but the workspace's, and it is the same for
+        # every family that wanted them, so it is said once and the run stops.
+        # Caught here because the sizes are rasterized in worker processes: an
+        # exception crossing back out of the pool arrives wrapped in its own
+        # traceback and this one carries the sentence that says what to do.
+        print(exc, file=sys.stderr)
+        return 2
 
     for plan in plans:
         if plan.report.built or plan.report.failed:
