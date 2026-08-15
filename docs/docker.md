@@ -39,6 +39,10 @@ checkout, or from the matching version inside an unpacked release. After the
 service is healthy, the launcher prints the actual browser address, mounted
 workspace and commands for logs, shutdown and cleanup.
 
+The Docker launchers are optional. If Docker with Compose is unavailable, they
+explain how to install it and point to `crossglyph.cmd` or `crossglyph.sh` for
+running CrossGlyph directly instead.
+
 ### Run Compose directly
 
 To use the published image:

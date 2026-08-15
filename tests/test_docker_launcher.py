@@ -14,6 +14,9 @@ NEEDS_WINDOWS = pytest.mark.skipif(os.name != "nt", reason="cmd.exe only")
 
 SH_DOCKER = r'''#!/bin/sh
 printf '%s\n' "$*" >> "$DOCKER_CALLS"
+if [ "$*" = "compose version" ]; then
+    exit "${DOCKER_VERSION_EXIT:-0}"
+fi
 if [ "$1" = inspect ]; then
     printf '%s\n' "$FAKE_WORKSPACE"
     exit 0
@@ -27,6 +30,10 @@ esac
 
 CMD_DOCKER = r'''@ECHO OFF
 >>"%DOCKER_CALLS%" echo %*
+if "%~1 %~2"=="compose version" (
+    if defined DOCKER_VERSION_EXIT exit /B %DOCKER_VERSION_EXIT%
+    exit /B 0
+)
 if "%~1"=="inspect" (
     echo %FAKE_WORKSPACE%
     exit /B 0
@@ -78,8 +85,9 @@ def _assert_success(done: subprocess.CompletedProcess, commands: pathlib.Path,
     calls = commands.read_text(encoding="utf-8").splitlines()
     expected = "docker compose -f compose.yaml -f compose.build.yaml" \
         if local else "docker compose"
+    assert calls[0] == "compose version"
     assert ("compose -f compose.yaml -f compose.build.yaml up -d --build --wait"
-            if local else "compose up -d --wait") in calls[0]
+            if local else "compose up -d --wait") in calls[1]
     assert "Open:      http://127.0.0.1:8123/" in done.stdout
     assert f"Workspace: {workspace}" in done.stdout
     assert f"Follow logs: {expected} logs -f" in done.stdout
@@ -133,7 +141,35 @@ def test_a_compose_failure_is_returned(
         check=False)
     assert done.returncode == 19
     assert "CrossGlyph is ready" not in done.stdout
-    assert len(commands.read_text(encoding="utf-8").splitlines()) == 1
+    assert len(commands.read_text(encoding="utf-8").splitlines()) == 2
+
+
+@pytest.mark.parametrize(
+    ("name", "runner", "docker", "suffix", "native"),
+    [
+        pytest.param(
+            "crossglyph-docker.sh", [SH or "sh"], SH_DOCKER, "",
+            "./crossglyph.sh", marks=NEEDS_SH),
+        pytest.param(
+            "crossglyph-docker.cmd", ["cmd.exe", "/d", "/c"],
+            CMD_DOCKER.replace("\n", "\r\n"), ".cmd", "crossglyph.cmd",
+            marks=NEEDS_WINDOWS),
+    ])
+def test_an_unavailable_docker_gets_native_launcher_guidance(
+        tmp_path, name, runner, docker, suffix, native):
+    env, commands = _environment(tmp_path, docker, suffix)
+    env["DOCKER_VERSION_EXIT"] = "127"
+    launcher = _launcher(tmp_path, name)
+    done = subprocess.run(
+        [*runner, str(launcher)], input="\n", capture_output=True, text=True,
+        env=env, check=False)
+    said = done.stdout + done.stderr
+    assert done.returncode == 1
+    assert "runs CrossGlyph inside an isolated Docker container" in said
+    assert "https://docs.docker.com/get-started/get-docker/" in said
+    assert native in said
+    assert commands.read_text(encoding="utf-8").splitlines() == [
+        "compose version"]
 
 
 @NEEDS_SH

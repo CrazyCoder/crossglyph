@@ -9,6 +9,9 @@ if exist "%~f0.staged" (copy /y "%~f0" "%~f0.previous" >nul 2>&1 & move /y "%~f0
 for %%I in ("%~dp0.") do set "CG_ROOT=%%~fI"
 set "CG_LOCAL="
 set "CG_EXIT=0"
+set "CG_WAIT="
+echo "%cmdcmdline%" | "%SystemRoot%\System32\find.exe" /i "%~nx0" >nul
+if not errorlevel 1 set "CG_WAIT=1"
 
 if "%~1"=="" goto :start
 if /i "%~1"=="--local" if "%~2"=="" (
@@ -39,6 +42,8 @@ if errorlevel 1 (
     goto :done
 )
 set "CG_PUSHED=1"
+call docker compose version >nul 2>&1
+if errorlevel 1 goto :docker-unavailable
 set "CG_FILES="
 set "CG_COMMAND=docker compose"
 if defined CG_LOCAL (
@@ -70,7 +75,23 @@ echo Next commands:
 echo   Follow logs: %CG_COMMAND% logs -f
 echo   Stop:        %CG_COMMAND% down
 echo   Clean up:    %CG_COMMAND% down --rmi all
+goto :done
+
+:docker-unavailable
+echo.
+echo This launcher runs CrossGlyph inside an isolated Docker container.
+echo Docker with Compose is not available.
+echo.
+echo To use this launcher, install and start Docker:
+echo   https://docs.docker.com/get-started/get-docker/
+echo.
+echo Or run crossglyph.cmd to start CrossGlyph directly.
+set "CG_EXIT=1"
 
 :done
 if defined CG_PUSHED popd >nul
+if defined CG_WAIT if not "%CG_EXIT%"=="0" (
+    echo.
+    pause
+)
 exit /B %CG_EXIT%

@@ -30,6 +30,19 @@ case "$#:$1" in
     *) usage >&2; exit 2 ;;
 esac
 
+if ! docker compose version >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+This launcher runs CrossGlyph inside an isolated Docker container.
+Docker with Compose is not available.
+
+To use this launcher, install and start Docker:
+  https://docs.docker.com/get-started/get-docker/
+
+Or run ./crossglyph.sh to start CrossGlyph directly.
+EOF
+    exit 1
+fi
+
 cd "$root" || exit 1
 
 compose() {
