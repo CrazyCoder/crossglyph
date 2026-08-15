@@ -704,8 +704,9 @@ def render(request: RenderRequest) -> Response:
         page = preview_page(font, request.text, spec)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
-    # advanceY the .cpfont format cannot hold (convert.py:1315-1320), which a
-    # large `size` can reach on a loose-hhea face. SystemExit is a
+    # advanceY the .cpfont format cannot hold, which generate_cpfont_multistyle
+    # exits on above 255 and a large `size` can reach on a loose-hhea face.
+    # SystemExit is a
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
     except SystemExit as exc:
@@ -716,8 +717,8 @@ def render(request: RenderRequest) -> Response:
             422, reason or "the converter rejected this combination; "
                            "see the server log") from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
-    # and the one this path can raise is the converter's (convert.py:1143,
-    # from rasterize_font_style on a malformed face). The fontbuild one comes
+    # and the one this path can raise is the converter's, from
+    # rasterize_font_style on a malformed face. The fontbuild one comes
     # from the family builder, which the preview never calls.
     #
     # FT_Exception comes from freetype-py itself and arrives first for a file

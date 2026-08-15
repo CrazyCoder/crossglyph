@@ -308,9 +308,9 @@ def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],
         cpfont.generate_cpfont_multistyle(
             {style: str(source) for style, source in sources.items()},
             size, list(coverage), str(path), tuning=tuning,
-            # Style 0's list is appended to all four styles by the converter
-            # (convert.py:1280-1283), which is how a regular-only fallback
-            # covers a bold word too -- and what the build does.
+            # Style 0's list is appended to all four styles by
+            # generate_cpfont_multistyle itself, which is how a regular-only
+            # fallback covers a bold word too -- and what the build does.
             fallback_style_fonts={0: [str(face) for face in fallbacks]}
             if fallbacks else None,
             style_axes={style: dict(coords)

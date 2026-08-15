@@ -871,8 +871,8 @@ def test_editing_the_text_reuses_the_font_when_the_alphabet_holds(client):
 @needs
 def test_a_corrupt_face_is_a_client_error_not_a_traceback(tmp_path):
     """Two classes are called FontBuildError; the one this path can raise is
-    the converter's (convert.py:321), not the family builder's. Catching the
-    wrong one left a 500 traceback where a 422 belongs."""
+    the converter's, from rasterize_font_style, not the family builder's.
+    Catching the wrong one left a 500 traceback where a 422 belongs."""
     from fastapi.testclient import TestClient
 
     from crossglyph.preview import server

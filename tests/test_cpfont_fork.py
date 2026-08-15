@@ -21,41 +21,41 @@ def test_base_coverage_is_always_injected():
     assert (0x0000, 0x007F) in cpfont.resolve_intervals("cyrillic")
 
 
-#: What our own comments say convert.py does, and the line each one points at.
-#: The converter is a pinned fork that gets refreshed wholesale, so every one
-#: of these numbers moves without anything else changing -- and a citation that
-#: has drifted onto an unrelated line is worse than none, since it reads as
-#: proof. Each entry is the cited range and a token the code there must carry.
-CITATIONS = [
-    ("1280-1283", "fallback_style_fonts.get(0, [])"),
-    ("1270", "HEADER_SIZE = 32"),
-    ("1314", "STYLE_TOC_FORMAT"),
-    ("1315-1320", "advanceY > 255"),
-    ("1143", "raise FontBuildError"),
-]
+#: What our own comments point at in convert.py, by name.
+#:
+#: Names rather than line numbers, because the numbers rot and say nothing
+#: while they do it: the converter is a pinned fork refreshed wholesale, so
+#: every number in it moves under a refresh, and any edit above one moves it
+#: too. A citation that has drifted onto an unrelated line is worse than none,
+#: since it still reads as proof -- one here pointed at a `continue` in the
+#: GPOS reader for a paragraph about FontBuildError. A name that is gone fails
+#: this test instead.
+CITATIONS = ["generate_cpfont_multistyle", "rasterize_font_style",
+             "HEADER_SIZE", "STYLE_TOC_FORMAT"]
 
 
-def test_the_lines_we_cite_in_the_converter_are_the_ones_we_mean():
+def _our_sources():
+    """Our own files, which is everywhere but the fork itself."""
+    for path in sorted((ROOT / "src/crossglyph").rglob("*.py")):
+        if path.parts[-2] != "cpfont":  # the fork citing itself is upstream's
+            yield path
+    yield from sorted((ROOT / "tests").glob("*.py"))
+
+
+def test_what_we_cite_in_the_converter_is_still_called_that():
     source = (ROOT / "src/crossglyph/cpfont/convert.py").read_text(
-        encoding="utf-8").splitlines()
+        encoding="utf-8")
+    for name in CITATIONS:
+        assert name in source, f"convert.py no longer has {name}"
 
-    for where, token in CITATIONS:
-        first, _, last = where.partition("-")
-        lines = source[int(first) - 1:int(last or first)]
-        assert any(token in line for line in lines), \
-            f"convert.py:{where} no longer carries {token!r}"
 
-    # And every citation in our own source is one of the above, so a new one
-    # cannot be added without being pinned here too.
+def test_no_comment_of_ours_cites_a_line_of_the_converter():
     import re
 
-    cited = set()
-    for path in sorted((ROOT / "src/crossglyph").rglob("*.py")):
-        if path.parts[-2] == "cpfont":
-            continue                    # the fork citing itself is upstream's
-        cited |= set(re.findall(r"convert\.py:([0-9]+(?:-[0-9]+)?)",
-                                path.read_text(encoding="utf-8")))
-    assert cited == {where for where, _ in CITATIONS}, cited
+    for path in _our_sources():
+        found = re.findall(r"convert\.py:[0-9]+(?:[-,][0-9]+)*",
+                           path.read_text(encoding="utf-8"))
+        assert not found, f"{path.name} cites {found}; name the function"
 
 
 # --- lazy font opening ------------------------------------------------------
