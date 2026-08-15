@@ -26,7 +26,7 @@ On the command line, after `crossglyph build` or `crossglyph fetch-fallbacks`,
 one line:
 
 ```
-note: 0.2.0 is available. Run crossglyph update to install it.
+note: 0.2.1 is available. Run crossglyph update to install it.
 ```
 
 The second sentence depends on how CrossGlyph was installed. A clone is told

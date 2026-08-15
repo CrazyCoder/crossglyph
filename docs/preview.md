@@ -76,7 +76,7 @@ reports is what is actually serving:
 
 ```
 preview on http://127.0.0.1:8000
-  pid 41288, crossglyph 0.2.0, up 2h
+  pid 41288, crossglyph 0.2.1, up 2h
   fonts /home/you/crossglyph/fonts
   log /home/you/crossglyph/preview.log
 ```
