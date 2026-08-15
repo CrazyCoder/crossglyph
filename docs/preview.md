@@ -81,9 +81,22 @@ preview on http://127.0.0.1:8000
   log /home/you/crossglyph/preview.log
 ```
 
-The workspace comes from the server rather than from what was typed, since
-`--fonts` and `$CROSSGLYPH_FONTS` both move it and a background process is not
-somewhere you can read the command back.
+The workspace and the pid come from the server rather than from what was
+typed. `--fonts` and `$CROSSGLYPH_FONTS` both move the workspace, and the
+process that serves is not always the one that was started: uv's venv python
+launches the real interpreter, so a pid remembered at the spawn would be a
+wrapper, and stopping it would leave the server holding the port.
+
+A preview that has stopped answering while its process is still there is said
+as one, since that is the state a stop has to be able to end:
+
+```
+a preview on http://127.0.0.1:8000 (pid 41288) is not answering.
+`crossglyph stop` will kill it.
+```
+
+`preview.log` is written unbuffered, so it can be read while the server is
+still up rather than filling in at the moment it exits.
 
 `restart` takes what it is not told from the start it replaces: bare, it comes
 back on the same address showing the same family, and `restart --port 9000`

@@ -12,7 +12,6 @@ import pytest
 
 from crossglyph import daemon, render
 
-WASM = render.WASM_PATH
 needs_wasm = pytest.mark.skipif(
     render.is_stale(),
     reason="the render core is missing or was built from other firmware; "
@@ -378,3 +377,16 @@ def test_the_log_can_be_read_while_the_server_is_still_up(tmp_path,
         assert "preview on" in daemon.log_tail(REPO)
     finally:
         daemon.stop(REPO)
+
+
+def test_a_restart_with_nothing_running_is_a_start(tmp_path, monkeypatch):
+    """Saying "no preview is running" first would read as a refusal."""
+    started = []
+    monkeypatch.setattr(daemon, "state_path",
+                        lambda root: tmp_path / daemon.STATE_NAME)
+    monkeypatch.setattr(daemon, "stop",
+                        lambda root: pytest.fail("stopped nothing"))
+    monkeypatch.setattr(daemon, "start",
+                        lambda root, opts: started.append(opts) or 0)
+    assert daemon.restart(tmp_path, daemon.parse([], "restart")) == 0
+    assert started and started[0].port == daemon.DEFAULT_PORT

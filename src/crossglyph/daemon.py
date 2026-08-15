@@ -250,16 +250,19 @@ def log_tail(root: pathlib.Path, lines: int = 15) -> str:
     return "\n".join(text.splitlines()[-lines:])
 
 
+#: When to change unit, and to what. An hour and a half of minutes and two
+#: days of hours, so the number stays small without the unit changing at the
+#: moment it would still have been the useful one.
+UNITS = ((172800, 86400, "d"), (5400, 3600, "h"), (90, 60, "m"))
+
+
 def since(started: float) -> str:
     """How long it has been up, said the way a person would."""
     seconds = max(0, int(time.time() - started))
-    if seconds < 90:
-        return f"{seconds}s"
-    if seconds < 5400:
-        return f"{seconds // 60}m"
-    if seconds < 172800:
-        return f"{seconds // 3600}h"
-    return f"{seconds // 86400}d"
+    for at, size, unit in UNITS:
+        if seconds >= at:
+            return f"{seconds // size}{unit}"
+    return f"{seconds}s"
 
 
 def look(root: pathlib.Path) -> tuple[State | None, dict | None]:
@@ -439,10 +442,14 @@ def restart(root: pathlib.Path, opts: argparse.Namespace) -> int:
     `restart --port 9000` moves only the port. Whether to open a browser is
     not one of those: that is a fact about this command, not about the server.
     """
-    settle(opts, load(root))
-    code = stop(root)
-    if code:
-        return code
+    state = load(root)
+    settle(opts, state)
+    # Only stop what is there. A restart with nothing running is a start, and
+    # saying "no preview is running" first would read as a refusal.
+    if state is not None:
+        code = stop(root)
+        if code:
+            return code
     return start(root, opts)
 
 
