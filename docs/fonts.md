@@ -558,7 +558,7 @@ to somebody who liked how it looked -- and what travels with it is four
 ```json
 "built": {
   "at": "2026-08-15T08:44:43Z",
-  "by": "crossglyph 0.1.2",
+  "by": "crossglyph 0.2.0",
   "cpfont_format": 4,
   "config": "bitter.conf",
   "settings": {"gamma": 1.0, "hinting": "light", "figures": "proportional", …},
