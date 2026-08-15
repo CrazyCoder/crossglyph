@@ -1758,6 +1758,16 @@ for (const { name, text } of sources) {
         env.progressWhat.steps.includes("Alto 12") &&
         env.progressWhat.steps.includes("Alto 13"),
         JSON.stringify(env.progressWhat.steps));
+  // Sizes run across a pool, so nothing lands until one of them finishes.
+  // Counting from the plan put a determinate zero on screen for the whole of
+  // that -- the sweep stopped, the bar sat at "0 of 2" looking stalled, and
+  // then started filling, which is two starts and one of them a fake.
+  check("never counting from a zero it had not been told",
+        !env.progressCount.steps.includes("0 of 2"),
+        JSON.stringify(env.progressCount.steps));
+  check("with the scale said in words until the first one lands",
+        env.progressWhat.steps.includes("building 2 sizes…"),
+        JSON.stringify(env.progressWhat.steps));
 
   await env.builds.all();
   check("Build all builds every family",

@@ -160,6 +160,25 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
+`off` at the bottom of that list is a third state rather than a second way to
+untick the box, and the difference shows on any text with a compound in it:
+
+```
+hyphenation off            was re-established after the
+                           cost-benefit analysis of the
+                           counter-example.
+
+hyphenation on, off        was re-established after the cost-
+                           benefit analysis of the counter-
+                           example.
+```
+
+With hyphenation off the reader never breaks inside a word. With it on and no
+language, it breaks at hyphens the text already carries and adds none of its
+own -- exactly what the device does with a book whose language it does not
+recognise, which is worth being able to look at. A language on top of that
+adds its patterns.
+
 The **Page** section folds, and starts folded. These are settings you match to
 the device you are judging against once and then leave, where everything above
 them is what a session is actually for. They are remembered in this browser, so

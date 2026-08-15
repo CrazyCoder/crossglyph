@@ -245,7 +245,17 @@ export function showStep(step) {
     // and a run with nothing to do is one.
     if (step.total) {
       builtNote.textContent = "";
-      progress.show(0, step.total, "");
+      // Still sweeping, and counting only from the first size that lands.
+      // Sizes run across a pool, so nothing at all comes back until one of
+      // them finishes: a determinate bar here would stop the sweep, sit at a
+      // frozen "0 of 16" for as long as the first size takes, and then start
+      // filling -- which is two starts, and the first of them looks stalled.
+      // The total goes in the label so the scale is still said out loud.
+      //
+      // Restarting the clock here is what it is for: the estimate wants the
+      // build, not the save and the planning in front of it.
+      progress.start(`building ${step.total} `
+                     + `size${step.total === 1 ? "" : "s"}…`);
     } else {
       builtNote.textContent = "everything is already current";
       progress.end();
