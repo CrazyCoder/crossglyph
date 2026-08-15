@@ -1,5 +1,12 @@
 # The preview
 
+<p align="center">
+  <a href="images/tune.png"><img src="images/tune.png" width="64%"
+     alt="The tune panel beside the page it draws"></a>
+  <a href="images/export.png"><img src="images/export.png" width="33%"
+     alt="The export panel"></a>
+</p>
+
 ```sh
 ./crossglyph.sh preview                    # the first family in the workspace
 ./crossglyph.sh preview --family notosans  # a family by name
