@@ -6,6 +6,14 @@
 *.sh   eol=lf
 *.wasm binary
 
+# Not ours: the wrapper engines derive from the tool wrapper in the IntelliJ
+# IDEA monorepo, under Apache 2.0, and THIRD-PARTY-NOTICES.md says so. Marking
+# them keeps a language summary describing what this project is written in.
+# tools/uv.cmd is not here: the configuration in it is ours.
+tools/tool-wrapper.sh  linguist-vendored
+tools/tool-wrapper.cmd linguist-vendored
+tools/tool-wrapper.ps1 linguist-vendored
+
 # Out of the release archive: none of it means anything outside a checkout.
 # The rules above still apply while archiving, because git reads them from the
 # tree rather than from the file it is writing.
