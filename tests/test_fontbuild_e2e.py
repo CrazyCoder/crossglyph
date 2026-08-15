@@ -2,6 +2,7 @@
 import shutil
 import struct
 
+import fontpaths
 import pytest
 
 from crossglyph import fontbuild, fontconf
@@ -264,11 +265,15 @@ def test_a_cff_face_is_darkened_unless_the_auto_hinter_is_in_charge():
     fall where FreeType's darkening curve rounds to nothing is unmoved too,
     and nothing short of rasterizing can know that.
     """
+    name = "NotoSansCJKjp-Regular.otf"
     faces = fontbuild.fallback_dir()
-    face = faces / "NotoSansCJKjp-Regular.otf" if faces else None
+    face = faces / name if faces else None
     if face is None or not face.is_file():
-        pytest.skip("needs the fetched Noto CJK face, which is the one CFF "
-                    "face this repo can reach")
+        declared = fontpaths.cff()
+        face = declared if declared and declared.name == name else None
+    if face is None:
+        pytest.skip("needs the fetched Noto CJK face in the fallback folder "
+                    "or CROSSGLYPH_TEST_OTF")
 
     assert not _darkening_moves(face, "auto"), \
         "the auto-hinter now darkens a CFF face, so the preview is greying " \
