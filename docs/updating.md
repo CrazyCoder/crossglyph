@@ -38,7 +38,7 @@ alone.
 
 A source download is the exception, and says what it is whatever the check
 found. Its version is whatever the last release set, so a tree taken from the
-main branch after that reports the release and compares as up to date while
+default branch after that reports the release and compares as up to date while
 holding rather more than it did.
 
 In the preview, the island under the specimen names the new version where it
@@ -138,7 +138,7 @@ deleting a folder somebody unpacked themselves is a larger act than adding two
 things to it. Delete them yourself if you want the disk back.
 
 The offer only appears when the published release is newer than the version in
-the tree. A snapshot taken from the main branch reports the version of the
+the tree. A snapshot taken from the default branch reports the version of the
 last release while holding rather more than it did, so installing that release
 over the top would be a step backwards.
 
