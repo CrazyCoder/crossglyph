@@ -3198,12 +3198,14 @@ for (const { name, text } of sources) {
         + "nothing to update to",
         env.about.detail.textContent.endsWith("45caec3e76c2."),
         env.about.detail.textContent);
-  check("the line answers the question the button asks, rather than saying "
-        + "when it was asked",
-        env.about.state.textContent === "Up to date.",
+  check("the line answers the question the button asks, and says when it "
+        + "found out, which is one subject rather than two",
+        /^Up to date, checked .* ago\.$/.test(env.about.state.textContent),
         env.about.state.textContent);
-  check("and when it last looked is kept, one line down",
-        /Checked .* ago\./.test(env.about.detail.textContent),
+  check("and the line below is only what this install is, with nothing "
+        + "about updates run into it",
+        env.about.detail.textContent === "Render core built from "
+        + "crosspoint-reader 45caec3e76c2.",
         env.about.detail.textContent);
   check("and the one press on offer is asking again",
         env.about.button.hidden === false && env.about.update.hidden === true,

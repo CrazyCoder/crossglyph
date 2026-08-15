@@ -32,21 +32,15 @@ function ago(seconds) {
   return `${Math.floor(seconds / DAY)} days ago`;
 }
 
-// The answer, not the asking. Somebody reading this line, or pressing the
-// button above it, wants to know whether there is an update; when the looking
-// last happened is a detail about that answer and goes on the line below.
+// The answer first, and when it was found after it, in one sentence about one
+// subject. The line below carries what this install is, which has nothing to
+// do with updates: putting the two together made a line that read as two
+// unrelated notices run into each other.
 function checkedLine(about) {
   if (about.checking_off) return "Update checks are off.";
   if (about.error) return UNREACHABLE;
   if (!about.checked_at) return "Not checked yet.";
-  return "Up to date.";
-}
-
-// Which is worth keeping, since an answer from a week ago is worth less than
-// one from a minute ago, and only this says which it is.
-function askedLine(about) {
-  if (about.checking_off || about.error || !about.checked_at) return "";
-  return `Checked ${ago(Date.now() / 1000 - about.checked_at)}.`;
+  return `Up to date, checked ${ago(Date.now() / 1000 - about.checked_at)}.`;
 }
 
 // What a restart would run, when that is not what is running. The server
@@ -83,8 +77,6 @@ export function showAbout(about) {
   }
 
   const said = [];
-  const asked = askedLine(about);
-  if (asked) said.push(asked);
   if (about.firmware) {
     said.push("Render core built from crosspoint-reader " +
               `${about.firmware.slice(0, SHORT)}.`);
