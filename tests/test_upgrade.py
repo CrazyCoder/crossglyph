@@ -207,6 +207,85 @@ def test_nothing_is_left_in_versions_afterwards(release, served):
         [OLD, NEW]
 
 
+# --- landing on a version directory that is already there -----------------
+
+
+@pytest.fixture
+def already(release):
+    """The version being installed is on disk: retention kept it through a
+    rollback, or a release was installed twice before anything restarted."""
+    landing = release / "versions" / NEW
+    (landing / "src").mkdir(parents=True)
+    (landing / "stale.txt").write_bytes(b"from the last time\n")
+    return landing
+
+
+def test_a_version_directory_already_there_is_replaced(already, release,
+                                                       served):
+    said = last(run(release))
+    assert said["event"] == "done", said
+    assert layout.current(release) == NEW
+    assert (already / "pyproject.toml").is_file()
+    assert not (already / "stale.txt").exists()
+
+
+def test_one_that_cannot_be_emptied_is_replaced_anyway(already, release,
+                                                       served, monkeypatch):
+    """The venv uv built in it holds files that may not be deletable at all --
+    see upgrade.swap for why. So the swap may not depend on deleting anything,
+    and here nothing can be deleted at all."""
+    monkeypatch.setattr(upgrade.shutil, "rmtree", lambda *a, **k: None)
+    said = last(run(release))
+    assert said["event"] == "done", said
+    assert layout.current(release) == NEW
+    assert (already / "pyproject.toml").is_file()
+
+
+def test_what_it_displaced_is_kept_out_of_reach_rather_than_deleted(
+        already, release, served, monkeypatch):
+    """Left for the next launch to sweep, and never a name the launcher could
+    recover onto in the meantime."""
+    monkeypatch.setattr(upgrade.shutil, "rmtree", lambda *a, **k: None)
+    run(release)
+    displaced = release / "versions" / f"{layout.OLD_PREFIX}{NEW}"
+    assert (displaced / "stale.txt").is_file()
+    assert layout.present(release) == [OLD, NEW]
+
+
+def test_a_displaced_tree_that_is_still_there_gets_its_own_name(release):
+    """Reusing the name of one an earlier update could not delete would fail
+    the same way it did."""
+    landing = release / "versions" / NEW
+    landing.mkdir(parents=True)
+    (landing.with_name(f"{layout.OLD_PREFIX}{NEW}")).mkdir()
+    assert upgrade.aside(landing).name == f"{layout.OLD_PREFIX}{NEW}-1"
+
+
+def test_a_landing_that_is_free_is_a_plain_rename(release):
+    """Which is what makes the ordinary update whole or not at all."""
+    incoming = release / "versions" / ".incoming"
+    incoming.mkdir(parents=True)
+    assert upgrade.swap(incoming, release / "versions" / NEW) is None
+
+
+def test_a_swap_that_fails_puts_back_what_it_moved(release, monkeypatch):
+    """The name it moves to is swept at the next launch, so leaving it there
+    would lose a working version over an update that did not happen."""
+    landing = release / "versions" / NEW
+    (landing / "src").mkdir(parents=True)
+    incoming = release / "versions" / ".incoming"
+    incoming.mkdir()
+
+    def refuse(self, target):
+        raise OSError("something else has it open")
+
+    monkeypatch.setattr(pathlib.Path, "replace", refuse)
+    with pytest.raises(OSError):
+        upgrade.swap(incoming, landing)
+    assert (landing / "src").is_dir()
+    assert not list((release / "versions").glob(f"{layout.OLD_PREFIX}*"))
+
+
 # --- when it goes wrong ---------------------------------------------------
 
 

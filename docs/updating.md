@@ -94,6 +94,13 @@ goes to `versions/.tmp-<version>.zip` and the unpack to
 `versions/.incoming-<version>`, neither of which the launcher will ever start,
 and both of which are swept at the next launch.
 
+Installing a version whose directory is already there, which is what rolling
+forward after a rollback does, moves the old one to `versions/.old-<version>`
+rather than deleting it. That is not tidiness: the environment uv built inside
+it shares its files with every other environment on the drive, and while
+CrossGlyph is running those files cannot be deleted at all. The directory is
+another name the launcher will never start, and it goes at the next launch.
+
 One thing stops it before it downloads anything: an install that does not own
 its own files, which is a clone, a container, or a folder nobody can write to.
 The notice says what to do instead.

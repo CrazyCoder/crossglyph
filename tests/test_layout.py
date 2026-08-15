@@ -118,6 +118,8 @@ def littered(tmp_path):
     make(tmp_path, ["0.1.0"], live="0.1.0")
     (tmp_path / "versions" / ".incoming-0.2.0" / "src").mkdir(parents=True)
     (tmp_path / "versions" / ".tmp-0.2.0.zip").write_bytes(b"half")
+    # A version an update displaced and could not delete on the spot.
+    (tmp_path / "versions" / ".old-0.2.0" / ".venv").mkdir(parents=True)
     return tmp_path
 
 
@@ -129,4 +131,10 @@ def test_sweep_clears_what_a_crashed_update_left(littered):
 
 def test_sweep_leaves_the_versions_alone(littered):
     layout.tidy(littered, keep=1)
+    assert layout.present(littered) == ["0.1.0"]
+
+
+def test_none_of_the_litter_can_be_launched_before_it_is_swept(littered):
+    """A displaced version is a whole tree, so the one answer that must not
+    include it is the one the launcher recovers from."""
     assert layout.present(littered) == ["0.1.0"]

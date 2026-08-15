@@ -177,6 +177,58 @@ def stage_launchers(root: pathlib.Path, incoming: pathlib.Path) -> list[str]:
     return staged
 
 
+def aside(landing: pathlib.Path) -> pathlib.Path:
+    """A free name beside `landing` to move it out of the way to.
+
+    Numbered only when it has to be, which means one an earlier update could
+    not delete is still sitting there. Reusing its name would fail the same way
+    it did.
+    """
+    attempt = 0
+    while True:
+        suffix = f"-{attempt}" if attempt else ""
+        candidate = landing.with_name(
+            f"{layout.OLD_PREFIX}{landing.name}{suffix}")
+        if not candidate.exists():
+            return candidate
+        attempt += 1
+
+
+def swap(incoming: pathlib.Path, landing: pathlib.Path) -> pathlib.Path | None:
+    """Make the extracted tree the version directory, and say what it displaced.
+
+    A rename, so the name appears whole or not at all: an update interrupted
+    anywhere before this leaves nothing the launcher could pick up.
+
+    A version directory that is already there -- rolling forward onto one
+    retention kept, or installing a release a second time before restarting --
+    is moved aside rather than emptied, and the name it went to is returned for
+    the caller to try to delete later. Emptying it can be impossible while the
+    tool is running, and on the one path where that matters most: uv hardlinks
+    wheels out of its cache, so every environment on the volume is a second
+    name for those same files, and Windows refuses to unlink any name of a file
+    some process has mapped. The preview serving the Update button is exactly
+    such a process, and the venv it holds open is a sibling of the one being
+    replaced. Renaming a directory is allowed where emptying it is not, which
+    is the whole reason this is a rename.
+    """
+    if not landing.exists():
+        incoming.replace(landing)
+        return None
+    stale = aside(landing)
+    landing.rename(stale)
+    try:
+        incoming.replace(landing)
+    except OSError:
+        # A tree just written is a tree a virus scanner may still have open,
+        # and that is a sharing violation on Windows. Put back what was moved:
+        # the name it went to is swept at the next launch, so leaving it there
+        # would lose a version that was working, over an update that failed.
+        stale.rename(landing)
+        raise
+    return stale
+
+
 def _download(url: str, into: pathlib.Path, sha256: str,
               size: int) -> Iterator[dict]:
     """Stream the release to disk, hashing it on the way past.
@@ -250,15 +302,18 @@ def steps(root: pathlib.Path, kind: str | None = None) -> Iterator[dict]:
         # edited file from one that changed between releases.
         kept = seed_workspace(root, incoming,
                               layout.version_dir(root, live) if live else None)
-        # Named as a version only once it is whole, so an update interrupted
-        # anywhere before this leaves nothing the launcher could pick up.
-        shutil.rmtree(landing, ignore_errors=True)
-        incoming.replace(landing)
+        stale = swap(incoming, landing)
         layout.write_current(root, found.version)
         # After current, so an install interrupted before this still starts:
         # the old launcher understands the new layout, which is what keeping
         # it thin is for.
         staged = stage_launchers(root, landing)
+        # Best effort, and after the update is already done: what is mapped by
+        # a running preview cannot go until it exits, and a version that is
+        # installed must not be reported as failed over a directory nobody can
+        # see. The next launch sweeps whatever is left.
+        if stale is not None:
+            shutil.rmtree(stale, ignore_errors=True)
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         shutil.rmtree(incoming, ignore_errors=True)
         yield {"event": "error", "error": str(exc)}

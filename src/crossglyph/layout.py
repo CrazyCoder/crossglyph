@@ -22,6 +22,11 @@ VERSIONS_NAME = "versions"
 INCOMING_PREFIX = ".incoming-"
 TMP_PREFIX = ".tmp-"
 
+#: A version directory an update moved out of its own way. It is left rather
+#: than deleted because deleting it can be impossible while the tool runs, for
+#: the reason `upgrade.swap` gives; the next launch sweeps it.
+OLD_PREFIX = ".old-"
+
 
 def versions_dir(root: pathlib.Path) -> pathlib.Path:
     return root / VERSIONS_NAME
@@ -115,13 +120,17 @@ def prune(root: pathlib.Path, keep: int) -> list[str]:
 
 
 def sweep(root: pathlib.Path) -> None:
-    """Clear what an interrupted update left in versions/."""
+    """Clear what an interrupted update, or one that could not tidy up, left.
+
+    Nothing in here is ever named as a version, so none of it is launchable and
+    a sweep that fails costs only the space until the next one.
+    """
     try:
         leftovers = list(versions_dir(root).iterdir())
     except OSError:
         return
     for path in leftovers:
-        if path.name.startswith(INCOMING_PREFIX):
+        if path.name.startswith((INCOMING_PREFIX, OLD_PREFIX)):
             shutil.rmtree(path, ignore_errors=True)
         elif path.name.startswith(TMP_PREFIX):
             try:
