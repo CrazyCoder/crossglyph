@@ -2295,11 +2295,33 @@ def test_a_forced_check_asks_and_answers(client, monkeypatch):
         return updates.State(2000.0, "9.9.9", None)
 
     monkeypatch.setattr(server.updates, "check", check)
-    monkeypatch.setattr(server.updates, "load_state",
-                        lambda root: updates.State(2000.0, "9.9.9", None))
+    monkeypatch.setattr(
+        server.updates, "load_state",
+        lambda root: updates.State(0.0, None, None))
     said = client.post("/update/check").json()
     assert asked and asked[0]["force"] is True
     assert said["latest"] == "9.9.9"
+
+
+def test_a_container_check_reports_how_to_update(client, monkeypatch):
+    from crossglyph import install, updates
+    from crossglyph.preview import server
+
+    state = updates.State(2000.0, "9.9.9", None)
+    monkeypatch.setattr(
+        server.updates, "check", lambda root, **kwargs: state)
+    monkeypatch.setattr(
+        server.updates, "load_state",
+        lambda root: updates.State(0.0, None, None))
+    monkeypatch.setattr(
+        server.install, "detect", lambda root: install.CONTAINER)
+    monkeypatch.setattr(server.version, "installed", lambda: "0.1.0")
+
+    said = client.post("/update/check").json()
+
+    assert said["available"] == "9.9.9"
+    assert said["can_self_update"] is False
+    assert said["notice"] == "Pull the new image to update."
 
 
 def test_a_page_load_stays_quiet_about_a_release_that_was_turned_down(

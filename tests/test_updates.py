@@ -112,6 +112,19 @@ def test_a_first_check_fetches_and_remembers(tmp_path, offline):
     assert updates.load_state(tmp_path).latest == "0.2.0"
 
 
+def test_a_package_can_put_check_state_on_a_writable_path(tmp_path, offline):
+    root = tmp_path / "read-only-install"
+    where = tmp_path / "runtime" / "state.json"
+    where.parent.mkdir()
+    env = {updates.STATE_ENV: str(where)}
+
+    updates.check(root, now=1000.0, environ=env)
+
+    assert updates.load_state(root, env).latest == "0.2.0"
+    assert where.is_file()
+    assert not (root / updates.STATE_NAME).exists()
+
+
 def test_a_second_check_inside_the_window_does_not_fetch(tmp_path, offline):
     updates.check(tmp_path, now=1000.0, environ={})
     updates.check(tmp_path, now=1000.0 + 3600, environ={})

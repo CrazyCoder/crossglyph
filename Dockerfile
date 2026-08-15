@@ -33,6 +33,7 @@ ENV CROSSGLYPH_FONTS=/workspace \
     CROSSGLYPH_HOME=/app \
     CROSSGLYPH_HOST=0.0.0.0 \
     CROSSGLYPH_INSTALL_KIND=container \
+    CROSSGLYPH_UPDATE_STATE=/tmp/crossglyph-update-state.json \
     HOME=/tmp \
     PATH=/app/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \

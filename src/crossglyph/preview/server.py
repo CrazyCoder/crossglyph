@@ -1051,7 +1051,7 @@ def defaults() -> JSONResponse:
     return JSONResponse(payload, headers=NO_STORE)
 
 
-def _about(asked: bool = False) -> dict:
+def _about(asked: bool = False, state: updates.State | None = None) -> dict:
     """What this install is, and what the last check found.
 
     Reading only. The page renders what is already known; the thread at
@@ -1065,7 +1065,7 @@ def _about(asked: bool = False) -> dict:
     """
     root = install.root()
     kind = install.detect(root)
-    state = updates.load_state(root)
+    state = updates.load_state(root) if state is None else state
     found = updates.available(state, asked=asked)
     running = version.installed()
     # What a restart would run. It differs from what is running only after an
@@ -1132,8 +1132,8 @@ def update_check() -> dict:
     apart from applying, so a forced check is never one mis-wired handler away
     from installing something.
     """
-    updates.check(install.root(), force=True)
-    return _about(asked=True)
+    state = updates.check(install.root(), force=True)
+    return _about(asked=True, state=state)
 
 
 def _startup(root: pathlib.Path) -> None:

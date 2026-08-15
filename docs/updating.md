@@ -230,9 +230,11 @@ asking. Nothing installs itself either way.
 
 ## What it writes
 
-`.update-state.json`, beside the launcher: when it last looked, what it found,
-and the version a rollback rejected. Deleting it costs one more check, and
-un-rejects a version you rolled back from.
+Native installs keep `.update-state.json` beside the launcher: when CrossGlyph
+last looked, what it found, and the version a rollback rejected. A container
+keeps the same state in its private temporary filesystem because the
+application image is read-only. Restarting it costs one more check. Deleting
+the native file does the same and un-rejects a version you rolled back from.
 
 ## What it sends
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import pathlib
 import re
 import time
@@ -36,9 +37,10 @@ HOME = f"https://github.com/{REPO}"
 #: and shared by everyone behind one.
 MANIFEST_URL = f"https://{_OWNER.lower()}.github.io/{_NAME}/latest.json"
 
-#: Written by the tool, beside the launcher. Not a config: nothing in it is a
-#: decision somebody made.
+#: Written beside the launcher unless a package supplies another writable
+#: path. It is state, not config: nothing in it is a decision somebody made.
 STATE_NAME = ".update-state.json"
+STATE_ENV = "CROSSGLYPH_UPDATE_STATE"
 
 #: Long enough not to delay a font build anybody is watching, short enough
 #: that an install with no network is not left sitting there.
@@ -122,10 +124,20 @@ def fetch(url: str, timeout: float = TIMEOUT) -> bytes:
         return answer.read(MAX_BYTES)
 
 
-def load_state(root: pathlib.Path) -> State:
+def state_path(root: pathlib.Path,
+               environ: Mapping[str, str] | None = None) -> pathlib.Path:
+    """Where this package can remember the last check."""
+    environ = os.environ if environ is None else environ
+    named = environ.get(STATE_ENV, "").strip()
+    return pathlib.Path(named).expanduser() if named else root / STATE_NAME
+
+
+def load_state(root: pathlib.Path,
+               environ: Mapping[str, str] | None = None) -> State:
     """What the last check found, or a state that has never checked."""
     try:
-        body = json.loads((root / STATE_NAME).read_text(encoding="utf-8"))
+        body = json.loads(
+            state_path(root, environ).read_text(encoding="utf-8"))
         return State(checked_at=float(body.get("checked_at", 0)),
                      latest=body.get("latest") or None,
                      error=body.get("error") or None,
@@ -134,10 +146,11 @@ def load_state(root: pathlib.Path) -> State:
         return State(checked_at=0.0, latest=None, error=None)
 
 
-def save_state(root: pathlib.Path, state: State) -> None:
-    """Best effort. A read-only install still runs, it just asks every time."""
+def save_state(root: pathlib.Path, state: State,
+               environ: Mapping[str, str] | None = None) -> None:
+    """Best effort. A read-only path still leaves the check's answer usable."""
     try:
-        (root / STATE_NAME).write_text(
+        state_path(root, environ).write_text(
             json.dumps(dataclasses.asdict(state)), encoding="utf-8")
     except OSError:
         pass
@@ -154,7 +167,7 @@ def check(root: pathlib.Path, *, force: bool = False,
     """
     now = time.time() if now is None else now
     wanted = updateconf.settings(root, environ, flag_off)
-    known = load_state(root)
+    known = load_state(root, environ)
     if not force:
         if not wanted.check:
             return known
@@ -179,7 +192,7 @@ def check(root: pathlib.Path, *, force: bool = False,
         # network meets the timeout on every single run.
         state = State(checked_at=now, latest=None, error=str(exc),
                       rejected=known.rejected)
-    save_state(root, state)
+    save_state(root, state, environ)
     return state
 
 

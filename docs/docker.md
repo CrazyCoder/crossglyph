@@ -200,6 +200,12 @@ docker run --rm \
 
 ## Update the image
 
+The preview checks the release manifest at startup and when you press
+**Check now**. If the selected image is behind, the version row names the
+release and says to pull the new image. The check state stays in the
+container's private temporary filesystem rather than adding a file to the
+mounted workspace.
+
 An installed ZIP defaults to its own version so native and container launches
 run the same code. Set `CROSSGLYPH_TAG` in `.env` to move a container-only
 deployment to another version, or to `latest` to follow each release. Then pull
