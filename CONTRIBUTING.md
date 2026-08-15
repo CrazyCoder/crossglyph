@@ -158,6 +158,26 @@ names. Two steps guard what the suite cannot say for itself: the wrappers keep
 their line endings, and the faces the rendering tests need are present, since
 a third of the suite skips without them and says nothing while doing it.
 
+### Pages has to admit the tag
+
+Two things about Pages have to be true before the first tag, and neither says
+so when it is not.
+
+Pages must be turned on with GitHub Actions as the source. The manifest is
+deployed after the release is published, so without it a tag creates the
+release and then fails, leaving something no install can discover and a rerun
+that stops at "release already exists".
+
+And the `github-pages` environment that turning it on creates allows
+deployments from the default branch only, while the release runs from a tag.
+The job is then rejected before its first step: two seconds, no steps, no log
+to say why. Once per repository:
+
+```sh
+gh api repos/<owner>/<repo>/environments/github-pages/deployment-branch-policies \
+  -X POST -f name='v*' -f type=tag
+```
+
 To build one locally without releasing it:
 
 ```sh
