@@ -1,0 +1,64 @@
+name: test
+
+# Off for now, and runnable from the Actions tab while the first release is
+# being shaken out. Turning it on is two edits: uncomment the triggers below,
+# and add `needs: test` to the release job in release.yml, so a tag cannot
+# publish something the suite has not passed.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [master]
+  # pull_request:
+
+jobs:
+  test:
+    strategy:
+      # Both, always. One of them going red is the interesting case, and
+      # stopping the other run is how that gets read as a fluke.
+      fail-fast: false
+      matrix:
+        include:
+          # Forward slashes on both: these reach a bash `test` as well as
+          # Python, and a backslash does not survive the first of those.
+          - os: ubuntu-latest
+            font: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+            italic: /usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf
+          - os: windows-latest
+            font: C:/Windows/Fonts/arial.ttf
+            italic: C:/Windows/Fonts/ariali.ttf
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # git normalizes nothing in the wrappers, so a checkout carries whatever
+      # was committed. What this catches is an editor that flattened one half
+      # of the polyglot, which breaks the interpreter nobody who did it runs.
+      - name: The wrappers kept their line endings
+        shell: bash
+        run: sh tools/check-line-endings.sh
+
+      # A third of the suite reads a real face and skips without one, silently.
+      # A runner image that stopped shipping this font would otherwise leave a
+      # green run that says nothing at all about rendering.
+      - name: The faces the suite needs are here
+        shell: bash
+        run: test -f "${{ matrix.font }}" && test -f "${{ matrix.italic }}"
+
+      # Through the wrapper rather than a setup action, which is what a user
+      # runs: every CI run then verifies the pinned uv against its checksum on
+      # both platforms, and .python-version puts it on the interpreter this
+      # release was built and tested against.
+      #
+      # -rs prints what skipped. CROSSGLYPH_TEST_OTF wants a CFF face with
+      # ligatures and a pnum feature, which neither image ships, so those stay
+      # skipped here and are named in the log rather than passing unnoticed.
+      - name: The suite
+        run: tools/uv.cmd run pytest -n auto -q -rs
+        env:
+          CROSSGLYPH_TEST_FONT: ${{ matrix.font }}
+          CROSSGLYPH_TEST_ITALIC: ${{ matrix.italic }}
+
+      # The page has no browser test. This links its modules against a stub DOM
+      # and is where a module reading a name it never imported fails.
+      - name: The page
+        run: node --experimental-vm-modules tests/preview_persistence.mjs

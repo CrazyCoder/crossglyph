@@ -146,6 +146,12 @@ builds, publishes the release, and puts the manifest on Pages. A tag that
 disagrees with `pyproject.toml` fails the run rather than shipping a release
 that misdescribes itself.
 
+A second workflow, `test.yml`, runs the suite and the page against Ubuntu and
+Windows. It is off while the first release is being shaken out, so only the
+Actions tab starts it. Turning it on is two edits: uncomment the triggers at
+the top of that file, and add `needs: test` to the release job, after which a
+tag cannot publish what the suite has not passed.
+
 To build one locally without releasing it:
 
 ```sh
