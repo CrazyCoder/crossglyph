@@ -10,7 +10,21 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-FW="${FW:-$ROOT/../crosspoint-reader}"
+
+# Where the firmware comes from, first that exists: a checkout that belongs to
+# this build and is on one branch for that reason, then a shared one. $FW beats
+# both, which is also how a build from a fork of the firmware works without
+# anything here having to know about forks.
+#
+# render/stamp.py resolves the same list for its staleness check, and a test
+# asserts the two agree. They have to: one decides what the module is built
+# from and the other decides whether it is out of date.
+if [ -z "${FW:-}" ]; then
+  for candidate in crosspoint-reader-engine crosspoint-reader; do
+    [ -d "$ROOT/../$candidate" ] && { FW="$ROOT/../$candidate"; break; }
+  done
+  FW="${FW:-$ROOT/../crosspoint-reader}"
+fi
 EMSDK="${EMSDK:-$ROOT/../emsdk}"
 OUT="$ROOT/src/crossglyph/render"
 OBJ="$ROOT/build/obj"
@@ -104,10 +118,20 @@ done
 COMMIT="$(git -C "$FW" rev-parse HEAD 2>/dev/null || true)"
 SOURCE="$FW"
 command -v cygpath >/dev/null 2>&1 && SOURCE="$(cygpath -m "$FW")"
+# Which firmware, and which branch of it. The repository's own name rather than
+# the directory's, so a checkout kept aside for this build does not report
+# itself as a fork of anything. It is also what a second engine would need,
+# whenever there is one: two modules built from two firmwares are otherwise
+# told apart only by a commit nobody recognises.
+ORIGIN="$(git -C "$FW" remote get-url origin 2>/dev/null || true)"
+NAME="$(basename "${ORIGIN%.git}")"
+NAME="${NAME:-$(basename "$FW")}"
+REF="$(git -C "$FW" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [ -n "$COMMIT" ]; then
-  # The commit and nothing else: the stamp is committed, and the path this was
-  # built from belongs to one machine.
-  printf '{"firmware": "%s"}\n' "$COMMIT" > "$OUT/render.built-from.json"
+  # No path: the stamp is committed, and where this was built belongs to one
+  # machine.
+  printf '{"firmware": "%s", "source": "%s", "ref": "%s"}\n' \
+    "$COMMIT" "$NAME" "$REF" > "$OUT/render.built-from.json"
 else
   # A firmware exported without .git has no commit to record. Writing an empty
   # one would read back as "no stamp", which counts as stale -- so every run

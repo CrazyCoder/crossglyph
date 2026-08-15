@@ -313,9 +313,10 @@ the Python wrapper replaced.
 
 ### Knowing when it is stale
 
-The build writes a stamp beside the module holding the firmware commit it came
-from. If a firmware checkout sits beside this repository and has moved past
-that commit, the preview says so once and draws anyway:
+The build writes a stamp beside the module holding the firmware it came from:
+the repository, the branch and the commit. If a firmware checkout sits beside
+this repository and has moved past that commit, the preview says so once and
+draws anyway:
 
 ```
 warning: the render core was built from crosspoint-reader 45caec3e76c2, and
@@ -328,6 +329,12 @@ An older renderer draws the page that older firmware drew, which is worth more
 than no preview. The warning exists because whoever moved the checkout is the
 one person who can rebuild the module, and it is said once per run rather than
 once per redraw.
+
+The checkout it compares against is `crosspoint-reader-engine` if there is one,
+which is a clone kept for the engine and left on `develop`, and a plain
+`crosspoint-reader` otherwise. That is what lets a working checkout be on any
+branch without the preview having an opinion about it. See
+[CONTRIBUTING.md](../CONTRIBUTING.md) for keeping it current.
 
 Without a checkout there is nothing to compare against, so nothing is claimed
 and nothing is printed. That is the released case, and the reason the module

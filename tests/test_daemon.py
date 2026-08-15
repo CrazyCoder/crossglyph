@@ -13,9 +13,8 @@ import pytest
 from crossglyph import daemon, render
 
 needs_wasm = pytest.mark.skipif(
-    render.is_stale(),
-    reason="the render core is missing or was built from other firmware; "
-           "run src/render/build.sh")
+    not render.WASM_PATH.is_file(),
+    reason="no src/crossglyph/render/render.wasm; run src/render/build.sh")
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 

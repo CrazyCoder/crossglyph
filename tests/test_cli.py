@@ -64,9 +64,9 @@ def test_a_core_with_no_stamp_says_so_rather_than_nothing(monkeypatch):
     from crossglyph import install
 
     monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
-    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: None)
+    monkeypatch.setattr(cli.stamp, "_stamp", dict)
     monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.ZIP)
-    assert "unknown commit" in cli.version_report()
+    assert "kept no record" in cli.version_report()
 
 
 def test_a_kind_that_cannot_update_itself_is_named(monkeypatch):

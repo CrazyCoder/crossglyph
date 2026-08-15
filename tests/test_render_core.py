@@ -11,10 +11,13 @@ import fontpaths
 from crossglyph import render
 
 WASM = render.WASM_PATH
+#: Missing, not stale. A core built from older firmware draws what that
+#: firmware drew and is the one a release ships, so it is exactly what these
+#: assertions are about; gating on staleness instead would silently drop a
+#: hundred tests the moment upstream moved.
 needs_wasm = pytest.mark.skipif(
-    render.is_stale(),
-    reason="the render core is missing or was built from other firmware; "
-           "run src/render/build.sh")
+    not render.WASM_PATH.is_file(),
+    reason="no src/crossglyph/render/render.wasm; run src/render/build.sh")
 
 
 @needs_wasm

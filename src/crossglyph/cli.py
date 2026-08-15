@@ -59,8 +59,7 @@ def version_report() -> str:
     said = install.label(install.detect(install.root()))
     note = f" ({said})" if said else ""
     return (f"crossglyph {version.installed()}{note}\n"
-            f"render core built from "
-            f"{stamp.FIRMWARE.name} {stamp.short(stamp.build_stamp())}")
+            f"render core built from {stamp.describe()}")
 
 
 def update_note() -> str:

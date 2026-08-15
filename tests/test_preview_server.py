@@ -11,11 +11,11 @@ from crossglyph import render
 
 SRC = fontpaths.truetype()
 needs = pytest.mark.skipif(
-    render.is_stale() or SRC is None,
+    not render.WASM_PATH.is_file() or SRC is None,
     reason="needs a render core and CROSSGLYPH_TEST_FONT")
 #: For the tests that build their own fonts: only the core has to be there.
 needs_core = pytest.mark.skipif(
-    render.is_stale(), reason="needs a current render core")
+    not render.WASM_PATH.is_file(), reason="needs a render core")
 
 
 def _conf(workspace):

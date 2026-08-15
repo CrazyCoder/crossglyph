@@ -13,7 +13,7 @@ ITALIC_SRC = fontpaths.italic()
 #: A face with real GSUB ligatures; sample has none at all.
 LIGATURE_SRC = fontpaths.cff()
 needs = pytest.mark.skipif(
-    render.is_stale() or SRC is None,
+    not render.WASM_PATH.is_file() or SRC is None,
     reason="needs a render core and CROSSGLYPH_TEST_FONT")
 needs_italic = pytest.mark.skipif(ITALIC_SRC is None,
                                   reason="set CROSSGLYPH_TEST_ITALIC to the italic face")
@@ -117,7 +117,7 @@ def test_hyphenation_draws_a_hyphen_the_text_never_asked_for(monkeypatch):
 #: so they are built here rather than hunted for in a font folder, where what
 #: the test asserted would depend on what had been dropped in it.
 needs_core = pytest.mark.skipif(
-    render.is_stale(), reason="needs a current build/render.wasm")
+    not render.WASM_PATH.is_file(), reason="needs build/render.wasm")
 
 
 def _pair(tmp_path):

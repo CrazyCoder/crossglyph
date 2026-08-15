@@ -245,10 +245,43 @@ somebody unpacking a zip.
 toolchain to build one with. Rebuild it after pulling the firmware, and after
 editing anything under `src/render/`.
 
+### Where it is built from
+
+The engine has a firmware checkout of its own, `crosspoint-reader-engine`
+beside this repository, tracking `develop`. Nothing works in it. A checkout
+you build firmware and run the emulator from moves between branches for
+reasons that have nothing to do with the preview, and every one of those moves
+would otherwise change what the core is built from and make the staleness
+warning fire.
+
+```sh
+uv run tools/update-engine.py            # clone it, or fetch and fast-forward
+uv run tools/update-engine.py --dry-run  # ask, change nothing
+uv run tools/update-engine.py --ref v1.2 # a one-off, detached
+```
+
+It reports which commits since the stamp touch anything the build compiles,
+sources and include directories both, so "has the renderer moved" is one
+command rather than a reading of the firmware log. It never builds: that needs
+emsdk, and on Windows a shell this is not.
+
+The build resolves the firmware in one order, and `render/stamp.py` resolves
+the same one so that what the module is built from and what it is judged
+against cannot drift:
+
+```
+$CROSSGLYPH_FIRMWARE  ->  ../crosspoint-reader-engine  ->  ../crosspoint-reader
+```
+
+The last of those keeps a single-checkout setup working, which is what a
+contributor and CI have. The first is how a build from a fork of the firmware
+works, without anything here knowing that forks exist. `$FW` overrides the lot
+for the build alone.
+
+### Building it
+
 It needs [emsdk](https://emscripten.org/docs/getting_started/downloads.html)
-and a [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader)
-checkout, both beside this repository. `$EMSDK` and `$FW` name them somewhere
-else.
+beside this repository, or `$EMSDK` naming it somewhere else.
 
 ```sh
 bash src/render/build.sh
@@ -268,10 +301,15 @@ framebuffer in a function local static because as a member of an `inline`
 variable it came out null in one translation unit and valid in another, so
 every drawn pixel vanished in silence.
 
-The build writes a stamp beside the module holding the firmware commit it came
-from. A checkout whose firmware has moved past that commit gets a warning, once
-per run, and the preview draws with the older renderer until you rebuild. A
-release has no firmware checkout, so nothing is compared and nothing is said.
+The build writes a stamp beside the module: the commit, the repository it came
+from and the branch it was on. A checkout whose firmware has moved past that
+commit gets a warning, once per run, and the preview draws with the older
+renderer until you rebuild. A release has no firmware checkout, so nothing is
+compared and nothing is said.
+
+The repository name is in the stamp because the directory it was built from is
+not the answer: an engine checkout is named for its job, and a second firmware
+would be a second name. `crossglyph --version` reports what the stamp says.
 
 ## Writing
 

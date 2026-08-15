@@ -16,10 +16,29 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 WASM_PATH = pathlib.Path(__file__).resolve().parent / "render.wasm"
 STAMP_PATH = WASM_PATH.with_name("render.built-from.json")
 
+#: Where the firmware comes from, first that exists: a checkout that belongs to
+#: the engine build and is on one branch for that reason, then a shared one.
+#: $CROSSGLYPH_FIRMWARE beats both, which is also how a fork of the firmware is
+#: built from without anything here knowing about forks.
+#:
+#: src/render/build.sh resolves $FW from the same list, and a test asserts they
+#: agree: one decides what the module is built from, this decides whether it is
+#: out of date, and a disagreement makes both answers wrong.
+ENGINE_DIRS = ("crosspoint-reader-engine", "crosspoint-reader")
+
+
+def _firmware() -> pathlib.Path:
+    named = os.environ.get("CROSSGLYPH_FIRMWARE")
+    if named:
+        return pathlib.Path(named)
+    beside = (ROOT.parent / name for name in ENGINE_DIRS)
+    return next((path for path in beside if path.is_dir()),
+                ROOT.parent / ENGINE_DIRS[-1])
+
+
 #: Only a checkout has this. Without one there is nothing to compare the
 #: module against, and is_stale() says so rather than guessing.
-FIRMWARE = pathlib.Path(os.environ.get("CROSSGLYPH_FIRMWARE")
-                        or ROOT.parent / "crosspoint-reader")
+FIRMWARE = _firmware()
 
 
 def short(commit: str | None) -> str:
@@ -27,9 +46,19 @@ def short(commit: str | None) -> str:
 
 
 def describe() -> str:
-    stamp = build_stamp()
-    return (f"{FIRMWARE.name} {short(stamp)}" if stamp
-            else "sources it kept no record of")
+    """What the module was built from, as a sentence fragment.
+
+    The firmware the stamp names, not the directory found beside this repo:
+    those differ as soon as the engine is built from a checkout of its own,
+    and they would differ again for a second firmware.
+    """
+    stamp = _stamp()
+    commit = stamp.get("firmware")
+    if not commit:
+        return "sources it kept no record of"
+    where = " ".join(part for part in (stamp.get("source") or FIRMWARE.name,
+                                       stamp.get("ref")) if part)
+    return f"{where} {short(commit)}"
 
 
 def _stamp() -> dict:
