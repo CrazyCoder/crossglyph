@@ -172,6 +172,35 @@ def test_a_plain_page_load_is_a_rescan_too(client, two_families):
     assert "bold" in server.family_config("Probe").styles
 
 
+def test_the_bundled_faces_are_watched_as_well(client, two_families):
+    """They are not families and never reach the picker, but a build fills
+    holes from them, so a set that appears changes what a page is drawn with
+    while no font and no config has moved."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    before = server.workspace_stamp()
+    bundled = fontbuild.SOURCE_DIR / fontbuild.FALLBACK_NAME
+    bundled.mkdir()
+    box_font(bundled / fontbuild.ANCHOR_FACE, [0x20, 0x41], family="NotoSans")
+    assert server.workspace_stamp() != before
+
+
+def test_a_fetched_fallback_set_is_not_answered_for_out_of_the_old_cache():
+    """Which faces a build would fill from is worked out once and kept. Left
+    alone, a set fetched under a running app was invisible to every render
+    after it: the answer from when there was nothing there kept coming back."""
+    from crossglyph.preview import server
+
+    server._bundled_faces.cache_clear()
+    server._bundled_faces("nowhere", "base")
+    assert server._bundled_faces.cache_info().currsize == 1
+    server.forget_families()
+    assert server._bundled_faces.cache_info().currsize == 0
+
+
 def test_a_folder_that_has_not_moved_keeps_what_it_resolved(client,
                                                             two_families):
     """The fingerprint earns its walk here: forgetting on every ask would make

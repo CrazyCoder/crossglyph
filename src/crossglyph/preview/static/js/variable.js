@@ -198,16 +198,20 @@ export function refreshFamilies(d) {
   }
   familyPicker.value = chosen;
   const entry = familyEntries.get(chosen);
+  // Nothing about this family moved, only the list around it. The common
+  // case by far -- every return to the tab -- and it does nothing at all.
+  if (JSON.stringify(before) === JSON.stringify(entry)) return;
+
   if (JSON.stringify(before && before.tuning)
       === JSON.stringify(entry.tuning)) {
-    // Only the list around it moved. The badges and the feature rows are
-    // re-shown, because the file behind a slot can be replaced without its
-    // config changing a word, and both are read off the font rather than
-    // typed. Nothing that holds what you typed is touched -- showExport would
-    // put the export fields back to the file on every single return to the
-    // tab, and those have nowhere else to live either.
+    // The knobs are still what the file has, but something else about the
+    // family did move: most often the file behind a slot was replaced. Re-show
+    // what is read off the font, and draw again, because the page in front of
+    // you was drawn with the face as it was. Not showExport -- it writes into
+    // fields you may have typed in, which have nowhere else to live either.
     showFaces();
     showFeatures(entry);
+    renderNow();
     return;
   }
   if (!unsavedWork()) {

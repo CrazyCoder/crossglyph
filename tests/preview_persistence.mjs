@@ -3634,6 +3634,37 @@ for (const { name, text } of sources) {
         env.fetches.defaults);
 }
 
+// A folder that has not moved is the case that happens every single time, so
+// it has to cost nothing -- and a face swapped under an unchanged config is
+// the case that looks like nothing and is not.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { later: DEFAULTS });
+  const drawn = env.fetches.render;
+  env.returning();
+  await settle();
+  check("a folder that has not moved is not redrawn",
+        env.fetches.render === drawn, env.fetches.render);
+}
+
+{
+  const later = structuredClone(DEFAULTS);
+  // An italic dropped in beside the family, which its config says nothing
+  // about: the knobs are untouched and the page is still drawn with two faces.
+  later.families.find(one => one.name === "Alto")
+       .faces = ["bold", "italic", "regular"];
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  const shown = () => env.badges.children.map(b => b.dataset.loaded).join();
+  const drawn = env.fetches.render;
+  check("two of the four to start with", shown() === "yes,yes,no,no", shown());
+
+  env.returning();
+  await settle();
+  check("a face that arrived under an unchanged config lights its badge",
+        shown() === "yes,yes,yes,no", shown());
+  check("and the page is drawn again, since the one on it has no italic",
+        env.fetches.render === drawn + 1, env.fetches.render);
+}
+
 // A config edited in an editor, with nothing of yours in the panel to lose.
 {
   const later = structuredClone(DEFAULTS);

@@ -1253,6 +1253,10 @@ def fetch(request: FetchRequest) -> StreamingResponse:
             for step in fontbuild.fetch_steps(
                     fontbuild.SOURCE_DIR, request.intervals, request.text):
                 if step["event"] == "done":
+                    # Before the page is told, so the render it draws next
+                    # fills from what has just landed rather than from the
+                    # answer worked out when there was nothing there.
+                    forget_families()
                     step["where"] = str(fontbuild.fallback_dir() or "")
                 yield json.dumps(step) + "\n"
         # The headers are long gone by here, so a failure travels as the last
@@ -1405,9 +1409,15 @@ def forget_families() -> None:
 
     A family can be addressed by several names and all.conf reaches every one
     of them, so the whole lot goes rather than one entry.
+
+    The bundled faces with them. They are not families and never show in the
+    picker, but which of them a build would fill from is worked out once and
+    kept, so a set fetched under a running app stayed invisible to every
+    render after it until the process was restarted.
     """
     _config_cached.cache_clear()
     _styles_cached.cache_clear()
+    _bundled_faces.cache_clear()
 
 
 _workspace: tuple | None = None
@@ -1428,6 +1438,13 @@ def workspace_stamp() -> tuple:
     source = fontbuild.SOURCE_DIR
     files = fontconf.font_files(source)
     files += sorted(fontbuild.conf_dir(source).glob("*.conf"))
+    # The bundled faces too, which discovery skips on purpose and a build
+    # reads all the same: fetched, replaced or removed, they change what a
+    # page is drawn with while no font and no config has moved.
+    bundled = fontbuild.fallback_dir(source)
+    if bundled and bundled.is_dir():
+        files += sorted(path for path in bundled.iterdir()
+                        if path.suffix.lower() in fontconf.FONT_SUFFIXES)
     return tuple(stamp for stamp in map(file_stamp, files) if stamp)
 
 
