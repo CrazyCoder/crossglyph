@@ -159,15 +159,15 @@ def _apply(root: pathlib.Path) -> int:
             if watching and shown >= 0:
                 print()
             for kept in step["kept"]:
-                print(f"kept your fonts/{kept}. The new one is beside it as "
+                print(f"kept your {kept}. The new one is beside it as "
                       f"{kept.rsplit('/', 1)[-1]}{upgrade.SUFFIX}.")
             if step["staged"]:
                 print(f"{' and '.join(step['staged'])} will be replaced at "
                       f"the next launch. The one in use cannot be, since it "
                       f"is the file running this.")
             if step["converting"]:
-                print("The files at the root are no longer read. Deleting "
-                      "them is safe, and leaving them costs disk.")
+                print("The old source files at the root are no longer read. "
+                      "Deleting them is safe, and leaving them costs disk.")
             print(f"{step['version']} installed. Restart CrossGlyph to use "
                   f"it.")
     return 0

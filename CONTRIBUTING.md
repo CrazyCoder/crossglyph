@@ -147,6 +147,12 @@ builds and publishes the zip and container image, and puts the manifest on
 Pages. A tag that disagrees with `pyproject.toml` fails the run rather than
 shipping a release that misdescribes itself.
 
+The ZIP carries `compose.yaml` at its root, pinned to the same version as the
+native files under `versions/`. `Dockerfile`, `.dockerignore` and
+`compose.build.yaml` are checkout-only inputs and stay out of the ZIP. This
+keeps an installed release image-only while contributors can build the current
+tree with the Compose override documented in `docs/docker.md`.
+
 A second workflow, `test.yml`, runs the suite and the page against Ubuntu and
 Windows on every push and pull request. The release calls it before it builds
 anything, so a tag cannot publish what the suite has not passed. That is a

@@ -3,8 +3,6 @@ name: crossglyph
 services:
   crossglyph:
     image: ghcr.io/crazycoder/crossglyph:${CROSSGLYPH_TAG:-latest}
-    build:
-      context: .
     pull_policy: missing
     command: ["preview", "--no-open"]
     environment:

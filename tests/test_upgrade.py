@@ -28,6 +28,14 @@ LAUNCHER = "#!/bin/sh\n# a launcher with a fix in it\n"
 OLD_LAUNCHER = b"#!/bin/sh\n"
 
 
+def compose(version: str) -> bytes:
+    return (f"image: ghcr.io/crazycoder/crossglyph:"
+            f"${{CROSSGLYPH_TAG:-{version}}}\n").encode()
+
+
+SOURCE_COMPOSE = compose("latest")
+
+
 def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
              executable=False) -> bytes:
     """A release zip shaped the way tools/make-release.py builds one."""
@@ -41,6 +49,8 @@ def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
         archive.writestr(f"{inside}/pyproject.toml", f'version = "{version}"\n')
         archive.writestr(f"{inside}/src/crossglyph/cli.py", "print()\n")
         archive.writestr(f"{inside}/fonts/conf/all.conf", template)
+        archive.writestr(f"{PREFIX}/compose.yaml", compose(version))
+        archive.writestr(f"{inside}/compose.yaml", compose(version))
         if executable:
             info = zipfile.ZipInfo(f"{inside}/tools/uv.cmd")
             info.create_system = upgrade.UNIX
@@ -97,6 +107,8 @@ def release(tmp_path):
     # and a fixture that wrote CRLF here would be testing the line endings.
     (tmp_path / "versions" / OLD / "crossglyph.sh").write_bytes(OLD_LAUNCHER)
     (tmp_path / "crossglyph.sh").write_bytes(OLD_LAUNCHER)
+    (tmp_path / "versions" / OLD / "compose.yaml").write_bytes(compose(OLD))
+    (tmp_path / "compose.yaml").write_bytes(compose(OLD))
     (tmp_path / "fonts" / "conf").mkdir(parents=True)
     (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(TEMPLATE)
     layout.write_current(tmp_path, OLD)
@@ -369,7 +381,7 @@ def test_a_template_nobody_has_is_written(tmp_path):
     incoming = tmp_path / "incoming"
     (incoming / "fonts" / "conf").mkdir(parents=True)
     (incoming / "fonts" / "conf" / "all.conf").write_bytes(b"new\n")
-    assert upgrade.seed_workspace(tmp_path, incoming, None) == []
+    assert upgrade.seed_conffiles(tmp_path, incoming, None) == []
     assert (tmp_path / "fonts" / "conf" / "all.conf").read_bytes() == b"new\n"
 
 
@@ -385,7 +397,7 @@ def test_a_template_nobody_edited_is_replaced(release, served):
 def test_a_template_somebody_edited_is_kept(release, served):
     (release / "fonts" / "conf" / "all.conf").write_bytes(b"out = D:/mine\n")
     said = last(run(release))
-    assert said["kept"] == ["conf/all.conf"]
+    assert said["kept"] == ["fonts/conf/all.conf"]
     assert (release / "fonts" / "conf" / "all.conf").read_bytes() == \
         b"out = D:/mine\n"
     assert (release / "fonts" / "conf" / "all.conf.new").read_bytes() == \
@@ -404,6 +416,24 @@ def test_nothing_else_in_the_workspace_is_touched(release, served):
     assert (release / "fonts" / "Alto.ttf").read_bytes() == b"a font"
 
 
+# --- managed root configuration ------------------------------------------
+
+
+def test_an_untouched_compose_file_is_replaced_immediately(release, served):
+    said = last(run(release))
+    assert said["kept"] == []
+    assert (release / "compose.yaml").read_bytes() == compose(NEW)
+    assert not (release / "compose.yaml.new").exists()
+
+
+def test_an_edited_compose_file_is_kept(release, served):
+    (release / "compose.yaml").write_bytes(b"# my deployment\n")
+    said = last(run(release))
+    assert said["kept"] == ["compose.yaml"]
+    assert (release / "compose.yaml").read_bytes() == b"# my deployment\n"
+    assert (release / "compose.yaml.new").read_bytes() == compose(NEW)
+
+
 # --- converting a source download -----------------------------------------
 
 
@@ -416,6 +446,7 @@ def source(tmp_path):
     (tmp_path / "crossglyph.sh").write_text("#!/bin/sh\n", encoding="utf-8")
     (tmp_path / "fonts" / "conf").mkdir(parents=True)
     (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(TEMPLATE)
+    (tmp_path / "compose.yaml").write_bytes(SOURCE_COMPOSE)
     return tmp_path
 
 
@@ -425,6 +456,13 @@ def test_a_source_download_gains_a_version_and_a_current(source, served):
     assert said["converting"] is True
     assert layout.current(source) == NEW
     assert (source / "versions" / NEW / "pyproject.toml").is_file()
+
+
+def test_a_source_download_keeps_its_compose_file(source, served):
+    said = last(run(source, install.SOURCE))
+    assert said["kept"] == ["compose.yaml"]
+    assert (source / "compose.yaml").read_bytes() == SOURCE_COMPOSE
+    assert (source / "compose.yaml.new").read_bytes() == compose(NEW)
 
 
 def test_the_old_flat_tree_is_left_alone(source, served):

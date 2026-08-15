@@ -100,11 +100,11 @@ export function showAbout(about) {
   island.title = [`CrossGlyph ${about.version}`, ...said].join("\n");
 }
 
-// What the install left in the workspace, said the way the command line says
-// it: one install, one sentence, whichever surface asked for it.
+// What the install kept, said the way the command line says it: one install,
+// one sentence, whichever surface asked for it.
 function keptLine(kept) {
   return kept.map(name =>
-    ` Kept your fonts/${name}. The new one is beside it as ` +
+    ` Kept your ${name}. The new one is beside it as ` +
     `${name.split("/").pop()}.new.`).join("");
 }
 
@@ -129,7 +129,7 @@ export function showUpdateStep(step) {
         ? ` ${step.staged.join(" and ")} will be replaced at the next launch.`
         : "") +
       (step.converting
-        ? " The files at the root are no longer read." : "");
+        ? " The old source files at the root are no longer read." : "");
   }
 }
 

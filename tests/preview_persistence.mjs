@@ -3472,7 +3472,8 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage(), DEFAULTS, {
     about: { available: "2.0.0", latest: "2.0.0" },
     updateSteps: [{ event: "done", version: "2.0.0", converting: false, staged: [],
-                    kept: ["conf/all.conf"], where: "versions/2.0.0" }] });
+                    kept: ["fonts/conf/all.conf", "compose.yaml"],
+                    where: "versions/2.0.0" }] });
   env.about.apply();
   await settle();
   check("the file it kept is named",
@@ -3480,6 +3481,12 @@ for (const { name, text } of sources) {
         env.about.updated.textContent);
   check("and so is what was written beside it",
         env.about.updated.textContent.includes("all.conf.new"),
+        env.about.updated.textContent);
+  check("and the managed root file it kept is named",
+        env.about.updated.textContent.includes("compose.yaml"),
+        env.about.updated.textContent);
+  check("with its replacement beside it",
+        env.about.updated.textContent.includes("compose.yaml.new"),
         env.about.updated.textContent);
 }
 

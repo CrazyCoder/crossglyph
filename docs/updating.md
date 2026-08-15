@@ -82,9 +82,9 @@ It fetches the manifest, stops if there is nothing newer, downloads the
 release, checks it against the SHA-256 the manifest gave, unpacks it into
 `versions/<new version>`, and writes that version into `current`.
 
-Nothing is replaced in place. The version you were on stays where it is, and
-so does everything at the root: `update.conf`, your `fonts` folder, and the
-launcher, which is dealt with below. What is installed does not become what is
+The version you were on stays where it is. `update.conf` and your `fonts`
+folder persist at the root, while the launcher and Docker configuration follow
+the rules below. What is installed does not become what the native launcher is
 running until you start CrossGlyph again.
 
 The preview says so and stops offering the release, since it is already on the
@@ -140,6 +140,17 @@ An update never writes over a file you edited. For each file it ships into
 
 Everything else in `fonts` is yours and is not looked at.
 
+### Docker configuration
+
+The root `compose.yaml` follows the same rule as the workspace templates. An
+untouched copy is replaced with the new release's file. If you edited it, yours
+is kept and the new one is written as `compose.yaml.new`.
+
+Each release's Compose file selects that release's image by default, so a
+native launch and a container launch from the same folder run the same version.
+Put deployment settings in `.env` rather than editing `compose.yaml` when
+possible. CrossGlyph does not write `.env`.
+
 ### A source download
 
 A tree from the **Code** button on GitHub has no `versions` folder and no
@@ -148,9 +159,9 @@ adds those two things and changes nothing else. The launcher already prefers
 the versioned layout, so the next run starts the new version, and the install
 updates normally from then on.
 
-The files at the root are left where they are. They are no longer read, and
-deleting a folder somebody unpacked themselves is a larger act than adding two
-things to it. Delete them yourself if you want the disk back.
+The old source files at the root are left where they are, but the launcher no
+longer reads them. The shared `fonts` workspace and `compose.yaml` remain at the
+root because native and container launches both use them.
 
 The offer only appears when the published release is newer than the version in
 the tree. A snapshot taken from the default branch reports the version of the

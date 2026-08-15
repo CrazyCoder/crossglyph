@@ -26,11 +26,13 @@ docker compose logs -f
 docker compose down
 ```
 
-Compose pulls `ghcr.io/crazycoder/crossglyph:latest` when the image is absent.
-To build the image from the current checkout instead, add `--build`:
+An installed release pulls the image tagged with that release's version. A
+source checkout follows `latest`. To build the image from the current checkout,
+add its build override:
 
 ```sh
-docker compose up -d --build --wait
+docker compose -f compose.yaml -f compose.build.yaml \
+  up -d --build --wait
 ```
 
 ## Run builds and other commands
@@ -82,7 +84,7 @@ shell or in a `.env` file beside `compose.yaml`.
 | `CROSSGLYPH_BIND` | `127.0.0.1` | The host address that publishes the preview |
 | `CROSSGLYPH_UID` | `1000` | The user ID that writes workspace files on Linux |
 | `CROSSGLYPH_GID` | `1000` | The group ID that writes workspace files on Linux |
-| `CROSSGLYPH_TAG` | `latest` | The image tag to run |
+| `CROSSGLYPH_TAG` | Release version in an installed ZIP; `latest` in a checkout | The image tag to run |
 
 On Linux, set `CROSSGLYPH_UID` and `CROSSGLYPH_GID` to the owner of the
 workspace if that account does not use IDs 1000 and 1000. Docker Desktop
@@ -115,15 +117,24 @@ docker run --rm \
 
 ## Update the image
 
-Pull the image and recreate the service. The workspace is outside the
-container, so this does not replace fonts, configs, fallbacks or output.
+An installed ZIP defaults to its own version so native and container launches
+run the same code. Set `CROSSGLYPH_TAG` in `.env` to move a container-only
+deployment to another version, or to `latest` to follow each release. Then pull
+the selected image and recreate the service:
 
 ```sh
 docker compose pull
 docker compose up -d --wait
 ```
 
-Set `CROSSGLYPH_TAG` to a version tag to keep a deployment on one release.
+The workspace is outside the container, so this does not replace fonts,
+configs, fallbacks or output.
+
+A native `crossglyph update` replaces an untouched root `compose.yaml` with the
+one pinned to the new release. If you edited that file, the update keeps it and
+writes `compose.yaml.new` beside it. Put deployment settings in `.env` so the
+managed Compose file can update without a conflict.
+
 Published images support `linux/amd64` and `linux/arm64`. Each release also
 carries build provenance and an SBOM in the GitHub Container Registry.
 

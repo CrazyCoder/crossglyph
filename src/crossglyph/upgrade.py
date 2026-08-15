@@ -35,9 +35,13 @@ DOWNLOAD_TIMEOUT = 120.0
 
 CHUNK = 262144
 
-#: The user's, and never written over: the update seeds files into it under
+#: The user's, and never written over: an update seeds templates into it under
 #: the conffile rule below and touches nothing else in it.
 WORKSPACE = "fonts"
+
+#: Shipped root configuration. It follows the same conffile rule as workspace
+#: templates, while user-owned files such as update.conf are never considered.
+MANAGED = ("compose.yaml",)
 
 #: Written beside a file the user has edited, rather than over it.
 SUFFIX = ".new"
@@ -110,45 +114,55 @@ def extract(archive: pathlib.Path, into: pathlib.Path, wanted: str) -> None:
                          f"{wanted} to install")
 
 
-def seed_workspace(root: pathlib.Path, incoming: pathlib.Path,
-                   shipped: pathlib.Path | None) -> list[str]:
-    """Put the new version's workspace templates where the user's workspace is.
+def _seed_conffile(live: pathlib.Path, arriving: pathlib.Path,
+                   was: pathlib.Path | None) -> bool:
+    """Apply one conffile. True means the live edit was kept."""
+    body = arriving.read_bytes()
+    if live.is_file():
+        theirs = live.read_bytes()
+        if theirs == body:
+            return False
+        if not (was and was.is_file() and was.read_bytes() == theirs):
+            live.with_name(live.name + SUFFIX).write_bytes(body)
+            return True
+    live.parent.mkdir(parents=True, exist_ok=True)
+    live.write_bytes(body)
+    return False
 
-    The conffile rule, which is Debian's and exists because these are files a
-    tool ships and a user then edits:
+
+def seed_conffiles(root: pathlib.Path, incoming: pathlib.Path,
+                   shipped: pathlib.Path | None) -> list[str]:
+    """Install shipped files a user may edit, preserving real edits.
+
+    The conffile rule is Debian's:
 
         absent               -> write it
         as it shipped        -> write it, since they never touched it
         anything else        -> keep theirs, and write <name>.new beside it
 
-    `shipped` is the copy that came with the version being replaced, which is
-    what tells an edited file from one that has simply changed between
-    releases. A source download has none, so a file that differs is kept and
-    gets a .new rather than being assumed untouched. That errs towards leaving
-    what somebody wrote where they wrote it.
-
-    Returns the files kept, so whoever asked for the update can be told a .new
-    is sitting there.
+    `shipped` is the version being replaced. A source download has no baseline,
+    so a differing live file is kept. Returned paths are relative to the
+    install root, for the update result to name.
     """
-    source = incoming / WORKSPACE
     kept = []
+    source = incoming / WORKSPACE
     for path in sorted(source.rglob("*")) if source.is_dir() else []:
         if not path.is_file():
             continue
         relative = path.relative_to(source)
         live = root / WORKSPACE / relative
-        arriving = path.read_bytes()
-        if live.is_file():
-            theirs = live.read_bytes()
-            if theirs == arriving:
-                continue
-            was = shipped / WORKSPACE / relative if shipped else None
-            if not (was and was.is_file() and was.read_bytes() == theirs):
-                live.with_name(live.name + SUFFIX).write_bytes(arriving)
-                kept.append(str(relative).replace("\\", "/"))
-                continue
-        live.parent.mkdir(parents=True, exist_ok=True)
-        live.write_bytes(arriving)
+        was = shipped / WORKSPACE / relative if shipped else None
+        if _seed_conffile(live, path, was):
+            kept.append(live.relative_to(root).as_posix())
+
+    for name in MANAGED:
+        arriving = incoming / name
+        if not arriving.is_file():
+            continue
+        live = root / name
+        was = shipped / name if shipped else None
+        if _seed_conffile(live, arriving, was):
+            kept.append(name)
     return kept
 
 
@@ -300,7 +314,7 @@ def steps(root: pathlib.Path, kind: str | None = None) -> Iterator[dict]:
         extract(archive, incoming, found.version)
         # The copy the version being replaced shipped, which is what tells an
         # edited file from one that changed between releases.
-        kept = seed_workspace(root, incoming,
+        kept = seed_conffiles(root, incoming,
                               layout.version_dir(root, live) if live else None)
         stale = swap(incoming, landing)
         layout.write_current(root, found.version)

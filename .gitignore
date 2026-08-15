@@ -4,6 +4,8 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+# Host-specific Docker deployment settings.
+.env
 # The workspace ships empty apart from the note that says what goes in it. A
 # negation cannot reach inside an ignored directory, so the directory itself is
 # never ignored, only its contents.

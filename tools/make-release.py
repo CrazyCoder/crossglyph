@@ -35,13 +35,18 @@ REPO = "CrazyCoder/crossglyph"
 #: update leaves it beside the live one, which applies it at the next launch.
 LAUNCHERS = frozenset({"crossglyph.cmd", "crossglyph.sh"})
 
+#: Shipped configuration that lives at the install root. Unlike a launcher it
+#: can be replaced during an update. The version copy is the byte-for-byte
+#: baseline that distinguishes an untouched file from one the user edited.
+MANAGED = frozenset({"compose.yaml"})
+
 #: The user's, and never written by an update: what they set stays set.
 #: `current` is generated rather than tracked, so it is not here.
 USERS = frozenset({"update.conf"})
 
 #: What lands at the root of the install as well as, or instead of, inside a
 #: version. Everything here outlives any one version.
-ROOT_FILES = LAUNCHERS | USERS
+ROOT_FILES = LAUNCHERS | MANAGED | USERS
 
 #: "Version made by", saying Unix. It is what decides whether a reader honours
 #: the mode at all: an entry claiming DOS carries no mode a POSIX unzip will
@@ -57,13 +62,13 @@ DEFAULT_MODE = 0o100644
 #: directory, filled in per build.
 REQUIRED = [
     "current",
-    "crossglyph.sh", "crossglyph.cmd", "update.conf",
+    "crossglyph.sh", "crossglyph.cmd", "compose.yaml", "update.conf",
     "fonts/README.md", "fonts/conf/all.conf",
-    # The same two inside the version: what an update compares against to tell
-    # a file the user edited from one that changed between releases.
+    # The version copies are the shipped baselines that tell an untouched
+    # root file from one the user edited.
+    "{v}/compose.yaml",
     "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
-    # And the launcher, which is where a staged one comes from. Without these
-    # a release can never fix the launcher of an install already out there.
+    # The launcher copy is what an update stages beside the live one.
     "{v}/crossglyph.cmd", "{v}/crossglyph.sh",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
     "{v}/THIRD-PARTY-NOTICES.md",
@@ -86,8 +91,9 @@ REQUIRED = [
 #: `export-ignore` and .gitignore are what keep them out; this is the check.
 EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
             ".github/workflows/release.yml", ".github/workflows/test.yml",
+            ".dockerignore", "Dockerfile", "compose.build.yaml",
             ".update-state.json",
-            # The interpreter pin is the checkout's and CI's. Shipping it
+            # The interpreter pin is for the checkout and CI. Shipping it
             # would have every install fetch that exact patch, and one more
             # of them for every release that moved it.
             ".python-version"]
@@ -104,23 +110,31 @@ EXECUTABLE = [
 def release_paths(path: str, version: str) -> tuple[str, ...]:
     """Where a tracked file lands in the release tree, which can be twice.
 
-    Everything belongs to one version except the launcher and the workspace,
-    which outlive every version: an update adds a directory under versions/
-    and rewrites `current`, and must not touch either of those.
+    Everything belongs to one version except the launchers, managed root
+    configuration and workspace, which outlive every version.
 
-    Two kinds of file land in both places, for the same reason from opposite
-    ends: the root copy is live and the version copy is the record. For a
-    workspace file that record is how an update tells a file somebody edited
-    from one that changed between releases. For the launcher it is the new one
-    itself, which an update stages beside the running copy.
-
-    They are a few kilobytes between them.
+    A duplicated root file is live; its version copy is either the shipped
+    baseline used to distinguish an untouched file from a user edit, or, for a
+    launcher, the new file staged beside the one that is running.
     """
     if path in USERS:
         return (path,)
-    if path in LAUNCHERS or path == "fonts" or path.startswith("fonts/"):
+    if (path in LAUNCHERS or path in MANAGED
+            or path == "fonts" or path.startswith("fonts/")):
         return (path, f"versions/{version}/{path}")
     return (f"versions/{version}/{path}",)
+
+
+def packaged_body(path: str, body: bytes, version: str) -> bytes:
+    """Pin the image in an installed release; a checkout follows `latest`."""
+    if path != "compose.yaml":
+        return body
+    marker = b"${CROSSGLYPH_TAG:-latest}"
+    if body.count(marker) != 1:
+        raise ValueError("compose.yaml must contain exactly one default image "
+                         "tag for the release builder to pin")
+    pinned = f"${{CROSSGLYPH_TAG:-{version}}}".encode()
+    return body.replace(marker, pinned)
 
 
 def version() -> str:
@@ -218,7 +232,7 @@ def repack(source: zipfile.ZipFile, out: pathlib.Path, name: str,
             if info.is_dir():
                 continue
             inner = info.filename[len(name) + 1:]
-            body = source.read(info)
+            body = packaged_body(inner, source.read(info), version)
             for where in release_paths(inner, version):
                 moved = zipfile.ZipInfo(f"{name}/{where}",
                                         date_time=info.date_time)

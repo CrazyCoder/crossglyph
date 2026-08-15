@@ -56,6 +56,12 @@ def test_the_packer_and_the_updater_mean_the_same_launcher():
     assert set(make_release.LAUNCHERS) == set(upgrade.LAUNCHERS)
 
 
+def test_the_packer_and_updater_mean_the_same_managed_files():
+    from crossglyph import upgrade
+
+    assert set(make_release.MANAGED) == set(upgrade.MANAGED)
+
+
 @pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
 def test_the_launcher_lands_in_both_places(path):
     """The root copy is the one that runs. The one inside the version is what
@@ -63,6 +69,11 @@ def test_the_launcher_lands_in_both_places(path):
     launcher of an install already out there."""
     assert make_release.release_paths(path, "0.2.0") == \
         (path, f"versions/0.2.0/{path}")
+
+
+def test_managed_root_configuration_lands_in_both_places():
+    assert make_release.release_paths("compose.yaml", "0.2.0") == \
+        ("compose.yaml", "versions/0.2.0/compose.yaml")
 
 
 @pytest.mark.parametrize("path", [
@@ -82,6 +93,24 @@ def test_the_version_directory_carries_its_own_uv():
         == ("versions/0.2.0/tools/uv.cmd",)
 
 
+def test_the_production_compose_file_is_image_only():
+    assert b"\n    build:" not in (REPO / "compose.yaml").read_bytes()
+
+
+def test_the_packaged_compose_default_is_the_release_version():
+    source = b"image: repo:${CROSSGLYPH_TAG:-latest}\n"
+    assert make_release.packaged_body("compose.yaml", source, "0.2.0") == \
+        b"image: repo:${CROSSGLYPH_TAG:-0.2.0}\n"
+
+
+def test_the_release_builder_refuses_an_ambiguous_compose_default():
+    with pytest.raises(ValueError, match="exactly one"):
+        make_release.packaged_body(
+            "compose.yaml",
+            b"${CROSSGLYPH_TAG:-latest}${CROSSGLYPH_TAG:-latest}",
+            "0.2.0")
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     """A real release archive, packed the way make-release.py packs one.
@@ -96,7 +125,8 @@ def built(tmp_path_factory):
     name = f"crossglyph-{version}"
     work = tmp_path_factory.mktemp("release")
     flat, out = work / "flat.zip", work / f"{name}.zip"
-    subprocess.run(["git", "-C", str(REPO), "archive", "--format=zip",
+    subprocess.run(["git", "-C", str(REPO), "archive",
+                    "--worktree-attributes", "--format=zip",
                     f"--prefix={name}/", "-o", str(flat), "HEAD"], check=True)
     with zipfile.ZipFile(flat) as source:
         make_release.repack(source, out, name, version)
@@ -118,6 +148,8 @@ def test_the_archive_holds_both_halves_of_the_release(built, members):
     assert "crossglyph.cmd" in members and "crossglyph.sh" in members
     assert "fonts/conf/all.conf" in members
     assert f"versions/{version}/pyproject.toml" in members
+    assert "compose.yaml" in members
+    assert f"versions/{version}/compose.yaml" in members
     assert f"versions/{version}/src/crossglyph/cli.py" in members
     assert f"versions/{version}/tools/uv.cmd" in members
 
@@ -129,6 +161,10 @@ def test_neither_half_leaks_into_the_other(built, members):
     version, _, _ = built
     assert "src/crossglyph/cli.py" not in members
     assert f"versions/{version}/update.conf" not in members
+    assert "Dockerfile" not in members
+    assert ".dockerignore" not in members
+    assert "compose.build.yaml" not in members
+    assert f"versions/{version}/Dockerfile" not in members
 
 
 def test_the_two_copies_of_a_template_are_the_same_bytes(built):
@@ -138,6 +174,16 @@ def test_the_two_copies_of_a_template_are_the_same_bytes(built):
     with zipfile.ZipFile(path) as archive:
         assert archive.read(f"{name}/fonts/conf/all.conf") == \
             archive.read(f"{name}/versions/{version}/fonts/conf/all.conf")
+
+
+def test_the_two_compose_files_are_identical_and_pinned(built):
+    version, name, path = built
+    with zipfile.ZipFile(path) as archive:
+        live = archive.read(f"{name}/compose.yaml")
+        baseline = archive.read(f"{name}/versions/{version}/compose.yaml")
+    assert live == baseline
+    assert f"${{CROSSGLYPH_TAG:-{version}}}".encode() in live
+    assert b"${CROSSGLYPH_TAG:-latest}" not in live
 
 
 def test_the_executables_extract_executable(built, members):

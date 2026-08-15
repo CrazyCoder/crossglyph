@@ -261,16 +261,19 @@ def test_being_up_to_date_is_not_a_failure(capsys, monkeypatch):
     assert "up to date" in capsys.readouterr().out
 
 
-def test_a_file_that_was_kept_is_named(capsys, monkeypatch):
-    """A .new sitting in the workspace that nobody was told about is a file
-    nobody ever reads."""
+@pytest.mark.parametrize(
+    ("kept", "replacement"),
+    [("fonts/conf/all.conf", "all.conf.new"),
+     ("compose.yaml", "compose.yaml.new")])
+def test_a_file_that_was_kept_is_named(capsys, monkeypatch, kept, replacement):
+    """A .new nobody was told about is a file nobody ever reads."""
     monkeypatch.setattr(cli.upgrade, "steps", steps(
-        {"event": "done", "version": "0.2.0", "kept": ["conf/all.conf"],
+        {"event": "done", "version": "0.2.0", "kept": [kept],
          "staged": [],
          "converting": False, "where": "versions/0.2.0"}))
     cli.main(["update"])
     said = capsys.readouterr().out
-    assert "fonts/conf/all.conf" in said and "all.conf.new" in said
+    assert kept in said and replacement in said
 
 
 def test_a_staged_launcher_is_named_and_so_is_when_it_lands(capsys,
