@@ -123,8 +123,14 @@ def test_a_kind_with_an_update_waiting_says_what_to_do_about_it(kind):
     assert install.notice(kind, True) == install.instruction(kind)
 
 
-def test_a_release_with_nothing_to_update_to_says_nothing():
-    assert install.notice(install.ZIP, False) == ""
+@pytest.mark.parametrize("kind", [install.ZIP, install.CONTAINER,
+                                  install.CHECKOUT, install.UNKNOWN])
+def test_an_install_with_nothing_to_update_to_says_nothing(kind):
+    """Whichever kind it is. A clone level with the published release has
+    nothing to pull, and a line telling it to pull anyway is an instruction to
+    fetch what it already has -- shown on every page load, including the ones
+    where the check could not reach the server to find out."""
+    assert install.notice(kind, False) == ""
 
 
 def test_a_source_download_says_so_whether_or_not_there_is_an_update():
@@ -137,10 +143,12 @@ def test_a_source_download_says_so_whether_or_not_there_is_an_update():
 
 @pytest.mark.parametrize("kind", [install.CONTAINER, install.CHECKOUT,
                                   install.UNKNOWN])
-def test_a_kind_that_cannot_update_itself_says_so_standing(kind):
-    """Worth saying when there is nothing to act on: what somebody can do here
-    is not what the buttons on this page do."""
-    assert install.notice(kind, False) == install.instruction(kind)
+def test_a_kind_that_cannot_update_itself_is_told_how_when_there_is_a_release(
+        kind):
+    """The button cannot do it for them, so the sentence has to say what
+    would -- but only once there is something to do."""
+    assert install.notice(kind, True) == install.instruction(kind)
+    assert install.notice(kind, False) == ""
 
 
 def test_a_kind_nobody_declared_is_named_rather_than_hidden():

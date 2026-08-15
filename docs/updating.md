@@ -31,7 +31,15 @@ note: 0.2.0 is available. Run crossglyph update to install it.
 
 The second sentence depends on how CrossGlyph was installed. A clone is told
 to pull, a container to take the new image, an unpacked release to run the
-command above.
+command above. None of them is told anything while there is nothing to do: the
+comparison is the version this install reports against the published one, so a
+clone that is behind that release hears about it and one that is not is left
+alone.
+
+A source download is the exception, and says what it is whatever the check
+found. Its version is whatever the last release set, so a tree taken from the
+main branch after that reports the release and compares as up to date while
+holding rather more than it did.
 
 In the preview, the island under the specimen names the new version where it
 otherwise says when it last looked. Beside that is one button: **Check now**

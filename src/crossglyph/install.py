@@ -118,14 +118,20 @@ def notice(kind: str, available: bool) -> str:
 
     One place decides this, so the page and the command line cannot come to
     disagree and neither has to work out for itself when there is something to
-    say. A release with nothing to update to says nothing at all: naming the
-    ordinary case on every run is noise.
+    say. An install with nothing to update to says nothing at all, whichever
+    kind it is: what a clone would have to do about a release it is not behind
+    is nothing, and standing there telling it to pull is an instruction to
+    fetch what it already has.
+
+    The comparison behind `available` is a version against the published one,
+    so a clone whose pyproject is behind that release is told and one that is
+    not is left alone. What that cannot see is a clone level with the release
+    and behind it in commits, which is the caveat a source download carries
+    below and a clone is expected to know about itself.
     """
     if available:
         return instruction(kind)
-    if kind in STANDING:
-        return STANDING[kind]
-    return "" if can_self_update(kind) else instruction(kind)
+    return STANDING.get(kind, "")
 
 
 def label(kind: str) -> str:
