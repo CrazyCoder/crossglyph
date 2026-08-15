@@ -88,10 +88,13 @@ def test_as_dict_carries_every_knob():
 
 # --- byte-compatibility ---------------------------------------------------
 
-def _build(tmp_path, name, **kwargs):
+def _build(tmp_path, name, source=None, **kwargs):
+    """`source` defaults to the face the machine supplies. A test whose
+    subject is a feature a face lacks passes one it built itself."""
     path = tmp_path / f"{name}.cpfont"
     cpfont.generate_cpfont_multistyle(
-        {0: str(SRC)}, 13, cpfont.resolve_intervals("base"), str(path), **kwargs)
+        {0: str(source or SRC)}, 13, cpfont.resolve_intervals("base"),
+        str(path), **kwargs)
     return path.read_bytes()
 
 
@@ -544,12 +547,21 @@ def test_proportional_figures_leave_the_letters_alone(tmp_path):
         assert _advance(prop, ord(ch)) == _advance(plain, ord(ch))
 
 
-@needs_font
 def test_a_font_without_pnum_is_honestly_unmoved(tmp_path):
-    """sample has no pnum feature, so the knob does nothing there -- the same
-    shape as ligatures on a face with no ligature pairs. Inert, not broken."""
-    assert _build(tmp_path, "a") == \
-        _build(tmp_path, "b", tuning=Tuning(figures="proportional"))
+    """A face with no pnum feature is unmoved by the knob, the same shape as
+    ligatures on a face with no ligature pairs. Inert, not broken.
+
+    Built here rather than taken from the machine: the subject is a face
+    *without* the feature, and a font somebody points at may well have one.
+    This asserted a property of whatever CROSSGLYPH_TEST_FONT happened to
+    name, and a build of Arial that carries pnum failed it.
+    """
+    import fontsmith
+
+    face = fontsmith.box_font(tmp_path / "Probe-Regular.ttf",
+                              [ord(ch) for ch in "0123456789abc"])
+    assert _build(tmp_path, "a", face) == \
+        _build(tmp_path, "b", face, tuning=Tuning(figures="proportional"))
 
 
 @needs_cff

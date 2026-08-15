@@ -172,13 +172,17 @@ needs_font = pytest.mark.skipif(SRC is None,
                                 reason="set CROSSGLYPH_TEST_FONT to a TTF")
 
 
-def _cpfont(tmp_path, intervals="base", **kwargs):
-    """A real .cpfont, built by the converter these tests share with the CLI."""
+def _cpfont(tmp_path, intervals="base", source=None, **kwargs):
+    """A real .cpfont, built by the converter these tests share with the CLI.
+
+    `source` names the face, and defaults to the one the machine supplies. A
+    test whose subject is what a face does *not* carry passes its own.
+    """
     from crossglyph import cpfont
     path = tmp_path / "probe.cpfont"
     cpfont.generate_cpfont_multistyle(
-        {0: str(SRC)}, 13, cpfont.resolve_intervals(intervals), str(path),
-        **kwargs)
+        {0: str(source or SRC)}, 13, cpfont.resolve_intervals(intervals),
+        str(path), **kwargs)
     return path
 
 
@@ -215,12 +219,21 @@ def test_glyphs_reach_ram_only_once_prewarmed(tmp_path):
 
 
 @needs_wasm
-@needs_font
 def test_a_font_without_a_replacement_glyph_reports_one_miss(tmp_path):
     """prewarm always requests U+FFFD alongside the text, and the converter
-    drops codepoints the face has no glyph for -- sample.ttf has no U+FFFD.
-    So one miss here is the device being right, not the module being wrong."""
-    blob = _cpfont(tmp_path).read_bytes()
+    drops codepoints the face has no glyph for. So one miss here is the device
+    being right, not the module being wrong.
+
+    The face is built here rather than read off the machine, because what is
+    under test is a face *without* U+FFFD and an absence is not something a
+    font somebody points at can be relied on to have. DejaVu carries one, and
+    against it this reported no misses at all while proving nothing.
+    """
+    import fontsmith
+
+    face = fontsmith.box_font(tmp_path / "Probe-Regular.ttf",
+                              [ord(letter) for letter in "abc"])
+    blob = _cpfont(tmp_path, source=face).read_bytes()
     module = render.load_module()
     module.call("rc_font_load", module.write(blob), len(blob))
     assert module.call("rc_font_prewarm", module.write(b"abc\x00")) == 1
@@ -841,22 +854,36 @@ def test_the_wrong_language_hyphenates_nothing_rather_than_wrongly(tmp_path):
     The failure mode is the benign one, and worth pinning as such: Liang
     patterns are built from their own script's letters, so the wrong language
     finds no breaks at all rather than breaking words in the wrong places.
+
+    Each language is measured against itself with hyphenation off, rather
+    than against the absence of hyphens, because a hyphen on the page is not
+    proof that the hyphenator put it there. A word too wide for its column is
+    split whatever the setting says, so "no hyphens anywhere" is a claim about
+    how wide the face is: true of a narrow one, false of a wide one, and a
+    test that passes for the wrong reason either way.
+
+    Turning hyphenation off does not stop the patterns deciding *where* such a
+    word breaks. The same overlong word lands on "communica-" under en, which
+    is a pattern point, and on "communicati-" under ru, which is as much as
+    fits. So the baseline has to share the language of the page it judges.
     """
     module = _loaded(tmp_path, intervals="cyrillic,latin-ext")
-    _spec(module, hyphenation=1)
     english = ("Typography is what language looks like, and international "
                "communication depends on consistently readable presentation.")
 
-    module.call("rc_page_set_language", module.write(b"en\x00"))
-    with_en = _lines(module, english, 200)
-    module.call("rc_page_set_language", module.write(b"ru\x00"))
-    with_ru = _lines(module, english, 200)
+    def laid_out(language, hyphenation):
+        _spec(module, hyphenation=hyphenation)
+        module.call("rc_page_set_language", module.write(language))
+        return _lines(module, english, 200)
 
-    assert any(line.endswith("-") for line in with_en), \
+    assert laid_out(b"ru\x00", 1) == laid_out(b"ru\x00", 0), \
+        "Russian patterns changed an English page: the wrong language must " \
+        "add nothing beyond the breaks the column width forces"
+
+    with_en = laid_out(b"en\x00", 1)
+    assert with_en != laid_out(b"en\x00", 0), \
         "English patterns found no break in English text"
-    assert not any(line.endswith("-") for line in with_ru), \
-        "Russian patterns broke an English word -- that would be wrong, " \
-        "not merely absent"
+    assert any(line.endswith("-") for line in with_en)
 
 
 @needs_wasm
