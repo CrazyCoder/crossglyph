@@ -74,12 +74,12 @@ def test_bundled_fallbacks_are_passed_in_the_workflow_order(config, tmp_path):
     kw = _kwargs(config, tmp_path / "out")
     assert _fallback_names(kw) == \
         list(fontbuild.BUNDLED_FALLBACKS) + ["NotoSansCJKjp-Regular.otf",
-                                             spacefont.FILENAME]
+                                             spacefont.cache_name()]
 
 
 def test_bundled_fallbacks_can_be_turned_off(config, tmp_path):
     kw = _kwargs(config, tmp_path / "out", "fallbacks = no\n")
-    assert _fallback_names(kw) == [spacefont.FILENAME], \
+    assert _fallback_names(kw) == [spacefont.cache_name()], \
         "only the space font survives; it is what keeps U+2006 drawable"
 
 
@@ -92,7 +92,7 @@ def test_the_space_font_comes_last_so_a_real_face_wins(config, tmp_path):
     """A fallback only fills what earlier faces lack, so this ordering is what
     lets a font that has its own U+2006 keep the designer's width."""
     kw = _kwargs(config, tmp_path / "out")
-    assert _fallback_names(kw)[-1] == spacefont.FILENAME
+    assert _fallback_names(kw)[-1] == spacefont.cache_name()
 
 
 def test_simplified_chinese_swaps_in_the_matching_cjk_fallbacks(config, tmp_path):
@@ -212,19 +212,54 @@ def test_a_second_family_declared_in_all_conf_is_still_claimed(tmp_path):
 
 
 def test_a_second_space_font_never_writes_over_the_first(tmp_path):
-    """Several workers reach a fresh output folder together, and each finds
-    the file missing. Whoever loses writes its own copy and drops it rather
-    than replacing one the converter may already have open."""
-    out = tmp_path / "out"
-    first = fontbuild.ensure_space_font(out)
+    """Several workers reach it together, and each finds the file missing.
+    Whoever loses writes its own copy and drops it rather than replacing one
+    the converter may already have open."""
+    # Widths of this test's own, so the file it writes to is nobody else's:
+    # the face is kept per machine now, and the suite runs several at once.
+    mine = {0x2009: 0.311}
+    first = fontbuild.ensure_space_font(mine)
     marked = first.read_bytes()
     first.write_bytes(marked + b"\0")           # tell this copy from another
+    try:
+        again = fontbuild.ensure_space_font(mine)
+        assert again == first
+        assert first.read_bytes() == marked + b"\0", "it was written over"
+        leftovers = [path.name for path in first.parent.iterdir()
+                     if path.name.startswith(first.name)]
+        assert leftovers == [first.name], "a temporary copy was left behind"
+    finally:
+        first.unlink(missing_ok=True)
 
-    again = fontbuild.ensure_space_font(out)
-    assert again == first
-    assert first.read_bytes() == marked + b"\0", "it was written over"
-    assert [p.name for p in out.iterdir() if p.name.startswith(first.name)] \
-        == [first.name], "a temporary copy was left behind"
+
+def test_the_space_face_is_not_left_where_a_build_is_copied_from(tmp_path):
+    """The output folder is the one folder here whose whole purpose is to be
+    copied onto a card, and this is an input to a build rather than a font to
+    read with: fourteen invisible glyphs, and a reader who copies it gains
+    nothing at all."""
+    assert fontbuild.space_font_path().parent != tmp_path
+    assert "cpfont" not in str(fontbuild.space_font_path().parent).lower()
+
+
+def test_a_different_space_table_is_a_different_file(tmp_path):
+    """Kept between builds and keyed on nothing, the first table written won
+    for good: a width edited in all.conf rebuilt every .cpfont from the spaces
+    as they were, with no way back short of deleting a hidden file."""
+    plain = fontbuild.space_font_path()
+    edited = fontbuild.space_font_path({0x2009: 0.9})
+    assert plain != edited
+
+
+def test_the_stray_space_face_is_swept_from_an_output_folder(tmp_path):
+    """Builds up to now left one in there, so the folders people already have
+    keep it until something takes it out."""
+    from crossglyph import spacefont
+
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / spacefont.STRAY_NAME).write_bytes(b"")
+    list(fontbuild.build_families([], out, keep=None))
+    assert not (out / spacefont.STRAY_NAME).exists()
 
 
 def test_a_renamed_family_leaves_an_orphan_directory(tmp_path):

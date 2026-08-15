@@ -19,6 +19,7 @@ import io
 import os
 import pathlib
 import struct
+import tempfile
 import time
 import typing
 
@@ -314,32 +315,53 @@ def fetch_fallbacks(source: pathlib.Path | str | None = None,
             if (target / name).is_file()]
 
 
-def space_font_path(out_dir: pathlib.Path) -> pathlib.Path:
-    return out_dir / spacefont.FILENAME
+def space_font_path(widths: dict[int, float] | None = None) -> pathlib.Path:
+    """Where the space-only face for these widths lives.
+
+    Not the output folder, which is the one folder here whose whole purpose is
+    to be copied onto a card: this is an input to a build and not a font to
+    read with, and a reader who copies it gains a face with fourteen invisible
+    glyphs in it. Not the workspace either, which can be mounted read-only
+    while the output is not. The temporary directory is writable wherever this
+    runs, it is nobody's to tidy, and a face that is swept from under a build
+    is written again by the worker that wants it.
+    """
+    return pathlib.Path(tempfile.gettempdir(), spacefont.cache_name(widths))
 
 
-def ensure_space_font(out_dir: pathlib.Path,
-                      widths: dict[int, float] | None = None) -> pathlib.Path:
+def ensure_space_font(widths: dict[int, float] | None = None) -> pathlib.Path:
     """Generate the space-only fallback font if it is not already there.
 
     Written under a name of this process's own and moved into place, because
     "is it there yet" and "write it" are two steps and several builds reach
-    them together: on a fresh output folder every worker finds the file
-    missing, and the second to open it for writing gets an OSError from
-    Windows while the first still has it.
+    them together: every worker finds the file missing, and the second to open
+    it for writing gets an OSError from Windows while the first still has it.
+
+    That race is wider than it used to be. The file is keyed on the widths and
+    kept where any build on the machine can find it, so the builds sharing it
+    are no longer only the ones writing to one output folder -- a command line
+    build and the preview's are two processes reaching this at once. Both ways
+    out end with the same bytes on disk, since the name is a digest of what is
+    in them.
     """
-    path = space_font_path(out_dir)
+    path = space_font_path(widths)
     if path.is_file():
         return path
     temporary = path.with_name(f"{path.name}.{os.getpid()}")
     spacefont.build(temporary, widths)
-    if path.is_file():
-        # Somebody else finished first. Theirs is as good as this one, and
-        # replacing a file the converter may already have open would only
-        # trade this race for another.
+    try:
+        if path.is_file():
+            # Somebody else finished first. Theirs is as good as this one, and
+            # replacing a file the converter may already have open would only
+            # trade this race for another.
+            temporary.unlink(missing_ok=True)
+        else:
+            os.replace(temporary, path)
+    except OSError:
+        # It appeared between the question and the answer, and on Windows it
+        # cannot be replaced while whoever wrote it still has it open. Theirs
+        # will do.
         temporary.unlink(missing_ok=True)
-    else:
-        os.replace(temporary, path)
     return path
 
 
@@ -369,7 +391,7 @@ def build_kwargs(variant: Variant, size: int, out_dir: pathlib.Path) -> dict:
     # spaces, so it cannot pad the build, and without it U+2006 and friends are
     # simply not drawn (see spacefont). Last, so a real face keeps its own.
     if config.space_glyphs:
-        fallbacks.append(str(space_font_path(out_dir)))
+        fallbacks.append(str(space_font_path(config.space_widths)))
 
     # A variable file fills several slots, each at its own coordinates, and the
     # optical size axis follows the size being built -- so this is per size and
@@ -478,7 +500,7 @@ class Built(typing.NamedTuple):
 def build_size(job: Job, out_dir: pathlib.Path) -> Built:
     """Build one .cpfont. Returns its size in bytes and its glyph count."""
     if job.variant.config.space_glyphs:
-        ensure_space_font(out_dir, job.variant.config.space_widths)
+        ensure_space_font(job.variant.config.space_widths)
     kwargs = build_kwargs(job.variant, job.size, out_dir)
     path = pathlib.Path(kwargs["output_path"])
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -625,7 +647,7 @@ def run_jobs(jobs: list[Job], out_dir: pathlib.Path,
     # doing it once up front means they all find it already written.
     for job in jobs:
         if job.variant.config.space_glyphs:
-            ensure_space_font(out_dir, job.variant.config.space_widths)
+            ensure_space_font(job.variant.config.space_widths)
 
     count = worker_count(len(jobs), workers)
     if count == 1:
@@ -700,6 +722,12 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
         for path in orphan_dirs(out_dir, keep):
             shutil.rmtree(path)
             removed.append(path.name)
+    # The space face that builds up to now left in here, which is ours and not
+    # a font to read with. Unreported: a line saying a hidden file went would
+    # need more explaining than the file was ever worth. Whatever the folder is
+    # on, a build that cannot delete from it is not a build worth failing.
+    with contextlib.suppress(OSError):
+        (out_dir / spacefont.STRAY_NAME).unlink(missing_ok=True)
 
     total = sum(len(plan.jobs) for plan in plans)
     yield {"event": "plan", "total": total, "out": str(out_dir),

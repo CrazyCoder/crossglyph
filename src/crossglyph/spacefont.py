@@ -44,7 +44,22 @@ DEFAULT_SPACE_WIDTHS = {
     0x3000: 1 / 1,    # IDEOGRAPHIC SPACE
 }
 
-FILENAME = ".crossglyph-spaces.ttf"
+#: What builds up to now left in the output folder. Nothing writes it any
+#: more; a build sweeps it out of the folders that have one, since that folder
+#: is what people copy to a card and this was never a font to read with.
+STRAY_NAME = ".crossglyph-spaces.ttf"
+
+
+def cache_name(overrides: dict[int, float] | None = None) -> str:
+    """What the face for these widths is called.
+
+    The digest is in the name because the file is kept between builds and the
+    widths are a setting: a table edited in all.conf has to produce a different
+    file rather than find the old one already there and use it. Twelve hex
+    digits, which is a collision nobody will see and a filename that still
+    fits on a screen.
+    """
+    return f"crossglyph-spaces-{spec_digest(overrides)[:12]}.ttf"
 
 
 def resolve_widths(overrides: dict[int, float] | None = None) -> dict[int, float]:

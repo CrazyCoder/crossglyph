@@ -209,6 +209,12 @@ U+202F are rewritten into a plain space before layout, so the device never asks
 a font for them, and a codepoint outside the table is rejected rather than
 silently ignored.
 
+The face itself is generated, and it is an input to a build rather than
+anything to put on a card: it lives in the temporary directory, named for a
+digest of the widths in it, and a build makes it if it is not already there.
+So a width edited here produces a different file rather than finding the old
+one and using it, and nothing lands in the folder you copy across.
+
 ## Tuning how glyphs look
 
 The device stores two bits per pixel, four levels, so every glyph passes
