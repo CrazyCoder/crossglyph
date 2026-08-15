@@ -47,12 +47,53 @@ Open <http://127.0.0.1:8000/> after starting the preview. Put TTF or OTF files
 in the local `fonts` folder. The running preview finds workspace changes when
 the page regains focus.
 
-Use these commands to read logs or stop either service:
+Follow the preview log:
 
 ```sh
 docker compose logs -f
+```
+
+### Stop the preview
+
+Stop a preview that uses the published image:
+
+```sh
 docker compose down
 ```
+
+Stop a preview that uses the local build:
+
+```sh
+docker compose -f compose.yaml -f compose.build.yaml down
+```
+
+Either command removes the CrossGlyph container and its Compose network. The
+image and the mounted workspace remain, so the next start is faster and the
+fonts are safe.
+
+### Remove the container and image
+
+To return the CrossGlyph-specific Docker resources to their state before the
+first start, add `--rmi all`. For the published image:
+
+```sh
+docker compose down --rmi all
+```
+
+For the local build:
+
+```sh
+docker compose -f compose.yaml -f compose.build.yaml down --rmi all
+```
+
+These commands stop and remove the container, Compose network and image used by
+the service. They do not delete anything from the mounted `fonts` folder.
+One-off commands shown with `run --rm` remove their containers when they finish.
+
+BuildKit may retain shared build cache and base-image layers. Docker does not
+provide a safe project-scoped command for removing them. Global prune commands
+can remove cache and resources used by unrelated projects, so they are not part
+of this cleanup.
 
 ## Run builds and other commands
 
