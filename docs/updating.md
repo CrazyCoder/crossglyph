@@ -41,8 +41,11 @@ found. Its version is whatever the last release set, so a tree taken from the
 default branch after that reports the release and compares as up to date while
 holding rather more than it did.
 
-In the preview, the island under the specimen names the new version where it
-otherwise says when it last looked. Beside that is one button: **Check now**
+In the preview, the island under the specimen answers the question: the new
+version when there is one, and **Up to date.** when there is not. When it last
+looked is a fact about that answer rather than the answer itself, so it sits
+on the line below with the rest of what this install is. Beside it is one
+button: **Check now**
 ordinarily, and **Update** in its place when there is a release this install
 can install. The name at the left of that line links the project, and the
 address comes from the same constant the updater fetches from, so the two

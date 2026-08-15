@@ -3198,9 +3198,13 @@ for (const { name, text } of sources) {
         + "nothing to update to",
         env.about.detail.textContent.endsWith("45caec3e76c2."),
         env.about.detail.textContent);
-  check("the line says when it last asked",
-        /^Checked .* ago\.$/.test(env.about.state.textContent),
+  check("the line answers the question the button asks, rather than saying "
+        + "when it was asked",
+        env.about.state.textContent === "Up to date.",
         env.about.state.textContent);
+  check("and when it last looked is kept, one line down",
+        /Checked .* ago\./.test(env.about.detail.textContent),
+        env.about.detail.textContent);
   check("and the one press on offer is asking again",
         env.about.button.hidden === false && env.about.update.hidden === true,
         `check ${env.about.button.hidden}, update ${env.about.update.hidden}`);
@@ -3234,8 +3238,9 @@ for (const { name, text } of sources) {
     firmware: null, kind: "container", can_self_update: false,
     available: "2.0.0", notice: "Pull the new image to update." },
   });
-  check("the notice takes the place of the commit",
-        env.about.detail.textContent === "Pull the new image to update.",
+  check("the notice takes the place of the commit, and stays last, being "
+        + "the one sentence with something to do in it",
+        env.about.detail.textContent.endsWith("Pull the new image to update."),
         env.about.detail.textContent);
   check("and a core with no stamp is left unsaid rather than guessed",
         !env.about.detail.textContent.includes("crosspoint-reader"),
