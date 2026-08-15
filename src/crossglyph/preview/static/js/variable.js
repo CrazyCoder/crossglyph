@@ -188,6 +188,9 @@ export function fillFamilies(d) {
 export function refreshFamilies(d) {
   const chosen = familyPicker.value;
   const before = familyEntries.get(chosen);
+  // Against the entry the controls were loaded from. Once the new list lands,
+  // an edit made on disk would otherwise look like unsaved work in the panel.
+  const hadUnsavedWork = unsavedWork();
   listFamilies(d);
   if (!familyEntries.has(chosen)) {
     // Its files have gone, so there is nothing left to draw it with and the
@@ -201,6 +204,11 @@ export function refreshFamilies(d) {
   // Nothing about this family moved, only the list around it. The common
   // case by far -- every return to the tab -- and it does nothing at all.
   if (JSON.stringify(before) === JSON.stringify(entry)) return;
+  if (!hadUnsavedWork) {
+    loadFamily();               // nothing of yours to lose: follow the file
+    renderNow();
+    return;
+  }
 
   if (JSON.stringify(before && before.tuning)
       === JSON.stringify(entry.tuning)) {
@@ -211,11 +219,6 @@ export function refreshFamilies(d) {
     // fields you may have typed in, which have nowhere else to live either.
     showFaces();
     showFeatures(entry);
-    renderNow();
-    return;
-  }
-  if (!unsavedWork()) {
-    loadFamily();               // nothing of yours to lose: follow the file
     renderNow();
     return;
   }

@@ -3728,4 +3728,46 @@ for (const { name, text } of sources) {
         env.byName.gamma.value === "1.75", env.byName.gamma.value);
 }
 
+// A variable family's slot coordinates live in the same config, and a clean
+// panel follows those too. Re-rendering with the old picker value would put
+// the value from before the edit back on the page.
+{
+  const later = structuredClone(DEFAULTS);
+  later.families.find(one => one.name === "Vari").variable.weights.text = 550;
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  env.family.choose("Vari");
+  await settle();
+  check("the variable slot starts where the file had it",
+        env.byName.axis_text.value === "400", env.byName.axis_text.value);
+
+  env.returning();
+  await settle();
+  check("an untouched variable slot follows the file",
+        env.byName.axis_text.value === "550", env.byName.axis_text.value);
+  check("and the next page is drawn at the new coordinate",
+        env.fetches.bodies.at(-1).axes.text === 550,
+        JSON.stringify(env.fetches.bodies.at(-1).axes));
+}
+
+// A coordinate already moved in the panel is work of yours, just as a tuning
+// knob is. The file becomes its new baseline without taking that work away.
+{
+  const later = structuredClone(DEFAULTS);
+  later.families.find(one => one.name === "Vari").variable.weights.text = 550;
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  env.family.choose("Vari");
+  await settle();
+  env.byName.axis_text.value = "900";
+  env.byName.axis_text.on.change();
+  await settle();
+
+  env.returning();
+  await settle();
+  check("an unsaved variable slot survives the file changing",
+        env.byName.axis_text.value === "900", env.byName.axis_text.value);
+  check("and the page keeps drawing what the panel says",
+        env.fetches.bodies.at(-1).axes.text === 900,
+        JSON.stringify(env.fetches.bodies.at(-1).axes));
+}
+
 process.exit(failures ? 1 : 0);
