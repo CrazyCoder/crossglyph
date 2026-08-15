@@ -57,6 +57,9 @@ DEFAULT_PORT = 8000
 @dataclasses.dataclass
 class State:
     """What a background start left behind, so the other commands can find it."""
+    #: The process serving the page, which is not always the one that was
+    #: spawned: the server reports its own, and a launcher or a trampoline in
+    #: between makes those differ.
     pid: int
     host: str
     port: int
@@ -224,14 +227,19 @@ DETACH: dict = {"creationflags": (subprocess.CREATE_NO_WINDOW
 
 def spawn(root: pathlib.Path, argv: list[str]) -> subprocess.Popen:
     """The preview, detached from this terminal and writing to the log."""
-    # Closed here as soon as the child has it: the child holds its own
-    # descriptor, and a copy left open in this process would keep the file
-    # locked on Windows long after this command has finished.
+    # Unbuffered, or the log is empty for as long as it would be useful:
+    # Python block-buffers stdout when it is a file, so a server that is up
+    # and misbehaving writes nothing until it exits. In the environment
+    # rather than as -u, since the launcher path runs a shell script.
+    env = dict(os.environ, PYTHONUNBUFFERED="1")
+    # The handle is closed as soon as the child has it: the child holds its
+    # own descriptor, and a copy left open here would keep the file locked on
+    # Windows long after this command has finished.
     with (root / LOG_NAME).open("wb") as handle:
         return subprocess.Popen([*command(root), "preview", *argv],
                                 stdin=subprocess.DEVNULL, stdout=handle,
                                 stderr=subprocess.STDOUT, cwd=str(root),
-                                close_fds=True, **DETACH)
+                                env=env, close_fds=True, **DETACH)
 
 
 def log_tail(root: pathlib.Path, lines: int = 15) -> str:
@@ -311,19 +319,20 @@ def start(root: pathlib.Path, opts: argparse.Namespace) -> int:
             *opts.rest]
     child = spawn(root, argv)
 
-    def record(running_version: str) -> None:
-        save(root, State(pid=child.pid, host=opts.host, port=opts.port,
+    def record(running_version: str, pid: int) -> None:
+        save(root, State(pid=pid, host=opts.host, port=opts.port,
                          rest=list(opts.rest), version=running_version,
                          started=time.time()))
 
-    record(version.installed())
+    record(version.installed(), child.pid)
     deadline = time.monotonic() + READY_TIMEOUT
     while time.monotonic() < deadline:
         body = probe(opts.host, opts.port, timeout=1.0)
         if body is not None:
-            # The version the child reports, not this process's own: after an
-            # update those differ, and the one serving pages is the true one.
-            record(body["version"])
+            # What the server says about itself, rather than what this process
+            # knows: after an update the versions differ, and the pid differs
+            # whenever something stood between the spawn and the server.
+            record(body["version"], body.get("pid") or child.pid)
             print(f"preview on {url(opts.host, opts.port)}  "
                   f"(pid {child.pid}, crossglyph {body['version']})")
             if opts.open_browser:

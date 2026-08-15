@@ -242,6 +242,10 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, monkeypatch):
         state, body = daemon.look(REPO)
         assert state.port == port
         assert body["version"]
+        # The server's own pid, not the one that was spawned. On Windows uv's
+        # venv python is a trampoline, so those differ and killing the wrong
+        # one would leave the port held.
+        assert state.pid == body["pid"] and daemon.alive(state.pid)
         assert daemon.status(REPO) == 0
     finally:
         assert daemon.stop(REPO) == 0
@@ -346,3 +350,31 @@ def test_a_port_held_by_something_that_is_not_ours_reads_as_taken():
     finally:
         held.close()
     assert not daemon.taken("127.0.0.1", port)
+
+
+def test_the_server_reports_its_own_pid():
+    """A launcher, and uv's venv python on Windows, both hand off to a child,
+    so the pid that was spawned is not always the one holding the port."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    with TestClient(server.app) as client:
+        assert client.get("/update").json()["pid"] == os.getpid()
+
+
+@needs_wasm
+def test_the_log_can_be_read_while_the_server_is_still_up(tmp_path,
+                                                          monkeypatch):
+    """Python block-buffers stdout to a file, so without PYTHONUNBUFFERED the
+    log fills only at exit, which is the one moment nobody needs it."""
+    monkeypatch.setenv("CROSSGLYPH_HOME", str(REPO))
+    monkeypatch.setattr(daemon, "state_path",
+                        lambda root: tmp_path / daemon.STATE_NAME)
+    opts = daemon.parse(["--port", str(free_port()), "--no-open"], "start")
+    daemon.settle(opts, None)
+    assert daemon.start(REPO, opts) == 0
+    try:
+        assert "preview on" in daemon.log_tail(REPO)
+    finally:
+        daemon.stop(REPO)

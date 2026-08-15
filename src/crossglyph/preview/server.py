@@ -1067,6 +1067,11 @@ def _about(asked: bool = False) -> dict:
     pending = live if live and live != running else None
     return {"version": running,
             "firmware": stamp.build_stamp(),
+            # The process actually serving, which is not always the one a
+            # background start spawned: a launcher, and uv's own venv python
+            # on Windows, both hand off to a child. Killing the wrapper would
+            # leave this one holding the port.
+            "pid": os.getpid(),
             # Which workspace this one is serving, since --fonts and
             # $CROSSGLYPH_FONTS both move it and a background server is not
             # somewhere you can see the command that started it.
