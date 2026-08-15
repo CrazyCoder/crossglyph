@@ -33,7 +33,7 @@ CONVERTER_SOURCES = (pathlib.Path(cpfont.convert.__file__),
                      pathlib.Path(cpfont.tuning.__file__))
 
 
-def _sha256(path: pathlib.Path) -> str:
+def source_digest(path: pathlib.Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
@@ -50,15 +50,15 @@ def digest(variant: Variant, size: float) -> str:
         "intervals": config.coverage,
         "fallbacks": config.fallbacks,
         "tuning": config.tuning.as_dict(),
-        "styles": {s: _sha256(config.styles[s]) for s in STYLES if s in config.styles},
+        "styles": {s: source_digest(config.styles[s]) for s in STYLES if s in config.styles},
         # A variable font's slots share a file, so the hash of that file says
         # nothing about which face each one is: without the coordinates, moving
         # the bold slot's weight leaves every size looking current.
         "axes": {style: coords for style in STYLES if style in config.styles
                  for coords in [config.coords(style, size)] if coords},
-        "user_fallbacks": {k: _sha256(v)
+        "user_fallbacks": {k: source_digest(v)
                            for k, v in sorted(config.user_fallbacks.items())},
-        "converter": [_sha256(path) for path in CONVERTER_SOURCES],
+        "converter": [source_digest(path) for path in CONVERTER_SOURCES],
         # The generated file is not hashed: fontTools stamps head.created, so
         # its bytes differ run to run while the font does not.
         "space_glyphs": (spacefont.spec_digest(config.space_widths)
@@ -91,13 +91,39 @@ def read_stamp(directory: pathlib.Path) -> dict[str, str]:
     return {str(k): str(v) for k, v in (data.get("sizes") or {}).items()}
 
 
-def write_stamp(directory: pathlib.Path, sizes: dict[float, str]) -> None:
+def read_built(directory: pathlib.Path) -> dict:
+    """The provenance block, or nothing. Kept across a rewrite that has none.
+
+    A prune rewrites the stamp to drop a size, and it knows nothing about what
+    the family was made from. Reading it back means one removed size does not
+    throw away the record of the build.
+    """
+    path = directory / STAMP_NAME
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data.get("built") or {} if isinstance(data, dict) else {}
+
+
+def write_stamp(directory: pathlib.Path, sizes: dict[float, str],
+                built: dict | None = None) -> None:
+    """Record what is current, and what made it.
+
+    `built` is provenance, written when a build has just produced something.
+    It is not part of what decides a rebuild -- `version` and the digests are
+    -- so a stamp from before it existed goes on matching, and adding this
+    rebuilds nothing.
+    """
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / STAMP_NAME).write_text(
-        json.dumps({"version": STAMP_VERSION,
-                    "sizes": {size_key(k): v for k, v in sorted(sizes.items())}},
-                   indent=2),
-        encoding="utf-8")
+    body: dict = {"version": STAMP_VERSION,
+                  "sizes": {size_key(k): v for k, v in sorted(sizes.items())}}
+    keep = built or read_built(directory)
+    if keep:
+        body["built"] = keep
+    (directory / STAMP_NAME).write_text(json.dumps(body, indent=2,
+                                                   ensure_ascii=False),
+                                        encoding="utf-8")
 
 
 def cpfont_path(directory: pathlib.Path, variant: Variant,

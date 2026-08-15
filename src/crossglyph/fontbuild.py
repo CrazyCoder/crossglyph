@@ -23,7 +23,7 @@ import tempfile
 import time
 import typing
 
-from . import cpfont, fontconf, fontstamp, spacefont
+from . import cpfont, fontconf, fontstamp, provenance, spacefont
 from .fontconf import STYLES, Config, FontConfigError, Variant, parse_config
 
 #: The tool's own root, which is where an unpacked release keeps its workspace.
@@ -558,17 +558,37 @@ def plan_variant(variant: Variant, out_dir: pathlib.Path,
 
 def finalize_variant(variant: Variant, out_dir: pathlib.Path,
                      failed: set[int]) -> None:
-    """Record what is now current.
+    """Record what is now current, and what it was made from.
 
     Sizes that failed are left out, so the next run retries exactly those and
     nothing else. Skipped sizes keep their entry because they are still valid.
     """
     directory = out_dir / variant.name
-    fontstamp.write_stamp(directory, {
-        size: fontstamp.digest(variant, size)
-        for size in variant.sizes
-        if size not in failed
-        and fontstamp.cpfont_path(directory, variant, size).is_file()})
+    fontstamp.write_stamp(
+        directory,
+        {size: fontstamp.digest(variant, size)
+         for size in variant.sizes
+         if size not in failed
+         and fontstamp.cpfont_path(directory, variant, size).is_file()},
+        built=provenance.describe(variant, directory,
+                                  fallbacks=_fallback_faces(variant, out_dir)))
+
+
+def _fallback_faces(variant: Variant, out_dir: pathlib.Path) -> list[str]:
+    """The faces this family fills its holes from, by filename.
+
+    Off build_kwargs rather than worked out again, so what is recorded is what
+    was passed -- including the order, which decides who wins a codepoint two
+    of them have.
+
+    Without the space face, which is generated here and is nothing anybody can
+    look up. That it was used at all is `space_glyphs` in the settings.
+    """
+    size = variant.sizes[0] if variant.sizes else 12
+    passed = build_kwargs(variant, size, out_dir)["fallback_style_fonts"] or {}
+    ours = space_font_path(variant.config.space_widths).name
+    names = [pathlib.Path(path).name for path in passed.get(0, [])]
+    return [name for name in names if name != ours]
 
 
 class Plan(typing.NamedTuple):

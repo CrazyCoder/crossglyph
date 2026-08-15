@@ -548,6 +548,56 @@ not be replaced.
 `--force` ignores the stamps. A failed size is left out of the stamp, so the
 next run retries exactly that one.
 
+## What a built family says about itself
+
+The same `.crossglyph.json` carries a `built` block recording how the family
+was made. A family folder is a thing people copy -- onto a card, into a zip,
+to somebody who liked how it looked -- and what travels with it is four
+`.cpfont` files whose only metadata is a name and a size. This is the rest.
+
+```json
+"built": {
+  "at": "2026-08-15T08:44:43Z",
+  "by": "crossglyph 0.1.2",
+  "cpfont_format": 4,
+  "config": "bitter.conf",
+  "settings": {"gamma": 1.0, "hinting": "light", "figures": "proportional", …},
+  "sources": {
+    "regular": {"file": "Bitter[wght].ttf", "sha256": "ef2b9a71…",
+                "name": "Bitter", "version": "Version 3.021",
+                "designer": "Sol Matas, and Bitter project Authors",
+                "licence_url": "https://openfontlicense.org",
+                "instance": {"wght": 500.0}, "instance_name": "Medium"}
+  },
+  "fallbacks": ["NotoSans-Regular.ttf", …],
+  "files": {"12": {"file": "Bitter_12.cpfont", "bytes": 1162006,
+                   "glyphs": 3095}}
+}
+```
+
+Every setting, not only the ones a config set. Defaults move between versions,
+so a record of the departures alone would reproduce a different font later and
+neither copy could say which one shipped.
+
+Some of it is there for a reader rather than for a rebuild. `sha256` is what
+says whether the face you have is the face this was made from, where a version
+string is a claim and a filename is a label. `licence_url` and `designer` are
+the first two questions a font someone handed you raises. `glyphs` answers
+what is in it without opening anything. `instance` is which face of a variable
+file a slot was drawn at, without which a reproduction of a Merriweather build
+comes back visibly lighter and nothing says why -- with `instance_name` beside
+it, because "Medium" is what somebody searching for that face would type and
+`wght 500` is what they would have to translate first. The `subfamily` cannot
+stand in for it: on a variable file that describes the default instance, which
+is Thin for Bitter and not what anybody built. And `point_size` appears for
+a fractional size, because the filename cannot hold one: the device parses the
+label with `strtol`, so a family built at 13.5 ships as `_14`.
+
+It is written when a build produces something, so a folder that is already
+current keeps the record of the run that made it. Nothing reads it back yet.
+It is written because the time to record how something was made is while you
+still know.
+
 Sizes are rasterized in parallel, one process each. The default is a worker per
 core less one, so the machine stays usable while a build runs, and never more
 than twelve however many cores there are. `-j` changes it. One size on its own
