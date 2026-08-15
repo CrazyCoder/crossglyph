@@ -1,7 +1,9 @@
 *
 !pyproject.toml
 !uv.lock
-!update.conf
 !LICENSE
 !src/
 !src/**
+!tools/
+!tools/uv.cmd
+!tools/tool-wrapper.sh

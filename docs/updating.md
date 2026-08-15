@@ -142,14 +142,14 @@ Everything else in `fonts` is yours and is not looked at.
 
 ### Docker configuration
 
-The root `compose.yaml` follows the same rule as the workspace templates. An
-untouched copy is replaced with the new release's file. If you edited it, yours
-is kept and the new one is written as `compose.yaml.new`.
+The root `compose.yaml` and `compose.build.yaml` follow the same rule as the
+workspace templates. An untouched copy is replaced with the new release's
+file. If you edited one, yours is kept and the new one is written as
+`<name>.new`.
 
-Each release's Compose file selects that release's image by default, so a
-native launch and a container launch from the same folder run the same version.
-Put deployment settings in `.env` rather than editing `compose.yaml` when
-possible. CrossGlyph does not write `.env`.
+Each release's Compose files select that release's image and versioned local
+build context by default. Put deployment settings in `.env` rather than
+editing the Compose files when possible. CrossGlyph does not write `.env`.
 
 ### A source download
 

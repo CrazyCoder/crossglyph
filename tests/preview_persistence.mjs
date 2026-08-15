@@ -3472,8 +3472,8 @@ for (const { name, text } of sources) {
   const env = await loaded(fakeStorage(), DEFAULTS, {
     about: { available: "2.0.0", latest: "2.0.0" },
     updateSteps: [{ event: "done", version: "2.0.0", converting: false, staged: [],
-                    kept: ["fonts/conf/all.conf", "compose.yaml"],
-                    where: "versions/2.0.0" }] });
+                    kept: ["fonts/conf/all.conf", "compose.build.yaml",
+                           "compose.yaml"], where: "versions/2.0.0" }] });
   env.about.apply();
   await settle();
   check("the file it kept is named",
@@ -3487,6 +3487,12 @@ for (const { name, text } of sources) {
         env.about.updated.textContent);
   check("with its replacement beside it",
         env.about.updated.textContent.includes("compose.yaml.new"),
+        env.about.updated.textContent);
+  check("the local build override it kept is named",
+        env.about.updated.textContent.includes("compose.build.yaml"),
+        env.about.updated.textContent);
+  check("with its replacement beside it too",
+        env.about.updated.textContent.includes("compose.build.yaml.new"),
         env.about.updated.textContent);
 }
 

@@ -71,9 +71,10 @@ def test_the_launcher_lands_in_both_places(path):
         (path, f"versions/0.2.0/{path}")
 
 
-def test_managed_root_configuration_lands_in_both_places():
-    assert make_release.release_paths("compose.yaml", "0.2.0") == \
-        ("compose.yaml", "versions/0.2.0/compose.yaml")
+@pytest.mark.parametrize("path", ["compose.build.yaml", "compose.yaml"])
+def test_managed_root_configuration_lands_in_both_places(path):
+    assert make_release.release_paths(path, "0.2.0") == \
+        (path, f"versions/0.2.0/{path}")
 
 
 @pytest.mark.parametrize("path", [
@@ -97,10 +98,23 @@ def test_the_production_compose_file_is_image_only():
     assert b"\n    build:" not in (REPO / "compose.yaml").read_bytes()
 
 
+def test_the_local_build_override_has_its_own_image():
+    body = (REPO / "compose.build.yaml").read_bytes()
+    assert b"image: crossglyph:local" in body
+    assert b"context: ." in body
+
+
 def test_the_packaged_compose_default_is_the_release_version():
     source = b"image: repo:${CROSSGLYPH_TAG:-latest}\n"
     assert make_release.packaged_body("compose.yaml", source, "0.2.0") == \
         b"image: repo:${CROSSGLYPH_TAG:-0.2.0}\n"
+
+
+def test_the_packaged_build_context_is_the_release_version():
+    source = b"build:\n  context: .\n"
+    assert make_release.packaged_body(
+        "compose.build.yaml", source, "0.2.0") == \
+        b"build:\n  context: ./versions/0.2.0\n"
 
 
 def test_the_release_builder_refuses_an_ambiguous_compose_default():
@@ -108,6 +122,14 @@ def test_the_release_builder_refuses_an_ambiguous_compose_default():
         make_release.packaged_body(
             "compose.yaml",
             b"${CROSSGLYPH_TAG:-latest}${CROSSGLYPH_TAG:-latest}",
+            "0.2.0")
+
+
+def test_the_release_builder_refuses_an_ambiguous_build_context():
+    with pytest.raises(ValueError, match="exactly one"):
+        make_release.packaged_body(
+            "compose.build.yaml",
+            b"context: .\ncontext: .\n",
             "0.2.0")
 
 
@@ -149,7 +171,11 @@ def test_the_archive_holds_both_halves_of_the_release(built, members):
     assert "fonts/conf/all.conf" in members
     assert f"versions/{version}/pyproject.toml" in members
     assert "compose.yaml" in members
+    assert "compose.build.yaml" in members
     assert f"versions/{version}/compose.yaml" in members
+    assert f"versions/{version}/compose.build.yaml" in members
+    assert f"versions/{version}/Dockerfile" in members
+    assert f"versions/{version}/.dockerignore" in members
     assert f"versions/{version}/src/crossglyph/cli.py" in members
     assert f"versions/{version}/tools/uv.cmd" in members
 
@@ -163,8 +189,6 @@ def test_neither_half_leaks_into_the_other(built, members):
     assert f"versions/{version}/update.conf" not in members
     assert "Dockerfile" not in members
     assert ".dockerignore" not in members
-    assert "compose.build.yaml" not in members
-    assert f"versions/{version}/Dockerfile" not in members
 
 
 def test_the_two_copies_of_a_template_are_the_same_bytes(built):
@@ -184,6 +208,16 @@ def test_the_two_compose_files_are_identical_and_pinned(built):
     assert live == baseline
     assert f"${{CROSSGLYPH_TAG:-{version}}}".encode() in live
     assert b"${CROSSGLYPH_TAG:-latest}" not in live
+
+
+def test_the_two_build_overrides_select_the_version_source(built):
+    version, name, path = built
+    with zipfile.ZipFile(path) as archive:
+        live = archive.read(f"{name}/compose.build.yaml")
+        baseline = archive.read(
+            f"{name}/versions/{version}/compose.build.yaml")
+    assert live == baseline
+    assert f"context: ./versions/{version}".encode() in live
 
 
 def test_the_executables_extract_executable(built, members):

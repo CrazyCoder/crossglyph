@@ -8,31 +8,50 @@ and built `.cpfont` families.
 The preview has no authentication. The supplied Compose service publishes it
 on `127.0.0.1` so that only the Docker host can open it.
 
-## Start the preview
+## Command cheat sheet
 
-Run these commands from the CrossGlyph folder:
+Run every command from the folder that contains `compose.yaml`. That can be a
+Git checkout or an unpacked release ZIP.
+
+| Folder | `docker compose` uses | Local build context |
+|---|---|---|
+| Git checkout | `ghcr.io/crazycoder/crossglyph:latest` | Current checkout |
+| Unpacked release | Image tagged with the release version | `versions/<release>` |
+
+To use the published image:
 
 ```sh
 docker compose up -d --wait
+docker compose run --rm crossglyph build
 ```
 
-Open <http://127.0.0.1:8000/>. Put TTF or OTF files in the local `fonts` folder.
-The running preview finds workspace changes when the page regains focus.
-
-Use these commands to read logs or stop the service:
-
-```sh
-docker compose logs -f
-docker compose down
-```
-
-An installed release pulls the image tagged with that release's version. A
-source checkout follows `latest`. To build the image from the current checkout,
-add its build override:
+To build from the code in the current folder instead:
 
 ```sh
 docker compose -f compose.yaml -f compose.build.yaml \
   up -d --build --wait
+docker compose -f compose.yaml -f compose.build.yaml \
+  run --rm --build crossglyph build
+```
+
+The local override names the image `crossglyph:local`. In a checkout it builds
+the checkout. In an unpacked release it builds the matching source under
+`versions/`, so it does not need the published CrossGlyph image.
+
+Docker is the only host tool this path needs. The build installs its own system
+packages and uses `tools/uv.cmd` to download and verify the pinned uv release.
+It still needs network access to the Python base image, Debian packages, the uv
+release and the Python packages unless those layers and downloads are cached.
+
+Open <http://127.0.0.1:8000/> after starting the preview. Put TTF or OTF files
+in the local `fonts` folder. The running preview finds workspace changes when
+the page regains focus.
+
+Use these commands to read logs or stop either service:
+
+```sh
+docker compose logs -f
+docker compose down
 ```
 
 ## Run builds and other commands
@@ -130,10 +149,11 @@ docker compose up -d --wait
 The workspace is outside the container, so this does not replace fonts,
 configs, fallbacks or output.
 
-A native `crossglyph update` replaces an untouched root `compose.yaml` with the
-one pinned to the new release. If you edited that file, the update keeps it and
-writes `compose.yaml.new` beside it. Put deployment settings in `.env` so the
-managed Compose file can update without a conflict.
+A native `crossglyph update` replaces untouched root `compose.yaml` and
+`compose.build.yaml` files with the ones for the new release. If you edited
+either file, the update keeps it and writes `<name>.new` beside it. Put
+deployment settings in `.env` so the managed Compose files can update without
+a conflict.
 
 Published images support `linux/amd64` and `linux/arm64`. Each release also
 carries build provenance and an SBOM in the GitHub Container Registry.

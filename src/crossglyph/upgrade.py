@@ -41,7 +41,7 @@ WORKSPACE = "fonts"
 
 #: Shipped root configuration. It follows the same conffile rule as workspace
 #: templates, while user-owned files such as update.conf are never considered.
-MANAGED = ("compose.yaml",)
+MANAGED = ("compose.build.yaml", "compose.yaml")
 
 #: Written beside a file the user has edited, rather than over it.
 SUFFIX = ".new"

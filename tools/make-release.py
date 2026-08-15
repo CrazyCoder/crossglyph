@@ -38,7 +38,7 @@ LAUNCHERS = frozenset({"crossglyph.cmd", "crossglyph.sh"})
 #: Shipped configuration that lives at the install root. Unlike a launcher it
 #: can be replaced during an update. The version copy is the byte-for-byte
 #: baseline that distinguishes an untouched file from one the user edited.
-MANAGED = frozenset({"compose.yaml"})
+MANAGED = frozenset({"compose.build.yaml", "compose.yaml"})
 
 #: The user's, and never written by an update: what they set stays set.
 #: `current` is generated rather than tracked, so it is not here.
@@ -62,15 +62,17 @@ DEFAULT_MODE = 0o100644
 #: directory, filled in per build.
 REQUIRED = [
     "current",
-    "crossglyph.sh", "crossglyph.cmd", "compose.yaml", "update.conf",
+    "crossglyph.sh", "crossglyph.cmd",
+    "compose.yaml", "compose.build.yaml", "update.conf",
     "fonts/README.md", "fonts/conf/all.conf",
     # The version copies are the shipped baselines that tell an untouched
     # root file from one the user edited.
-    "{v}/compose.yaml",
+    "{v}/compose.yaml", "{v}/compose.build.yaml",
     "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
     # The launcher copy is what an update stages beside the live one.
     "{v}/crossglyph.cmd", "{v}/crossglyph.sh",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
+    "{v}/Dockerfile", "{v}/.dockerignore",
     "{v}/THIRD-PARTY-NOTICES.md",
     "{v}/src/crossglyph/cli.py",
     "{v}/src/crossglyph/render/render.wasm",
@@ -91,12 +93,14 @@ REQUIRED = [
 #: `export-ignore` and .gitignore are what keep them out; this is the check.
 EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
             ".github/workflows/release.yml", ".github/workflows/test.yml",
-            ".dockerignore", "Dockerfile", "compose.build.yaml",
             ".update-state.json",
             # The interpreter pin is for the checkout and CI. Shipping it
             # would have every install fetch that exact patch, and one more
             # of them for every release that moved it.
             ".python-version"]
+
+#: Build inputs live under the version selected by the generated override.
+ROOT_EXCLUDED = [".dockerignore", "Dockerfile"]
 
 #: Executed on macOS and Linux, so the bit has to survive the archive and the
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.
@@ -126,15 +130,21 @@ def release_paths(path: str, version: str) -> tuple[str, ...]:
 
 
 def packaged_body(path: str, body: bytes, version: str) -> bytes:
-    """Pin the image in an installed release; a checkout follows `latest`."""
-    if path != "compose.yaml":
+    """Adapt checkout Compose defaults to an installed release."""
+    if path == "compose.yaml":
+        marker = b"${CROSSGLYPH_TAG:-latest}"
+        replacement = f"${{CROSSGLYPH_TAG:-{version}}}".encode()
+        description = "default image tag"
+    elif path == "compose.build.yaml":
+        marker = b"context: .\n"
+        replacement = f"context: ./versions/{version}\n".encode()
+        description = "default build context"
+    else:
         return body
-    marker = b"${CROSSGLYPH_TAG:-latest}"
     if body.count(marker) != 1:
-        raise ValueError("compose.yaml must contain exactly one default image "
-                         "tag for the release builder to pin")
-    pinned = f"${{CROSSGLYPH_TAG:-{version}}}".encode()
-    return body.replace(marker, pinned)
+        raise ValueError(f"{path} must contain exactly one {description} "
+                         "for the release builder to replace")
+    return body.replace(marker, replacement)
 
 
 def version() -> str:
@@ -278,6 +288,9 @@ def main() -> int:
             for path in (unwanted, f"{where}/{unwanted}"):
                 if path in members:
                     problems.append(f"should not be in a release: {path}")
+        for path in ROOT_EXCLUDED:
+            if path in members:
+                problems.append(f"should not be at the release root: {path}")
         for path in EXECUTABLE:
             info = members.get(path.format(v=where))
             if info is None:

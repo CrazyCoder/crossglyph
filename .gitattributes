@@ -25,9 +25,6 @@ tools/tool-wrapper.ps1 linguist-vendored
 .gitignore     export-ignore
 .githooks/     export-ignore
 .github/       export-ignore
-Dockerfile         export-ignore
-.dockerignore      export-ignore
-compose.build.yaml export-ignore
 # The interpreter pin is for this checkout and for CI, which build and test
 # what gets released. An install resolves against requires-python instead: a
 # patch digit we moved is no reason for somebody to download a second CPython,

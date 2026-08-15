@@ -264,6 +264,7 @@ def test_being_up_to_date_is_not_a_failure(capsys, monkeypatch):
 @pytest.mark.parametrize(
     ("kept", "replacement"),
     [("fonts/conf/all.conf", "all.conf.new"),
+     ("compose.build.yaml", "compose.build.yaml.new"),
      ("compose.yaml", "compose.yaml.new")])
 def test_a_file_that_was_kept_is_named(capsys, monkeypatch, kept, replacement):
     """A .new nobody was told about is a file nobody ever reads."""
