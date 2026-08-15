@@ -147,11 +147,12 @@ builds and publishes the zip and container image, and puts the manifest on
 Pages. A tag that disagrees with `pyproject.toml` fails the run rather than
 shipping a release that misdescribes itself.
 
-The ZIP carries `compose.yaml` and `compose.build.yaml` at its root. The first
-selects the matching published image; the second builds the source under the
-matching `versions/` directory as `crossglyph:local`. `Dockerfile` and
-`.dockerignore` live inside that versioned build context. The release therefore
-supports the same image and local-build commands as a checkout.
+The ZIP carries `compose.yaml`, `compose.build.yaml` and both Docker launchers
+at its root. The first Compose file selects the matching published image; the
+second builds the source under the matching `versions/` directory as
+`crossglyph:local`. `Dockerfile` and `.dockerignore` live inside that versioned
+build context. The release therefore supports the same image and local-build
+commands as a checkout.
 
 A second workflow, `test.yml`, runs the suite and the page against Ubuntu and
 Windows on every push and pull request. The release calls it before it builds

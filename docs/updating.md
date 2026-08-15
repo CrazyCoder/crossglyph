@@ -110,23 +110,24 @@ One thing stops it before it downloads anything: an install that does not own
 its own files, which is a clone, a container, or a folder nobody can write to.
 The notice says what to do instead.
 
-### The launcher
+### The launchers
 
-`crossglyph.cmd` and `crossglyph.sh` are the one thing an update cannot write
-over, because one of them is the file running the update. Both cmd.exe and a
-POSIX shell read a script as they execute it and resume at the offset they had
+The four root launchers are scripts, and a shell may be reading one while an
+update runs. Both cmd.exe and a POSIX shell resume at the byte offset they had
 reached, so a file that changed length underneath them is read from the middle
 of a word.
 
-So a release that changes the launcher leaves the new one beside it, as
-`crossglyph.sh.staged` or `crossglyph.cmd.staged`, and the launcher applies it
-at the next launch before it does anything else. The one it replaces is kept
-with `.previous` on the end: if a launcher ever ships broken, renaming that
-back undoes it without reinstalling anything.
+A launcher that is already installed is therefore updated beside itself with
+`.staged` on the end. It applies that copy at its next launch before doing any
+other work, and keeps the replaced file with `.previous` on the end. If a
+launcher ever ships broken, renaming that copy back undoes it without
+reinstalling anything.
 
-Nothing about this needs doing by hand, and nothing is left half applied: an
-install whose launcher is one release behind still runs, because what the
-launcher does is read `current` and start the version it names.
+A launcher introduced by a release is installed directly because no running
+process could have opened a file that was not there. Nothing about either path
+needs doing by hand. An install whose launcher is one release behind still
+runs, because the native launcher reads `current` and starts the version it
+names.
 
 ### Your workspace
 

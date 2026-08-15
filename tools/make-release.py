@@ -33,7 +33,9 @@ REPO = "CrazyCoder/crossglyph"
 #: What runs the tool, and what an update cannot write over while it is being
 #: read. The copy inside the version is where the new one comes from: an
 #: update leaves it beside the live one, which applies it at the next launch.
-LAUNCHERS = frozenset({"crossglyph.cmd", "crossglyph.sh"})
+LAUNCHERS = frozenset({
+    "crossglyph-docker.cmd", "crossglyph-docker.sh",
+    "crossglyph.cmd", "crossglyph.sh"})
 
 #: Shipped configuration that lives at the install root. Unlike a launcher it
 #: can be replaced during an update. The version copy is the byte-for-byte
@@ -63,14 +65,17 @@ DEFAULT_MODE = 0o100644
 REQUIRED = [
     "current",
     "crossglyph.sh", "crossglyph.cmd",
+    "crossglyph-docker.sh", "crossglyph-docker.cmd",
     "compose.yaml", "compose.build.yaml", "update.conf",
     "fonts/README.md", "fonts/conf/all.conf",
     # The version copies are the shipped baselines that tell an untouched
     # root file from one the user edited.
     "{v}/compose.yaml", "{v}/compose.build.yaml",
     "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
-    # The launcher copy is what an update stages beside the live one.
+    # Each launcher's version copy is what an update installs or stages beside
+    # the live one.
     "{v}/crossglyph.cmd", "{v}/crossglyph.sh",
+    "{v}/crossglyph-docker.cmd", "{v}/crossglyph-docker.sh",
     "{v}/pyproject.toml", "{v}/uv.lock", "{v}/LICENSE", "{v}/README.md",
     "{v}/Dockerfile", "{v}/.dockerignore",
     "{v}/THIRD-PARTY-NOTICES.md",
@@ -106,6 +111,7 @@ ROOT_EXCLUDED = [".dockerignore", "Dockerfile"]
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.
 EXECUTABLE = [
     "crossglyph.sh", "{v}/crossglyph.sh",
+    "crossglyph-docker.sh", "{v}/crossglyph-docker.sh",
     "{v}/tools/uv.cmd", "{v}/tools/tool-wrapper.sh",
     "{v}/tools/check-line-endings.sh", "{v}/src/render/build.sh",
 ]

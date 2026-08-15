@@ -12,10 +12,11 @@ def project(tmp_path, noto_or_skip):
     source = tmp_path / "src"
     source.mkdir()
     shutil.copy(noto_or_skip, source / "Probe-Regular.ttf")
-    # ascii only, one small size: enough to exercise the whole pipeline without
-    # spending a minute on Cyrillic and Greek coverage.
+    # ASCII only, one small size: enough to exercise the whole pipeline without
+    # spending a minute on Cyrillic and Greek coverage. No fallback setting or
+    # downloaded set: the default build has to stand on its own.
     (source / "probe.conf").write_text(
-        "sizes = 12\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+        "sizes = 12\nintervals = base\n", encoding="utf-8")
     return fontconf.parse_config(source / "probe.conf").variants()[0]
 
 

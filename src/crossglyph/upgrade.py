@@ -46,14 +46,14 @@ MANAGED = ("compose.build.yaml", "compose.yaml")
 #: Written beside a file the user has edited, rather than over it.
 SUFFIX = ".new"
 
-#: The launcher, which is the one file an update cannot write over: it is open
-#: and being read by cmd.exe or by a shell as this runs. The new one is left
-#: beside it with this suffix, and the launcher itself applies it at the next
-#: launch, before it has done anything else. See the comment at the top of
-#: crossglyph.cmd for what happens when that rule is broken.
+#: Launchers are staged when they already exist because a shell may be reading
+#: one while an update runs. A launcher introduced by a release is not open and
+#: can be installed directly; later replacements follow the staged path.
 STAGED = ".staged"
 
-LAUNCHERS = ("crossglyph.cmd", "crossglyph.sh")
+LAUNCHERS = (
+    "crossglyph-docker.cmd", "crossglyph-docker.sh",
+    "crossglyph.cmd", "crossglyph.sh")
 
 #: "Version made by" saying Unix, which is what makes a mode in the archive
 #: mean anything. zipfile does not apply either, so this module does.
@@ -167,26 +167,33 @@ def seed_conffiles(root: pathlib.Path, incoming: pathlib.Path,
 
 
 def stage_launchers(root: pathlib.Path, incoming: pathlib.Path) -> list[str]:
-    """Leave the new launcher beside the running one. Returns what was staged.
+    """Install missing launchers and stage changed ones. Return those staged.
 
-    Only where it differs, so an install whose launcher has not changed gets
-    no file it has to notice. The live one is never written: it is open, and
-    the platforms differ only in how badly that ends.
+    A launcher already at the root may be open and being read, so its
+    replacement waits beside it for the next launch. A newly introduced
+    launcher cannot be open and is installed immediately.
     """
     staged = []
     for name in LAUNCHERS:
         arriving = incoming / name
+        if not arriving.is_file():
+            continue
         live = root / name
-        if not arriving.is_file() or (live.is_file()
-                                      and live.read_bytes()
-                                      == arriving.read_bytes()):
+        body = arriving.read_bytes()
+        mode = arriving.stat().st_mode & 0o777 or 0o755
+        if not live.exists():
+            live.write_bytes(body)
+            if os.name != "nt":
+                live.chmod(mode)
+            continue
+        if live.is_file() and live.read_bytes() == body:
             continue
         beside = root / (name + STAGED)
-        beside.write_bytes(arriving.read_bytes())
+        beside.write_bytes(body)
         # The one it replaces was executable, and the one that replaces it has
         # to be, or the next launch is the last one.
         if os.name != "nt":
-            beside.chmod(arriving.stat().st_mode & 0o777 or 0o755)
+            beside.chmod(mode)
         staged.append(name)
     return staged
 

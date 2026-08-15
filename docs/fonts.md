@@ -57,7 +57,7 @@ sizes_mod      = 13 15 17 19
 mod_suffix     = Mod
 intervals      = reading
 ranges         = (0x2900-0x29FF),(0x2E00-0x2E7F)
-fallbacks      = yes
+fallbacks      = no
 space_glyphs   = yes
 thresholds     = 4 8 12
 hinting        = normal
@@ -77,7 +77,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `mod_suffix` | `Mod` | suffix for that second family |
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
-| `fallbacks` | `yes` | append the twelve bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script |
+| `fallbacks` | `no` | append the twelve bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |

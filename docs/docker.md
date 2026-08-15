@@ -18,6 +18,29 @@ Git checkout or an unpacked release ZIP.
 | Git checkout | `ghcr.io/crazycoder/crossglyph:latest` | Current checkout |
 | Unpacked release | Image tagged with the release version | `versions/<release>` |
 
+### Start with the Docker launcher
+
+On Windows:
+
+```bat
+crossglyph-docker.cmd
+crossglyph-docker.cmd --local
+```
+
+On macOS or Linux:
+
+```sh
+./crossglyph-docker.sh
+./crossglyph-docker.sh --local
+```
+
+With no option the launcher uses the published image. `--local` builds from the
+checkout, or from the matching version inside an unpacked release. After the
+service is healthy, the launcher prints the actual browser address, mounted
+workspace and commands for logs, shutdown and cleanup.
+
+### Run Compose directly
+
 To use the published image:
 
 ```sh
@@ -43,9 +66,9 @@ packages and uses `tools/uv.cmd` to download and verify the pinned uv release.
 It still needs network access to the Python base image, Debian packages, the uv
 release and the Python packages unless those layers and downloads are cached.
 
-Open <http://127.0.0.1:8000/> after starting the preview. Put TTF or OTF files
-in the local `fonts` folder. The running preview finds workspace changes when
-the page regains focus.
+When Compose is run directly, open <http://127.0.0.1:8000/> after the preview is
+healthy. Put TTF or OTF files in the local `fonts` folder. The running preview
+finds workspace changes when the page regains focus.
 
 Follow the preview log:
 

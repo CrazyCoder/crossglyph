@@ -88,16 +88,24 @@ publishes none, so uv tries to compile it and needs a build toolchain.
 ## Docker
 
 Docker can run the preview and command-line builds with only the `fonts`
-workspace mounted from the host:
+workspace mounted from the host. On Windows:
 
-```sh
-docker compose up -d --wait
-docker compose run --rm crossglyph build
+```bat
+crossglyph-docker.cmd
 ```
 
-The image installs nothing on the host and publishes the preview on
-`127.0.0.1` by default. [docs/docker.md](docs/docker.md) covers the mounted
-workspace, image tags, batch commands and remote hosting.
+On macOS or Linux:
+
+```sh
+./crossglyph-docker.sh
+```
+
+The launcher waits for a healthy preview, then prints its browser address, the
+mounted workspace and the commands for logs and shutdown. Add `--local` to
+build from the unpacked release or checkout instead of pulling CrossGlyph's
+published image. The image installs nothing on the host and publishes the
+preview on `127.0.0.1` by default. [docs/docker.md](docs/docker.md) covers the
+raw Compose commands, image tags, batch builds and remote hosting.
 
 ## The workspace
 
@@ -153,9 +161,11 @@ script, or, in the preview, text on the page that cannot be drawn without one.
 One face answers all four languages, Korean included, so there is no choice to
 make between them.
 
-The preview offers the same thing as a button, with a bar, since that download
-takes a while. Set `fallbacks = no` in a config to build without them, which is
-a factor of twelve smaller for a narrow face.
+The preview offers the same download as a button, with a bar, since it takes a
+while. Bundled fallbacks are off by default, which keeps a first build
+self-contained and makes a narrow face about twelve times smaller. After
+fetching them, turn on **bundled fallback faces** in the preview or set
+`fallbacks = yes` in a config to fill codepoints the family lacks.
 
 ## What is here
 

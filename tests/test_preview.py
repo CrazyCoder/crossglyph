@@ -133,8 +133,8 @@ def _pair(tmp_path):
 
 @needs_core
 def test_a_fallback_fills_a_codepoint_the_family_lacks(tmp_path):
-    """What the device does with `fallbacks = yes`, which is the default -- so
-    a preview without it draws a blank where the card would draw a glyph."""
+    """What the device does when fallbacks are explicitly enabled: a preview
+    without one draws a blank where the card would draw a glyph."""
     from crossglyph import preview
 
     main, fallback = _pair(tmp_path)

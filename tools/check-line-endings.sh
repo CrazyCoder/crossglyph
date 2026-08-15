@@ -57,6 +57,7 @@ check tools/uv.cmd polyglot
 # tool-wrapper.cmd is not polyglot: its shell counterpart is a separate file,
 # so it is an ordinary batch file and CRLF throughout.
 check tools/tool-wrapper.cmd batch
+check crossglyph-docker.cmd batch
 
 if [ "$status" -eq 0 ]; then
     echo "line endings ok"

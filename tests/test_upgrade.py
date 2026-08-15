@@ -26,6 +26,10 @@ TEMPLATE = b"# out = \n"
 #: What the new release's launcher says, which is not what the install's does.
 LAUNCHER = "#!/bin/sh\n# a launcher with a fix in it\n"
 OLD_LAUNCHER = b"#!/bin/sh\n"
+DOCKER_LAUNCHERS = {
+    "crossglyph-docker.cmd": b"@ECHO OFF\r\nREM Docker launcher\r\n",
+    "crossglyph-docker.sh": b"#!/bin/sh\n# Docker launcher\n",
+}
 
 
 def compose(version: str) -> bytes:
@@ -51,6 +55,13 @@ def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
         inside = f"{PREFIX}/versions/{version}"
         archive.writestr(f"{PREFIX}/crossglyph.sh", LAUNCHER)
         archive.writestr(f"{inside}/crossglyph.sh", LAUNCHER)
+        for name, launcher in DOCKER_LAUNCHERS.items():
+            for target in (f"{PREFIX}/{name}", f"{inside}/{name}"):
+                info = zipfile.ZipInfo(target)
+                if name.endswith(".sh"):
+                    info.create_system = upgrade.UNIX
+                    info.external_attr = 0o100755 << 16
+                archive.writestr(info, launcher)
         archive.writestr(f"{PREFIX}/current", f"{version}\n")
         archive.writestr(f"{PREFIX}/fonts/conf/all.conf", template)
         archive.writestr(f"{inside}/pyproject.toml", f'version = "{version}"\n')
@@ -176,6 +187,29 @@ def test_a_release_that_changes_the_launcher_stages_it(release, served):
         "it wrote over the launcher that is running"
     assert (release / f"crossglyph.sh{upgrade.STAGED}").read_bytes() == \
         LAUNCHER.encode()
+
+
+@pytest.mark.parametrize(("name", "body"), DOCKER_LAUNCHERS.items())
+def test_a_new_launcher_is_installed_immediately(release, served, name, body):
+    said = last(run(release))
+    assert name not in said["staged"]
+    assert (release / name).read_bytes() == body
+    assert not (release / f"{name}{upgrade.STAGED}").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="no executable bit on Windows")
+def test_a_new_unix_launcher_is_installed_executable(release, served):
+    run(release)
+    assert os.access(release / "crossglyph-docker.sh", os.X_OK)
+
+
+@pytest.mark.parametrize(("name", "body"), DOCKER_LAUNCHERS.items())
+def test_a_changed_docker_launcher_is_staged(release, served, name, body):
+    (release / name).write_bytes(b"outdated\n")
+    said = last(run(release))
+    assert name in said["staged"]
+    assert (release / name).read_bytes() == b"outdated\n"
+    assert (release / f"{name}{upgrade.STAGED}").read_bytes() == body
 
 
 def test_a_launcher_that_did_not_change_is_not_staged(release, served):

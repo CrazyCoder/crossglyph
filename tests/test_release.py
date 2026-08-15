@@ -62,7 +62,10 @@ def test_the_packer_and_updater_mean_the_same_managed_files():
     assert set(make_release.MANAGED) == set(upgrade.MANAGED)
 
 
-@pytest.mark.parametrize("path", ["crossglyph.cmd", "crossglyph.sh"])
+@pytest.mark.parametrize(
+    "path",
+    ["crossglyph-docker.cmd", "crossglyph-docker.sh",
+     "crossglyph.cmd", "crossglyph.sh"])
 def test_the_launcher_lands_in_both_places(path):
     """The root copy is the one that runs. The one inside the version is what
     an update stages beside it, and without it a release could never fix the
@@ -167,7 +170,10 @@ def test_the_archive_holds_both_halves_of_the_release(built, members):
     version, name, path = built
     with zipfile.ZipFile(path) as archive:
         assert archive.read(f"{name}/current").decode().strip() == version
-    assert "crossglyph.cmd" in members and "crossglyph.sh" in members
+    for launcher in ("crossglyph-docker.cmd", "crossglyph-docker.sh",
+                     "crossglyph.cmd", "crossglyph.sh"):
+        assert launcher in members
+        assert f"versions/{version}/{launcher}" in members
     assert "fonts/conf/all.conf" in members
     assert f"versions/{version}/pyproject.toml" in members
     assert "compose.yaml" in members
@@ -221,7 +227,7 @@ def test_the_two_build_overrides_select_the_version_source(built):
 
 
 def test_the_executables_extract_executable(built, members):
-    """crossglyph.sh is run directly and uv.cmd is exec'd by it.
+    """Unix launchers run directly and uv.cmd is exec'd by one of them.
 
     create_system as well as the bits, and that is the half easy to lose: a
     POSIX unzip applies a mode only when the entry says Unix, so an archive
@@ -229,7 +235,11 @@ def test_the_executables_extract_executable(built, members):
     assertion about the bits still passes. That shipped once.
     """
     version, _, _ = built
-    for member in ("crossglyph.sh", f"versions/{version}/tools/uv.cmd"):
+    for member in (
+            "crossglyph.sh", "crossglyph-docker.sh",
+            f"versions/{version}/crossglyph.sh",
+            f"versions/{version}/crossglyph-docker.sh",
+            f"versions/{version}/tools/uv.cmd"):
         info = members[member]
         assert (info.external_attr >> 16) & 0o111, \
             f"not executable after the repack: {member}"

@@ -60,6 +60,12 @@ def test_name_defaults_to_the_config_filename(tmp_path):
     assert fontconf.parse_config(tmp_path / "Alto.conf").name == "Alto"
 
 
+def test_bundled_fallbacks_are_opt_in(tmp_path):
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "Alto.conf").write_text("", encoding="utf-8")
+    assert fontconf.parse_config(tmp_path / "Alto.conf").fallbacks is False
+
+
 def test_name_is_sanitised_for_use_in_filenames(tmp_path):
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text("name = Alto Pro!\nfamily = Alto\n",

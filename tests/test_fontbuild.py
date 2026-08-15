@@ -71,14 +71,14 @@ def _fallback_names(kw):
 
 
 def test_bundled_fallbacks_are_passed_in_the_workflow_order(config, tmp_path):
-    kw = _kwargs(config, tmp_path / "out")
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
     assert _fallback_names(kw) == \
         list(fontbuild.BUNDLED_FALLBACKS) + ["NotoSansCJKjp-Regular.otf",
                                              spacefont.cache_name()]
 
 
-def test_bundled_fallbacks_can_be_turned_off(config, tmp_path):
-    kw = _kwargs(config, tmp_path / "out", "fallbacks = no\n")
+def test_bundled_fallbacks_are_disabled_by_default(config, tmp_path):
+    kw = _kwargs(config, tmp_path / "out")
     assert _fallback_names(kw) == [spacefont.cache_name()], \
         "only the space font survives; it is what keeps U+2006 drawable"
 
@@ -91,19 +91,21 @@ def test_the_space_font_can_be_turned_off_separately(config, tmp_path):
 def test_the_space_font_comes_last_so_a_real_face_wins(config, tmp_path):
     """A fallback only fills what earlier faces lack, so this ordering is what
     lets a font that has its own U+2006 keep the designer's width."""
-    kw = _kwargs(config, tmp_path / "out")
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
     assert _fallback_names(kw)[-1] == spacefont.cache_name()
 
 
 def test_simplified_chinese_swaps_in_the_matching_cjk_fallbacks(config, tmp_path):
-    kw = _kwargs(config, tmp_path / "out", "intervals = cjk-sc\n")
+    kw = _kwargs(
+        config, tmp_path / "out", "fallbacks = yes\nintervals = cjk-sc\n")
     passed = _fallback_names(kw)
     assert passed[-3:-1] == ["NotoSansCJKsc-Regular.otf", "NotoSansCJKjp-Regular.otf"]
 
 
 def test_user_fallback_families_are_passed(config, tmp_path):
-    kw = _kwargs(config, tmp_path / "out",
-                 "fallback_regular = Fallback-Regular.ttf\n")
+    kw = _kwargs(
+        config, tmp_path / "out",
+        "fallbacks = yes\nfallback_regular = Fallback-Regular.ttf\n")
     assert _fallback_names(kw)[0] == "Fallback-Regular.ttf", \
         "a user fallback is offered before the bundled ones"
 
