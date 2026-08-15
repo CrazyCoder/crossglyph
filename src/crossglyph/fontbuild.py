@@ -564,14 +564,16 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
     nothing else. Skipped sizes keep their entry because they are still valid.
     """
     directory = out_dir / variant.name
+    current = {size: fontstamp.digest(variant, size)
+               for size in variant.sizes
+               if size not in failed
+               and fontstamp.cpfont_path(directory, variant, size).is_file()}
     fontstamp.write_stamp(
-        directory,
-        {size: fontstamp.digest(variant, size)
-         for size in variant.sizes
-         if size not in failed
-         and fontstamp.cpfont_path(directory, variant, size).is_file()},
-        built=provenance.describe(variant, directory,
-                                  fallbacks=_fallback_faces(variant, out_dir)))
+        directory, current,
+        # The same sizes, so what the record speaks for and what it calls
+        # current are one list rather than two that can disagree.
+        built=provenance.describe(variant, directory, current,
+                                  _fallback_faces(variant, out_dir)))
 
 
 def _fallback_faces(variant: Variant, out_dir: pathlib.Path) -> list[str]:

@@ -79,13 +79,22 @@ def size_key(size: float) -> str:
     return str(int(size)) if float(size).is_integer() else str(size)
 
 
-def read_stamp(directory: pathlib.Path) -> dict[str, str]:
-    """Recorded size -> digest, empty when missing, unreadable or stale-schema."""
-    path = directory / STAMP_NAME
+def _read(directory: pathlib.Path) -> dict:
+    """The stamp file as it stands, or an empty one.
+
+    Missing, half-written, or not an object at all: there is one thing to do
+    with a note this tool left itself and cannot read, which is write it again.
+    """
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads((directory / STAMP_NAME).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    return data if isinstance(data, dict) else {}
+
+
+def read_stamp(directory: pathlib.Path) -> dict[str, str]:
+    """Recorded size -> digest, empty when missing, unreadable or stale-schema."""
+    data = _read(directory)
     if data.get("version") != STAMP_VERSION:
         return {}
     return {str(k): str(v) for k, v in (data.get("sizes") or {}).items()}
@@ -97,13 +106,12 @@ def read_built(directory: pathlib.Path) -> dict:
     A prune rewrites the stamp to drop a size, and it knows nothing about what
     the family was made from. Reading it back means one removed size does not
     throw away the record of the build.
+
+    No version check, unlike the digests: those are only meaningful to the
+    schema that wrote them, while a record of how a family was made is worth
+    keeping across whatever this file becomes.
     """
-    path = directory / STAMP_NAME
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data.get("built") or {} if isinstance(data, dict) else {}
+    return _read(directory).get("built") or {}
 
 
 def write_stamp(directory: pathlib.Path, sizes: dict[float, str],

@@ -75,6 +75,31 @@ def test_what_landed_is_listed_with_its_glyph_count(built):
     assert one["glyphs"] > 0 and one["bytes"] > 0
 
 
+def test_a_size_that_failed_is_not_claimed_by_the_record(tmp_path):
+    """Its .cpfont from a week ago can still be sitting in the folder, and
+    listing that under this run's settings and timestamp is the one kind of
+    lie a provenance file cannot afford."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12 14\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    out = tmp_path / "out"
+    variant = fontconf.parse_config(tmp_path / "probe.conf").variants()[0]
+    list(fontbuild.build_families([variant.config], out))
+    assert set(_record(out)["files"]) == {"12", "14"}
+
+    # 14 fails on the next run, and its file from the run above stays put.
+    fontbuild.finalize_variant(variant, out, failed={14})
+    assert set(_record(out)["files"]) == {"12"}
+    assert (out / "Probe" / "Probe_14.cpfont").is_file()
+
+
+def _record(out):
+    return json.loads((out / "Probe" / fontstamp.STAMP_NAME)
+                      .read_text(encoding="utf-8"))["built"]
+
+
 def test_a_fractional_size_is_recorded_where_the_filename_cannot_hold_it(
         tmp_path):
     """The device parses the label with strtol, so a family built at 13.5
@@ -130,7 +155,7 @@ def test_the_generated_space_face_is_not_listed_as_a_source(built):
                    for name in built["built"]["fallbacks"])
 
 
-def test_a_prune_does_not_throw_the_record_away(tmp_path, built):
+def test_a_rewrite_with_no_record_keeps_the_one_already_there(tmp_path, built):
     """Dropping a size rewrites the stamp, and that rewrite knows nothing
     about how the family was made."""
     directory = tmp_path / "out" / "Probe"

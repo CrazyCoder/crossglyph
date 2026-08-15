@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import typing
 
-from . import cpfont, version
-from .fontconf import STYLES, Config, Variant, size_label
+from . import cpfont, fontstamp, version
+from .fontconf import STYLES, Config, Variant, size_label, variable_font
 
 #: Name table records worth keeping, each with the ids to try in order. Enough
 #: to find the original again and to know what may be done with it -- which is
@@ -93,8 +94,6 @@ def _instance_name(path: pathlib.Path, coords: dict[str, float]) -> str | None:
     An unnamed point is ordinary -- a weight pinned between two instances has
     no name to find -- so this answers None rather than inventing one.
     """
-    from .fontconf import variable_font
-
     found = variable_font(path)
     if not found:
         return None
@@ -106,10 +105,9 @@ def _instance_name(path: pathlib.Path, coords: dict[str, float]) -> str | None:
 
 
 def _sources(variant: Variant) -> dict:
-    from .fontstamp import source_digest
-
     config: Config = variant.config
-    return {style: _face(config.styles[style], source_digest(config.styles[style]),
+    return {style: _face(config.styles[style],
+                         fontstamp.source_digest(config.styles[style]),
                          config.coords(style))
             for style in STYLES if style in config.styles}
 
@@ -142,35 +140,43 @@ def _settings(variant: Variant) -> dict:
     return settings
 
 
-def _files(variant: Variant, directory: pathlib.Path) -> dict:
-    """What landed, per size, keyed as the filename spells it.
+def _files(variant: Variant, directory: pathlib.Path,
+           sizes: typing.Iterable[float]) -> dict:
+    """The sizes this record speaks for, keyed as the filename spells them.
+
+    `sizes` is what the stamp is calling current, not everything the config
+    asks for. A size that failed can still have last week's .cpfont sitting in
+    the folder, and listing that under this run's settings and timestamp would
+    be the one kind of lie a provenance file cannot afford.
 
     `point_size` is here because the filename cannot hold it: the device parses
     the label with strtol into a uint8_t, so a family built at 13.5 ships as
     _14 and reads back as 14 to anything that trusts the name. This is the only
     place the size it was actually rasterized at survives.
     """
+    # Local, and the one import here that has to be: fontbuild imports this
+    # module to write what it built.
     from .fontbuild import style_metrics
 
     found = {}
-    for size in variant.sizes:
-        path = directory / f"{variant.name}_{size_label(size)}.cpfont"
+    for size in sorted(sizes):
+        path = fontstamp.cpfont_path(directory, variant, size)
         if not path.is_file():
             continue
         entry = {"file": path.name, "bytes": path.stat().st_size,
                  "glyphs": style_metrics(path).glyphs}
-        if float(size) != float(size_label(size)):
+        if not float(size).is_integer():
             entry["point_size"] = size
         found[size_label(size)] = entry
     return found
 
 
 def describe(variant: Variant, directory: pathlib.Path,
-             fallbacks: list[str] | None = None,
-             now: datetime.datetime | None = None) -> dict:
+             sizes: typing.Iterable[float],
+             fallbacks: list[str] | None = None) -> dict:
     """The provenance block for one built family."""
     config: Config = variant.config
-    stamped = (now or datetime.datetime.now(datetime.timezone.utc))
+    stamped = datetime.datetime.now(datetime.timezone.utc)
     return {
         "at": stamped.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "by": f"crossglyph {version.installed()}",
@@ -179,5 +185,5 @@ def describe(variant: Variant, directory: pathlib.Path,
         "settings": _settings(variant),
         "sources": _sources(variant),
         "fallbacks": list(fallbacks or []),
-        "files": _files(variant, directory),
+        "files": _files(variant, directory, sizes),
     }
