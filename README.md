@@ -85,6 +85,20 @@ rest.
 Windows on ARM is the one platform without ready-made wheels: `freetype-py`
 publishes none, so uv tries to compile it and needs a build toolchain.
 
+## Docker
+
+Docker can run the preview and command-line builds with only the `fonts`
+workspace mounted from the host:
+
+```sh
+docker compose up -d --wait
+docker compose run --rm crossglyph build
+```
+
+The image installs nothing on the host and publishes the preview on
+`127.0.0.1` by default. [docs/docker.md](docs/docker.md) covers the mounted
+workspace, image tags, batch commands and remote hosting.
+
 ## The workspace
 
 The `fonts` folder sits beside the launcher, outside `versions`, so an update
@@ -152,7 +166,7 @@ a factor of twelve smaller for a narrow face.
 | `src/crossglyph/render/` | the firmware's renderer, compiled to WebAssembly, and the Python that drives it |
 | `src/render/` | the C++ and the build script that produce that module |
 | `src/crossglyph/starter/` | Literata, the family an empty workspace opens on |
-| `docs/` | [fonts.md](docs/fonts.md) for building, [preview.md](docs/preview.md) for the renderer, [updating.md](docs/updating.md) for the update check |
+| `docs/` | [fonts.md](docs/fonts.md) for building, [preview.md](docs/preview.md) for the renderer, [docker.md](docs/docker.md) for containers, [updating.md](docs/updating.md) for the update check |
 
 CrossGlyph is MIT licensed. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 for the code it carries, and [CONTRIBUTING.md](CONTRIBUTING.md) to work on it.

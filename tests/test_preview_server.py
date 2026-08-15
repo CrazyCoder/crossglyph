@@ -1837,6 +1837,31 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
     assert server._family in {"Probe", "Filler"}
 
 
+@pytest.mark.parametrize(
+    ("arguments", "wanted"),
+    [(["--no-open"], "0.0.0.0"),
+     (["--no-open", "--host", "192.0.2.1"], "192.0.2.1")])
+def test_the_preview_host_uses_the_environment_unless_flagged(
+        two_families, monkeypatch, arguments, wanted):
+    """An image can set one safe container default without changing the local
+    default or stopping an explicit address from winning."""
+    from crossglyph.preview import server
+
+    served = {}
+
+    class Uvicorn:
+        def __init__(self, config):
+            served["config"] = config
+
+        def run(self):
+            pass
+
+    monkeypatch.setenv("CROSSGLYPH_HOST", "0.0.0.0")
+    monkeypatch.setattr("uvicorn.Server", Uvicorn)
+    assert server.main(arguments) == 0
+    assert served["config"].host == wanted
+
+
 def test_an_empty_workspace_opens_on_the_bundled_family(tmp_path, monkeypatch):
     """There is always a family to draw, so a first run draws one instead of
     stopping to say what to put in the folder."""

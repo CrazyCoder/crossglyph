@@ -63,3 +63,45 @@ jobs:
       # and is where a module reading a name it never imported fails.
       - name: The page
         run: node --experimental-vm-modules tests/preview_persistence.mjs
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: crossglyph:test
+
+      - name: Run the preview and a command-line build
+        shell: bash
+        run: |
+          workspace="$(mktemp -d)"
+          trap 'docker rm -f crossglyph-smoke >/dev/null 2>&1 || true; rm -rf "$workspace"' EXIT
+          mkdir "$workspace/conf"
+          cp /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf "$workspace/"
+          printf 'fallbacks = no\nsizes = 12\n' >"$workspace/conf/all.conf"
+
+          common=(
+            --read-only --tmpfs /tmp
+            --cap-drop ALL --security-opt no-new-privileges
+            --user "$(id -u):$(id -g)"
+            --mount "type=bind,source=$workspace,target=/workspace"
+          )
+          docker run --rm "${common[@]}" crossglyph:test build
+          test -n "$(find "$workspace/cpfonts" -name '*.cpfont' -print -quit)"
+
+          docker run -d --name crossglyph-smoke "${common[@]}" \
+            -p 127.0.0.1:18000:8000 crossglyph:test preview --no-open
+          for attempt in {1..30}; do
+            if curl --fail --silent --output /dev/null \
+              http://127.0.0.1:18000/; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs crossglyph-smoke
+          exit 1

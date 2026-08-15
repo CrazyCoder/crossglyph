@@ -1519,7 +1519,10 @@ def main(argv=None) -> int:
                         help=f"the workspace to read families from "
                              f"(default: {fontbuild.SOURCE_DIR}, or "
                              f"$CROSSGLYPH_FONTS)")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument(
+        "--host", default=os.environ.get("CROSSGLYPH_HOST", "127.0.0.1"),
+        help="address to serve on (default: %(default)s, or "
+             "$CROSSGLYPH_HOST)")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-open", dest="open_browser", action="store_false",
                         help="serve without opening a browser")

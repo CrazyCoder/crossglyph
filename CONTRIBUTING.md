@@ -143,9 +143,9 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 The workflow does the rest: it checks that the tag and the version agree,
-builds, publishes the release, and puts the manifest on Pages. A tag that
-disagrees with `pyproject.toml` fails the run rather than shipping a release
-that misdescribes itself.
+builds and publishes the zip and container image, and puts the manifest on
+Pages. A tag that disagrees with `pyproject.toml` fails the run rather than
+shipping a release that misdescribes itself.
 
 A second workflow, `test.yml`, runs the suite and the page against Ubuntu and
 Windows on every push and pull request. The release calls it before it builds
@@ -158,6 +158,19 @@ checksum on both platforms and tests on the interpreter `.python-version`
 names. Two steps guard what the suite cannot say for itself: the wrappers keep
 their line endings, and the faces the rendering tests need are present, since
 a third of the suite skips without them and says nothing while doing it.
+
+### The container package must be public
+
+GitHub creates a new package under a personal account as private, even when
+the source repository is public. After the first workflow publishes the image,
+open **Profile > Packages > crossglyph > Package settings > Change visibility**
+and select **Public**. This is a one-time setting. A private package asks Docker
+users to sign in instead of allowing the anonymous pull that `compose.yaml`
+uses.
+
+The image's source label links the package to this repository before the first
+push. The package then inherits repository access, and the release workflow can
+publish later tags with its `packages: write` permission.
 
 ### Pages has to admit the tag
 

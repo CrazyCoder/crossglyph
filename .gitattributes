@@ -5,6 +5,10 @@
 *.ps1  -text
 *.sh   eol=lf
 *.wasm binary
+Dockerfile    eol=lf
+.dockerignore eol=lf
+*.yaml        eol=lf
+*.yml         eol=lf
 
 # Not ours: the wrapper engines derive from the tool wrapper in the IntelliJ
 # IDEA monorepo, under Apache 2.0, and THIRD-PARTY-NOTICES.md says so. Marking

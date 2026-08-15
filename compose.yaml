@@ -1,0 +1,32 @@
+name: crossglyph
+
+services:
+  crossglyph:
+    image: ghcr.io/crazycoder/crossglyph:${CROSSGLYPH_TAG:-latest}
+    build:
+      context: .
+    pull_policy: missing
+    command: ["preview", "--no-open"]
+    environment:
+      CROSSGLYPH_FONTS: /workspace
+    user: "${CROSSGLYPH_UID:-1000}:${CROSSGLYPH_GID:-1000}"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - name: preview
+        target: 8000
+        published: "${CROSSGLYPH_PORT:-8000}"
+        host_ip: "${CROSSGLYPH_BIND:-127.0.0.1}"
+        protocol: tcp
+        app_protocol: http
+    volumes:
+      - type: bind
+        source: "${CROSSGLYPH_WORKSPACE:-./fonts}"
+        target: /workspace
+    restart: unless-stopped
