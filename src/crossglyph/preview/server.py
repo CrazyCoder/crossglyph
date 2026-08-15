@@ -1613,5 +1613,11 @@ def main(argv=None) -> int:
     global _server
     _server = uvicorn.Server(uvicorn.Config(
         app, host=opts.host, port=opts.port, log_level="warning"))
-    _server.run()
+    try:
+        _server.run()
+    except KeyboardInterrupt:
+        # Server.capture_signals deliberately re-raises SIGINT after its
+        # graceful shutdown. uvicorn.run() catches it, but constructing the
+        # Server here is what lets /shutdown address the live instance.
+        pass
     return 0

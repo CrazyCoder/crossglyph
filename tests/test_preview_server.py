@@ -1837,6 +1837,22 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
     assert server._family in {"Probe", "Filler"}
 
 
+def test_ctrl_c_stops_the_preview_without_a_traceback(two_families,
+                                                       monkeypatch):
+    """Uvicorn re-raises its captured SIGINT after shutting down cleanly."""
+    from crossglyph.preview import server
+
+    class Uvicorn:
+        def __init__(self, _config):
+            pass
+
+        def run(self):
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr("uvicorn.Server", Uvicorn)
+    assert server.main(["--no-open"]) == 0
+
+
 @pytest.mark.parametrize(
     ("arguments", "wanted"),
     [(["--no-open"], "0.0.0.0"),

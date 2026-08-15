@@ -79,8 +79,12 @@ if not exist "%BINARY_PATH%" (
 REM Add tool directory to PATH so scripts can find related binaries (e.g., npx needs node)
 set "PATH=%TARGET_DIR%;%PATH%"
 
-"%BINARY_PATH%" %*
-exit /B %ERRORLEVEL%
+REM Ctrl+C marks the current batch for a termination prompt after the tool exits.
+REM Another CALL parsed on the same physical line clears that pending abort
+REM before cmd.exe can ask. The first CALL expansion saves the tool's exit code
+REM before the harmless invalid IF changes it. Keep all three commands together.
+"%BINARY_PATH%" %* & call set "TOOL_EXIT=%%ERRORLEVEL%%" & call if EnsureError
+exit /B %TOOL_EXIT%
 
 :get_platform_vars
 REM Get checksum for current platform

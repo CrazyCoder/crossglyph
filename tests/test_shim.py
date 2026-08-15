@@ -299,6 +299,24 @@ def test_the_batch_run_that_applies_one_cannot_carry_the_code_out(tmp_path):
 
 
 @needs_windows
+def test_the_windows_tool_wrapper_preserves_the_tool_exit_code(tmp_path):
+    local = tmp_path / "local"
+    binary = local / "CrossGlyph" / "tools" / "probe" / "1" / "probe.exe"
+    binary.parent.mkdir(parents=True)
+    shutil.copyfile(os.environ["COMSPEC"], binary)
+    checksum = "already-verified"
+    (binary.parent / ".complete").write_text(checksum, encoding="utf-8")
+    done = subprocess.run(
+        ["cmd.exe", "/d", "/c", str(REPO / "tools" / "tool-wrapper.cmd"),
+         "/d", "/c", "exit", "/B", "7"],
+        env={**os.environ, "LOCALAPPDATA": str(local), "TOOL_NAME": "probe",
+             "TOOL_VERSION": "1", "TOOL_BINARY_WINDOWS": "probe.exe",
+             "TOOL_CHECKSUM_WINDOWS_X64": checksum,
+             "TOOL_CHECKSUM_WINDOWS_ARM64": checksum})
+    assert done.returncode == 7
+
+
+@needs_windows
 def test_the_batch_launcher_reads_no_further_after_applying_one(tmp_path):
     """The reason the apply is one line ending in exit /B. With it on several,
     cmd.exe resumes in the replaced file at the offset it had reached and runs
