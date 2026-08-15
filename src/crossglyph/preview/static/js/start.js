@@ -31,7 +31,7 @@ samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender()
 // different returns: a tab switch fires visibilitychange, and clicking back
 // from an editor in another window fires focus with the page never hidden.
 let asking = false;
-export function askAgain() {
+function askAgain() {
   if (document.hidden || asking) return;
   asking = true;
   fetch("/defaults").then(r => r.json()).then(refreshFamilies)

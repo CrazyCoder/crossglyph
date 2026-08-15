@@ -93,8 +93,11 @@ def two_families(tmp_path, monkeypatch):
     (_conf(tmp_path) / "all.conf").write_text("fallbacks = no\n", encoding="utf-8")
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
     # The build caches are keyed on paths this fixture reuses across tests, so
-    # a stale entry would answer for the previous folder.
+    # a stale entry would answer for the previous folder. The fingerprint goes
+    # with them: it is a module global, so the folder the last test built is
+    # what this one would be compared against.
     server.forget_families()
+    server._workspace = None
     server.build_font_cached.cache_clear()
     server.resolved_fallbacks.cache_clear()
     server.set_font_source(tmp_path / "Probe-Regular.ttf", family="Probe")
@@ -147,6 +150,26 @@ def test_a_config_edited_by_hand_reaches_the_next_render(client, two_families):
 
     client.get("/defaults")             # the page's tab has come back
     assert server.family_config("Probe").tuning.gamma == 1.6
+
+
+def test_a_plain_page_load_is_a_rescan_too(client, two_families):
+    """The page fetches /defaults on load as well as when its tab comes back,
+    so a reload is the other way in and has to pick the folder up too. One
+    endpoint does both, which is what makes that true rather than a second
+    thing to remember."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    client.get("/defaults")                         # the page, loaded
+    server.family_config("Probe")
+    box_font(fontbuild.SOURCE_DIR / "Probe-Bold.ttf", [0x20, 0x41],
+             family="Probe", style="Bold")
+    assert "bold" not in server.family_config("Probe").styles
+
+    client.get("/defaults")                         # the page, reloaded
+    assert "bold" in server.family_config("Probe").styles
 
 
 def test_a_folder_that_has_not_moved_keeps_what_it_resolved(client,

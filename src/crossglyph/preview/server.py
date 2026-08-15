@@ -1446,10 +1446,16 @@ def rescan() -> bool:
     most of what a background one does. One fingerprint costs 14ms over 69
     files and 350ms over 2000: nothing once, and a great deal on every frame
     of a dragged slider.
+
+    The first call counts as a change, since nothing is known yet. That clears
+    caches that are cold, which costs nothing, and it is worth more than the
+    branch it replaces: skipping it rests on nothing having resolved a family
+    before the page's first ask, which is true today and is not something
+    anything states or checks.
     """
     global _workspace
     seen, _workspace = _workspace, workspace_stamp()
-    if seen is None or seen == _workspace:
+    if seen == _workspace:
         return False
     forget_families()
     return True

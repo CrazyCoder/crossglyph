@@ -12,6 +12,7 @@ import configparser
 import dataclasses
 import functools
 import math
+import os
 import pathlib
 import re
 import struct
@@ -459,20 +460,24 @@ def font_files(directory: pathlib.Path) -> list[pathlib.Path]:
     only thing that decides is what lets a folder be rearranged without
     renaming what it builds.
 
-    Sorted by path, so two files that would claim one slot are settled the
-    same way on every machine.
+    Sorted within each folder, and the folders in order, so two files that
+    would claim one slot are settled the same way on every machine.
     """
     if not directory.is_dir():
         return []
     found = []
-    for path in sorted(directory.rglob("*")):
-        if path.suffix.lower() not in FONT_SUFFIXES or not path.is_file():
-            continue
-        parts = path.relative_to(directory).parts[:-1]
-        if any(part.startswith(".") or part.lower() in SKIP_DIRS
-               for part in parts):
-            continue
-        found.append(path)
+    for parent, folders, names in os.walk(directory):
+        # Pruned rather than filtered afterwards, which is the whole saving
+        # the skip list is there for: a build folder is one entry to not
+        # descend into, or a few hundred paths to build and discard. Sorted in
+        # place, because os.walk reads this list back to decide where to go.
+        folders[:] = sorted(name for name in folders
+                            if not name.startswith(".")
+                            and name.lower() not in SKIP_DIRS)
+        for name in sorted(names):
+            path = pathlib.Path(parent, name)
+            if path.suffix.lower() in FONT_SUFFIXES and path.is_file():
+                found.append(path)
     return found
 
 

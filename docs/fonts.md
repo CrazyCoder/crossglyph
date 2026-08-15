@@ -29,8 +29,12 @@ folder is organization and nothing else: a face is known by its filename
 wherever it sits, so `serif/Charis-Bold.ttf` is Charis' bold exactly as
 `Charis-Bold.ttf` at the root would be, and a folder of `Regular.ttf` and
 `Bold.ttf` builds families called Regular and Bold rather than one named after
-the folder. Rename the files, not the folder. `conf`, `cpfonts` and anything
-beginning with a dot are left alone.
+the folder. Rename the files, not the folder.
+
+Four folders are left alone: `conf` holds configs, `cpfonts` holds builds,
+`fallbacks` holds the Noto faces that fill holes in other families rather than
+being families themselves, and anything beginning with a dot is somebody
+else's.
 
 It cannot set `name`, `family`, or the explicit style and fallback file keys.
 Those name one specific family or file, so they are rejected there.
