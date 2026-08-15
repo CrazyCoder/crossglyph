@@ -85,7 +85,11 @@ REQUIRED = [
 #: tell a fresh install it had already checked, on somebody else's clock.
 #: `export-ignore` and .gitignore are what keep them out; this is the check.
 EXCLUDED = [".gitattributes", ".gitignore", ".githooks/pre-commit",
-            ".github/workflows/release.yml", ".update-state.json"]
+            ".github/workflows/release.yml", ".update-state.json",
+            # The interpreter pin is the checkout's and CI's. Shipping it
+            # would have every install fetch that exact patch, and one more
+            # of them for every release that moved it.
+            ".python-version"]
 
 #: Executed on macOS and Linux, so the bit has to survive the archive and the
 #: repack. uv.cmd is on the list because crossglyph.sh execs it.

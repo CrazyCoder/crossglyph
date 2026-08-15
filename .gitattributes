@@ -13,3 +13,8 @@
 .gitignore     export-ignore
 .githooks/     export-ignore
 .github/       export-ignore
+# The interpreter pin is for this checkout and for CI, which build and test
+# what gets released. An install resolves against requires-python instead: a
+# patch digit we moved is no reason for somebody to download a second CPython,
+# and uv never collects the one the release before it left behind.
+.python-version export-ignore

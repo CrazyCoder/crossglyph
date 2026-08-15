@@ -7,6 +7,14 @@ uv run pytest -n 8 -q     # the whole suite, before pushing
 node --experimental-vm-modules tests/preview_persistence.mjs
 ```
 
+`.python-version` pins CPython 3.12.14, so `uv sync` fetches that exact
+interpreter instead of taking whichever 3.12 or later the machine happens to
+have. It carries `export-ignore`, which keeps it out of the release: a checkout
+and CI build and test what ships, while an install resolves against
+`requires-python` and reuses an interpreter it already has. Moving a patch
+digit here is no reason for everyone to download a second CPython, and uv
+removes neither of them on its own.
+
 `-n 8` is pytest-xdist and belongs on the full run only. Each worker costs about
 two seconds to start, which is more than a scoped run takes at all.
 
