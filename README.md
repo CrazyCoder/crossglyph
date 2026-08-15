@@ -21,9 +21,10 @@ the point size.
 
 - the firmware's own renderer, its C++ compiled to WebAssembly, so the page is
   what the device draws rather than an impression of it
-- fourteen rasterizing controls: size, weight, slant, hinting mode, grayscale
-  hinting, stem darkening, gamma, the three grey thresholds, line height,
-  letter and word spacing, kerning strength, ligatures, proportional figures
+- fourteen rasterizing controls: gamma, the three grey thresholds, weight,
+  slant, hinting mode, grayscale hinting, mono rasterizing, stem darkening,
+  line height, letter and word spacing, kerning strength, ligatures,
+  proportional figures
 - eight page controls, so the page you judge is set up like the device you are
   judging for: margin, alignment, line spacing, hyphenation and the language
   its patterns come from, paragraph spacing, anti-aliasing and night mode
