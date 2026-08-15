@@ -161,11 +161,35 @@ a third of the suite skips without them and says nothing while doing it.
 
 ### Testing a private container candidate
 
+A first push made by this public repository's `GITHUB_TOKEN` creates a public
+package. Seed the package once from a maintainer account instead:
+
+```sh
+workspace="$(mktemp -d)"
+trap 'rm -rf "$workspace"' EXIT
+mkdir "$workspace/context" "$workspace/docker"
+printf 'private CrossGlyph candidate package\n' >"$workspace/context/marker"
+printf 'FROM scratch\nCOPY marker /crossglyph-private-candidate\n' \
+  >"$workspace/context/Dockerfile"
+gh auth token |
+  DOCKER_CONFIG="$workspace/docker" docker login ghcr.io \
+    --username CrazyCoder --password-stdin
+DOCKER_CONFIG="$workspace/docker" docker buildx build \
+  --platform linux/amd64 --push --provenance=false --sbom=false \
+  --tag ghcr.io/crazycoder/crossglyph-testing:bootstrap "$workspace/context"
+```
+
+The `gh` token needs `write:packages`. The temporary Docker configuration
+keeps this login separate from the maintainer's normal Docker credentials.
+After the push, open **Profile > Packages > crossglyph-testing > Package
+settings > Manage Actions access**, add the **crossglyph** repository with the
+**Write** role, and leave the package private.
+
 Run **Actions > container candidate > Run workflow** to test the registry path
-without making a release. The workflow runs `test.yml`, then seeds
-`crossglyph-testing` with a label-free bootstrap image. Only after an anonymous
-manifest request proves the package is private does it push the current commit
-with a `candidate-<commit>` tag and the source-repository label.
+without making a release. The workflow runs `test.yml`, requires authenticated
+access to the private bootstrap, and proves that an anonymous manifest request
+cannot read it before pushing the current commit with a `candidate-<commit>`
+tag and the source-repository label.
 
 The workflow repeats the anonymous check after that link, checks the remote
 AMD64 and ARM64 manifest while authenticated, pulls the AMD64 image back from

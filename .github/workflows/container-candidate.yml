@@ -33,23 +33,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A source label on the first image links the package to this public
-      # repository while GHCR creates it. Seed it without that label, prove
-      # anonymous clients cannot read it, then publish the real candidate.
-      - name: Bootstrap the private package
+      # A first push made with this public repository's GITHUB_TOKEN creates a
+      # public package. Require a maintainer-seeded private package instead.
+      - name: Require the private bootstrap package
         shell: bash
         run: |
-          directory="$(mktemp -d)"
-          trap 'rm -rf "$directory"' EXIT
-          printf 'private CrossGlyph candidate package\n' >"$directory/marker"
-          printf 'FROM scratch\nCOPY marker /crossglyph-private-candidate\n' \
-            >"$directory/Dockerfile"
-          docker buildx build --platform linux/amd64 --push \
-            --tag "$BOOTSTRAP_IMAGE" "$directory"
+          if ! docker manifest inspect "$BOOTSTRAP_IMAGE" >/dev/null 2>&1; then
+            echo "::error::the private bootstrap is missing or this repository cannot read it; follow CONTRIBUTING.md"
+            exit 1
+          fi
 
-      - name: Refuse a public bootstrap package
-        shell: bash
-        run: |
           credentials="$(mktemp -d)"
           trap 'rm -rf "$credentials"' EXIT
           if DOCKER_CONFIG="$credentials" \
