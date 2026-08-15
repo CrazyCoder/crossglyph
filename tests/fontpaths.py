@@ -13,11 +13,14 @@ from __future__ import annotations
 import os
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+from crossglyph.render import stamp
 
-#: The firmware's own built-in font sources, in a checkout beside this one.
-FIRMWARE_TTF = (ROOT.parent / "crosspoint-reader" / "lib" / "EpdFont"
-                / "builtinFonts" / "source" / "NotoSans" / "NotoSans-Regular.ttf")
+#: The firmware's own built-in font sources. Whichever checkout the render
+#: core is built from, so the one setup CONTRIBUTING describes -- an engine
+#: clone and no working one -- still finds the face. Naming a directory here
+#: instead skipped every test that reads it, and a skip says nothing.
+FIRMWARE_TTF = (stamp.FIRMWARE / "lib" / "EpdFont" / "builtinFonts"
+                / "source" / "NotoSans" / "NotoSans-Regular.ttf")
 
 
 def _declared(variable: str) -> pathlib.Path | None:
