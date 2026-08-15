@@ -894,9 +894,18 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
     tuning = tuning or Tuning()
     # --darken-aa lowers the thresholds so partially-covered edge pixels round
-    # up to a darker shade more readily. It is what the built-in reading fonts
-    # (Bitter/Lexend Deca/ChareInk) use, and without it self-built fonts render
-    # visibly lighter than their built-in counterparts at the same weight.
+    # up to a darker shade more readily. The reading fonts a self-built one is
+    # put beside were made this way, so without it your own renders visibly
+    # lighter than they do at the same nominal weight.
+    #
+    # FORK: upstream calls those three "the built-in reading fonts
+    # (Bitter/Lexend Deca/ChareInk)", and not one of them is built in.
+    # CrossPoint compiles in NotoSans, NotoSerif, Ubuntu and OpenDyslexic
+    # (lib/EpdFont/builtinFonts/source/); Bitter alone is among the card fonts
+    # its own script builds (lib/EpdFont/scripts/sd-fonts.yaml); and the trio
+    # together is what the CrossInk fork ships in place of the defaults
+    # (crosspoint-reader README, "Community forks").
+    #
     # An explicit tuning that sets thresholds itself wins.
     if darken_aa and tuning.thresholds == Tuning().thresholds:
         tuning = dataclasses.replace(tuning, thresholds=Tuning.DARKEN_AA)
@@ -1373,8 +1382,8 @@ def main():
     parser.add_argument("--force-autohint", dest="force_autohint", action="store_true",
                         help="Force FreeType auto-hinter instead of native font hinting.")
     parser.add_argument("--darken-aa", dest="darken_aa", action="store_true",
-                        help="Use darker 2-bit anti-aliasing thresholds, matching the built-in "
-                             "reading fonts (Bitter/Lexend Deca/ChareInk).")
+                        help="Use darker 2-bit anti-aliasing thresholds, matching the reading "
+                             "fonts shipped ready-built.")
     parser.add_argument("-o", "--output", dest="output",
                         help="Output file path (for single-size mode).")
     parser.add_argument("--output-dir", dest="output_dir",
