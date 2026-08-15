@@ -145,7 +145,7 @@ def test_the_note_carries_the_kind_s_own_instruction(monkeypatch):
 
     monkeypatch.setattr(cli.updates, "check",
                         lambda *a, **k: updates.State(1.0, "0.2.0", None))
-    monkeypatch.setattr(cli.updates, "available", lambda state: "0.2.0")
+    monkeypatch.setattr(cli.updates, "available", lambda state, **kw: "0.2.0")
     monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.CONTAINER)
     said = cli.update_note()
     assert "0.2.0" in said
@@ -159,7 +159,7 @@ def test_update_check_reports_being_up_to_date(capsys, monkeypatch):
 
     monkeypatch.setattr(cli.updates, "check",
                         lambda *a, **k: updates.State(1.0, "0.1.0", None))
-    monkeypatch.setattr(cli.updates, "available", lambda state: None)
+    monkeypatch.setattr(cli.updates, "available", lambda state, **kw: None)
     assert cli.main(["update", "--check"]) == 0
     assert "up to date" in capsys.readouterr().out.lower()
 
@@ -178,9 +178,40 @@ def test_update_check_names_the_newer_release(capsys, monkeypatch):
 
     monkeypatch.setattr(cli.updates, "check",
                         lambda *a, **k: updates.State(1.0, "0.2.0", None))
-    monkeypatch.setattr(cli.updates, "available", lambda state: "0.2.0")
+    monkeypatch.setattr(cli.updates, "available", lambda state, **kw: "0.2.0")
     assert cli.main(["update", "--check"]) == 0
     assert "0.2.0" in capsys.readouterr().out
+
+
+def test_update_check_names_the_release_a_rollback_turned_down(capsys,
+                                                                monkeypatch):
+    """Somebody asked, so they are answered, and told why nothing had
+    mentioned it. The rejection stops the tool raising the subject; refusing
+    to answer a question about it would only leave them unable to find what
+    `crossglyph update` already does."""
+    from crossglyph import updates
+
+    state = updates.State(1.0, "0.2.0", None, rejected="0.2.0")
+    monkeypatch.setattr(cli.updates, "check", lambda *a, **k: state)
+    monkeypatch.setattr(cli.updates.version, "installed", lambda: "0.1.0")
+
+    assert cli.main(["update", "--check"]) == 0
+    said = capsys.readouterr().out
+    assert "0.2.0 is available" in said
+    assert "rolled back" in said
+
+
+def test_the_note_after_a_build_still_says_nothing_about_it(capsys,
+                                                            monkeypatch):
+    """The other half of the rule. This one is the tool raising the subject,
+    unasked, after work somebody ran for another reason."""
+    from crossglyph import updates
+
+    state = updates.State(1.0, "0.2.0", None, rejected="0.2.0")
+    monkeypatch.setattr(cli.updates, "check", lambda *a, **k: state)
+    monkeypatch.setattr(cli.updates.version, "installed", lambda: "0.1.0")
+
+    assert cli.update_note() == ""
 
 
 def test_an_argument_update_does_not_know_is_refused(capsys):

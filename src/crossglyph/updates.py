@@ -183,20 +183,37 @@ def check(root: pathlib.Path, *, force: bool = False,
     return state
 
 
-def available(state: State) -> str | None:
+def was_turned_down(state: State, found: str | None) -> bool:
+    """Whether `found` is the release a rollback turned down.
+
+    Which is not the same as being equal to it: a rollback from 0.3.0 turns
+    down 0.2.0 as well, since going back to what you left is what rollback
+    already does.
+    """
+    return bool(found and state.rejected
+                and not version.is_newer(found, state.rejected))
+
+
+def available(state: State, *, asked: bool = False) -> str | None:
     """The release worth moving to, or None.
 
     Strictly newer, so a tree already past the last release is never told to
     move backwards. That is the ordinary case for a clone of master, whose
     version is only bumped when a release is cut.
 
-    A version somebody rolled back from stays quiet until something newer than
-    it appears. Rollback would be pointless otherwise: the next check would
-    offer the release they had just escaped, and offer it every day.
+    A version somebody rolled back from is kept out of the checks the tool
+    makes on its own, and only those. Rollback would be pointless otherwise:
+    every daily check would offer the release they had just escaped.
+
+    `asked` is somebody asking, and they are answered. The rejection exists so
+    the tool stops raising it, not so the answer becomes unavailable: a person
+    who wants the version they rolled back from is entitled to be told it is
+    there, and `crossglyph update` installs it, which has always compared
+    versions rather than consulting this.
     """
     if not state.latest:
         return None
-    if state.rejected and not version.is_newer(state.latest, state.rejected):
+    if not asked and was_turned_down(state, state.latest):
         return None
     return state.latest if version.is_newer(state.latest,
                                             version.installed()) else None

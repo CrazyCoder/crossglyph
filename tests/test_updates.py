@@ -219,6 +219,55 @@ def test_a_failed_check_offers_nothing():
     assert updates.available(updates.State(1000.0, None, "down")) is None
 
 
+def test_the_release_a_rollback_turned_down_is_not_raised_again(monkeypatch):
+    """Which is the whole point of recording it. Otherwise every check would
+    offer the release somebody had just escaped, once a day, forever."""
+    monkeypatch.setattr(updates.version, "installed", lambda: "0.1.0")
+    state = updates.State(1000.0, "0.2.0", None, rejected="0.2.0")
+
+    assert updates.available(state) is None
+
+
+def test_but_somebody_who_asks_is_told_about_it(monkeypatch):
+    """The rejection stops the tool raising the subject. It is not a rule
+    against answering a question, and `crossglyph update` would install that
+    release anyway, so hiding it from the person asking only leaves them
+    unable to find what the tool already lets them do."""
+    monkeypatch.setattr(updates.version, "installed", lambda: "0.1.0")
+    state = updates.State(1000.0, "0.2.0", None, rejected="0.2.0")
+
+    assert updates.available(state, asked=True) == "0.2.0"
+    assert updates.was_turned_down(state, "0.2.0")
+
+
+def test_a_release_newer_than_the_one_turned_down_is_raised(monkeypatch):
+    """The rejection covers what they escaped, not everything after it."""
+    monkeypatch.setattr(updates.version, "installed", lambda: "0.1.0")
+    state = updates.State(1000.0, "0.3.0", None, rejected="0.2.0")
+
+    assert updates.available(state) == "0.3.0"
+    assert not updates.was_turned_down(state, "0.3.0")
+
+
+def test_a_release_older_than_the_one_turned_down_is_covered_too(monkeypatch):
+    """Rolling back from 0.3.0 lands on something, and being offered a step
+    back towards where you already are is the same nag by another number."""
+    monkeypatch.setattr(updates.version, "installed", lambda: "0.1.0")
+    state = updates.State(1000.0, "0.2.0", None, rejected="0.3.0")
+
+    assert updates.available(state) is None
+    assert updates.was_turned_down(state, "0.2.0")
+
+
+def test_asking_still_offers_nothing_when_there_is_nothing(monkeypatch):
+    """`asked` lifts the rejection and nothing else: it cannot conjure a
+    release out of a version that is not newer than what is installed."""
+    monkeypatch.setattr(updates.version, "installed", lambda: "0.2.0")
+    state = updates.State(1000.0, "0.2.0", None, rejected="0.2.0")
+
+    assert updates.available(state, asked=True) is None
+
+
 def test_nothing_in_this_file_reaches_the_network(monkeypatch):
     """The seam is one function. If a later test calls check() without the
     offline fixture, this is what makes it obvious rather than slow."""

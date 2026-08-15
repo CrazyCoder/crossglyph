@@ -55,11 +55,11 @@ crossglyph update --check
 ```
 
 Asks straight away, whatever the interval says and whether or not automatic
-checks are turned off. It reports all three answers, including the two the
-automatic check keeps to itself: that you are up to date, and that it could
-not reach the server.
+checks are turned off. It reports every answer, including the three the
+automatic check keeps to itself: that you are up to date, that it could not
+reach the server, and a release you rolled back from.
 
-**Check now** in the preview does the same thing.
+**Check now** in the preview does the same thing, and offers what it finds.
 
 ## Installing one
 
@@ -151,9 +151,16 @@ crossglyph update --rollback
 Puts `current` back to the version before this one and says so. Restart
 CrossGlyph and you are on it.
 
-The version you left is recorded, and the check stays quiet about it until
-something newer than it appears. Otherwise the next check would offer you the
-release you just escaped, and go on offering it every day.
+The version you left is recorded, and the checks CrossGlyph makes on its own
+stay quiet about it until something newer than it appears. Otherwise the next
+one would offer you the release you just escaped, and go on offering it every
+day.
+
+That silence is the tool not raising the subject, and it is nothing more than
+that. Ask and you are answered: `crossglyph update --check` and **Check now**
+both name that release and say why nothing had mentioned it, the button
+appears beside it, and `crossglyph update` installs it. A rollback is a
+decision about being nagged, not one you have to undo to change your mind.
 
 ## How many versions are kept
 

@@ -3378,6 +3378,27 @@ for (const { name, text } of sources) {
         String(env.about.update.hidden));
 }
 
+// 58h2. The release a rollback turned down. A page load says nothing about
+//       it, because that is the tool raising the subject; the button asks on
+//       somebody's behalf, and the answer says why it had gone unmentioned.
+//       Offering it again with no explanation would read as the button being
+//       broken rather than as a rule being followed.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    available: null, latest: "2.0.0", turned_down: false } });
+  check("a load offers nothing", env.about.update.hidden === true,
+        String(env.about.update.hidden));
+
+  const {showAbout} = env.modules.get("about.js");
+  showAbout({ ...ABOUT, available: "2.0.0", latest: "2.0.0",
+              turned_down: true });
+  check("what the button found is offered",
+        env.about.update.hidden === false, String(env.about.update.hidden));
+  check("and the island says why it had said nothing",
+        env.about.detail.textContent.includes("rolled back from 2.0.0"),
+        env.about.detail.textContent);
+}
+
 // 58i0. A launcher an update could not replace is left beside the live one,
 //       and the sentence is where anybody learns it will be applied at the
 //       next launch rather than now.

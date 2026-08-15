@@ -2141,6 +2141,38 @@ def test_a_forced_check_asks_and_answers(client, monkeypatch):
     assert said["latest"] == "9.9.9"
 
 
+def test_a_page_load_stays_quiet_about_a_release_that_was_turned_down(
+        client, monkeypatch):
+    """A load is the tool raising the subject, which is the nagging a
+    rollback exists to stop."""
+    from crossglyph import updates
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(2000.0, "9.9.9", None,
+                                                   rejected="9.9.9"))
+    said = client.get("/update").json()
+
+    assert said["latest"] == "9.9.9"
+    assert said["available"] is None
+    assert said["turned_down"] is False
+
+
+def test_but_the_button_names_it_and_offers_it(client, monkeypatch):
+    """The same distinction the command line draws: pressing Check now is a
+    person asking, and the answer includes why it had not been mentioned."""
+    from crossglyph import updates
+    from crossglyph.preview import server
+
+    state = updates.State(2000.0, "9.9.9", None, rejected="9.9.9")
+    monkeypatch.setattr(server.updates, "check", lambda root, **kw: state)
+    monkeypatch.setattr(server.updates, "load_state", lambda root: state)
+    said = client.post("/update/check").json()
+
+    assert said["available"] == "9.9.9"
+    assert said["turned_down"] is True
+
+
 def test_a_forced_check_that_fails_says_so_rather_than_erroring(client,
                                                                 monkeypatch):
     """A 500 would show the page nothing to explain. The failure is the

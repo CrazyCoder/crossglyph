@@ -77,6 +77,12 @@ export function showAbout(about) {
     said.push("Render core built from crosspoint-reader " +
               `${about.firmware.slice(0, SHORT)}.`);
   }
+  // Why a release is on offer that the page load did not mention: the button
+  // asked, and asking is answered even about the one a rollback turned down.
+  if (about.turned_down && about.available) {
+    said.push(`You rolled back from ${about.available}, ` +
+              "so checks stay quiet about it.");
+  }
   // Decided by the server, which is where the same rule serves the command
   // line. Empty for a release with nothing to update to, which is the case
   // that should say nothing at all.

@@ -1039,17 +1039,22 @@ def defaults() -> dict:
             "family": _family}
 
 
-def _about() -> dict:
+def _about(asked: bool = False) -> dict:
     """What this install is, and what the last check found.
 
     Reading only. The page renders what is already known; the thread at
     startup and the button are the two things that ask, which is what keeps a
     page load off the network.
+
+    `asked` is the button rather than a page load, and it is what decides
+    whether a release somebody rolled back from is named. A load is the tool
+    raising the subject, which is the nagging the rejection exists to stop;
+    the button is a person asking, and they get an answer.
     """
     root = install.root()
     kind = install.detect(root)
     state = updates.load_state(root)
-    found = updates.available(state)
+    found = updates.available(state, asked=asked)
     running = version.installed()
     # What a restart would run. It differs from what is running only after an
     # update or a rollback, and saying so is the only way this process can:
@@ -1076,6 +1081,10 @@ def _about() -> dict:
             "notice": install.notice(kind, bool(found) and not pending),
             "latest": state.latest,
             "available": found,
+            # Named, so the island can say why it is offering a release the
+            # page load before it did not. Silently reappearing on a button
+            # press reads as a bug in the button.
+            "turned_down": updates.was_turned_down(state, found),
             "checked_at": state.checked_at or None,
             "checking_off": not updateconf.settings(root).check,
             "error": state.error}
@@ -1102,7 +1111,7 @@ def update_check() -> dict:
     from installing something.
     """
     updates.check(install.root(), force=True)
-    return _about()
+    return _about(asked=True)
 
 
 def _startup(root: pathlib.Path) -> None:

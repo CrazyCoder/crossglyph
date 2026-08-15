@@ -87,20 +87,26 @@ def _checked(code: int, quiet: bool) -> int:
 def _check_only(root: pathlib.Path) -> int:
     """Ask now, and install nothing.
 
-    Both of the states it can report are ones the automatic check keeps to
-    itself, and both are why somebody asked by hand.
+    Every state it can report is one the automatic check keeps to itself, and
+    every one of them is why somebody asked by hand: that you are up to date,
+    that the server could not be reached, and the release a rollback turned
+    down. That last one is silenced so the tool stops raising it, which is a
+    different thing from refusing to answer somebody who asks.
     """
     state = updates.check(root, force=True)
     if state.error:
         print(f"could not reach the update server: {state.error}",
               file=sys.stderr)
         return 1
-    found = updates.available(state)
-    if found:
-        print(f"{found} is available. "
-              f"{install.instruction(install.detect(root))}")
-    else:
+    found = updates.available(state, asked=True)
+    if not found:
         print(f"crossglyph {version.installed()} is up to date.")
+        return 0
+    said = f"{found} is available."
+    if updates.was_turned_down(state, found):
+        said = (f"{found} is available, and is the release you rolled back "
+                f"from, so checks stay quiet about it.")
+    print(f"{said} {install.instruction(install.detect(root))}")
     return 0
 
 
