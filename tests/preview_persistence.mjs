@@ -3244,19 +3244,20 @@ for (const { name, text } of sources) {
 // 58a. A newer release takes the place of the line about when the asking last
 //      happened. It is the only answer worth having while there is one, and
 //      one thing on the right is what keeps the island to a single line.
+//      The server sends no instruction for a kind this page can install for
+//      itself, so the line below stays what this install is.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, { about: {
-    available: "2.0.0", latest: "2.0.0",
-    notice: "Run crossglyph update to install it." } });
+    available: "2.0.0", latest: "2.0.0", notice: "" } });
   check("the state names the version to move to",
         env.about.state.textContent === "2.0.0 is available.",
         env.about.state.textContent);
-  check("and the detail says how",
-        env.about.detail.textContent.includes("crossglyph update"),
-        env.about.detail.textContent);
   check("and the press on offer is the one that installs it",
         env.about.update.hidden === false && env.about.button.hidden === true,
         `check ${env.about.button.hidden}, update ${env.about.update.hidden}`);
+  check("and nothing beside the button tells you to run the command it runs",
+        !env.about.detail.textContent.includes("crossglyph update"),
+        env.about.detail.textContent);
 }
 
 // 58b. A kind that cannot replace its own files says so instead, because the
@@ -3296,6 +3297,20 @@ for (const { name, text } of sources) {
   check("the line says it could not ask",
         env.about.state.textContent === "Could not reach the update server.",
         env.about.state.textContent);
+}
+
+// 58e. One of anything is not "1 minutes". This line is on the page every
+//      time it loads, and it spends a whole minute of every hour being wrong.
+{
+  const at = seconds => ({ about: { checked_at: Date.now() / 1000 - seconds } });
+  const one = await loaded(fakeStorage(), DEFAULTS, at(90));
+  check("one of a unit is said in the singular",
+        one.about.state.textContent === "Up to date, checked 1 minute ago.",
+        one.about.state.textContent);
+  const several = await loaded(fakeStorage(), DEFAULTS, at(2 * 3600));
+  check("and more than one is not",
+        several.about.state.textContent === "Up to date, checked 2 hours ago.",
+        several.about.state.textContent);
 }
 
 // 58e. The button asks, and says so while it is asking.

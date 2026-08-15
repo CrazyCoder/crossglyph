@@ -23,13 +23,17 @@ const MINUTE = 60, HOUR = 3600, DAY = 86400;
 
 const UNREACHABLE = "Could not reach the update server.";
 
+function count(value, unit) {
+  return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
+}
+
 // Said in the coarsest unit that is still true. "3 hours ago" is what anybody
 // wants from this line; a timestamp is not.
 function ago(seconds) {
   if (seconds < MINUTE) return "just now";
-  if (seconds < HOUR) return `${Math.floor(seconds / MINUTE)} minutes ago`;
-  if (seconds < DAY) return `${Math.floor(seconds / HOUR)} hours ago`;
-  return `${Math.floor(seconds / DAY)} days ago`;
+  if (seconds < HOUR) return count(Math.floor(seconds / MINUTE), "minute");
+  if (seconds < DAY) return count(Math.floor(seconds / HOUR), "hour");
+  return count(Math.floor(seconds / DAY), "day");
 }
 
 // The answer first, and when it was found after it, in one sentence about one
