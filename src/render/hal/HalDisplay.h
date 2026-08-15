@@ -93,7 +93,12 @@ class HalDisplay {
   void copyGrayscaleLsbBuffers(const uint8_t*) {}
   void copyGrayscaleMsbBuffers(const uint8_t*) {}
   void cleanupGrayscaleBuffers(const uint8_t*) {}
-  void displayGrayBuffer(bool = false, RefreshMode = HALF_REFRESH) {}
+  // (turnOffScreen, lut, factoryMode), as lib/hal/HalDisplay.h has it. The
+  // last two arrived with the factory grayscale LUT for cover images; nothing
+  // here shows one, but the signature has to match or GfxRenderer will not
+  // compile against this stub.
+  void displayGrayBuffer(bool = false, const unsigned char* = nullptr,
+                         bool = false) {}
   void grayscaleRevert() {}
   void writeGrayscalePlaneStrip(bool, const uint8_t*, int, int) {}
   bool supportsStripGrayscale() const { return false; }

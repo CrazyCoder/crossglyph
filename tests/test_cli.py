@@ -51,13 +51,18 @@ def test_the_report_names_the_version_and_the_render_core(monkeypatch):
     from crossglyph import install
 
     monkeypatch.setattr(cli.version, "installed", lambda: "1.2.3")
-    monkeypatch.setattr(cli.stamp, "build_stamp", lambda: "45caec3e76c2472b")
+    # A stamp of our own, since the committed one moves with every rebuild:
+    # what is asserted is that the report carries what the stamp says.
+    monkeypatch.setattr(cli.stamp, "_stamp",
+                        lambda: {"firmware": "45caec3e76c2472b",
+                                 "source": "crosspoint-reader",
+                                 "ref": "develop"})
     monkeypatch.setattr(cli.install, "detect", lambda *a, **k: install.ZIP)
 
     said = cli.version_report()
     assert said.startswith("crossglyph 1.2.3")
     assert "45caec3e76c2" in said
-    assert "crosspoint-reader" in said
+    assert "crosspoint-reader develop" in said
 
 
 def test_a_core_with_no_stamp_says_so_rather_than_nothing(monkeypatch):

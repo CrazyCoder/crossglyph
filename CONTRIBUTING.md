@@ -301,6 +301,11 @@ framebuffer in a function local static because as a member of an `inline`
 variable it came out null in one translation unit and valid in another, so
 every drawn pixel vanished in silence.
 
+The stubs under `src/render/hal/` stand in for the firmware's own HAL, so
+their signatures have to track it. When the firmware changes one, the build
+says so as a compile error naming both, which is the good case: an argument
+added to `displayGrayBuffer` upstream stops the build rather than the page.
+
 The build writes a stamp beside the module: the commit, the repository it came
 from and the branch it was on. A checkout whose firmware has moved past that
 commit gets a warning, once per run, and the preview draws with the older
