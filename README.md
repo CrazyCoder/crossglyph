@@ -28,6 +28,8 @@ the point size.
 - eight page controls, so the page you judge is set up like the device you are
   judging for: margin, alignment, line spacing, hyphenation and the language
   its patterns come from, paragraph spacing, anti-aliasing and night mode
+- variable fonts build at the weight their designer named, or at any weight you
+  pick: left alone, Merriweather would ship its Light as your Regular
 - four sizes of a four-style family, 795 glyphs each with kerning, built in
   about a second, one process per size
 - twelve Noto faces on request, so a missing arrow or Greek letter is not a
