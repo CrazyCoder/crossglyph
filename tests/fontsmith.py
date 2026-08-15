@@ -74,8 +74,8 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
 
     # Unmapped alternates, which is what a proportional figure is: reachable
     # through the pnum lookup and by glyph index, and by nothing else.
-    narrow = [f"{_glyph_name(code)}.pnum" for code in codepoints
-              if figures and 0x30 <= code <= 0x39]
+    narrow = {f"{_glyph_name(code)}.pnum": code for code in codepoints
+              if figures and 0x30 <= code <= 0x39}
 
     builder = FontBuilder(UPEM, isTTF=not cff)
     builder.setupGlyphOrder([".notdef", *names, *narrow])
@@ -89,9 +89,15 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
     else:
         builder.setupGlyf({".notdef": empty,
                            **{name: box for name in (*names, *narrow)}})
+    # A width of its own per alternate, rather than one narrow width for all
+    # of them. "Tabular means every digit shares an advance" is the property
+    # the feature exists to break, and a fixture whose proportional digits are
+    # also uniform cannot tell a working substitution from a dropped one. The
+    # one is the narrow digit, as it is in every face that draws these.
     builder.setupHorizontalMetrics(
         {**{name: (ADVANCE, 80) for name in (".notdef", *names)},
-         **{name: (ADVANCE // 2, 40) for name in narrow}})
+         **{name: (ADVANCE // 2 if code == 0x31 else ADVANCE * 3 // 4, 40)
+            for name, code in narrow.items()}})
     builder.setupHorizontalHeader(ascent=800, descent=-200)
     builder.setupOS2(sTypoAscender=800, sTypoDescender=-200,
                      usWinAscent=800, usWinDescent=200)

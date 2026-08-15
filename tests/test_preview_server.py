@@ -996,22 +996,21 @@ def test_a_corrupt_face_is_a_client_error_not_a_traceback(tmp_path):
         server.set_font_source(SRC)
 
 
-PNUM_SRC = fontpaths.cff()
-needs_pnum = pytest.mark.skipif(PNUM_SRC is None,
-                                reason="set CROSSGLYPH_TEST_OTF to a face with a pnum feature")
-
-
-@needs_pnum
-def test_the_figures_knob_reaches_the_page():
-    """A synthesized face has no pnum feature, and the knob is honestly inert
-    without one. This needs a face whose designer drew proportional figures,
-    and the sample text carries enough digits to show the substitution."""
+def test_the_figures_knob_reaches_the_page(tmp_path):
+    """The knob is honestly inert on a face with no pnum feature, so this
+    needs one that draws proportional figures -- built here rather than taken
+    off the machine, which asked for "a CFF face" and got three failures from
+    any CFF face that happens not to draw them."""
     from fastapi.testclient import TestClient
+    from fontsmith import box_font
 
     from crossglyph.preview import server
 
+    face = box_font(tmp_path / "Prop-Regular.ttf",
+                    [ord(ch) for ch in "0123456789 the quick brown fox"],
+                    figures=True, cff=True, family="Prop")
     try:
-        server.set_font_source(PNUM_SRC)
+        server.set_font_source(face)
         client = TestClient(server.app)
         plain = client.post("/render", json={"size": 13})
         prop = client.post("/render", json={

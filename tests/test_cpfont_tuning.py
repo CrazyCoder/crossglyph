@@ -566,36 +566,55 @@ def test_an_unknown_figure_style_is_refused():
         Tuning(figures="oldstyle")
 
 
-@needs_cff
-def test_proportional_figures_narrow_the_one(tmp_path):
-    """Alto pads every tabular digit to 506 design units and its proportional
-    '1' is 321 -- the gap tabular figures leave around a narrow digit in prose
-    is the entire reason the feature exists.
+def _pnum_face(tmp_path):
+    """A CFF face whose designer drew proportional figures, built here.
 
-    Asserting the ratio rather than merely "narrower" is what makes this catch
+    Not a face off the machine. These three want one specific property -- a
+    pnum feature that narrows some digits and not others -- and the gate said
+    only "a CFF face": point CROSSGLYPH_TEST_OTF at a reasonable one that
+    happens not to draw proportional figures, as the bundled CJK face does,
+    and all three fail while saying nothing about the converter. Built, they
+    also run for everybody rather than for whoever set the variable.
+
+    CFF, because the substitution is read through the Adobe driver here and a
+    TrueType face would exercise the other one.
+    """
+    import fontsmith
+
+    return fontsmith.box_font(tmp_path / "Prop-Regular.ttf",
+                              [ord(ch) for ch in "0123456789aHWm "],
+                              figures=True, cff=True, family="Prop")
+
+
+def test_proportional_figures_narrow_the_one(tmp_path):
+    """The gap tabular figures leave around a narrow digit in prose is the
+    entire reason the feature exists, and the one is the digit it shows on.
+
+    Asserting the width rather than merely "narrower" is what makes this catch
     the substitution landing on the *wrong* glyph: the pnum alternates carry no
     cmap entry, so they are reachable only by glyph index, and an index read
     against the wrong table would still give some other width.
     """
-    plain = _figures(tmp_path, CFF)
-    prop = _figures(tmp_path, CFF, Tuning(figures="proportional"))
+    face = _pnum_face(tmp_path)
+    plain = _figures(tmp_path, face)
+    prop = _figures(tmp_path, face, Tuning(figures="proportional"))
     ratio = _advance(prop, ord("1")) / _advance(plain, ord("1"))
-    assert abs(ratio - 321 / 506) < 0.005, ratio
+    assert abs(ratio - 0.5) < 0.05, ratio
 
 
-@needs_cff
 def test_proportional_figures_stop_all_digits_being_one_width(tmp_path):
     """The defining property: tabular means every digit shares an advance."""
-    plain = _figures(tmp_path, CFF)
-    prop = _figures(tmp_path, CFF, Tuning(figures="proportional"))
+    face = _pnum_face(tmp_path)
+    plain = _figures(tmp_path, face)
+    prop = _figures(tmp_path, face, Tuning(figures="proportional"))
     assert len({_advance(plain, ord(d)) for d in "0123456789"}) == 1
     assert len({_advance(prop, ord(d)) for d in "0123456789"}) > 1
 
 
-@needs_cff
 def test_proportional_figures_leave_the_letters_alone(tmp_path):
-    plain = _figures(tmp_path, CFF)
-    prop = _figures(tmp_path, CFF, Tuning(figures="proportional"))
+    face = _pnum_face(tmp_path)
+    plain = _figures(tmp_path, face)
+    prop = _figures(tmp_path, face, Tuning(figures="proportional"))
     for ch in "aHWm":
         assert _advance(prop, ord(ch)) == _advance(plain, ord(ch))
 
