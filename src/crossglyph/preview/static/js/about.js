@@ -39,9 +39,10 @@ function checkedLine(about) {
   return `Checked ${ago(Date.now() / 1000 - about.checked_at)}.`;
 }
 
-// What this run of the page has installed, and the one thing the server
-// cannot tell it: the process answering is still the old version, so every
-// check it makes finds the release already sitting on disk and calls it new.
+// What a restart would run, when that is not what is running. The server
+// reads it off the disk, so a reload and a second browser are told as much as
+// the page that pressed the button; this holds it for the one moment the
+// server has not been asked again, which is the end of an update.
 let installed = null;
 
 // Which leaves nothing to press. What is installed does not become what is
@@ -56,6 +57,7 @@ function showInstalled() {
 export function showAbout(about) {
   number.textContent = about.version;
   if (about.home) home.href = about.home;
+  installed = installed || about.pending || null;
   if (installed) {
     showInstalled();
   } else {

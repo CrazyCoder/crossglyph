@@ -71,6 +71,13 @@ so does everything at the root: `update.conf`, your `fonts` folder, and the
 launcher, which is dealt with below. What is installed does not become what is
 running until you start CrossGlyph again.
 
+The preview says so and stops offering the release, since it is already on the
+disk. That comes from the disk rather than from the page that pressed the
+button, so a reload, a second browser and an update run from the command line
+while the preview is open are all told the same thing: a server that goes on
+being the version it started as would otherwise find that release on every
+check and offer it again.
+
 An update interrupted anywhere leaves an install that still runs. The download
 goes to `versions/.tmp-<version>.zip` and the unpack to
 `versions/.incoming-<version>`, neither of which the launcher will ever start,

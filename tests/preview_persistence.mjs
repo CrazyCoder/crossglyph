@@ -3344,6 +3344,21 @@ for (const { name, text } of sources) {
         JSON.stringify(env.about.update.states));
 }
 
+// 58h1. A reload is told as much, and so is a second browser. What a restart
+//       would run is read off the disk by the server, so the answer does not
+//       live in the page that pressed the button -- and an update done from
+//       the command line, while this page sat open, reaches it too.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { about: {
+    pending: "2.0.0", available: "2.0.0", latest: "2.0.0" } });
+  check("a page that installed nothing still says what is waiting",
+        env.about.state.textContent === "2.0.0 installed.",
+        env.about.state.textContent);
+  check("and offers nothing to install",
+        env.about.update.hidden === true && env.about.button.hidden === true,
+        `update ${env.about.update.hidden}, check ${env.about.button.hidden}`);
+}
+
 // 58h0. And a check afterwards does not offer it again. This process is still
 //       the old version, so the manifest goes on looking newer to it for as
 //       long as it runs -- the page is the only thing that knows the release

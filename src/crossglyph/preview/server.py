@@ -1050,18 +1050,30 @@ def _about() -> dict:
     kind = install.detect(root)
     state = updates.load_state(root)
     found = updates.available(state)
-    return {"version": version.installed(),
+    running = version.installed()
+    # What a restart would run. It differs from what is running only after an
+    # update or a rollback, and saying so is the only way this process can:
+    # it goes on being the old version for as long as it lives, so every check
+    # it makes finds the release already on the disk and calls it new. On disk
+    # rather than remembered, so a reload, a second browser and an update done
+    # from the command line all get the same answer.
+    live = layout.current(root)
+    pending = live if live and live != running else None
+    return {"version": running,
             "firmware": stamp.build_stamp(),
             # Sent rather than written into the page, so the link and the
             # place the updater fetches from cannot come to disagree.
             "home": updates.HOME,
             "kind": kind,
+            "pending": pending,
             "can_self_update": install.can_self_update(kind),
             # The sentence, already decided. The page renders what it is given
             # rather than working out for itself when there is one, which is
             # the rule that keeps it and the command line saying the same
-            # thing about the same install.
-            "notice": install.notice(kind, bool(found)),
+            # thing about the same install. Nothing to say once the release is
+            # installed and waiting: telling somebody how to fetch what they
+            # have already fetched is the nag this exists to avoid.
+            "notice": install.notice(kind, bool(found) and not pending),
             "latest": state.latest,
             "available": found,
             "checked_at": state.checked_at or None,

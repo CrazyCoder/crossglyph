@@ -2044,6 +2044,43 @@ def test_the_update_endpoint_says_what_this_install_is(client):
                                             bool(said["available"]))
 
 
+def test_an_installed_release_waiting_for_a_restart_is_said(client,
+                                                            monkeypatch):
+    """This process goes on being the version it started as, so a check it
+    makes after an update finds the release already on the disk and calls it
+    new. What a restart would run is the answer to that, and it is read off
+    the disk rather than remembered: a reload, a second browser and an update
+    done from the command line are all told the same thing.
+    """
+    from crossglyph.preview import server
+
+    from crossglyph import install, updates
+
+    monkeypatch.setattr(server.updates, "load_state",
+                        lambda root: updates.State(1000.0, "9.9.9", None))
+    monkeypatch.setattr(server.layout, "current", lambda root: "9.9.9")
+    said = client.get("/update").json()
+    assert said["pending"] == "9.9.9"
+    # The release is still the newest one there is, and still worth naming.
+    assert said["available"] == "9.9.9"
+    # But nothing says how to fetch what has already been fetched: the notice
+    # is the one for an install with nothing to install.
+    assert said["notice"] == install.notice(said["kind"], False)
+
+
+def test_nothing_is_pending_while_what_runs_is_what_is_current(client,
+                                                               monkeypatch):
+    from crossglyph import version
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(server.layout, "current",
+                        lambda root: version.installed())
+    assert client.get("/update").json()["pending"] is None
+    # A checkout has no `current` at all, which is the ordinary case here.
+    monkeypatch.setattr(server.layout, "current", lambda root: None)
+    assert client.get("/update").json()["pending"] is None
+
+
 def test_the_firmware_commit_travels_with_the_version(client, monkeypatch):
     """Two installs on the same version can carry different renderers, so the
     commit is part of the answer rather than a detail."""
