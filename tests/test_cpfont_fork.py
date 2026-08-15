@@ -27,11 +27,11 @@ def test_base_coverage_is_always_injected():
 #: has drifted onto an unrelated line is worse than none, since it reads as
 #: proof. Each entry is the cited range and a token the code there must carry.
 CITATIONS = [
-    ("1257-1260", "fallback_style_fonts.get(0, [])"),
-    ("1247", "HEADER_SIZE = 32"),
-    ("1291", "STYLE_TOC_FORMAT"),
-    ("1292-1297", "advanceY > 255"),
-    ("1120", "raise FontBuildError"),
+    ("1268-1271", "fallback_style_fonts.get(0, [])"),
+    ("1258", "HEADER_SIZE = 32"),
+    ("1302", "STYLE_TOC_FORMAT"),
+    ("1303-1308", "advanceY > 255"),
+    ("1131", "raise FontBuildError"),
 ]
 
 

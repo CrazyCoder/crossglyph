@@ -946,8 +946,19 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 # FORK: FT_Outline_Embolden fattens the outline without moving
                 # linearHoriAdvance, so text gets heavier at unchanged spacing.
                 # Rendering is ours to do, since FT_LOAD_RENDER was withheld.
+                #
+                # byref, and it segfaults without it. The function takes an
+                # FT_Outline*, and freetype-py declares no argtypes for it, so
+                # handing over the structure passes it by value. On Windows
+                # x64 that survives: the ABI puts anything larger than eight
+                # bytes behind a pointer, which is what the callee reads. The
+                # System V ABI puts it on the stack instead, so the callee
+                # takes the first eight bytes of the outline for its address
+                # and writes through it. That is a crash on every Linux and
+                # macOS build the moment somebody moves the weight knob.
                 freetype.FT_Outline_Embolden(
-                    target_face.glyph.outline._FT_Outline, embolden)
+                    freetype.byref(target_face.glyph.outline._FT_Outline),
+                    embolden)
                 freetype.FT_Render_Glyph(
                     target_face.glyph._FT_GlyphSlot,
                     freetype.FT_RENDER_MODE_MONO if tuning.mono
