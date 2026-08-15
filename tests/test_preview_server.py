@@ -105,6 +105,55 @@ def two_families(tmp_path, monkeypatch):
     server.set_font_source(SRC)
 
 
+def test_the_family_list_is_read_from_the_folder_every_time(client,
+                                                            two_families):
+    """A guard rather than a fix: this list has never been remembered, and a
+    font dropped into a docker volume shows up in it as soon as anything asks.
+    What has to ask is the page, which does when its tab comes back."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+
+    def named():
+        return {entry["name"]
+                for entry in client.get("/defaults").json()["families"]}
+
+    assert "Newcomer" not in named()
+    box_font(fontbuild.SOURCE_DIR / "Newcomer-Regular.ttf", [0x20, 0x41],
+             family="Newcomer")
+    assert "Newcomer" in named()
+
+
+def test_a_config_edited_by_hand_reaches_the_next_render(client, two_families):
+    """What a family resolves to *is* remembered, and it is what the next page
+    is drawn with. Left cached, an edit in an editor shows in the picker while
+    the image beside it goes on being built from the file as it was."""
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    assert server.family_config("Probe").tuning.gamma == 1.0
+    (_conf(fontbuild.SOURCE_DIR) / "probe.conf").write_text(
+        "gamma = 1.6\n", encoding="utf-8")
+    assert server.family_config("Probe").tuning.gamma == 1.0, \
+        "resolved once and kept, which is the thing being fixed"
+
+    client.get("/defaults")             # the page's tab has come back
+    assert server.family_config("Probe").tuning.gamma == 1.6
+
+
+def test_a_folder_that_has_not_moved_keeps_what_it_resolved(client,
+                                                            two_families):
+    """The fingerprint earns its walk here: forgetting on every ask would make
+    each return to the tab re-read every config in the folder."""
+    from crossglyph.preview import server
+
+    client.get("/defaults")
+    server.family_config("Probe")                   # fills the cache
+    before = server._config_cached.cache_info().currsize
+    client.get("/defaults")
+    assert server._config_cached.cache_info().currsize == before
+
+
 @needs_core
 def test_a_chosen_fallback_family_reaches_the_page(client, two_families):
     """The panel's fallback pickers are build settings that now show: a

@@ -124,6 +124,29 @@ a token cannot help here. A browser elsewhere could only learn one if the page
 carried it, and a page that carries it hands it to everyone who can load the
 page.
 
+## When the folder changes underneath it
+
+The font folder is not only the app's to change. A font gets dropped into it,
+a config gets edited in an editor, a docker volume gets a new file from
+outside the container, all while the page is open.
+
+Reaching the folder means leaving the window, so coming back to the page is
+when it asks again: on tab focus it re-reads the folder, and a font added,
+removed or retuned since the last look is in the picker. Nothing polls, so an
+app nobody is looking at does no work at all, which is most of what a
+background one does.
+
+What you are tuning keeps its place through that. The picker does not move
+under you, and unsaved knobs are never overwritten, since they are the only
+thing on the page with nowhere else to live. When the open family's config
+changes on disk:
+
+- with nothing of yours in the panel, it follows the file and redraws
+- with unsaved knobs, they stay, the page says the file changed, and the
+  revert arrows compare against the file as it is now rather than as it was
+
+A family whose files have gone falls back the way a fresh page would.
+
 ## What the controls do
 
 Font controls (`gamma`, `weight`, `line_height`, the spacings, `kerning`,

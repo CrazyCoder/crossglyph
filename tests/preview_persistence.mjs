@@ -718,13 +718,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
     },
   };
-  const fetches = { render: 0, checks: 0, applies: 0, bodies: [], saves: [],
-                    builds: [], fallbacks: [] };
+  const fetches = { render: 0, checks: 0, applies: 0, defaults: 0, bodies: [],
+                    saves: [], builds: [], fallbacks: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
   let answer = true;
-  const keys = [], keyups = [];
+  const keys = [], keyups = [], returns = [];
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
@@ -741,12 +741,22 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) {
         if (kind === "keydown") keys.push(fn);
         if (kind === "keyup") keyups.push(fn);
+        if (kind === "visibilitychange") returns.push(fn);
       },
+      //: Whether the tab is in the background. The page asks before it
+      //: re-reads the folder, so a hidden one has to be able to say yes.
+      hidden: false,
       documentElement: {
         dataset: { appearance: "system" },
         classList: { toggle() {} },
       },
       title: "",
+    },
+    // Coming back to the page is two different events -- a tab switch is the
+    // document's, and clicking back from another window is this one's -- and
+    // the page listens for both because neither covers the other.
+    window: {
+      addEventListener(kind, fn) { if (kind === "focus") returns.push(fn); },
     },
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     createElement: () => ({ dataset: {}, style: {}, textContent: "", title: "" }),
@@ -907,7 +917,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         return Promise.resolve({ json: () => Promise.resolve(
           { ...ABOUT, ...(opts.about ?? {}) }) });
       }
-      return Promise.resolve({ json: () => Promise.resolve(defaults) });
+      // The folder as it is now. `later` is what a second ask gets, which is
+      // how a font arriving or a config being edited is put to the page.
+      fetches.defaults++;
+      const answer = fetches.defaults > 1 && opts.later ? opts.later : defaults;
+      return Promise.resolve({ json: () => Promise.resolve(answer) });
     },
     // The chunks above are already text, so this only has to exist.
     TextDecoder: class { decode(chunk) { return chunk || ""; } },
@@ -940,6 +954,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     console,
   };
   return { form, listeners, sandbox, byName, clicks, sliderList, fetches,
+           //: Come back to the page, as either event does.
+           returning: () => { for (const fn of returns) fn(); },
            revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
@@ -3577,6 +3593,83 @@ for (const { name, text } of sources) {
   check("with that written down too, rather than left to the default",
         storage.data["crossglyph.folds"] === "mod",
         storage.data["crossglyph.folds"]);
+}
+
+// The font folder is not only ours to change: a font gets dropped into it and
+// a config gets edited beside it, both while the page is open. Reaching the
+// folder means leaving the window, so coming back is when the page asks again.
+{
+  const later = structuredClone(DEFAULTS);
+  later.families.push({ name: "Newcomer", faces: ["regular"],
+                        files: { regular: "Newcomer.ttf" },
+                        tuning: { ...DEFAULTS.families[0].tuning },
+                        features: {}, conf: "newcomer.conf" });
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  const named = () => env.family.options.map(o => o.value).join();
+  const was = named();
+
+  // Typed into the export panel and not built yet, which is unsaved work of
+  // exactly the kind the knobs are.
+  env.exportForm.elements.ranges.value = "0x2200-0x22FF";
+
+  env.returning();
+  await settle();
+  check("coming back to the page asks the folder again",
+        env.fetches.defaults === 2, env.fetches.defaults);
+  check("a font added while it was away is in the picker",
+        named() === was + ",Newcomer", named());
+  check("and what was being tuned keeps its place",
+        env.family.value === "Alto", env.family.value);
+  check("and what was typed beside it is still typed",
+        env.exportForm.elements.ranges.value === "0x2200-0x22FF",
+        env.exportForm.elements.ranges.value);
+}
+
+{
+  const env = await loaded(fakeStorage());
+  env.sandbox.document.hidden = true;
+  env.returning();
+  await settle();
+  check("a tab in the background asks nothing", env.fetches.defaults === 1,
+        env.fetches.defaults);
+}
+
+// A config edited in an editor, with nothing of yours in the panel to lose.
+{
+  const later = structuredClone(DEFAULTS);
+  later.families.find(one => one.name === "Alto").tuning.gamma = 1.75;
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  check("the knob starts where the file had it",
+        env.byName.gamma.value === "1.2", env.byName.gamma.value);
+
+  env.returning();
+  await settle();
+  check("an untouched panel follows the file", env.byName.gamma.value === "1.75",
+        env.byName.gamma.value);
+  check("and says nothing about it, since nothing was lost",
+        env.note.textContent === "", env.note.textContent);
+}
+
+// The same edit, arriving on top of knobs you have not saved. Those are the
+// one thing on the page with nowhere else to live, so the file does not win.
+{
+  const later = structuredClone(DEFAULTS);
+  later.families.find(one => one.name === "Alto").tuning.gamma = 1.75;
+  const env = await loaded(fakeStorage(), DEFAULTS, { later });
+  env.byName.gamma.value = "2.5";
+  env.listeners.input({ target: env.byName.gamma });
+
+  env.returning();
+  await settle();
+  check("unsaved knobs survive a config that changed under them",
+        env.byName.gamma.value === "2.5", env.byName.gamma.value);
+  check("and the page says the file moved",
+        env.note.textContent.includes("changed on disk"), env.note.textContent);
+  // Asked by pressing it, since the arrow's own words are the same either
+  // way: what has to have moved is the value behind it.
+  env.revertList.find(r => r.dataset.reset === "gamma").click();
+  check("and the arrow now bypasses to the file as it is now, not as it was",
+        env.byName.gamma.value === "1.75", env.byName.gamma.value);
 }
 
 process.exit(failures ? 1 : 0);

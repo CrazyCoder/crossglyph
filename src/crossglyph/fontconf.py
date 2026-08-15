@@ -434,6 +434,41 @@ def _short_style(stem: str, wanted: str) -> str | None:
     return None
 
 
+#: Folders a walk does not enter. `conf` holds configs and `cpfonts` is where
+#: builds land, so neither has a source face in it; a dot folder is somebody
+#: else's business. Named rather than resolved, because an `out` pointed
+#: somewhere else still holds no fonts -- .cpfont is not a font suffix, so
+#: walking a build folder finds nothing either way and this only saves the
+#: walking.
+SKIP_DIRS = ("conf", "cpfonts")
+
+
+def font_files(directory: pathlib.Path) -> list[pathlib.Path]:
+    """Every font file in a workspace, subfolders included.
+
+    Folders are organization and nothing more: a face is known by its
+    filename wherever it sits, so `serif/Charis-Bold.ttf` is Charis' bold
+    exactly as `Charis-Bold.ttf` at the root would be. Keeping the name the
+    only thing that decides is what lets a folder be rearranged without
+    renaming what it builds.
+
+    Sorted by path, so two files that would claim one slot are settled the
+    same way on every machine.
+    """
+    if not directory.is_dir():
+        return []
+    found = []
+    for path in sorted(directory.rglob("*")):
+        if path.suffix.lower() not in FONT_SUFFIXES or not path.is_file():
+            continue
+        parts = path.relative_to(directory).parts[:-1]
+        if any(part.startswith(".") or part.lower() in SKIP_DIRS
+               for part in parts):
+            continue
+        found.append(path)
+    return found
+
+
 def discover_styles(directory: pathlib.Path, family: str) -> dict[str, pathlib.Path]:
     """Map style -> font file for one family in one directory.
 
@@ -443,8 +478,7 @@ def discover_styles(directory: pathlib.Path, family: str) -> dict[str, pathlib.P
     found: dict[str, tuple[int, str, pathlib.Path]] = {}
     parked: list[pathlib.Path] = []
     wanted = family.casefold()
-    fonts = sorted(p for p in (directory.iterdir() if directory.is_dir() else [])
-                   if p.suffix.lower() in FONT_SUFFIXES and p.is_file())
+    fonts = font_files(directory)
     # Only then is a bare "b"/"i" suffix trustworthy (see SHORT_SUFFIXES).
     terse = any(font_stem(p).casefold() == wanted for p in fonts)
 
@@ -495,8 +529,7 @@ def discover_families(directory: pathlib.Path) -> dict[str, dict[str, pathlib.Pa
     A weight that is genuinely its own family keeps one -- `Quill-Light`
     strips to itself, not to `Quill`, so it is built separately.
     """
-    fonts = sorted(p for p in (directory.iterdir() if directory.is_dir() else [])
-                   if p.suffix.lower() in FONT_SUFFIXES and p.is_file())
+    fonts = font_files(directory)
     candidates = sorted(
         {family_of(font_stem(p)) for p in fonts
          if not EXTRA_WEIGHT_RE.search(font_stem(p))},

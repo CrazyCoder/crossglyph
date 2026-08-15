@@ -1007,7 +1007,11 @@ def defaults() -> dict:
     `families` is the picker's list and `family` the entry to select. When the
     app was started on a bare file there is no entry to select: `font` names
     it, and the page keeps it as a choice of its own at the top of the list.
+
+    The page asks for this again whenever its tab comes back, so this is where
+    a font dropped into the folder, or a config edited beside it, is noticed.
     """
+    rescan()
     return {"text": SAMPLE_TEXT,
             # Every preset, in picker order, so switching between them is a
             # dropdown rather than a round trip. The page picks one of these
@@ -1391,15 +1395,58 @@ def _config_cached(source: str, name: str) -> Config:
 
 
 def forget_families() -> None:
-    """Drop what was resolved from the folder, after something wrote to it.
+    """Drop what was resolved from the folder, after it changed underneath us.
 
-    A save is the only thing that changes a config under a running app, and it
-    changes exactly the family it named -- but a family can be addressed by
-    several names and all.conf reaches every one of them, so the whole lot goes
-    rather than one entry.
+    A family can be addressed by several names and all.conf reaches every one
+    of them, so the whole lot goes rather than one entry.
     """
     _config_cached.cache_clear()
     _styles_cached.cache_clear()
+
+
+_workspace: tuple | None = None
+
+
+def workspace_stamp() -> tuple:
+    """Every source file in the workspace, with what says it has been edited.
+
+    The question file_stamp asks of one face, asked of the folder: fonts and
+    configs together, since a .conf decides which faces a family resolves to
+    and all.conf reaches all of them.
+
+    A fingerprint rather than a watcher. There is nothing to keep running and
+    nothing to miss -- a volume mounted after the process started, an editor
+    writing through a rename, a file copied in with an old mtime but a new
+    size all just look different the next time this is asked.
+    """
+    source = fontbuild.SOURCE_DIR
+    files = fontconf.font_files(source)
+    files += sorted(fontbuild.conf_dir(source).glob("*.conf"))
+    return tuple(stamp for stamp in map(file_stamp, files) if stamp)
+
+
+def rescan() -> bool:
+    """Forget the resolved families if the folder has moved on. True when it had.
+
+    The list a picker shows is read from the folder every time and was never
+    the stale part. What goes stale is what a family *resolves to* -- which
+    files its four slots hold, and what its config sets them to -- because
+    that is what is cached, and it is what the next render draws with.
+
+    Called from /defaults alone, which the page asks for on load and whenever
+    its tab comes back. That is the whole of it on purpose: reaching the
+    folder means leaving the window, so coming back is when it can have
+    changed, and an app nobody is looking at does no work at all -- which is
+    most of what a background one does. One fingerprint costs 14ms over 69
+    files and 350ms over 2000: nothing once, and a great deal on every frame
+    of a dragged slider.
+    """
+    global _workspace
+    seen, _workspace = _workspace, workspace_stamp()
+    if seen is None or seen == _workspace:
+        return False
+    forget_families()
+    return True
 
 
 def family_faces(name: str) -> dict[str, pathlib.Path]:

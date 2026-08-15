@@ -146,7 +146,12 @@ export function loadFamily() {
   refreshReverts();
 }
 
-export function fillFamilies(d) {
+//: The picker's options and the entries behind them, from what /defaults
+//: reports. Rebuilt rather than added to, since a refresh has to lose a font
+//: that left the folder as well as gain one that arrived.
+function listFamilies(d) {
+  familyEntries.clear();
+  familyPicker.replaceChildren();
   // The app can be started on a bare file, which is no family and cannot be
   // one. It stays selectable as the empty value, at the top, under its own
   // filename -- otherwise choosing another font would strand it. It has no
@@ -159,6 +164,10 @@ export function fillFamilies(d) {
     familyPicker.add(new Option(familyLabel(family), family.name));
     familyEntries.set(family.name, family);
   }
+}
+
+export function fillFamilies(d) {
+  listFamilies(d);
   if (!familyPicker.options.length) return;   // nothing to choose between
   const saved = attempt(() => localStorage.getItem(FAMILY), null);
   // A remembered name whose font has since left the folder falls back to what
@@ -167,6 +176,53 @@ export function fillFamilies(d) {
   familyPicker.value = familyEntries.has(wanted) ? wanted
                                                  : familyPicker.options[0].value;
   loadFamily();
+}
+
+// The folder, asked again, because the tab has come back and reaching the
+// folder meant leaving the window. A font may have been dropped in, taken
+// away, or retuned in an editor while the page was not looking.
+//
+// What you are tuning keeps its place and its knobs: the picker moving under
+// you would be worse than a stale list, and unsaved knobs are the only thing
+// on this page with nowhere else to live.
+export function refreshFamilies(d) {
+  const chosen = familyPicker.value;
+  const before = familyEntries.get(chosen);
+  listFamilies(d);
+  if (!familyEntries.has(chosen)) {
+    // Its files have gone, so there is nothing left to draw it with and the
+    // picker settles the way a fresh page would.
+    fillFamilies(d);
+    renderNow();
+    return;
+  }
+  familyPicker.value = chosen;
+  const entry = familyEntries.get(chosen);
+  if (JSON.stringify(before && before.tuning)
+      === JSON.stringify(entry.tuning)) {
+    // Only the list around it moved. The badges and the feature rows are
+    // re-shown, because the file behind a slot can be replaced without its
+    // config changing a word, and both are read off the font rather than
+    // typed. Nothing that holds what you typed is touched -- showExport would
+    // put the export fields back to the file on every single return to the
+    // tab, and those have nowhere else to live either.
+    showFaces();
+    showFeatures(entry);
+    return;
+  }
+  if (!unsavedWork()) {
+    loadFamily();               // nothing of yours to lose: follow the file
+    renderNow();
+    return;
+  }
+  // Yours stay. The arrows compare against the file from here, so what the
+  // note says and what the panel offers to revert to agree.
+  rememberSaved(entry.tuning);
+  refreshReverts();
+  showSaveState();
+  savedNote.textContent =
+    (entry.conf || "the config") + " changed on disk. Your unsaved knobs are "
+    + "still here, and the arrows now compare against the new file.";
 }
 
 //: Wired by the entry point rather than on import: a module body runs

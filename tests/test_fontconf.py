@@ -111,6 +111,58 @@ def test_dir_key_points_discovery_at_another_folder(tmp_path):
     assert cfg.styles["regular"].parent == fonts
 
 
+# --- walking the workspace ------------------------------------------------
+
+def test_a_face_in_a_subfolder_is_part_of_the_workspace(tmp_path):
+    """A font folder arrives as a folder, and unpacking it into the root to be
+    seen is busywork the tool can do itself."""
+    nested = tmp_path / "serif" / "alto"
+    nested.mkdir(parents=True)
+    _touch(nested, *ALTO)
+    assert fontconf.discover_styles(tmp_path, "Alto")["regular"].parent == nested
+    assert "Alto" in fontconf.discover_families(tmp_path)
+
+
+def test_a_family_split_across_folders_is_still_one_family(tmp_path):
+    """Folders organize; the filename says what a face is."""
+    (tmp_path / "upright").mkdir()
+    (tmp_path / "sloped").mkdir()
+    _touch(tmp_path / "upright", "Quill-Regular.ttf", "Quill-Bold.ttf")
+    _touch(tmp_path / "sloped", "Quill-Italic.ttf")
+    styles = fontconf.discover_styles(tmp_path, "Quill")
+    assert set(styles) >= {"regular", "bold", "italic"}
+
+
+@pytest.mark.parametrize("folder", ["conf", "cpfonts", ".git"])
+def test_the_folders_that_are_not_sources_are_not_walked(tmp_path, folder):
+    """conf holds configs, cpfonts holds builds, and a dot folder is somebody
+    else's. A face that turns up in one of them was not put there to be built."""
+    buried = tmp_path / folder
+    buried.mkdir()
+    _touch(buried, *ALTO)
+    assert fontconf.discover_families(tmp_path) == {}
+
+
+def test_a_build_folder_named_something_else_costs_only_the_walk(tmp_path):
+    """`out` can point anywhere, so the skip list cannot name every build
+    folder. It does not have to: what lands in one is .cpfont, which is not a
+    font suffix."""
+    built = tmp_path / "somewhere-else"
+    built.mkdir()
+    (built / "Alto_12.cpfont").write_bytes(b"")
+    assert fontconf.font_files(tmp_path) == []
+
+
+def test_the_walk_is_ordered_the_same_way_everywhere(tmp_path):
+    """Two files that would claim one slot are settled by path, so a folder
+    does not resolve differently on another machine."""
+    for folder in ("b", "a"):
+        (tmp_path / folder).mkdir()
+        _touch(tmp_path / folder, "Alto-Medium.otf")
+    found = fontconf.font_files(tmp_path)
+    assert [path.parent.name for path in found] == ["a", "b"]
+
+
 # --- style discovery ------------------------------------------------------
 
 def test_medium_is_the_regular_face(tmp_path):

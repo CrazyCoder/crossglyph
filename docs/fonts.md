@@ -24,6 +24,14 @@ changes.
 Discovery does not depend on it either. Drop four files in the workspace and
 they build on the next run, taking their name from the filenames.
 
+Subfolders are walked, so a family that arrives as a folder can stay one. The
+folder is organization and nothing else: a face is known by its filename
+wherever it sits, so `serif/Charis-Bold.ttf` is Charis' bold exactly as
+`Charis-Bold.ttf` at the root would be, and a folder of `Regular.ttf` and
+`Bold.ttf` builds families called Regular and Bold rather than one named after
+the folder. Rename the files, not the folder. `conf`, `cpfonts` and anything
+beginning with a dot are left alone.
+
 It cannot set `name`, `family`, or the explicit style and fallback file keys.
 Those name one specific family or file, so they are rejected there.
 

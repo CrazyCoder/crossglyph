@@ -10,7 +10,7 @@ import {wireResets} from "./resets.js";
 import {refreshReverts} from "./reverts.js";
 import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
 import {wireUntuned} from "./untuned.js";
-import {fillFamilies, onFamilyChange} from "./variable.js";
+import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 
 // Every listener that reaches across modules, in one place and after all of
 // them have finished evaluating. The import graph has cycles, so a module body
@@ -24,6 +24,22 @@ wireUntuned();
 wireBuildButtons();
 familyPicker.addEventListener("change", onFamilyChange);
 samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender(); });
+
+// The font folder can change while the page is open -- a font dropped in, a
+// config edited beside it -- and reaching it means leaving the window, so
+// coming back is when that has just happened. Both events, because they are
+// different returns: a tab switch fires visibilitychange, and clicking back
+// from an editor in another window fires focus with the page never hidden.
+let asking = false;
+export function askAgain() {
+  if (document.hidden || asking) return;
+  asking = true;
+  fetch("/defaults").then(r => r.json()).then(refreshFamilies)
+    .catch((error) => console.error(error))
+    .finally(() => { asking = false; });
+}
+window.addEventListener("focus", askAgain);
+document.addEventListener("visibilitychange", askAgain);
 
 const remembered = loadPage();
 // Nothing has been set on this device, so the browser's own languages are the
