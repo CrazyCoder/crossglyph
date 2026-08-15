@@ -1,6 +1,6 @@
 [project]
 name = "crossglyph"
-version = "0.1.0"
+version = "0.1.1"
 description = "Build and tune CrossPoint .cpfont families for Xteink e-readers"
 requires-python = ">=3.12"
 dependencies = ["pillow>=10", "fonttools>=4.50",
