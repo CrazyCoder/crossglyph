@@ -1,5 +1,8 @@
 """The render core: the firmware's own drawing code, compiled to wasm."""
+import contextlib
+import gc
 import pathlib
+import sys
 
 import pytest
 
@@ -50,6 +53,69 @@ def test_nothing_emscripten_specific_is_imported():
 def test_a_missing_core_says_how_to_build_it(tmp_path):
     with pytest.raises(render.RenderCoreMissing, match="build.sh"):
         render.load_module(tmp_path / "absent.wasm")
+
+
+# --- shutdown -------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def teardown_ffi(monkeypatch):
+    """The interpreter's last moments, as wasmtime's destructors meet them.
+
+    Module teardown sets a module's globals to None, so a destructor running
+    after it calls None instead of the C function it wanted. Anything raised
+    there reaches sys.unraisablehook, which is where the "Exception ignored
+    in" spew comes from, and this collects it rather than printing it.
+    """
+    import wasmtime
+
+    monkeypatch.setattr(wasmtime._store.ffi, "wasmtime_store_delete", None)
+    monkeypatch.setattr(wasmtime._engine.ffi, "wasm_engine_delete", None)
+    caught = []
+    hook = sys.unraisablehook
+    sys.unraisablehook = caught.append
+    try:
+        yield caught
+    finally:
+        sys.unraisablehook = hook
+
+
+@needs_wasm
+def test_closing_a_module_releases_the_runtimes_own_objects():
+    module = render.load_module(WASM)
+    store = module._store
+    module.close()
+    with pytest.raises(ValueError, match="closed"):
+        store.ptr()
+    module.close()                      # idempotent, as an atexit hook must be
+
+
+@needs_wasm
+def test_a_closed_module_says_nothing_when_it_is_collected_at_teardown(
+        monkeypatch):
+    """What a Ctrl+C in the preview used to print, twice, after a render."""
+    module = render.load_module(WASM)
+    module.close()
+    with teardown_ffi(monkeypatch) as caught:
+        del module
+        gc.collect()
+    assert not caught
+
+
+@needs_wasm
+def test_a_module_nobody_closed_is_what_made_the_noise(monkeypatch):
+    """The case the test above asserts the absence of, so it can bite.
+
+    Without close(), the only thing that frees the store is __del__, and by
+    then the destructor it needs is gone.
+    """
+    module = render.load_module(WASM)
+    module._closing.detach()            # as if the finalizer were never set
+    with teardown_ffi(monkeypatch) as caught:
+        del module
+        gc.collect()
+    assert caught and all(isinstance(entry.exc_value, TypeError)
+                          for entry in caught)
 
 
 # --- staleness ------------------------------------------------------------

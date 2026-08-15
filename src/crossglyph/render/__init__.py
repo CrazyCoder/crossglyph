@@ -17,6 +17,7 @@ import functools
 import pathlib
 import sys
 import threading
+import weakref
 from collections.abc import Iterator
 
 from . import stamp
@@ -44,6 +45,25 @@ EXPECTED_IMPORTS = frozenset({
 })
 
 
+def _close(*handles) -> None:
+    """Hand wasmtime's own objects back while wasmtime can still take them.
+
+    A Store and an Engine each own a C pointer that `Managed.__del__` frees
+    through `wasmtime._ffi`. Left to the collector, that runs during
+    interpreter finalization, where the ffi module's globals have already been
+    set to None: the destructor calls one of them, gets `TypeError: 'NoneType'
+    object is not callable`, and since __del__ may not raise, the interpreter
+    prints "Exception ignored in ..." with a traceback for each object. A
+    Ctrl+C in the preview after a page has been drawn lands exactly there.
+
+    So this runs from `weakref.finalize`, whose callbacks fire from atexit,
+    before module teardown. The __del__ that follows finds a null pointer and
+    returns without a word.
+    """
+    for handle in handles:
+        handle.close()
+
+
 class RenderModule:
     """One instantiation of the render core, with its own linear memory."""
 
@@ -67,6 +87,15 @@ class RenderModule:
         self._memory = self._exports["memory"]
         #: Pointers handed out by write()/alloc(), freed by release().
         self._owned: list[int] = []
+        # The store first: it is what holds the instance and the memory, and
+        # the engine outlives it by a reference of its own. Not `self`, which
+        # a finalizer may not hold and stay a finalizer.
+        self._closing = weakref.finalize(self, _close, self._store, engine)
+
+    def close(self) -> None:
+        """Free the wasm runtime's objects now. Idempotent, and the finalizer
+        does it anyway when this module is dropped or the process ends."""
+        self._closing()
 
     def call(self, name: str, *args):
         export = self._exports.get(name)
