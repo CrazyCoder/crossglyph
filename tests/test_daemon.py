@@ -408,3 +408,18 @@ def test_a_restart_with_nothing_running_is_a_start(tmp_path, monkeypatch):
                         lambda root, opts: started.append(opts) or 0)
     assert daemon.restart(tmp_path, daemon.parse([], "restart")) == 0
     assert started and started[0].port == daemon.DEFAULT_PORT
+
+
+@pytest.mark.parametrize("name", ("start", "stop", "status", "restart"))
+def test_background_commands_are_refused_in_a_container(
+        name, tmp_path, monkeypatch, capsys):
+    """Docker owns the process lifetime, so its app writes no native daemon
+    state and never detaches a child from the container's foreground process."""
+    monkeypatch.setattr(daemon.install, "root", lambda: tmp_path)
+    monkeypatch.setattr(
+        daemon.install, "detect",
+        lambda root: daemon.install.CONTAINER)
+
+    assert daemon.main(name, []) == 2
+    assert "Docker or Compose" in capsys.readouterr().err
+    assert not any(tmp_path.iterdir())

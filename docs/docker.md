@@ -47,6 +47,11 @@ docker compose run --rm crossglyph fetch-fallbacks
 docker compose run --rm crossglyph --version
 ```
 
+Docker owns the preview process lifetime. The native `start`, `stop`, `status`
+and `restart` commands are unavailable in a container, so they cannot create
+daemon state or detach a child process there. Use `docker compose up`,
+`docker compose down` and `docker compose ps` instead.
+
 Builds read source fonts from the workspace root and configs from `conf/`.
 They write to `cpfonts/` unless `out` in `conf/all.conf` selects another path.
 Use a path relative to the workspace so that the output remains in the mounted

@@ -526,6 +526,11 @@ def parse(argv: list[str], name: str) -> argparse.Namespace:
 def main(name: str, argv: list[str]) -> int:
     """One of start, stop, status, restart."""
     root = install.root()
+    if install.detect(root) == install.CONTAINER:
+        print("background preview commands are not available in a container. "
+              "Run `crossglyph preview` in the foreground, and use Docker or "
+              "Compose to start and stop the container.", file=sys.stderr)
+        return 2
     if name in ("stop", "status"):
         if argv:
             print(f"usage: crossglyph {name}", file=sys.stderr)

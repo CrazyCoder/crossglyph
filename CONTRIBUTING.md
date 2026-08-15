@@ -159,6 +159,24 @@ names. Two steps guard what the suite cannot say for itself: the wrappers keep
 their line endings, and the faces the rendering tests need are present, since
 a third of the suite skips without them and says nothing while doing it.
 
+### Testing a private container candidate
+
+Run **Actions > container candidate > Run workflow** to test the registry path
+without making a release. The workflow runs `test.yml`, then pushes the current
+commit to the private `crossglyph-testing` package with a `candidate-<commit>`
+tag. It checks the remote AMD64 and ARM64 manifest, pulls the AMD64 image back
+from GHCR, builds a real `.cpfont`, and waits for its preview to answer.
+
+Keep `crossglyph-testing` private. GitHub gives a new personal package private
+visibility by default. Before a later run, check **Profile > Packages >
+crossglyph-testing > Package settings** if anyone could have changed it. Old
+candidate versions can be deleted from that page when they are no longer
+needed.
+
+This workflow creates no Git tag or GitHub release, and it does not deploy the
+Pages manifest. Existing installs therefore have no candidate version to
+offer as an update.
+
 ### The container package must be public
 
 GitHub creates a new package under a personal account as private, even when
