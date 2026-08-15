@@ -1,17 +1,32 @@
 # CrossGlyph
 
-Build fonts for an e-reader running
-[CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader), and tune
-them against the renderer that will draw them.
+Tune a font for an Xteink reader running
+[CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader), and watch
+the page redraw as you move each control. A change lands in 10 to 300 ms,
+depending on your hardware and how much of the font is being built.
 
-CrossPoint reads fonts as `.cpfont` files: glyph bitmaps at two bits per pixel,
-rasterized for one point size, with kerning and ligature tables baked in. The
-device has no rasterizer, so every size is a separate build. CrossGlyph turns a
-folder of TTF or OTF files into those files.
+Most fonts need tuning to read well at two bits per pixel. Until now every
+guess cost a card swap or an emulator run, so almost nobody went past changing
+the point size.
 
-It also opens a preview in your browser. The page is drawn by the firmware's
-own renderer, compiled to WebAssembly, so what you see is what the device
-draws. Every setting is a control, and the page redraws as you move it.
+- the firmware's own renderer, its C++ compiled to WebAssembly, so the page is
+  what the device draws rather than an impression of it
+- fourteen rasterizing controls: size, weight, slant, hinting mode, grayscale
+  hinting, stem darkening, gamma, the three grey thresholds, line height,
+  letter and word spacing, kerning strength, ligatures, proportional figures
+- four page controls: hyphenation, paragraph spacing, anti-aliasing and night
+  mode
+- four sizes of a four-style family, 795 glyphs each with kerning, built in
+  about a second, one process per size
+- twelve Noto faces on request, so a missing arrow or Greek letter is not a
+  hole in the page
+- nothing installed system wide, since the launcher fetches uv, Python and the
+  dependencies into a cache directory you can delete
+
+CrossGlyph turns TTF and OTF files into `.cpfont`, which is what the device
+reads: glyph bitmaps at two bits per pixel, one file per point size, kerning
+and ligature tables baked in. The device has no rasterizer, so every size is a
+separate build.
 
 ## Quick start
 
