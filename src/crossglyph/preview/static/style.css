@@ -540,7 +540,8 @@
   /* Press and hold shows it untuned, so the sheet must not be draggable or
      selectable: either gesture takes the pointer and the release with it,
      and the page stays untuned until something else is clicked. */
-  #page { display: block; image-rendering: pixelated; background: var(--l0);
+  #page { box-sizing: content-box; display: block; image-rendering: pixelated;
+          background: var(--l0);
           border: 1px solid var(--line);
           user-select: none; -webkit-user-drag: none;
           opacity: 0; transition: opacity .2s ease-out; }

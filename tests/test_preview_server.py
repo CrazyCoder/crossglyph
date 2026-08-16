@@ -61,23 +61,31 @@ def test_the_watermark_names_the_running_version_and_respects_night_mode():
     from crossglyph.render import image
 
     assert server.WATERMARK == f"CrossGlyph {version.installed()}"
+    assert server.WATERMARK_MASK.mode == "1"
+    assert server.WATERMARK_MASK.size == (6 * len(server.WATERMARK), 12)
+    all_digits = "CrossGlyph 0123456789"
+    assert server._watermark_mask(all_digits).size == (6 * len(all_digits), 12)
 
     paper = Image.new("L", (480, 800), image.WHITE)
     day = server._watermark(paper.copy())
     changed = ImageChops.difference(paper, day).getbbox()
     assert changed is not None
     left, top, right, bottom = changed
-    assert left > paper.width // 2
-    assert top > paper.height - 30
-    assert right <= paper.width - server.WATERMARK_INSET
-    assert bottom <= paper.height - server.WATERMARK_INSET
+    mask_left = paper.width - server.WATERMARK_INSET - \
+        server.WATERMARK_MASK.width
+    mask_top = paper.height - server.WATERMARK_INSET - \
+        server.WATERMARK_MASK.height
+    assert mask_left <= left < right <= mask_left + server.WATERMARK_MASK.width
+    assert mask_top <= top < bottom <= mask_top + server.WATERMARK_MASK.height
     day_levels = {value for value, count in enumerate(day.histogram()) if count}
     assert day_levels == {image.DARK, image.WHITE}
 
     black = Image.new("L", paper.size, image.BLACK)
     night = server._watermark(black.copy(), inverted=True)
     assert ImageChops.difference(black, night).getbbox() is not None
-    night_levels = {value for value, count in enumerate(night.histogram()) if count}
+    night_levels = {
+        value for value, count in enumerate(night.histogram()) if count
+    }
     assert night_levels == {image.BLACK, image.LIGHT}
 
 
@@ -117,12 +125,22 @@ def test_one_bit_rendering_reaches_the_render(client):
     """The knob a reader who keeps anti-aliasing off is tuning against."""
     from PIL import Image
 
+    from crossglyph.preview import server
+
     response = client.post("/render",
                            json={"size": 13, "page": {"antialiased": False}})
     page = Image.open(io.BytesIO(response.content))
+    left = page.width - server.WATERMARK_INSET - \
+        server.WATERMARK_MASK.width
+    top = page.height - server.WATERMARK_INSET - \
+        server.WATERMARK_MASK.height
+    right = left + server.WATERMARK_MASK.width
+    bottom = top + server.WATERMARK_MASK.height
     framebuffer = (
-        page.crop((0, 0, page.width // 2, page.height)),
-        page.crop((page.width // 2, 0, page.width, page.height - 30)),
+        page.crop((0, 0, page.width, top)),
+        page.crop((0, top, left, page.height)),
+        page.crop((right, top, page.width, page.height)),
+        page.crop((left, bottom, right, page.height)),
     )
     levels = {
         value

@@ -35,7 +35,7 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 from .. import (
     daemon,
@@ -94,18 +94,57 @@ _family: str | None = None
 #: Presentation metadata sits above the simulated framebuffer. Keep the label
 #: process-stable: an update only changes the version after the preview restarts.
 WATERMARK = f"CrossGlyph {version.installed()}"
-WATERMARK_FONT = ImageFont.load_default(size=12)
 WATERMARK_INSET = 5
 
+#: The glyphs needed by `WATERMARK`, including any MAJOR.MINOR.PATCH version.
+#: Each byte is one six-pixel row from Spleen 6x12 2.2.0. This is a true bitmap
+#: font, not a thresholded outline, so every stroke lands on the pixel grid.
+#: Spleen is BSD-2-Clause; THIRD-PARTY-NOTICES.md carries its notice.
+_SPLEEN_6X12 = {
+    " ": bytes.fromhex("00 00 00 00 00 00 00 00 00 00 00 00"),
+    ".": bytes.fromhex("00 00 00 00 00 00 00 00 20 00 00 00"),
+    "0": bytes.fromhex("00 70 88 98 a8 c8 88 88 70 00 00 00"),
+    "1": bytes.fromhex("00 20 60 20 20 20 20 20 70 00 00 00"),
+    "2": bytes.fromhex("00 70 88 08 08 70 80 80 f8 00 00 00"),
+    "3": bytes.fromhex("00 70 88 08 30 08 08 88 70 00 00 00"),
+    "4": bytes.fromhex("00 80 80 90 90 90 f8 10 10 00 00 00"),
+    "5": bytes.fromhex("00 f8 80 80 f0 08 08 08 f0 00 00 00"),
+    "6": bytes.fromhex("00 70 80 80 f0 88 88 88 70 00 00 00"),
+    "7": bytes.fromhex("00 f8 88 08 10 20 20 20 20 00 00 00"),
+    "8": bytes.fromhex("00 70 88 88 70 88 88 88 70 00 00 00"),
+    "9": bytes.fromhex("00 70 88 88 88 78 08 08 70 00 00 00"),
+    "C": bytes.fromhex("00 78 80 80 80 80 80 80 78 00 00 00"),
+    "G": bytes.fromhex("00 78 80 80 b8 88 88 88 78 00 00 00"),
+    "h": bytes.fromhex("00 80 80 f0 88 88 88 88 88 00 00 00"),
+    "l": bytes.fromhex("00 40 40 40 40 40 40 40 30 00 00 00"),
+    "o": bytes.fromhex("00 00 00 70 88 88 88 88 70 00 00 00"),
+    "p": bytes.fromhex("00 00 00 f0 88 88 88 88 f0 80 80 80"),
+    "r": bytes.fromhex("00 00 00 78 88 80 80 80 80 00 00 00"),
+    "s": bytes.fromhex("00 00 00 78 80 70 08 08 f0 00 00 00"),
+    "y": bytes.fromhex("00 00 00 88 88 88 88 88 78 08 08 f0"),
+}
+_SPLEEN_SIZE = (6, 12)
 
-def _watermark(page: Image.Image, *, inverted: bool = False,
-               label: str = WATERMARK) -> Image.Image:
+
+def _watermark_mask(text: str) -> Image.Image:
+    """Compose Spleen glyph rows into one reusable one-bit label."""
+    width, height = _SPLEEN_SIZE
+    mask = Image.new("1", (width * len(text), height))
+    for index, char in enumerate(text):
+        glyph = Image.frombytes("1", _SPLEEN_SIZE, _SPLEEN_6X12[char])
+        mask.paste(glyph, (index * width, 0))
+    return mask
+
+
+WATERMARK_MASK = _watermark_mask(WATERMARK)
+
+
+def _watermark(page: Image.Image, *, inverted: bool = False) -> Image.Image:
     """Add the generator and version to the bottom-right of a rendered page."""
-    mask = Image.new("1", page.size)
-    ImageDraw.Draw(mask).text(
-        (page.width - WATERMARK_INSET, page.height - WATERMARK_INSET),
-        label, font=WATERMARK_FONT, fill=1, anchor="rb")
-    page.paste(image.LIGHT if inverted else image.DARK, mask=mask)
+    left = page.width - WATERMARK_INSET - WATERMARK_MASK.width
+    top = page.height - WATERMARK_INSET - WATERMARK_MASK.height
+    page.paste(image.LIGHT if inverted else image.DARK, (left, top),
+               WATERMARK_MASK)
     return page
 
 
