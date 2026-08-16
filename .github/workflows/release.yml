@@ -25,6 +25,20 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # The annotation is the release body. Refuse a lightweight tag before
+      # building or publishing anything, rather than falling back to its
+      # commit message and calling that release notes.
+      - name: The tag carries the release notes
+        run: |
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != tag ]; then
+            echo "$GITHUB_REF_NAME must be an annotated tag" >&2
+            exit 1
+          fi
+          notes="$(git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME")"
+          if [ -z "$notes" ]; then
+            echo "$GITHUB_REF_NAME has no release notes" >&2
+            exit 1
+          fi
 
       - uses: astral-sh/setup-uv@v5
 
@@ -84,7 +98,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create "$GITHUB_REF_NAME" dist/crossglyph-*.zip
-          --title "$GITHUB_REF_NAME" --generate-notes
+          --title "$GITHUB_REF_NAME" --verify-tag --notes-from-tag
 
       # Pages serves the manifest: CDN backed and unmetered, where the REST
       # API is 60 requests an hour per address and shared behind a NAT.
