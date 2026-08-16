@@ -246,6 +246,11 @@ instead, which answers "what does this font change". Leave a knob on stock and
 it differs from the config again, so the arrow points back the other way. The
 tooltip names which of the two it is holding.
 
+Numeric axes of a variable font, such as `wdth`, use the same arrow. The
+family's config is the first comparison, the default declared by the font is
+the stock comparison, and **Untuned** shows that stock value. Weight pickers
+remain face choices rather than one shared tuning axis.
+
 A switch has no arrow. There is nothing to set aside when the value you are not
 looking at is the other one, a click away on the box itself, so a checkbox
 carries a mark instead: it says the row differs, and the tooltip says which way

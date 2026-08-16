@@ -1,10 +1,10 @@
 import {form, showFeatures, syncLineHeight} from "./dom.js";
 import {fillFallbackPickers, showExport} from "./export.js";
 import {FAMILY, familyEntries, familyLabel, familyPicker, offerSavedThresholds, showFaces, shownFamily, rememberShown} from "./family.js";
-import {numericRow} from "./knobs.js";
+import {numericRow, showSlider} from "./knobs.js";
 import {attempt} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
-import {KNOB_KEYS, baseState, putKnob, refreshReverts, rememberSaved, stashed} from "./reverts.js";
+import {KNOB_KEYS, baseState, putKnob, refreshReverts, rememberSaved, showRevertState, stashed} from "./reverts.js";
 import {savedNote, showSaveState, unsavedWork} from "./save.js";
 
 // --- variable fonts -------------------------------------------------------
@@ -18,6 +18,7 @@ export const axisRows = document.getElementById("axis-rows");
 export const WEIGHT_SLOTS = ["text", "bold"];
 //: The axis tag each slider shows, rebuilt whenever the family changes.
 export const axisFields = new Map();
+const axisButtons = new Map();
 export let variableSpec = null;
 
 //: The axes and instances of the family on the page, or null for a static one.
@@ -42,13 +43,91 @@ export function fillWeights(picker, instances, value) {
   picker.value = value == null ? "" : String(value);
 }
 
+function axisKey(tag) { return `axis_${tag}`; }
+
+function axisSpec(tag) {
+  return variableSpec && variableSpec.axes.find(axis => axis.tag === tag);
+}
+
+function axisTarget(tag) {
+  const axis = axisSpec(tag), field = axisFields.get(tag);
+  if (!axis || !field) return null;
+  const current = Number(field.value);
+  const saved = Number(variableSpec.other[tag] ?? axis.default);
+  if (current !== saved) return {value: saved, source: "config"};
+  const factory = Number(axis.default);
+  if (current !== factory) return {value: factory, source: "stock"};
+  return null;
+}
+
+function setAxis(tag, value) {
+  const field = axisFields.get(tag);
+  if (!field) return;
+  field.value = String(value);
+  showSlider(field);
+  onAxisChange();
+}
+
+export function refreshAxisReverts() {
+  for (const [tag, button] of axisButtons) {
+    showRevertState(button, stashed.get(axisKey(tag)), axisTarget(tag));
+  }
+}
+
+function bypassAxis(tag, target = axisTarget(tag)) {
+  const field = axisFields.get(tag);
+  if (!field || !target) return;
+  stashed.set(axisKey(tag), {value: field.value, source: target.source});
+  setAxis(tag, target.value);
+}
+
+function restoreAxis(tag) {
+  const key = axisKey(tag), held = stashed.get(key);
+  if (!held) return;
+  stashed.delete(key);
+  setAxis(tag, held.value);
+}
+
+function toggleAxis(tag) {
+  if (stashed.has(axisKey(tag))) restoreAxis(tag); else bypassAxis(tag);
+  refreshAxisReverts();
+}
+
+export function compareAxes(on) {
+  for (const tag of axisFields.keys()) {
+    const axis = axisSpec(tag), field = axisFields.get(tag);
+    if (!axis || !field) continue;
+    if (on) {
+      if (Number(field.value) !== Number(axis.default) &&
+          !stashed.has(axisKey(tag))) {
+        bypassAxis(tag, {value: axis.default, source: "stock"});
+      }
+    } else {
+      restoreAxis(tag);
+    }
+  }
+  refreshAxisReverts();
+}
+
 export function axisRow(axis, value) {
   const {row, field} = numericRow({
     label: axis.tag, min: axis.min, max: axis.max, value, id: `axis-${axis.tag}`,
     step: (axis.max - axis.min) > 20 ? "1" : "0.5",
     title: `${axis.tag}: ${axis.min} to ${axis.max}, ${axis.default} by default`,
   });
+  field.name = axisKey(axis.tag);
+  field.dataset.group = "axes";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "revert";
+  button.dataset.state = "off";
+  button.hidden = true;
+  button.textContent = "\u21ba";
+  button.setAttribute("aria-label", `compare ${axis.tag}`);
+  button.addEventListener("click", () => toggleAxis(axis.tag));
+  row.append(button);
   axisFields.set(axis.tag, field);
+  axisButtons.set(axis.tag, button);
   return row;
 }
 
@@ -56,6 +135,7 @@ export function showVariable(entry) {
   variableSpec = (entry && entry.variable) || null;
   variableBox.hidden = !variableSpec;
   axisFields.clear();
+  axisButtons.clear();
   axisRows.replaceChildren();
   if (!variableSpec) return;
   for (const slot of WEIGHT_SLOTS) {
@@ -71,6 +151,7 @@ export function showVariable(entry) {
     rows.push(axisRow(axis, variableSpec.other[axis.tag] ?? axis.default));
   }
   axisRows.replaceChildren(...rows);
+  refreshAxisReverts();
 }
 
 // What a render and a save carry: the two weights, then every other axis.
@@ -106,6 +187,7 @@ export function axesDiffer() {
 // font's own named instance if it has not. The same value the compare arrows
 // measure against, so a reset lands on a panel that reads as clean.
 export function resetAxes() {
+  for (const tag of axisFields.keys()) stashed.delete(axisKey(tag));
   const entry = familyEntries.get(shownFamily);
   if (entry) showVariable(entry);
 }
@@ -114,6 +196,7 @@ export function resetAxes() {
 // through knobChanged like every other field, which is where the save state
 // and the coalesced redraw already come from.
 export function onAxisChange() {
+  refreshAxisReverts();
   showSaveState();
   scheduleRender();
 }

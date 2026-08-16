@@ -2227,6 +2227,78 @@ for (const { name, text } of sources) {
         env.save.disabled === true, String(env.save.disabled));
 }
 
+
+// 40d. A numeric axis is a tuning control with the same two comparisons as a
+//      declared knob: the config is its first way back, and the font's own
+//      axis default is what Untuned means.
+{
+  const defaults = JSON.parse(JSON.stringify(DEFAULTS));
+  const variable = defaults.families.find(family => family.name === "Vari").variable;
+  variable.other.wdth = 105;
+  const env = await loaded(fakeStorage(), defaults);
+  env.family.choose("Vari");
+  await settle();
+
+  let row = env.sandbox.document.getElementById("axis-rows").children[0];
+  let slider = row.children[1], field = row.children[2].children[1];
+  let arrow = row.children[3];
+  check("an axis opens on the value its config declares",
+        field.value === "105", field.value);
+  check("and offers its font default as the stock comparison",
+        arrow.hidden === false && /stock value/.test(arrow.title), arrow.title);
+
+  field.value = "110";
+  env.listeners.input({target: field});
+  await settle();
+  check("changing an axis offers a per-row way back to the config",
+        arrow.hidden === false && /what the config has/.test(arrow.title),
+        arrow.title);
+  check("and keeps its slider synchronized",
+        slider.value === "110", `${slider.value}/${field.value}`);
+  check("and offers to save", env.save.disabled === false,
+        String(env.save.disabled));
+
+  arrow.on.click();
+  await settle();
+  check("the axis arrow shows the config value",
+        field.value === "105" && arrow.dataset.state === "on",
+        `${field.value}/${arrow.dataset.state}`);
+  arrow.on.click();
+  await settle();
+  check("and puts the edited value back",
+        field.value === "110" && arrow.dataset.state === "off",
+        `${field.value}/${arrow.dataset.state}`);
+
+  await env.save.click();
+  check("saving makes the edited axis the config baseline",
+        env.fetches.saves.at(-1).axes.wdth === 110 &&
+          env.save.disabled === true &&
+          /stock value/.test(arrow.title),
+        `${JSON.stringify(env.fetches.saves.at(-1).axes)}/${arrow.title}`);
+
+  env.compare.fire();
+  await settle();
+  check("Untuned shows the font's own axis default, not the config",
+        field.value === "100", field.value);
+  env.compare.fire();
+  await settle();
+  check("leaving Untuned restores the edited axis value",
+        field.value === "110", field.value);
+
+  field.value = "105";
+  env.listeners.input({target: field});
+  await settle();
+  env.clicks.font();
+  await settle();
+  row = env.sandbox.document.getElementById("axis-rows").children[0];
+  field = row.children[2].children[1];
+  arrow = row.children[3];
+  check("Reset font knobs restores the saved axis baseline",
+        field.value === "110" && env.save.disabled === true, field.value);
+  check("and the rebuilt row still offers its stock comparison",
+        arrow.hidden === false && /stock value/.test(arrow.title), arrow.title);
+}
+
 // 41. A render that fails says so over the sheet. A blank page with the reason
 //     under the text box is a page nobody reads: the eye is on the specimen,
 //     so that is where the sentence goes.

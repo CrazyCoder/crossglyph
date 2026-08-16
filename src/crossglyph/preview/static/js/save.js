@@ -4,7 +4,7 @@ import {familyEntries, familyPicker, renameFamily, shownFamily} from "./family.j
 import {body, failureText} from "./render.js";
 import {KNOB_KEYS, knobModified, refreshReverts, rememberSaved, stashed} from "./reverts.js";
 import {compare} from "./untuned.js";
-import {WEIGHT_SLOTS, axesDiffer, axisSettings, variableSpec, rememberVariable} from "./variable.js";
+import {WEIGHT_SLOTS, axesDiffer, axisSettings, refreshAxisReverts, variableSpec, rememberVariable} from "./variable.js";
 
 // --- saving to the family's own config ------------------------------------
 // The knobs start at what the family is set to and go back there, which makes
@@ -140,6 +140,7 @@ export async function saveKnobs() {
     ? result.moved.join(", ") + " \u2192 " + result.conf
     : result.conf + " already said that";
   refreshReverts();
+  refreshAxisReverts();
   return true;
 }
 

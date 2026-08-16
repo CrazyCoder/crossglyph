@@ -5,7 +5,7 @@ import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
 import {refreshReverts, stashed} from "./reverts.js";
 import {languageChosen, typedInBox} from "./text.js";
-import {axisSettings} from "./variable.js";
+import {axisSettings, refreshAxisReverts} from "./variable.js";
 
 export function body() {
   const out = {tuning: {}, page: {}};
@@ -163,6 +163,7 @@ export function knobChanged(el) {
   // Typing goes straight into the field, so without this the slider sits
   // wherever it was until the field loses focus and `change` finally fires.
   if (el.type === "number" && el.value !== "") showSlider(el);
+  if (el.dataset.group === "axes") refreshAxisReverts();
   refreshReverts();
   scheduleRender();
 }

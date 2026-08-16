@@ -1,5 +1,6 @@
 import {form, img} from "./dom.js";
 import {KNOB_KEYS, bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, stashed} from "./reverts.js";
+import {compareAxes} from "./variable.js";
 
 // --- comparing the whole tuning -------------------------------------------
 // The same toggle over every font knob at once: what does this face look like
@@ -34,6 +35,7 @@ export function toggleCompare() {
       restoreKnob(name);
     }
   }
+  compareAxes(on);
   refreshReverts();
 }
 

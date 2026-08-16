@@ -142,20 +142,21 @@ export function knobModified(name, base) {
   return !sameState(currentState(name), base ?? baseState(name));
 }
 
+export function showRevertState(button, held, target) {
+  const off = Boolean(held);
+  button.hidden = !(off || target);
+  button.dataset.state = off ? "on" : "off";
+  const source = off ? held.source : target && target.source;
+  const what = source === "stock" ? "the stock value" : "what the config has";
+  button.title = off
+    ? `Showing ${what}. Click to put your value back.`
+    : `Set your value aside and show ${what}. Click again to bring it back.`;
+}
+
 export function refreshReverts() {
   for (const button of reverts) {
     const name = button.dataset.reset;
-    const off = stashed.has(name);
-    const target = compareTarget(name);
-    button.hidden = !(off || target);
-    button.dataset.state = off ? "on" : "off";
-    const source = off ? stashed.get(name).source : target && target.source;
-    const what = source === "stock" ? "the stock value" : "what the config has";
-    // What pressing it does, in both states. It is a comparison rather than a
-    // reset: your value is set aside, not thrown away.
-    button.title = off
-      ? `Showing ${what}. Click to put your value back.`
-      : `Set your value aside and show ${what}. Click again to bring it back.`;
+    showRevertState(button, stashed.get(name), compareTarget(name));
   }
   for (const mark of marks) {
     const target = compareTarget(mark.dataset.mark);
