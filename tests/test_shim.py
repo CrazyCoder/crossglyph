@@ -298,22 +298,63 @@ def test_the_batch_run_that_applies_one_cannot_carry_the_code_out(tmp_path):
     assert _cmd(root).returncode == 0
 
 
-@needs_windows
-def test_the_windows_tool_wrapper_preserves_the_tool_exit_code(tmp_path):
+#: A wrapper run with nothing of its own inherited. Every TOOL_ variable the
+#: wrapper reads is named by the test that wants it, because the suite is
+#: launched both ways: `tools/uv.cmd run pytest`, which is what CI does, puts
+#: uv's own TOOL_URL_* and TOOL_CHECKSUM_* in the environment, and a bare
+#: `uv run pytest` does not. Inheriting them means a test that exercises
+#: whichever launcher happened to start it and passes either way while
+#: covering two different things.
+TOOL_FREE = {name: value for name, value in os.environ.items()
+             if not name.startswith("TOOL_")}
+
+
+def _wrapper(tmp_path: pathlib.Path, cached: bool,
+             **env: str) -> subprocess.CompletedProcess:
+    """Run tool-wrapper.cmd on a probe that exits 7, and say what came back.
+
+    `cached` stages the binary and the flag file a completed download leaves,
+    which is the state a second run finds.
+    """
     local = tmp_path / "local"
-    binary = local / "CrossGlyph" / "tools" / "probe" / "1" / "probe.exe"
-    binary.parent.mkdir(parents=True)
-    shutil.copyfile(os.environ["COMSPEC"], binary)
-    checksum = "already-verified"
-    (binary.parent / ".complete").write_text(checksum, encoding="utf-8")
-    done = subprocess.run(
+    target = local / "CrossGlyph" / "tools" / "probe" / "1"
+    target.mkdir(parents=True)
+    if cached:
+        shutil.copyfile(os.environ["COMSPEC"], target / "probe.exe")
+        (target / ".complete").write_text("already-verified", encoding="utf-8")
+    return subprocess.run(
         ["cmd.exe", "/d", "/c", str(REPO / "tools" / "tool-wrapper.cmd"),
          "/d", "/c", "exit", "/B", "7"],
-        env={**os.environ, "LOCALAPPDATA": str(local), "TOOL_NAME": "probe",
+        capture_output=True, text=True,
+        env={**TOOL_FREE, "LOCALAPPDATA": str(local), "TOOL_NAME": "probe",
              "TOOL_VERSION": "1", "TOOL_BINARY_WINDOWS": "probe.exe",
-             "TOOL_CHECKSUM_WINDOWS_X64": checksum,
-             "TOOL_CHECKSUM_WINDOWS_ARM64": checksum})
-    assert done.returncode == 7
+             "TOOL_CHECKSUM_WINDOWS_X64": "already-verified",
+             "TOOL_CHECKSUM_WINDOWS_ARM64": "already-verified", **env})
+
+
+@needs_windows
+def test_the_windows_tool_wrapper_preserves_the_tool_exit_code(tmp_path):
+    """The wrapper is transparent: the tool's own code is what the caller
+    sees, or a failing build reads as a passing one.
+
+    The environment carries checksums and no URL, which is the cached tool's
+    whole case: nothing is fetched, so nothing needs the address it would be
+    fetched from. tool-wrapper.sh looks at the cache before it asks for a URL
+    and this one has to agree, or one environment runs a tool on one platform
+    and is refused on the other.
+    """
+    done = _wrapper(tmp_path, cached=True)
+    assert done.returncode == 7, done.stdout + done.stderr
+
+
+@needs_windows
+def test_a_download_still_needs_its_url(tmp_path):
+    """The other side of the check above, which is the one that would rot:
+    moved far enough down, a missing URL stops being an error and becomes a
+    download of nothing."""
+    done = _wrapper(tmp_path, cached=False)
+    assert done.returncode == 1
+    assert "No URL defined" in done.stdout + done.stderr
 
 
 @needs_windows
