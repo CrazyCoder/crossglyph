@@ -60,7 +60,12 @@ REM Don't write .complete here — cache may be incomplete (e.g. node.exe exists
 REM but npm.cmd is missing). Only a full download+extraction writes the flag.
 if exist "%BINARY_PATH%" goto :execute
 
-REM Download and verify using PowerShell script
+REM Download and verify using PowerShell script. Only a download needs the
+REM URL; a cached tool runs without one, matching tool-wrapper.sh.
+if "%DOWNLOAD_URL%"=="" (
+  echo ERROR: No URL defined for platform: %PLATFORM% >&2
+  exit /B 1
+)
 set "POWERSHELL=%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe"
 set "PS_SCRIPT=%~dp0tool-wrapper.ps1"
 
@@ -101,10 +106,6 @@ if "%PLATFORM%"=="WINDOWS_X64" (
 
 if "%EXPECTED_CHECKSUM%"=="" (
   echo ERROR: No checksum defined for platform: %PLATFORM% >&2
-  exit /B 1
-)
-if "%DOWNLOAD_URL%"=="" (
-  echo ERROR: No URL defined for platform: %PLATFORM% >&2
   exit /B 1
 )
 exit /B 0
