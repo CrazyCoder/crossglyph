@@ -1,0 +1,10 @@
+Correction: the claim that this fixed "any offline launch" is wrong. The URL
+is a hardcoded string in uv.cmd, so it costs nothing to have and is present
+offline; only a download needs the network. The old code failed on exactly one
+combination, checksums set with no URL, which no caller in this repo produces.
+It surfaced as a test failure under a bare `uv run pytest`, where the launcher's
+TOOL_URL_* are absent, and the real defect was that inherited environment in
+the test rather than the wrapper. See 295ca45.
+
+Kept because it is harmless and matches tool-wrapper.sh, which has always
+checked the cache before requiring a URL.
