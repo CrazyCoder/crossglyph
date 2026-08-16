@@ -37,16 +37,15 @@ export function wireResets() {
   document.getElementById("retry").addEventListener("click", renderNow);
 
   document.getElementById("reset-font").addEventListener("click", () => {
-    // Everything in the Font section: the tuning knobs plus `size`, which
-    // posts at the root. The text box is content rather than a knob, so
-    // neither button touches it -- an empty box already means "use the
-    // shipped sample".
+    // Everything in the Font section except size, which is the remembered view.
+    // The text box is content rather than a knob, so neither button touches it:
+    // an empty box already means "use the shipped sample".
     //
     // The axis controls go back too, but not to the markup: their factory
     // value is the family's own, so resetAxes is what puts them there.
     for (const el of form.elements) {
       if (el.name && el.dataset.group !== "page" && el.dataset.group !== "axes"
-          && el.name !== "text") {
+          && el.name !== "text" && el.name !== "size") {
         resetControl(el);
       }
     }

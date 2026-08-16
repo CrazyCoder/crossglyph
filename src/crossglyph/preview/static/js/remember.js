@@ -3,9 +3,9 @@ import {form} from "./dom.js";
 // --- remembering the reader's own settings --------------------------------
 // The Page knobs are the ones each person has already set on their device, so
 // re-entering them every visit is friction with nothing to show for it. Font
-// knobs deliberately do not persist: those are the experiment, and starting
-// them anywhere but the shipped defaults would make a session hard to reason
-// about.
+// tuning knobs deliberately do not persist: those are the experiment, and
+// starting them anywhere but the shipped defaults would make a session hard
+// to reason about.
 export const STORE = "crossglyph.page";
 
 // Storage *throws* rather than returning null when a browser has it blocked --
@@ -13,6 +13,37 @@ export const STORE = "crossglyph.page";
 // still a working preview, so every access is best effort.
 export function attempt(fn, fallback) {
   try { return fn(); } catch (error) { return fallback; }
+}
+
+// Size is which view of the font is open, not tuning written to its config.
+// Keep it apart from Page, whose Reset button deliberately forgets the reader's
+// device settings without changing what font size they are looking at.
+export const SIZE = "crossglyph.size";
+
+function validSize(raw) {
+  const el = form.elements.size;
+  const value = Number(raw);
+  if (raw === null || String(raw).trim() === "" || !Number.isFinite(value)) {
+    return null;
+  }
+  const min = Number(el.min), max = Number(el.max);
+  if ((Number.isFinite(min) && value < min) ||
+      (Number.isFinite(max) && value > max)) return null;
+  const step = Number(el.step) || 1;
+  const base = Number.isFinite(min) ? min : 0;
+  const steps = (value - base) / step;
+  if (Math.abs(steps - Math.round(steps)) > 1e-9) return null;
+  return String(value);
+}
+
+export function saveSize() {
+  const value = validSize(form.elements.size.value);
+  if (value !== null) attempt(() => localStorage.setItem(SIZE, value));
+}
+
+export function loadSize() {
+  const value = validSize(attempt(() => localStorage.getItem(SIZE), null));
+  if (value !== null) form.elements.size.value = value;
 }
 
 export function pageControls() {

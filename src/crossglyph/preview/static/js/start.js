@@ -4,7 +4,7 @@ import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
         wireBuildButtons} from "./export.js";
 import {syncSliders, wireKnobs} from "./knobs.js";
-import {declareLanguage, loadPage, preferredLanguage} from "./remember.js";
+import {declareLanguage, loadPage, loadSize, preferredLanguage} from "./remember.js";
 import {renderNow, scheduleRender, wireRender} from "./render.js";
 import {wireResets} from "./resets.js";
 import {refreshReverts} from "./reverts.js";
@@ -46,6 +46,7 @@ const remembered = loadPage();
 // best guess there is at which patterns to hyphenate with. Declared rather
 // than saved, so it stays a default and not a decision -- see declareLanguage.
 if (!remembered) declareLanguage(preferredLanguage(navigator.languages));
+loadSize();
 loadText();
 syncSliders();
 syncLineHeight();

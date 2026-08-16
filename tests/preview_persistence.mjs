@@ -1,6 +1,6 @@
-// The Page knobs persist to localStorage, and the ways that breaks are all
-// silent: a knob that stops being remembered, a stored value that blanks a
-// select, storage throwing in a private window. None of it shows as an error.
+// The Page knobs and view size persist to localStorage, and the ways that
+// breaks are all silent: a setting that stops being remembered, a stored value
+// that blanks a control, storage throwing in a private window. None is an error.
 //
 // Driven from tests/test_preview.py, which skips when node is absent. The page
 // has no build step and no framework, so this stubs the handful of browser
@@ -481,7 +481,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // One arrow per knob, shown only when that knob is off its default.
   // A checkbox on each side of the font/page line, because a checkbox's state
   // is `checked` alone and everything else about it is a trap.
-  const revertList = ["gamma", "margin", "alignment", "line_height",
+  const revertList = ["size", "gamma", "margin", "alignment", "line_height",
                       "hinting", "language"].map(name => ({
     dataset: { reset: name },
     hidden: true,
@@ -1066,18 +1066,22 @@ for (const { name, text } of sources) {
         reaching.join(" | "));
 }
 
-// 1. Changing a page knob writes it.
+// 1. Changing a remembered setting writes it to the right store.
 {
   const store = fakeStorage();
   const env = await run(store);
   env.byName.margin.value = "22";
   env.byName.hyphenation.checked = true;
   env.listeners.input({ target: env.byName.margin });
+  env.byName.size.value = "18";
+  env.listeners.input({ target: env.byName.size });
   const saved = JSON.parse(store.data["crossglyph.page"]);
-  check("a page knob is remembered", saved.margin === "22" && saved.hyphenation === true,
-        JSON.stringify(saved));
+  check("a page knob is remembered",
+        saved.margin === "22" && saved.hyphenation === true, JSON.stringify(saved));
   check("font knobs are not remembered", !("gamma" in saved) && !("size" in saved),
         JSON.stringify(saved));
+  check("view size is remembered separately",
+        store.data["crossglyph.size"] === "18", JSON.stringify(store.data));
 }
 
 // 2. A fresh load restores them.
@@ -1085,27 +1089,38 @@ for (const { name, text } of sources) {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify(
       { margin: "22", alignment: "left", language: "en", hyphenation: true, antialiased: false }),
+    "crossglyph.size": "18.25",
   });
   const env = await run(store);
   check("margin restored", env.byName.margin.value === "22", env.byName.margin.value);
   check("select restored", env.byName.alignment.value === "left", env.byName.alignment.value);
   check("checkbox on restored", env.byName.hyphenation.checked === true);
   check("checkbox off restored", env.byName.antialiased.checked === false);
+  check("view size restored", env.byName.size.value === "18.25", env.byName.size.value);
+
+  const bad = await run(fakeStorage({"crossglyph.size": "99"}));
+  check("an invalid stored size leaves the default standing",
+        bad.byName.size.value === "13", bad.byName.size.value);
 }
 
 // 3. Resetting the page settings restores them and forgets them.
 {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify({ margin: "22", hyphenation: true }),
+    "crossglyph.size": "18",
   });
   const env = await run(store);
-  check("the stored values were applied first", env.byName.margin.value === "22");
+  check("the stored values were applied first",
+        env.byName.margin.value === "22" && env.byName.size.value === "18");
   env.clicks.page();
   check("page reset restores the shipped defaults",
         env.byName.margin.value === "5" && env.byName.hyphenation.checked === false,
         `${env.byName.margin.value} ${env.byName.hyphenation.checked}`);
   check("page reset forgets the remembered settings",
         !("crossglyph.page" in store.data), JSON.stringify(store.data));
+  check("page reset keeps the view size",
+        env.byName.size.value === "18" && store.data["crossglyph.size"] === "18",
+        JSON.stringify(store.data));
 }
 
 // 4. The whole point of splitting them: each reset leaves the other alone.
@@ -1117,11 +1132,14 @@ for (const { name, text } of sources) {
   env.listeners.input({ target: env.byName.margin });
   env.byName.gamma.value = "2.5";
   env.byName.size.value = "18";
+  env.listeners.input({ target: env.byName.size });
 
   env.clicks.font();
   check("font reset restores the font knobs",
-        env.byName.gamma.value === "1" && env.byName.size.value === "13",
-        `${env.byName.gamma.value} ${env.byName.size.value}`);
+        env.byName.gamma.value === "1", env.byName.gamma.value);
+  check("font reset keeps the view size",
+        env.byName.size.value === "18" && store.data["crossglyph.size"] === "18",
+        JSON.stringify(store.data));
   check("font reset keeps the reader's page settings",
         env.byName.margin.value === "30" && env.byName.hyphenation.checked === true,
         `${env.byName.margin.value} ${env.byName.hyphenation.checked}`);
@@ -1132,6 +1150,9 @@ for (const { name, text } of sources) {
   env.clicks.page();
   check("page reset leaves the font knobs alone",
         env.byName.gamma.value === "0.5", env.byName.gamma.value);
+  check("page reset still leaves the view size alone",
+        env.byName.size.value === "18" && store.data["crossglyph.size"] === "18",
+        JSON.stringify(store.data));
 }
 
 // 5. The slider and the field are one value in two controls.
@@ -1157,16 +1178,20 @@ for (const { name, text } of sources) {
         slider.style.props["--fill"] === "19%", slider.style.props["--fill"]);
 }
 
-// 6. A remembered page value has to reach that knob's slider too, or it shows
-//    the default while the field shows what was restored.
+// 6. Remembered values have to reach their sliders too, or a slider shows the
+//    default while its field shows what was restored.
 {
   const store = fakeStorage({
     "crossglyph.page": JSON.stringify({ margin: "31" }),
+    "crossglyph.size": "18.25",
   });
   const env = await run(store);
-  const slider = env.sliderList.find(s => s.dataset.sliderFor === "margin");
-  check("a restored value reaches its slider",
-        slider.value === "31", `${slider.value} vs field ${env.byName.margin.value}`);
+  const margin = env.sliderList.find(s => s.dataset.sliderFor === "margin");
+  const size = env.sliderList.find(s => s.dataset.sliderFor === "size");
+  check("a restored page value reaches its slider",
+        margin.value === "31", `${margin.value} vs field ${env.byName.margin.value}`);
+  check("the restored view size reaches its slider",
+        size.value === "18.25", `${size.value} vs field ${env.byName.size.value}`);
 }
 
 // 7. A stored option that no longer exists leaves the device default standing.
@@ -1202,7 +1227,8 @@ for (const { name, text } of sources) {
 // 9. The arrow is a bypass toggle, not a one-way reset: click to see the
 //    default, click again to get your value back, as often as you like.
 {
-  const env = await run(fakeStorage());
+  const store = fakeStorage();
+  const env = await run(store);
   const arrow = name => env.revertList.find(r => r.dataset.reset === name);
   env.byName.gamma.value = "2.5";
   env.listeners.input({ target: env.byName.gamma });
@@ -1218,6 +1244,17 @@ for (const { name, text } of sources) {
         env.byName.gamma.value === "2.5", env.byName.gamma.value);
   check("and it is no longer marked set aside",
         arrow("gamma").dataset.state === "off");
+
+  env.byName.size.value = "18";
+  env.listeners.input({ target: env.byName.size });
+  arrow("size").click();
+  check("a size comparison does not replace the remembered view",
+        env.byName.size.value === "13" && store.data["crossglyph.size"] === "18",
+        `${env.byName.size.value} ${store.data["crossglyph.size"]}`);
+  arrow("size").click();
+  check("returning from the comparison restores the remembered view",
+        env.byName.size.value === "18" && store.data["crossglyph.size"] === "18",
+        `${env.byName.size.value} ${store.data["crossglyph.size"]}`);
 
   arrow("gamma").click();
   env.byName.gamma.value = "3";

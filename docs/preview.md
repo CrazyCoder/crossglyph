@@ -233,6 +233,9 @@ key, or press and hold the page itself. The size stays where it is, since that
 is which size you are working at rather than tuning. Holding is a look and not
 a change: whatever the toggle was set to is what comes back on release.
 
+Size is a view setting. The browser remembers it for the next visit, but it is
+not written to the family's config, and neither reset action changes it.
+
 One knob at a time is the arrow beside it. It is a comparison rather than a
 reset: your value is set aside and one press brings it back, so you can flick
 between the two as often as it takes. Which value it offers depends on where

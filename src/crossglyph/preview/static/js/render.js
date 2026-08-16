@@ -2,7 +2,7 @@ import {form, img, lineHeightAuto, status} from "./dom.js";
 import {exportForm, exportSettings} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
-import {savePage} from "./remember.js";
+import {savePage, saveSize} from "./remember.js";
 import {refreshReverts, stashed} from "./reverts.js";
 import {languageChosen, typedInBox} from "./text.js";
 import {axisSettings} from "./variable.js";
@@ -157,6 +157,8 @@ export function scheduleRender() {
 
 export function knobChanged(el) {
   if (el.dataset.group === "page") savePage();
+  // A comparison is a temporary look, not a new choice to restore next visit.
+  if (el.name === "size" && !stashed.has("size")) saveSize();
   if (el.name === "text") typedInBox();
   // Typing goes straight into the field, so without this the slider sits
   // wherever it was until the field loses focus and `change` finally fires.
