@@ -3524,7 +3524,8 @@ for (const { name, text } of sources) {
     about: { available: "2.0.0", latest: "2.0.0" },
     updateSteps: [
       { event: "done", version: "2.0.0", converting: false, kept: [],
-        staged: [], where: "versions/2.0.0", restarting: true },
+        staged: [], where: "versions/2.0.0", restarting: true,
+        restart_log: "D:\\CrossGlyph\\preview.log" },
     ],
     restartAnswers: [
       new TypeError("Failed to fetch"),
@@ -3542,6 +3543,81 @@ for (const { name, text } of sources) {
         env.fetches.updateReads === 3, String(env.fetches.updateReads));
   check("the new version causes exactly one reload",
         env.reloads() === 1, String(env.reloads()));
+}
+
+// 58h1a. Bootstrap time is not server startup time. As long as the old
+//         process says the handoff child is alive, no fixed count turns that
+//         truthful answer into a failure.
+{
+  const starting = Array.from(
+    {length: 260}, () => ({ ...ABOUT, handoff: "starting" }));
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [
+      { event: "done", version: "2.0.0", converting: false, kept: [],
+        staged: [], where: "versions/2.0.0", restarting: true,
+        restart_log: "D:\\CrossGlyph\\preview.log" },
+    ],
+    restartAnswers: [
+      ...starting,
+      { ...ABOUT, version: "2.0.0", installed: "2.0.0" },
+    ],
+  });
+
+  await env.about.apply();
+
+  check("a long live bootstrap still reaches the new version",
+        env.reloads() === 1, String(env.reloads()));
+  check("the bootstrap outlived the former overall retry count",
+        env.fetches.updateReads > 240, String(env.fetches.updateReads));
+}
+
+// 58h1b. A child that exits while the old server still answers has failed.
+//         The log is the evidence left by the hidden process.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [
+      { event: "done", version: "2.0.0", converting: false, kept: [],
+        staged: [], where: "versions/2.0.0", restarting: true,
+        restart_log: "D:\\CrossGlyph\\preview.log" },
+    ],
+    restartAnswers: [{ ...ABOUT, handoff: "failed" }],
+  });
+
+  await env.about.apply();
+
+  check("a failed handoff does not reload",
+        env.reloads() === 0, String(env.reloads()));
+  check("a failed handoff names the restart log",
+        env.about.updated.textContent.endsWith(
+          "See D:\\CrossGlyph\\preview.log."),
+        env.about.updated.textContent);
+}
+
+// 58h1c. Once the old server disappears, the new server gets a bounded
+//         startup window. Silence through all of it is a real manual fallback.
+{
+  const unavailable = Array.from(
+    {length: 240}, () => new TypeError("Failed to fetch"));
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [
+      { event: "done", version: "2.0.0", converting: false, kept: [],
+        staged: [], where: "versions/2.0.0", restarting: true,
+        restart_log: "D:\\CrossGlyph\\preview.log" },
+    ],
+    restartAnswers: unavailable,
+  });
+
+  await env.about.apply();
+
+  check("an absent replacement does not reload",
+        env.reloads() === 0, String(env.reloads()));
+  check("an absent replacement receives manual guidance",
+        env.about.updated.textContent.includes(
+          "Close CrossGlyph and open it again"),
+        env.about.updated.textContent);
 }
 
 

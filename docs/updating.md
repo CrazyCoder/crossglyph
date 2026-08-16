@@ -79,6 +79,8 @@ The **Update** button in a local preview downloads the release, installs it,
 restarts CrossGlyph on the same address and reloads the page after the new
 version answers. The port can disappear briefly between the two processes.
 The page waits through that gap rather than treating it as a failed update.
+Only one install request runs at a time. A second tab cannot start another
+download or another restart while the first one is working.
 
 `crossglyph update` does the same install from the command line, without
 restarting a process you may be using for something else.
@@ -91,11 +93,16 @@ The version you were on stays where it is. `update.conf` and your `fonts`
 folder persist at the root, while the launcher and Docker configuration follow
 the rules below.
 
-If the preview cannot hand itself to the new version, it says to close
-CrossGlyph and open it again. This includes an update requested through a
-non-loopback address, because a remote page is not allowed to stop the server.
-The same instruction applies after `crossglyph update`. On that next launch,
-the native launcher runs the version named by `current`.
+The detached restart writes its setup and failure output to `preview.log`.
+The page keeps waiting while that process is still building the new
+environment; it recommends closing CrossGlyph and opening it again only after
+the handoff exits or the replacement server fails to appear.
+
+The same instruction appears when a preview cannot hand itself to the new
+version. This includes an update requested through a non-loopback address,
+because a remote page is not allowed to stop the server, and an update run
+with `crossglyph update`. On the next launch, the native launcher runs the
+version named by `current`.
 
 Automatic handoff is a capability of the version that is running, not the one
 it has just downloaded. The first update from a release without that capability

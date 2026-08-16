@@ -15,6 +15,7 @@ import json
 import os
 import pathlib
 import sys
+import threading
 import time
 
 try:
@@ -1124,6 +1125,7 @@ def _about(asked: bool = False, state: updates.State | None = None) -> dict:
             "home": updates.HOME,
             "kind": kind,
             "pending": pending,
+            "handoff": _handoff_status(),
             "can_self_update": install.can_self_update(kind),
             # The sentence, already decided. The page renders what it is given
             # rather than working out for itself when there is one, which is
@@ -1182,6 +1184,37 @@ def _startup(root: pathlib.Path) -> None:
 #: while main() is inside Server.run(), not under the test client or in --png.
 _server = None
 _restart_state: daemon.State | None = None
+_handoff_process = None
+_handoff_failed = False
+
+#: Applying and installed are both exclusive. The latter lasts until this
+#: process exits: another request from a stale tab must not reinstall the same
+#: version or launch a second restart while the first one is taking over.
+_update_guard = threading.Lock()
+_update_phase = "idle"
+
+
+def _begin_update() -> bool:
+    global _update_phase
+    with _update_guard:
+        if _update_phase != "idle":
+            return False
+        _update_phase = "applying"
+        return True
+
+
+def _finish_update(installed: bool) -> None:
+    global _update_phase
+    with _update_guard:
+        _update_phase = "installed" if installed else "idle"
+
+
+def _handoff_status() -> str | None:
+    if _handoff_failed:
+        return "failed"
+    if _handoff_process is None:
+        return None
+    return "starting" if _handoff_process.poll() is None else "failed"
 
 
 def _loopback(client: str) -> bool:
@@ -1222,8 +1255,13 @@ def shutdown(request: Request) -> dict:
     return {"stopping": True}
 
 
+class UpdateRequest(BaseModel):
+    """The JSON object that makes a browser update an intentional request."""
+
+
 @app.post("/update")
-def update_apply(request: Request) -> StreamingResponse:
+def update_apply(request: Request,
+                 _body: UpdateRequest) -> StreamingResponse:
     """Install the newest release, then hand a local preview to that release.
 
     A line of JSON at a time, the way /build and /fallbacks answer, so the
@@ -1233,27 +1271,48 @@ def update_apply(request: Request) -> StreamingResponse:
     while a real server has enough state to reproduce itself.
     """
     root = install.root()
+    if not _begin_update():
+        line = json.dumps({
+            "event": "error",
+            "error": "an update is already running or waiting for CrossGlyph "
+                     "to restart.",
+        }) + "\n"
+        return StreamingResponse(iter((line,)),
+                                 media_type="application/x-ndjson")
+
     state = _restart_state
     local = _loopback(request.client.host if request.client else "")
     target = None
+    installed = False
 
     def lines():
-        nonlocal target
-        for original in upgrade.steps(root):
-            step = original
-            if original.get("event") == "done":
-                version_name = original["version"]
-                can_restart = (local and state is not None
-                               and daemon.handoff_command(
-                                   root, version_name) is not None)
-                if can_restart:
-                    target = version_name
-                step = {**original, "restarting": can_restart}
-            yield json.dumps(step) + "\n"
+        nonlocal installed, target
+        try:
+            for original in upgrade.steps(root):
+                step = original
+                if original.get("event") == "done":
+                    version_name = original["version"]
+                    can_restart = (local and state is not None
+                                   and daemon.handoff_command(
+                                       root, version_name) is not None)
+                    if can_restart:
+                        target = version_name
+                    step = {
+                        **original,
+                        "restarting": can_restart,
+                        "restart_log": (
+                            str(root / daemon.LOG_NAME) if can_restart else None),
+                    }
+                    installed = True
+                yield json.dumps(step) + "\n"
+        finally:
+            _finish_update(installed)
 
     def restart() -> None:
+        global _handoff_failed, _handoff_process
         if target is not None and state is not None:
-            daemon.handoff(root, target, state)
+            _handoff_process = daemon.handoff(root, target, state)
+            _handoff_failed = _handoff_process is None
 
     return StreamingResponse(
         lines(), media_type="application/x-ndjson",
@@ -1657,7 +1716,6 @@ def main(argv=None) -> int:
         print(f"wrote {opts.png}")
         return 0
 
-    import threading
     import webbrowser
 
     import uvicorn
@@ -1680,7 +1738,10 @@ def main(argv=None) -> int:
     # Config and Server rather than uvicorn.run, which is the two of them and
     # keeps neither: /shutdown needs the object to ask. The restart state also
     # makes a foreground preview reproducible by the detached update handoff.
-    global _server, _restart_state
+    global _server, _restart_state, _handoff_process, _handoff_failed
+    _finish_update(False)
+    _handoff_process = None
+    _handoff_failed = False
     _server = uvicorn.Server(uvicorn.Config(
         app, host=opts.host, port=opts.port, log_level="warning"))
     _restart_state = daemon.State(
@@ -1697,4 +1758,7 @@ def main(argv=None) -> int:
     finally:
         _server = None
         _restart_state = None
+        _handoff_process = None
+        _handoff_failed = False
+        _finish_update(False)
     return 0

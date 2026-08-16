@@ -22,7 +22,8 @@ const SHORT = 12;
 const MINUTE = 60, HOUR = 3600, DAY = 86400;
 
 const UNREACHABLE = "Could not reach the update server.";
-const RESTART_ATTEMPTS = 240;
+const HANDOFF_START_ATTEMPTS = 20;
+const SERVER_START_ATTEMPTS = 240;
 const RESTART_POLL_MS = 500;
 
 function count(value, unit) {
@@ -55,6 +56,7 @@ function checkedLine(about) {
 // server has not been asked again, which is the end of an update.
 let installed = null;
 let restartTarget = null;
+let restartLog = null;
 
 // Which leaves nothing to press. What is installed does not become what is
 // running until the tool is started again, and asking again can only find the
@@ -137,29 +139,57 @@ export function showUpdateStep(step) {
       (step.converting
         ? " The old source files at the root are no longer read." : "");
     if (step.restarting) restartTarget = step.version;
+    restartLog = step.restart_log || "preview.log";
   }
 }
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+function showRestartFailure() {
+  updateNote.textContent =
+    "The update is installed, but automatic restart did not finish. " +
+    "Close CrossGlyph and open it again to use the update. " +
+    `See ${restartLog || "preview.log"}.`;
+}
+
 async function waitForRestart(target) {
-  for (let attempt = 0; attempt < RESTART_ATTEMPTS; ++attempt) {
+  let handoffStarts = 0;
+  let serverStarts = 0;
+  while (true) {
     await pause(RESTART_POLL_MS);
     try {
       const response = await fetch("/update", {cache: "no-store"});
-      if (!response.ok) continue;
+      if (!response.ok) throw new Error(`restart probe returned ${response.status}`);
       const next = await response.json();
       if (next.version === target) {
         globalThis.location.reload();
         return;
       }
+      serverStarts = 0;
+      if (next.handoff === "failed") {
+        showRestartFailure();
+        return;
+      }
+      if (next.handoff === "starting") {
+        // Bootstrap can include a dependency sync or native build. It is not
+        // a failure merely because it takes longer than server startup.
+        handoffStarts = 0;
+        continue;
+      }
+      if (++handoffStarts >= HANDOFF_START_ATTEMPTS) {
+        showRestartFailure();
+        return;
+      }
     } catch {
-      // The old server has stopped and the new one has not bound the port yet.
+      handoffStarts = 0;
+      // Once the old server leaves, the new one has the daemon's full startup
+      // window to bind the port. No process can answer with finer status here.
+      if (++serverStarts >= SERVER_START_ATTEMPTS) {
+        showRestartFailure();
+        return;
+      }
     }
   }
-  updateNote.textContent =
-    "The update is installed, but automatic restart did not finish. " +
-    "Close CrossGlyph and open it again to use the update.";
 }
 
 // Its own button, so this is a handle the module owns rather than a name
@@ -170,6 +200,7 @@ updateButton.addEventListener("click", async () => {
   updateButton.disabled = true;
   updateNote.textContent = "";
   restartTarget = null;
+  restartLog = null;
   progress.start("asking for the new release…");
   try {
     await streamInto("/update", {}, showUpdateStep, updateNote);

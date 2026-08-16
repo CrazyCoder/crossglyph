@@ -177,13 +177,16 @@ def test_update_handoff_bootstraps_an_unopened_release_from_its_wrapper(
     command = daemon.handoff_command(tmp_path, "0.2.0")
 
     assert command is not None
-    assert str(uv) in command
-    expected = ["cmd", "/c"] if os.name == "nt" else ["/bin/sh", str(uv)]
-    assert command[:len(expected)] == expected
     assert str(tmp_path / daemon.LAUNCHER) not in command
-    assert command[-4:] == [
-        str(tmp_path / "versions" / "0.2.0"),
-        "crossglyph", "restart", "--no-open"]
+    if os.name == "nt":
+        assert isinstance(command, str)
+        assert f"%{daemon.HANDOFF_UV_ENV}%" in command
+        assert f"%{daemon.HANDOFF_PROJECT_ENV}%" in command
+    else:
+        assert command[:2] == ["/bin/sh", str(uv)]
+        assert command[-4:] == [
+            str(tmp_path / "versions" / "0.2.0"),
+            "crossglyph", "restart", "--no-open"]
 
 
 def test_handoff_preserves_the_running_preview_for_restart(
@@ -203,6 +206,48 @@ def test_handoff_preserves_the_running_preview_for_restart(
     assert launched["command"] == daemon.handoff_command(tmp_path, "0.2.0")
     assert launched["options"]["cwd"] == str(tmp_path)
     assert launched["options"]["env"]["CROSSGLYPH_HOME"] == str(tmp_path)
+    assert pathlib.Path(launched["options"]["stdout"].name) == \
+        tmp_path / daemon.LOG_NAME
+    assert launched["options"]["stderr"] is subprocess.STDOUT
+    if os.name == "nt":
+        assert launched["options"]["env"][daemon.HANDOFF_UV_ENV].endswith(
+            "tools\\uv.cmd")
+        assert launched["options"]["env"][daemon.HANDOFF_PROJECT_ENV] == \
+            str(tmp_path / "versions" / "0.2.0")
+
+
+def test_a_handoff_that_cannot_start_leaves_the_failure_in_the_log(
+        tmp_path, monkeypatch):
+    a_release(tmp_path, "0.2.0", venv=True)
+
+    def refused(*_args, **_kwargs):
+        raise OSError("process creation was refused")
+
+    monkeypatch.setattr(daemon.subprocess, "Popen", refused)
+
+    assert daemon.handoff(tmp_path, "0.2.0", a_state()) is None
+    log = (tmp_path / daemon.LOG_NAME).read_text(encoding="utf-8")
+    assert "process creation was refused" in log
+
+
+@pytest.mark.skipif(os.name != "nt", reason="cmd.exe only")
+def test_windows_handoff_preserves_every_valid_path_character(tmp_path):
+    root = tmp_path / "install&()^%PATH%! space"
+    a_release(root, "0.2.0", venv=False)
+    uv = root / "versions" / "0.2.0" / "tools" / "uv.cmd"
+    uv.parent.mkdir()
+    marker = tmp_path / "handoff-ran.txt"
+    uv.write_bytes(
+        f'@echo off\r\n> "{marker}" echo %*\r\necho HANDOFF_OK\r\n'.encode())
+
+    process = daemon.handoff(root, "0.2.0", a_state())
+
+    assert process is not None
+    assert process.wait(timeout=10) == 0
+    assert marker.read_text(encoding="utf-8").strip().endswith(
+        "crossglyph restart --no-open")
+    assert "HANDOFF_OK" in (
+        root / daemon.LOG_NAME).read_text(encoding="utf-8")
 
 
 def test_a_checkout_starts_from_the_interpreter_running_it(tmp_path):

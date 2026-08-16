@@ -49,6 +49,8 @@ VENV_PYTHON = pathlib.Path(".venv") / (
     "Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 LAUNCHER = "crossglyph.cmd" if os.name == "nt" else "crossglyph.sh"
+HANDOFF_UV_ENV = "CROSSGLYPH_HANDOFF_UV"
+HANDOFF_PROJECT_ENV = "CROSSGLYPH_HANDOFF_PROJECT"
 
 
 DEFAULT_HOST = "127.0.0.1"
@@ -237,7 +239,7 @@ def command(root: pathlib.Path) -> list[str]:
     return [sys.executable, "-m", "crossglyph"]
 
 
-def handoff_command(root: pathlib.Path, target: str) -> list[str] | None:
+def handoff_command(root: pathlib.Path, target: str) -> list[str] | str | None:
     """Bootstrap `target` without touching a root launcher that may be live."""
     directory = layout.version_dir(root, target)
     python = directory / VENV_PYTHON
@@ -246,9 +248,15 @@ def handoff_command(root: pathlib.Path, target: str) -> list[str] | None:
     uv = directory / "tools" / "uv.cmd"
     if not uv.is_file():
         return None
-    runner = ["cmd", "/c", str(uv)] if os.name == "nt" \
-        else ["/bin/sh", str(uv)]
-    return [*runner, "run", "--project", str(directory),
+    if os.name == "nt":
+        # Paths arrive through the environment rather than cmd.exe's command
+        # text. Expansion happens inside quotes and is not parsed a second
+        # time, so valid path characters such as &, ^ and % stay characters.
+        return (
+            'cmd.exe /d /s /v:off /c '
+            f'""%{HANDOFF_UV_ENV}%" run --project '
+            f'"%{HANDOFF_PROJECT_ENV}%" crossglyph restart --no-open"')
+    return ["/bin/sh", str(uv), "run", "--project", str(directory),
             "crossglyph", "restart", "--no-open"]
 
 
@@ -281,13 +289,26 @@ def handoff(root: pathlib.Path, target: str,
     if command is None:
         return None
     save(root, state)
+    directory = layout.version_dir(root, target)
     env = dict(os.environ, PYTHONUNBUFFERED="1",
                CROSSGLYPH_HOME=str(root))
     env.setdefault("CROSSGLYPH_FONTS", str(root / "fonts"))
-    return subprocess.Popen(command, stdin=subprocess.DEVNULL,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, cwd=str(root),
-                            env=env, close_fds=True, **DETACH)
+    if os.name == "nt":
+        env[HANDOFF_UV_ENV] = str(directory / "tools" / "uv.cmd")
+        env[HANDOFF_PROJECT_ENV] = str(directory)
+    log = root / LOG_NAME
+    with log.open("ab") as output:
+        output.write(
+            f"\nupdate restart: starting CrossGlyph {target}\n".encode())
+        output.flush()
+        try:
+            return subprocess.Popen(
+                command, stdin=subprocess.DEVNULL, stdout=output,
+                stderr=subprocess.STDOUT, cwd=str(root), env=env,
+                close_fds=True, **DETACH)
+        except OSError as exc:
+            output.write(f"update restart could not start: {exc}\n".encode())
+            return None
 
 
 def spawn(root: pathlib.Path, argv: list[str]) -> subprocess.Popen:

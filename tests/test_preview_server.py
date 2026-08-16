@@ -2407,9 +2407,10 @@ def test_the_page_is_told_when_checking_is_off(client, monkeypatch):
 def steps(client, monkeypatch, *given):
     from crossglyph.preview import server
 
+    monkeypatch.setattr(server, "_update_phase", "idle")
     monkeypatch.setattr(server.upgrade, "steps",
                         lambda root, *a, **kw: iter(given))
-    said = client.post("/update")
+    said = client.post("/update", json={})
     assert said.status_code == 200
     return [json.loads(line) for line in said.text.splitlines() if line]
 
@@ -2429,15 +2430,17 @@ def test_applying_streams_a_line_at_a_time(client, monkeypatch):
 
 def test_a_local_update_hands_the_running_preview_to_the_new_version(
         monkeypatch):
-    from fastapi.testclient import TestClient
-
     from crossglyph import daemon
     from crossglyph.preview import server
+    from fastapi.testclient import TestClient
 
     state = daemon.State(
         pid=1234, host="127.0.0.1", port=8123,
         rest=["--family", "notosans"], version="0.3.0", started=1.0)
     handed = []
+    monkeypatch.setattr(server, "_update_phase", "idle")
+    monkeypatch.setattr(server, "_handoff_process", None)
+    monkeypatch.setattr(server, "_handoff_failed", False)
     monkeypatch.setattr(server, "_restart_state", state)
     monkeypatch.setattr(
         server.upgrade, "steps",
@@ -2447,16 +2450,102 @@ def test_a_local_update_hands_the_running_preview_to_the_new_version(
     monkeypatch.setattr(
         server.daemon, "handoff_command",
         lambda root, target: ["new-python", "-m", "crossglyph"])
-    monkeypatch.setattr(
-        server.daemon, "handoff",
-        lambda root, target, saved: handed.append((root, target, saved)))
+
+    class Started:
+        def poll(self):
+            return None
+
+    def handoff(root, target, saved):
+        handed.append((root, target, saved))
+        return Started()
+
+    monkeypatch.setattr(server.daemon, "handoff", handoff)
 
     with TestClient(server.app, client=("127.0.0.1", 55555)) as client:
         said = [json.loads(line) for line in
-                client.post("/update").text.splitlines() if line]
+                client.post("/update", json={}).text.splitlines() if line]
+        repeated = [json.loads(line) for line in
+                    client.post("/update", json={}).text.splitlines() if line]
+        status = client.get("/update").json()
 
     assert said[-1]["restarting"] is True
+    assert said[-1]["restart_log"].endswith(server.daemon.LOG_NAME)
+    assert repeated == [{
+        "event": "error",
+        "error": "an update is already running or waiting for CrossGlyph "
+                 "to restart.",
+    }]
+    assert status["handoff"] == "starting"
     assert handed == [(server.install.root(), "9.9.9", state)]
+
+
+def test_a_cross_origin_form_cannot_apply_an_update(client, monkeypatch):
+    from crossglyph.preview import server
+
+    called = []
+    monkeypatch.setattr(server, "_update_phase", "idle")
+    monkeypatch.setattr(
+        server.upgrade, "steps", lambda root: called.append(root) or iter(()))
+
+    answer = client.post(
+        "/update",
+        headers={
+            "Origin": "https://attacker.invalid",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        content="submit=update",
+    )
+
+    assert answer.status_code == 422
+    assert called == []
+
+
+def test_a_second_request_cannot_overlap_an_update(monkeypatch):
+    import threading
+
+    from crossglyph.preview import server
+    from fastapi.testclient import TestClient
+
+    entered = threading.Event()
+    finish = threading.Event()
+    first = []
+    monkeypatch.setattr(server, "_update_phase", "idle")
+
+    def applying(_root):
+        entered.set()
+        assert finish.wait(timeout=5)
+        yield {"event": "error", "error": "first request finished"}
+
+    monkeypatch.setattr(server.upgrade, "steps", applying)
+
+    def post_first():
+        first.append(TestClient(server.app).post("/update", json={}))
+
+    worker = threading.Thread(target=post_first)
+    worker.start()
+    try:
+        assert entered.wait(timeout=5)
+        second = TestClient(server.app).post("/update", json={})
+    finally:
+        finish.set()
+        worker.join(timeout=5)
+
+    assert not worker.is_alive()
+    assert "already running" in second.text
+    assert "first request finished" in first[0].text
+
+
+def test_update_state_reports_a_failed_handoff(client, monkeypatch):
+    from crossglyph.preview import server
+
+    class Finished:
+        def poll(self):
+            return 1
+
+    monkeypatch.setattr(server, "_handoff_process", Finished())
+    monkeypatch.setattr(server, "_handoff_failed", False)
+
+    assert client.get("/update").json()["handoff"] == "failed"
 
 
 def test_a_refusal_is_the_first_line_rather_than_a_status(client, monkeypatch):
@@ -2475,7 +2564,8 @@ def test_the_endpoint_does_not_decide_who_may_apply(client, monkeypatch):
     from crossglyph.preview import server
 
     seen = []
+    monkeypatch.setattr(server, "_update_phase", "idle")
     monkeypatch.setattr(server.upgrade, "steps",
                         lambda root, *a, **kw: seen.append(root) or iter(()))
-    client.post("/update")
+    client.post("/update", json={})
     assert seen == [server.install.root()]
