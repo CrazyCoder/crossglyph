@@ -4486,4 +4486,37 @@ for (const deferred of [
         !("crossglyph.device" in storage.data));
 }
 
+// img.decode() settles the sheet before it is painted, but a rejection is not
+// "this image cannot draw": Chromium rejects when a newer src replaces the one
+// being decoded and under decoder pressure, and a loaded element still paints.
+// Dropping the frame there freezes the preview on a browser that rejects
+// routinely -- the server renders every knob change and nothing on screen
+// moves.
+{
+  const env = await loaded(fakeStorage());
+  const device = env.modules.get("device.js");
+
+  env.device.canvas.pixels = null;
+  env.sheet.decode = () => Promise.reject(new Error("EncodingError"));
+  env.sheet.complete = true;
+  await device.showRenderedPage();
+  check("a rejected decode still paints the loaded sheet",
+        Array.isArray(env.device.canvas.pixels),
+        String(env.device.canvas.pixels));
+
+  env.device.canvas.pixels = null;
+  env.sheet.complete = false;
+  const painting = device.showRenderedPage();
+  await settle();
+  check("a rejected decode waits for a sheet still loading",
+        env.device.canvas.pixels === null,
+        String(env.device.canvas.pixels));
+  env.sheet.complete = true;
+  env.sheet.on.load();
+  await painting;
+  check("and paints it once the load lands",
+        Array.isArray(env.device.canvas.pixels),
+        String(env.device.canvas.pixels));
+}
+
 process.exit(failures ? 1 : 0);

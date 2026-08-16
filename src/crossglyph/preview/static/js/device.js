@@ -142,9 +142,9 @@ export function layoutDevice() {
 }
 
 function tone(value, low, high) {
-  let index = LEVELS.findIndex(level => value <= level);
-  if (index <= 0) return low;
-  if (index < 0) index = LEVELS.length - 1;
+  const index = LEVELS.findIndex(level => value <= level);
+  if (index === 0) return low;
+  if (index < 0) return high;
   const start = LEVELS[index - 1], end = LEVELS[index];
   const fraction = (value - start) / (end - start);
   const ratio = LEVEL_RATIOS[index - 1] +
@@ -189,10 +189,21 @@ export function paintDevicePage() {
 }
 
 export async function showRenderedPage() {
+  // decode() settles the bytes off the paint path, but a rejection is not
+  // "this image cannot draw": Chromium rejects when a newer src replaces the
+  // one being decoded and under decoder pressure, and a loaded element still
+  // paints. So a failed decode falls through to the load itself rather than
+  // dropping the frame -- on a browser that rejects routinely, dropping it
+  // freezes the preview while the server answers every knob change.
   try {
     if (typeof img.decode === "function") await img.decode();
   } catch {
-    return;
+    if (img.complete === false) {
+      await new Promise(resolve => {
+        img.addEventListener("load", resolve, {once: true});
+        img.addEventListener("error", resolve, {once: true});
+      });
+    }
   }
   paintDevicePage();
   layoutDevice();
