@@ -1662,6 +1662,7 @@ def test_a_face_with_nothing_but_an_optical_size_offers_no_controls(
                                 family="Optic", axis=("opsz", 6, 12, 72),
                                 instances={"Text": 12})
     assert _entry("Optic")["variable"] is None
+    assert _entry("Optic")["files"]["regular"] == "Optic[opsz].ttf"
 
 
 def _second_axis(path, tag="wdth", low=75, default=100, high=125):
@@ -1822,6 +1823,8 @@ def test_saving_preserves_a_hidden_optical_size_override(
     assert "regular = OpticWeight[wght,opsz].ttf@opsz=12" in written
     assert server.family_config("OpticWeight").axis_overrides["regular"] == {
         "opsz": 12.0}
+    assert _entry("OpticWeight")["files"]["regular"] == (
+        "OpticWeight[wght,opsz].ttf at opsz 12, wght 400")
 
 
 def test_the_automatic_pick_is_not_written_back(variable_source):

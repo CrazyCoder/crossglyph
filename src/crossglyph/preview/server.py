@@ -275,11 +275,14 @@ def panel_coords(config: Config, style: str, size: float | None,
 def _axis_note(config: Config, style: str) -> str:
     """A slot's design coordinates, for the badge that names its file.
 
-    Empty for a static face. `opsz` is left out: it follows the size on the
-    page rather than saying anything about which face this slot is.
+    Automatic `opsz` follows the size on the page and says nothing about which
+    face this slot is. An explicit pin identifies the face and is shown.
     """
-    coords = {tag: value for tag, value in config.coords(style).items()
-              if tag != "opsz"}
+    pinned = config.axis_overrides.get(style, {})
+    coords = {
+        tag: value for tag, value in config.coords(style).items()
+        if tag != FOLLOWS_SIZE or tag in pinned
+    }
     if not coords:
         return ""
     return " at " + ", ".join(f"{tag} {value:g}"
