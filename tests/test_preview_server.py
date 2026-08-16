@@ -1794,6 +1794,36 @@ def test_only_the_axes_that_differ_are_written(variable_source, tmp_path):
         "wght": 500.0, "wdth": 100.0}
 
 
+def test_saving_preserves_a_hidden_optical_size_override(
+        variable_source, tmp_path):
+    import fontsmith
+    from fastapi.testclient import TestClient
+
+    from crossglyph.cpfont.tuning import Tuning
+    from crossglyph.preview import server
+
+    _second_axis(fontsmith.variable_box_font(
+        tmp_path / "OpticWeight[wght,opsz].ttf", range(0x41, 0x5B),
+        family="OpticWeight"), tag="opsz", low=7, default=12, high=72)
+    config_path = _conf(variable_source) / "opticweight.conf"
+    config_path.write_text(
+        "family = OpticWeight\n"
+        "regular = OpticWeight[wght,opsz].ttf@opsz=12\n",
+        encoding="utf-8")
+    body = {key: Tuning().as_dict()[key] for key in server.SAVED_KEYS}
+    body.pop("line_height", None)
+
+    answer = TestClient(server.app).post(
+        "/save", json={"family": "OpticWeight", "tuning": body,
+                       "axes": {"text": 400, "bold": 700}})
+
+    assert answer.status_code == 200, answer.text
+    written = config_path.read_text(encoding="utf-8")
+    assert "regular = OpticWeight[wght,opsz].ttf@opsz=12" in written
+    assert server.family_config("OpticWeight").axis_overrides["regular"] == {
+        "opsz": 12.0}
+
+
 def test_the_automatic_pick_is_not_written_back(variable_source):
     """A slot sitting where discovery would put it anyway keeps no line, so the
     config goes on following the font rather than freezing today's answer."""

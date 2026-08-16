@@ -517,9 +517,11 @@ regular    = Merriweather[opsz,wdth,wght].ttf@wght=600
 bold       = Merriweather[opsz,wdth,wght].ttf@wght=900
 ```
 
-Several axes are comma separated (`@wght=600,wdth=95`), values are clamped to
+Several axes are comma separated (`@wght=600,opsz=24`), values are clamped to
 the axis range, and an axis the font does not have is an error naming the ones
-it does. A pinned coordinate wins over the named instance and over `opsz`.
+it does. An explicit `opsz` pin replaces automatic optical sizing and is kept
+when the preview saves the family, even though the preview has no optical-size
+control.
 
 The coordinates are part of what decides a rebuild. Two slots sharing a file
 have the same content hash, so without them, moving a weight would leave every

@@ -818,9 +818,10 @@ def axis_changes(panel: dict, config: Config) -> dict[str, str | None]:
         if path is None:
             continue
         wanted = panel_coords(config, style, None, panel)
+        pinned = config.axis_overrides.get(style, {})
         # Against the automatic pick, which is this config with nothing pinned.
         plain = fontconf.slot_coords(path, style)
-        if not wanted or wanted == plain:
+        if not wanted or (wanted == plain and FOLLOWS_SIZE not in pinned):
             changes[style] = None
             continue
         # The file relative to the config's own folder, so it stays portable --
@@ -829,9 +830,13 @@ def axis_changes(panel: dict, config: Config) -> dict[str, str | None]:
         # Only the axes that differ from the automatic pick. A coordinate is an
         # override laid over the font's own instance, so restating the rest
         # says nothing -- and freezes a value that should go on following the
-        # font if its designer ever moves that instance.
-        axes = ",".join(f"{tag}={value:g}" for tag, value in sorted(wanted.items())
-                        if tag != FOLLOWS_SIZE and plain.get(tag) != value)
+        # font if its designer ever moves that instance. An explicit optical
+        # size remains a pin even at the font's default: automatic optical size
+        # would move away from it for another build size.
+        axes = ",".join(
+            f"{tag}={value:g}" for tag, value in sorted(wanted.items())
+            if plain.get(tag) != value or
+            (tag == FOLLOWS_SIZE and tag in pinned))
         changes[style] = f"{name}@{axes}" if axes else name
     return changes
 
