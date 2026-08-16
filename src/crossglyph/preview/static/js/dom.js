@@ -1,5 +1,4 @@
 export const form = document.getElementById("knobs");
-export const img = document.getElementById("page");
 export const status = document.getElementById("status");
 export const lineHeightAuto = document.getElementById("lh-auto");
 // Which specimen is in the box. Chrome rather than a knob, so it carries no

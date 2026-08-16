@@ -970,7 +970,7 @@ def test_the_breakpoints_fit_what_they_lay_out():
     gap = rem(r"column-gap: ([\d.]+)rem", css)
     padding = rem(r"body \{\s*\n\s*margin: 0; padding: ([\d.]+)rem", css)
     stage = rem(r"#stage \{[^}]*padding: ([\d.]+)rem", css)
-    sheet = float(re.search(r'id="page" width="(\d+)"', html).group(1))
+    sheet = float(re.search(r'id="device-page" width="(\d+)"', html).group(1))
     geometries = re.findall(
         r"native:\s*\{width:\s*(\d+).*?"
         r"frame:\s*\{width:\s*(\d+).*?"
@@ -979,8 +979,9 @@ def test_the_breakpoints_fit_what_they_lay_out():
     assert geometries
     widest_surface = max(float(frame) * float(native) / float(aperture)
                          for native, frame, aperture in geometries)
-    # The stage's border adds to its two paddings. The hidden source image is
-    # smaller than the widest visible frame, but remains part of the contract.
+    # The stage's border adds to its two paddings. The canvas's declared width
+    # is narrower than the widest visible frame, but remains part of the
+    # contract.
     page_column = max(sheet, widest_surface) + 2 * stage + 2
 
     # A media query counts the scrollbar as width the layout does not get, and

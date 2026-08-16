@@ -1,4 +1,4 @@
-import {form, img, lineHeightAuto, status} from "./dom.js";
+import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
 import {exportForm, exportSettings} from "./export.js";
 import {familyPicker} from "./family.js";
@@ -50,9 +50,9 @@ export function body() {
 // Draw now. Only two things call this: the first paint, and a family switch,
 // which are one-off and deliberate. Everything driven by a control calls
 // scheduleRender instead -- see below.
-// Which request is the current one, what it drew, and the timer that
-// coalesces the ones behind it.
-let timer = null, latest = 0, url = null, inFlight = null;
+// Which request is the current one, and the timer that coalesces the ones
+// behind it.
+let timer = null, latest = 0, inFlight = null;
 
 export const pageError = document.getElementById("page-error");
 
@@ -140,15 +140,23 @@ export async function renderNow() {
     return;
   }
   showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
-  const next = URL.createObjectURL(payload);
-  if (url) URL.revokeObjectURL(url);
-  img.src = url = next;
-  await showRenderedPage();
-  if (mine !== latest) return;
-  // The sheet is blank until a page has been drawn on it. Set here rather than
-  // on the img's own load, because the empty placeholder it starts on loads
-  // too -- and it is the page arriving that is worth showing, not the element.
-  img.classList.add("shown");
+  // Decoded straight from the response bytes, off the DOM: no element, no
+  // object URL, no load or decode() state whose lifetime a later render has
+  // to manage. The canvas keeps the previous page until this one is ready.
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(payload);
+  } catch (error) {
+    if (mine !== latest) return;
+    showPageError("The page could not be shown.", String(error));
+    status.textContent = "bad image";
+    return;
+  }
+  if (mine !== latest) {
+    if (typeof bitmap.close === "function") bitmap.close();
+    return;
+  }
+  showRenderedPage(bitmap);
   pageError.hidden = true;
   status.textContent = `${Math.round(performance.now() - started)} ms`;
 }

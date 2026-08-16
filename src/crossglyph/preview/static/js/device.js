@@ -1,4 +1,3 @@
-import {img} from "./dom.js";
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
 
@@ -157,13 +156,19 @@ function rgb(level, paperTone) {
           Math.min(255, level + 1), level];
 }
 
+//: The decoded page the canvas draws, replaced whole by each render. A bitmap
+//: rather than an <img>: an element brings a src whose load and decode are
+//: asynchronous state of their own, and every await on them is a place a
+//: flaky decoder can strand the pipeline.
+let page = null;
+
 export function paintDevicePage() {
-  if (!img.naturalWidth || typeof canvas.getContext !== "function") return;
+  if (!page || typeof canvas.getContext !== "function") return;
   const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
+  canvas.width = page.width;
+  canvas.height = page.height;
   context.imageSmoothingEnabled = false;
-  context.drawImage(img, 0, 0);
+  context.drawImage(page, 0, 0);
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
   // Both controls measure "more": more paper is lighter, more ink is darker.
   const paperLevel = Math.round(Number(paper.value) * 255 / 100);
@@ -188,23 +193,9 @@ export function paintDevicePage() {
   canvas.classList.add("shown");
 }
 
-export async function showRenderedPage() {
-  // decode() settles the bytes off the paint path, but a rejection is not
-  // "this image cannot draw": Chromium rejects when a newer src replaces the
-  // one being decoded and under decoder pressure, and a loaded element still
-  // paints. So a failed decode falls through to the load itself rather than
-  // dropping the frame -- on a browser that rejects routinely, dropping it
-  // freezes the preview while the server answers every knob change.
-  try {
-    if (typeof img.decode === "function") await img.decode();
-  } catch {
-    if (img.complete === false) {
-      await new Promise(resolve => {
-        img.addEventListener("load", resolve, {once: true});
-        img.addEventListener("error", resolve, {once: true});
-      });
-    }
-  }
+export function showRenderedPage(bitmap) {
+  if (page && typeof page.close === "function") page.close();
+  page = bitmap;
   paintDevicePage();
   layoutDevice();
 }

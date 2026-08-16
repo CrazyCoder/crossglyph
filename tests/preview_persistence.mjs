@@ -679,10 +679,18 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       press(shiftKey = false) { this.on.pointerdown({shiftKey}); },
     })));
   const deviceSurface = makeElement();
+  //: The sheet gesture: press and hold on the device surface shows the page
+  //: untuned.
+  const sheet = {
+    press(button = 0) {
+      deviceSurface.on.pointerdown({button, preventDefault() {}});
+    },
+    release(how = "pointerup") { deviceSurface.on[how](); },
+  };
   const deviceCanvas = makeElement();
   deviceCanvas.getBoundingClientRect = () => ({left: 0, top: 0});
   deviceCanvas.getContext = () => ({
-    drawImage() {},
+    drawImage(source) { deviceCanvas.painted = source; },
     getImageData: () => ({
       data: new Uint8ClampedArray([0, 0, 0, 255, 96, 96, 96, 255,
                                   200, 200, 200, 255, 255, 255, 255, 255]),
@@ -770,25 +778,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-ruler": makeElement(),
     "reset-device": deviceReset,
     knobs: form,
-    // The sheet, which is a control as well as an image: press and hold on it
-    // shows the page untuned.
-    page: {
-      src: "", set: null, on: {}, classes: new Set(),
-      naturalWidth: 480, naturalHeight: 800,
-      classList: {
-        add(name) { stubs.page.classes.add(name); },
-        remove(name) { stubs.page.classes.delete(name); },
-        contains(name) { return stubs.page.classes.has(name); },
-      },
-      addEventListener(kind, fn) { this.on[kind] = fn; },
-      press(button = 0) {
-        (deviceSurface.on.pointerdown || this.on.pointerdown)(
-          {button, preventDefault() {}});
-      },
-      release(how = "pointerup") {
-        (deviceSurface.on[how] || this.on[how])();
-      },
-    },
     // The notice drawn over the sheet when a render fails, and the button on it.
     "page-error": {
       hidden: true,
@@ -815,7 +804,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   };
   const fetches = { render: 0, checks: 0, applies: 0, defaults: 0,
                     updateReads: 0, bodies: [], saves: [], builds: [],
-                    fallbacks: [], bodyReads: [], objectUrls: [], revoked: [] };
+                    fallbacks: [], bodyReads: [], bitmaps: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
@@ -924,7 +913,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         }
         if (opts.renderOk) {
           return Promise.resolve({
-            ok: true, status: 200, blob: () => Promise.resolve({}),
+            ok: true, status: 200, blob: () => Promise.resolve({fresh: true}),
             // How many characters the page could not draw. A real answer
             // always carries it; `undrawn` in the options is how a test asks
             // for a page with holes in it.
@@ -1083,13 +1072,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       }
     },
     performance: { now: () => 0 },
-    URL: {
-      createObjectURL(blob) {
-        const url = `blob:${fetches.objectUrls.length + 1}`;
-        fetches.objectUrls.push({url, blob});
-        return url;
-      },
-      revokeObjectURL(url) { fetches.revoked.push(url); },
+    // The decoded page. Identity is what the assertions need: which body it
+    // came from, and whether anything closed it.
+    createImageBitmap: (blob) => {
+      const bitmap = {width: 480, height: 800, source: blob, closed: false,
+                      close() { this.closed = true; }};
+      fetches.bitmaps.push(bitmap);
+      return Promise.resolve(bitmap);
     },
     AbortController: class {
       constructor() {
@@ -1158,7 +1147,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
-           sheet: stubs.page,
+           sheet,
            device: {
              model: deviceModel, color: deviceColor, frame: deviceFrame,
              scale: deviceScale, paper: devicePaper, ink: deviceInk,
@@ -2640,13 +2629,14 @@ for (const deferred of [
   await settle();
   await settle();
   check(`aborting the ${deferred.label} body lets the newer page paint`,
-        env.sheet.src === "blob:1" && env.pageError.hidden === true,
-        `${env.sheet.src} / ${env.pageError.hidden}`);
+        env.device.canvas.painted?.source?.fresh === true &&
+        env.pageError.hidden === true,
+        `${JSON.stringify(env.device.canvas.painted)} / ${env.pageError.hidden}`);
 }
 
 // 41e. Aborting is advisory once a response body is already completing. If an
-//      old read resolves anyway, it must stop before revoking the newer page's
-//      URL or assigning its own image.
+//      old read resolves anyway, it must stop before decoding or painting over
+//      the newer page.
 {
   const env = await loaded(fakeStorage(), undefined, {
     deferredRenderBodies: [{ok: true, ignoreAbort: true}], renderOk: true,
@@ -2655,12 +2645,14 @@ for (const deferred of [
   env.listeners.input({target: env.byName.gamma});
   await settle();
   await settle();
-  const newest = env.sheet.src;
+  const newest = env.device.canvas.painted;
   env.fetches.bodyReads[0].resolve({stale: true});
   await settle();
-  check("a stale body cannot replace or revoke the newer page",
-        env.sheet.src === newest && !env.fetches.revoked.includes(newest),
-        `${env.sheet.src} / ${env.fetches.revoked.join()}`);
+  check("a stale body cannot decode or paint over the newer page",
+        env.device.canvas.painted === newest &&
+        env.fetches.bitmaps.length === 1,
+        `${JSON.stringify(env.device.canvas.painted)} / `
+        + `${env.fetches.bitmaps.length}`);
 }
 
 // 42. The language only says which patterns hyphenate, so with the switch
@@ -2849,22 +2841,20 @@ for (const deferred of [
         String(env.byName.inverted.checked));
 }
 
-// 47. The sheet is blank until there is a page on it. An img with no source
-//     is the browser's broken-image mark, which is the one thing on this page
-//     that is never true, so it starts on an empty placeholder and is shown
-//     when a real page lands.
+// 47. The sheet is blank until there is a page on it: the canvas starts
+//     transparent and is shown when the first page lands.
 {
   // The default render never answers, which is the state a reload is in
-  // until the server has drawn: the sheet is blank paper, not a broken mark.
+  // until the server has drawn: the sheet is blank paper.
   const waiting = await loaded(fakeStorage());
   check("nothing is shown before a page has been drawn",
-        waiting.sheet.classes.has("shown") === false,
-        JSON.stringify([...waiting.sheet.classes]));
+        waiting.device.canvas.classes.has("shown") === false,
+        JSON.stringify([...waiting.device.canvas.classes]));
 
   const env = await loaded(fakeStorage(), undefined, {renderOk: true});
   check("and the first page that arrives puts it up",
-        env.sheet.classes.has("shown") === true,
-        JSON.stringify([...env.sheet.classes]));
+        env.device.canvas.classes.has("shown") === true,
+        JSON.stringify([...env.device.canvas.classes]));
 }
 
 // 47b. A render that failed leaves it blank rather than showing an empty
@@ -2873,8 +2863,8 @@ for (const deferred of [
   const env = await loaded(fakeStorage(), undefined,
                            {renderFails: {status: 503, body: "no faces yet"}});
   check("a refused page shows nothing on the sheet",
-        env.sheet.classes.has("shown") === false,
-        JSON.stringify([...env.sheet.classes]));
+        env.device.canvas.classes.has("shown") === false,
+        JSON.stringify([...env.device.canvas.classes]));
 }
 
 // --- the sample text presets ----------------------------------------------
@@ -4393,7 +4383,7 @@ for (const deferred of [
     device: "x3", color: "white", frame: false, scale: "custom",
     paper: "100", ink: "50", calibration: "110",
   })});
-  const env = await loaded(storage);
+  const env = await loaded(storage, undefined, {renderOk: true});
   check("the saved reader model reaches the render request",
         env.fetches.bodies.at(-1).page.device === "x3",
         JSON.stringify(env.fetches.bodies.at(-1).page));
@@ -4486,37 +4476,27 @@ for (const deferred of [
         !("crossglyph.device" in storage.data));
 }
 
-// img.decode() settles the sheet before it is painted, but a rejection is not
-// "this image cannot draw": Chromium rejects when a newer src replaces the one
-// being decoded and under decoder pressure, and a loaded element still paints.
-// Dropping the frame there freezes the preview on a browser that rejects
-// routinely -- the server renders every knob change and nothing on screen
-// moves.
+// The decoded bitmaps are the only page state the pipeline holds, so their
+// two closes are the whole memory story: a newer page closes the one it
+// replaces, and the newest is the one on the canvas.
 {
-  const env = await loaded(fakeStorage());
-  const device = env.modules.get("device.js");
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  const first = env.fetches.bitmaps.at(-1);
+  check("the first page is painted open",
+        env.device.canvas.painted === first && first.closed === false,
+        JSON.stringify(first));
 
-  env.device.canvas.pixels = null;
-  env.sheet.decode = () => Promise.reject(new Error("EncodingError"));
-  env.sheet.complete = true;
-  await device.showRenderedPage();
-  check("a rejected decode still paints the loaded sheet",
-        Array.isArray(env.device.canvas.pixels),
-        String(env.device.canvas.pixels));
-
-  env.device.canvas.pixels = null;
-  env.sheet.complete = false;
-  const painting = device.showRenderedPage();
+  env.byName.gamma.value = "1.4";
+  env.listeners.input({target: env.byName.gamma});
   await settle();
-  check("a rejected decode waits for a sheet still loading",
-        env.device.canvas.pixels === null,
-        String(env.device.canvas.pixels));
-  env.sheet.complete = true;
-  env.sheet.on.load();
-  await painting;
-  check("and paints it once the load lands",
-        Array.isArray(env.device.canvas.pixels),
-        String(env.device.canvas.pixels));
+  await settle();
+  const second = env.fetches.bitmaps.at(-1);
+  check("a newer page closes the bitmap it replaces",
+        second !== first && first.closed === true && second.closed === false,
+        JSON.stringify(env.fetches.bitmaps));
+  check("and the canvas shows the newest page",
+        env.device.canvas.painted === second,
+        JSON.stringify(env.device.canvas.painted));
 }
 
 process.exit(failures ? 1 : 0);

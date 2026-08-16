@@ -573,13 +573,6 @@
   #device-frame {
     inset: 0 auto auto 0; z-index: 2; pointer-events: none;
   }
-  /* The response image is only a decoded source for the canvas. Keeping it in
-     the DOM preserves its cheap browser decoder without giving it a second
-     painted copy to resample. */
-  #page {
-    position: fixed; width: 1px; height: 1px; left: -10px; top: -10px;
-    opacity: 0; pointer-events: none;
-  }
   @media (prefers-reduced-motion: reduce) {
     #device-page { transition: none; }
   }
