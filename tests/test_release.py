@@ -14,6 +14,45 @@ import pytest
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
+
+def test_release_job_refetches_tag_object(tmp_path):
+    """The annotation is the release body, so the gate restores its object."""
+    workflow = (REPO / ".github" / "workflows" / "release.yml").read_text()
+    gate = workflow[workflow.index("      - name: The tag carries"):
+                    workflow.index("      - uses: astral-sh/setup-uv")]
+    assert "git fetch --force --depth=1 origin" in gate
+    assert "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME" in gate
+
+    source, checkout = tmp_path / "source", tmp_path / "checkout"
+    source.mkdir()
+
+    def git(*args, cwd):
+        return subprocess.run(
+            ["git", *args], cwd=cwd, check=True, capture_output=True,
+            text=True).stdout.strip()
+
+    git("init", "-q", cwd=source)
+    git("-c", "commit.gpgSign=false", "-c", "user.name=CrossGlyph",
+        "-c", "user.email=test@example.invalid", "commit", "--allow-empty",
+        "-m", "release", cwd=source)
+    git("-c", "tag.gpgSign=false", "-c", "user.name=CrossGlyph",
+        "-c", "user.email=test@example.invalid", "tag", "-a", "v1.0.0",
+        "-m", "notes", cwd=source)
+    commit = git("rev-parse", "v1.0.0^{}", cwd=source)
+
+    checkout.mkdir()
+    git("init", "-q", cwd=checkout)
+    git("remote", "add", "origin", str(source), cwd=checkout)
+    git("fetch", "--no-tags", "--depth=1", "origin",
+        f"+{commit}:refs/tags/v1.0.0", cwd=checkout)
+    assert git("cat-file", "-t", "v1.0.0", cwd=checkout) == "commit"
+
+    git("fetch", "--force", "--depth=1", "origin",
+        "refs/tags/v1.0.0:refs/tags/v1.0.0", cwd=checkout)
+    assert git("cat-file", "-t", "v1.0.0", cwd=checkout) == "tag"
+    assert git("for-each-ref", "--format=%(contents)", "refs/tags/v1.0.0",
+               cwd=checkout).startswith("notes")
+
 _spec = importlib.util.spec_from_file_location(
     "make_release", REPO / "tools" / "make-release.py")
 assert _spec and _spec.loader

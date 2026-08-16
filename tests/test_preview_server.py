@@ -936,15 +936,14 @@ def test_save_is_reachable_from_either_panel():
 
 
 def test_the_breakpoints_fit_what_they_lay_out():
-    """The page shows three columns above a width, two below it and one below
-    that. Both widths are arithmetic -- the panels, the widest reader frame,
-    the stage around it, the gaps between them and the page's padding -- and
-    nothing recomputes them: widen a panel or frame and the breakpoint has to
-    move with it, or the page overflows horizontally.
+    """The no-script page shows three columns above a width, two below it and
+    one below that. Once the device module has measured the reader it may keep
+    two columns below the fallback breakpoint, but both fixed widths must
+    remain safe before that script runs.
 
-    Neither of the other suites can see this. The probe drives a stub DOM with
-    no stylesheet, and a browser would have to be opened at exactly the wrong
-    width to catch it.
+    Neither of the other suites can see the stylesheet. The module probe does
+    cover the measured one/two-column decision, while this check ties its
+    states to CSS and verifies the fallback arithmetic.
     """
     import re
 
@@ -954,6 +953,9 @@ def test_the_breakpoints_fit_what_they_lay_out():
     html = (server.STATIC / "index.html").read_text(encoding="utf-8")
     device_js = (server.STATIC / "js" / "device.js").read_text(
         encoding="utf-8")
+    for columns in ("one", "two"):
+        assert f':root[data-preview-columns="{columns}"] body' in css
+    assert "root.dataset.previewColumns" in device_js
 
     def rem(pattern: str, text: str) -> float:
         found = re.search(pattern, text)

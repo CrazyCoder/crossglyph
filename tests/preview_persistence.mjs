@@ -820,15 +820,31 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const cancelled = new Set();
   const prompts = [];
   let answer = true;
-  const keys = [], keyups = [], returns = [];
+  const keys = [], keyups = [], returns = [], resizes = [];
   let reloads = 0;
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
   const root = makeElement();
   root.dataset.appearance = "system";
+  root.twoColumnClientWidth = Number(opts.viewportWidth) || 0;
+  root.oneColumnClientWidth =
+    Number(opts.oneColumnViewportWidth) || root.twoColumnClientWidth;
+  root.twoColumnWidth =
+    Number(opts.twoColumnWidth) || root.twoColumnClientWidth;
+  Object.defineProperty(root, "clientWidth", {get() {
+    return root.dataset.previewColumns === "one"
+      ? root.oneColumnClientWidth : root.twoColumnClientWidth;
+  }});
+  Object.defineProperty(root, "scrollWidth", {get() {
+    return root.dataset.previewColumns === "two"
+      ? root.twoColumnWidth : root.clientWidth;
+  }});
   const sandbox = {
     ...HOST,
+    addEventListener(kind, fn) {
+      if (kind === "resize") resizes.push(fn);
+    },
     document: {
       getElementById: id => stubs[id],
       createElement: makeElement,
@@ -1116,6 +1132,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            reloads: () => reloads,
            //: Come back to the page, as either event does.
            returning: () => { for (const fn of returns) fn(); },
+           resize(clientWidth, twoColumnWidth,
+                  oneColumnClientWidth = clientWidth) {
+             root.twoColumnClientWidth = clientWidth;
+             root.oneColumnClientWidth = oneColumnClientWidth;
+             root.twoColumnWidth = twoColumnWidth;
+             for (const fn of resizes) fn();
+           },
            revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
@@ -4320,6 +4343,27 @@ for (const deferred of [
   device.syncDeviceColor();
   check("a chosen frame color can differ from the page",
         env.device.color.value === "white", env.device.color.value);
+}
+
+// The browser's measured grid decides when the preview moves under Tune.
+// DPR, frame and scale all change that width after CSS breakpoints are known.
+{
+  const env = await loaded(fakeStorage(), undefined, {
+    viewportWidth: 1274, twoColumnWidth: 1030,
+  });
+  check("a compact preview stays beside Tune while both columns fit",
+        env.root.dataset.previewColumns === "two",
+        env.root.dataset.previewColumns);
+
+  env.resize(1100, 1280);
+  check("an overflowing preview moves under Tune",
+        env.root.dataset.previewColumns === "one",
+        env.root.dataset.previewColumns);
+
+  env.resize(1274, 1030, 1259);
+  check("a compact preview returns beside Tune after resizing",
+        env.root.dataset.previewColumns === "two",
+        env.root.dataset.previewColumns);
 }
 
 // A model chosen through the select must survive a fresh page load, not only

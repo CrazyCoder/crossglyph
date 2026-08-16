@@ -21,6 +21,21 @@ const calibrationSlider = document.getElementById("device-calibration-slider");
 const ruler = document.getElementById("device-ruler");
 const reset = document.getElementById("reset-device");
 
+const root = document.documentElement;
+
+
+function syncPreviewColumns() {
+  // Ask the actual grid. Reader model, frame, scale, DPR and viewport height
+  // all change its intrinsic width, so a fixed viewport breakpoint cannot.
+  // Read the viewport after trying two columns: stacking may add a vertical
+  // scrollbar, and its narrower width must not prevent expansion restoring.
+  root.dataset.previewColumns = "two";
+  const available = Number(root?.clientWidth);
+  if (!available) return;
+  root.dataset.previewColumns =
+    Number(root.scrollWidth) > available ? "one" : "two";
+}
+
 // Geometry is in each normalized frame PNG's own pixels. The assets correct the
 // source renders to the documented body aspect and carry an aperture with the
 // native screen aspect. Runtime scaling is therefore one uniform factor.
@@ -123,6 +138,7 @@ export function layoutDevice() {
   frame.style.height = `${device.frame.height * factor}px`;
   surface.style.transform = "";
   alignPixelGrid();
+  syncPreviewColumns();
 }
 
 function tone(value, low, high) {

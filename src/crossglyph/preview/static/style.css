@@ -119,6 +119,22 @@
     /* The mark says "something happened in there while you were elsewhere",
        so it has nothing to say about the panel you are looking at. */
     :root[data-panel="export"] #tab-busy { display: none; }
+
+    /* The query below is the no-script first layout. Once the reader has been
+       sized, device.js tries these two tracks and keeps them only when their
+       measured width fits the viewport. */
+    :root[data-preview-columns="two"] body {
+      grid-template-columns: 30rem min-content;
+      grid-template-areas:
+        "chrome page"
+        "tabs   page"
+        "panel  page"
+        "save   page";
+    }
+    :root[data-preview-columns="one"] body {
+      grid-template-columns: 30rem;
+      grid-template-areas: "chrome" "tabs" "panel" "save" "page";
+    }
   }
 
   /* Narrower than the panel and the widest reader frame side by side: one

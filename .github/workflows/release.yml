@@ -30,6 +30,10 @@ jobs:
       # commit message and calling that release notes.
       - name: The tag carries the release notes
         run: |
+          # checkout records github.sha at the tag name, which peels an
+          # annotated tag to its commit. Fetch the published object itself.
+          git fetch --force --depth=1 origin \
+            "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != tag ]; then
             echo "$GITHUB_REF_NAME must be an annotated tag" >&2
             exit 1

@@ -10,13 +10,12 @@ guess cost a card swap or an emulator run, so almost nobody went past changing
 the point size.
 
 <p align="center">
-  <a href="docs/images/tune.png"><img src="docs/images/tune.png" width="64%"
-     alt="The tune panel beside the page it draws: size, gamma, weight,
-          spacing, kerning, hinting and figures, with the specimen showing
-          roman, italic and bold"></a>
-  <a href="docs/images/export.png"><img src="docs/images/export.png" width="33%"
-     alt="The export panel: four point sizes, coverage chosen by script, extra
-          codepoint ranges, fallback faces and the output folder"></a>
+  <a href="docs/images/tune.png"><img src="docs/images/tune.png" width="32%"
+     alt="The Tune panel with font and page controls"></a>
+  <a href="docs/images/preview.png"><img src="docs/images/preview.png" width="32%"
+     alt="A rendered page inside the white Xteink X4 frame"></a>
+  <a href="docs/images/export.png"><img src="docs/images/export.png" width="32%"
+     alt="The Export panel with sizes, coverage, fallbacks and build controls"></a>
 </p>
 
 - the firmware's own renderer, its C++ compiled to WebAssembly, so the page is
