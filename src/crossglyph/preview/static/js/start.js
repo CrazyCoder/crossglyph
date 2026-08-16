@@ -9,6 +9,8 @@ import {declareLanguage, loadPage, loadSize, preferredLanguage} from "./remember
 import {renderNow, scheduleRender, wireRender} from "./render.js";
 import {wireResets} from "./resets.js";
 import {refreshReverts} from "./reverts.js";
+import {showTabMarks} from "./save.js";
+import {tabButtons} from "./tabs.js";
 import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
 import {wireUntuned} from "./untuned.js";
 import {systemDark, themeButtons} from "./theme.js";
@@ -29,6 +31,11 @@ systemDark.addEventListener("change", syncDeviceColor);
 wireResets();
 wireUntuned();
 wireBuildButtons();
+// A mark is about the panel you are not on, so switching panels changes which
+// of the two is owed one even though nothing was edited. tabs.js sets the
+// attribute this reads, and both listeners are on the same press, so the
+// attribute is already the new one by the time this runs.
+for (const tab of tabButtons) tab.addEventListener("click", showTabMarks);
 familyPicker.addEventListener("change", onFamilyChange);
 samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender(); });
 

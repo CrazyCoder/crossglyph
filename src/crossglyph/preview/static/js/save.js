@@ -17,6 +17,13 @@ import {WEIGHT_SLOTS, axesDiffer, axisSettings, refreshAxisReverts, variableSpec
 // what ships.
 export const saveButton = document.getElementById("save");
 export const savedNote = document.getElementById("saved");
+// What each tab says about the panel behind it. Save stands under the knobs
+// alone, so on the export tab there is no lit button to say the panel has
+// something in it the .conf has not got -- and on the knobs tab the export
+// settings were never visible to begin with. Each mark is that sentence for
+// the panel you are not looking at.
+const tuneUnsaved = document.getElementById("tune-unsaved");
+const exportUnsaved = document.getElementById("export-unsaved");
 
 // Compared, not remembered: a flag set by the first edit stays set when you
 // put the value back, and then Save is lit with nothing to save. The panel is
@@ -42,13 +49,20 @@ export function exportDiffers() {
   });
 }
 
-// What a save would write, against what the config says. A knob being compared
-// is not in it: the panel is showing the config's own value, so there is
-// nothing to write for it, and a Save offering itself over a page that matches
-// the file is an offer to do nothing.
-export function knobsDiffer() {
-  return exportDiffers() || axesDiffer() ||
+// The knobs' own half of the same question. A knob being compared is not in
+// it: the panel is showing the config's own value, so there is nothing to
+// write for it, and a Save offering itself over a page that matches the file
+// is an offer to do nothing.
+export function tuningDiffers() {
+  return axesDiffer() ||
     KNOB_KEYS.some(name => form.elements[name] && knobModified(name));
+}
+
+// What a save would write, against what the config says. One button writes
+// both panels, so this is both halves; the halves are apart because a mark on
+// a tab has to say which panel it is about.
+export function knobsDiffer() {
+  return exportDiffers() || tuningDiffers();
 }
 
 // The other question, which the family switch asks: is there work here that
@@ -58,10 +72,27 @@ export function unsavedWork() {
   return knobsDiffer() || stashed.size > 0;
 }
 
+// Which tab has something to say. Never about the panel on screen, the same
+// rule the build's mark keeps: what you are looking at says it for itself, the
+// knobs with a lit Save and the export panel with a press that saves before it
+// builds. Recomputed rather than latched, so putting a value back takes the
+// mark down again -- the panel is clean when it says what the config says,
+// however it got there.
+//
+// There is nothing to do about the widths where all three columns fit: the
+// stylesheet takes the whole bar out of the document there, and both panels
+// are on screen anyway.
+export function showTabMarks() {
+  const onExport = document.documentElement.dataset.panel === "export";
+  tuneUnsaved.hidden = !onExport || !tuningDiffers();
+  exportUnsaved.hidden = onExport || !exportDiffers();
+}
+
 export function showSaveState() {
   const entry = familyEntries.get(familyPicker.value);
   saveButton.hidden = !entry || !entry.conf;
   saveButton.disabled = !knobsDiffer();
+  showTabMarks();
   if (entry && entry.conf) {
     saveButton.textContent = entry.derived ? "Create " + entry.conf
                                            : "Save to " + entry.conf;

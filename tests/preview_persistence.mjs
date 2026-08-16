@@ -613,18 +613,30 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     const what = recording(), count = recording();
     const parts = { ".bar": bar, ".bar-fill": fill,
                     ".progress-what": what, ".progress-count": count };
-    return { hidden: true, bar, fill, what, count,
+    // The build's row is the panel's foot, which is on screen whether or not
+    // anything is running and says so with a dataset flag rather than by
+    // leaving the document. The update's uses `hidden`; both are here because
+    // one stub stands for both rows.
+    return { hidden: true, dataset: {}, bar, fill, what, count,
              querySelector(selector) { return parts[selector]; } };
   };
   // A press whose element carries state: the panel tabs and the fold on the
   // Page heading. What the press leaves on the element is asserted as well as
   // what it does, so this keeps the attribute rather than dropping it.
+  // Every listener, not the last one: a tab carries two, one from tabs.js for
+  // which panel is showing and one from start.js for the marks that depend on
+  // it. Kept in the order they were added, which is the order the browser
+  // calls them in and the order the second one needs -- it reads what the
+  // first one wrote.
   const presses = {};
   const pressStub = (name) => ({
     attrs: {},
     setAttribute(key, value) { this.attrs[key] = value; },
-    addEventListener(kind, fn) { if (kind === "click") presses[name] = fn; },
+    addEventListener(kind, fn) {
+      if (kind === "click") (presses[name] ||= []).push(fn);
+    },
   });
+  const press = (name) => { for (const fn of presses[name] || []) fn(); };
   const saveButton = {
     hidden: false, disabled: true, textContent: "", title: "",
     on: {},
@@ -711,7 +723,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Every value the note took, so the counting can be asserted and not
     // just the last line of it.
     built: recording(),
-    progress: progressRow(),
+    // The export panel's foot, which is the row the build's bar is drawn in.
+    buildbar: progressRow(),
     "tab-tune": pressStub("tune"),
     "tab-export": pressStub("export"),
     // The headings that fold the section or card under them.
@@ -721,6 +734,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "mod-dot": { hidden: true },
     // What a build leaves on the tab it ran behind.
     "tab-busy": { hidden: true },
+    // What each tab says about work in the panel behind it that the .conf has
+    // not got. Save is only under the knobs, so the export panel has no lit
+    // button of its own to say it.
+    "tune-unsaved": { hidden: true },
+    "export-unsaved": { hidden: true },
     "source-note": { textContent: "" },
     // The row of sizes past the four boxes, which most families do not have.
     "more-row": { hidden: false },
@@ -1135,14 +1153,16 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            root: sandbox.document.documentElement,
            tabs: { tune: stubs["tab-tune"], export: stubs["tab-export"],
                    busy: stubs["tab-busy"],
-                   press: (which) => presses[which]() },
+                   tuneUnsaved: stubs["tune-unsaved"],
+                   exportUnsaved: stubs["export-unsaved"],
+                   press },
            fold: { page: stubs["page-toggle"], mod: stubs["mod-toggle"],
                    device: stubs["device-toggle"], text: stubs["text-toggle"],
-                   dot: stubs["mod-dot"], press: (which) => presses[which]() },
-           progress: stubs.progress, bar: stubs.progress.bar,
-           barFill: stubs.progress.fill,
-           progressWhat: stubs.progress.what,
-           progressCount: stubs.progress.count,
+                   dot: stubs["mod-dot"], press },
+           progress: stubs.buildbar, bar: stubs.buildbar.bar,
+           barFill: stubs.buildbar.fill,
+           progressWhat: stubs.buildbar.what,
+           progressCount: stubs.buildbar.count,
            buildEls: [stubs.build, stubs["build-all"]],
            fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
@@ -2028,9 +2048,10 @@ for (const { name, text } of sources) {
   check("Build builds the family on screen",
         env.fetches.builds.at(-1).family === "Alto",
         JSON.stringify(env.fetches.builds.at(-1)));
-  check("and says what it did, what it cost and where",
-        env.built.textContent
-          === "2 built (2.4 MB), 0 already current → D:\\fonts\\cpfonts",
+  // Not where: the note has one reserved line in the panel's foot, and the
+  // output box three rows above it is already showing the folder.
+  check("and says what it did and what it cost",
+        env.built.textContent === "2 built (2.4 MB), 0 already current",
         env.built.textContent);
   check("having counted its way there rather than sitting on 'building…'",
         env.progressCount.steps.includes("1 of 2") &&
@@ -2122,6 +2143,13 @@ for (const { name, text } of sources) {
         + "it arrived in",
         env.note.textContent === "could not write arial.conf",
         env.note.textContent);
+  // That button is under the knobs, and behind a tab this panel does not show
+  // it. The refusal is the half worth having -- a name another family has
+  // taken, a size the device could not read -- so it is said beside the press
+  // that failed as well, where whoever pressed it is looking.
+  check("and the reason beside the press that failed, not only under Save",
+        env.built.textContent.includes("could not write arial.conf"),
+        env.built.textContent);
   check("and hands the buttons back",
         env.buildEls.every(one => one.disabled === false),
         env.buildEls.map(one => one.disabled).join());
@@ -2711,6 +2739,45 @@ for (const deferred of [
   check("and it goes when the build does", env.progress.hidden === true);
 }
 
+// 43a. The build's own bar, which is not that one. It is a rule in the foot of
+//      the export panel, in the tone that foot's border is drawn in, so at
+//      rest it is the divider under the buttons and a run only fills it. The
+//      foot is the one card on the page that has to hold still: taking the bar
+//      out of the document between runs would change its height at both ends
+//      of every build. Idle it is also nothing to a screen reader, since a
+//      progressbar sitting at no value all day is a control that is not there.
+{
+  const env = await loaded(fakeStorage());
+  const {progressBar} = env.modules.get("progress.js");
+  const row = env.progress;
+  const progress = progressBar(row, undefined, {keep: true});
+
+  // It starts out of nobody's way, which the markup says rather than this: the
+  // bar is in the document from the first paint, and nothing has run yet to
+  // put an attribute on it. test_the_build_bar_is_a_rule_until_it_runs has it.
+  progress.start("planning Alto…");
+  check("a run never touches the row's own hidden",
+        row.hidden === true, String(row.hidden));
+  check("and says it is running on the row instead",
+        row.dataset.running === "", JSON.stringify(row.dataset));
+  check("with the bar exposed again while it has something to say",
+        !("aria-hidden" in env.bar.attrs), JSON.stringify(env.bar.attrs));
+
+  progress.show(3, 12, "Alto 14");
+  progress.end();
+  check("the end puts the flag down rather than the row",
+        row.dataset.running === undefined && row.hidden === true,
+        `${row.dataset.running} ${row.hidden}`);
+  check("and clears the line, since it is still on screen to be read",
+        env.progressWhat.steps.at(-1) === "" &&
+        env.progressCount.steps.at(-1) === "",
+        JSON.stringify([env.progressWhat.steps.at(-1),
+                        env.progressCount.steps.at(-1)]));
+  check("leaving a rule and not a progressbar at nothing",
+        env.bar.attrs["aria-hidden"] === "true" &&
+        !("aria-valuenow" in env.bar.attrs), JSON.stringify(env.bar.attrs));
+}
+
 // 43b. The estimate, which is arithmetic and worth asking directly. It is
 //      held back rather than shown wrong: the first size pays the one-off
 //      costs of the whole run, so an estimate drawn from it is out by a
@@ -3126,14 +3193,20 @@ for (const deferred of [
         env.fetchButton.states.join());
   check("the bar ends full before it is put away",
         env.barFill.widths.includes("100%"), env.barFill.widths.join());
-  check("and is put away when the download is done",
-        env.progress.hidden === true);
+  // The foot it is drawn in stays: this bar is the rule under the buttons and
+  // only ever goes quiet. Put away means back to no fraction and nothing said.
+  check("and goes quiet when the download is done",
+        env.progress.dataset.running === undefined &&
+        env.barFill.style.width === "0%",
+        `${env.progress.dataset.running} ${env.barFill.style.width}`);
   check("the count is in bytes, not files",
         env.progressCount.steps.some(line => line.includes("MB of")),
         env.progressCount.steps.join(" | "));
+  // Past the clearing at the end, which is the bar being put down rather than
+  // anything the run had to say.
   check("the last file named is the one that took the time",
-        env.progressWhat.steps.at(-1).includes("CJK"),
-        env.progressWhat.steps.at(-1));
+        env.progressWhat.steps.filter(Boolean).at(-1).includes("CJK"),
+        env.progressWhat.steps.filter(Boolean).at(-1));
   check("what landed is said afterwards",
         env.fetchNote.textContent === "13 faces", env.fetchNote.textContent);
   check("and the page redraws, since it can draw more than it could",
@@ -3178,8 +3251,10 @@ for (const deferred of [
         env.fetchNote.textContent);
   check("and leaves the button pressable again",
         env.fetchButton.disabled === false, String(env.fetchButton.disabled));
-  check("with the bar put away rather than stuck part full",
-        env.progress.hidden === true);
+  check("with the bar put down rather than stuck part full",
+        env.progress.dataset.running === undefined &&
+        env.barFill.style.width === "0%",
+        `${env.progress.dataset.running} ${env.barFill.style.width}`);
 }
 
 // 67. Fetching the faces is half the job: the box beside them is what puts
@@ -3311,7 +3386,7 @@ for (const deferred of [
   ] });
   await env.builds.one();
   check("a run that wrote nothing gives no size",
-        env.built.textContent === "0 built, 1 already current → D:\\fonts\\cpfonts",
+        env.built.textContent === "0 built, 1 already current",
         env.built.textContent);
 }
 
@@ -4085,6 +4160,63 @@ for (const deferred of [
   env.tabs.press("export");
   check("looking clears it", env.tabs.busy.hidden === true,
         String(env.tabs.busy.hidden));
+}
+
+// 59a2. The other mark a tab carries: work in the panel behind it that the
+//       .conf has not got. Save stands under the knobs alone, so from the
+//       export tab there is no lit button to say the export settings have been
+//       edited, and from the knobs tab those settings were never on screen.
+//       Each mark is that sentence about the panel you are not looking at.
+{
+  const env = await loaded(fakeStorage());
+  check("both tabs open clean",
+        env.tabs.tuneUnsaved.hidden === true &&
+        env.tabs.exportUnsaved.hidden === true,
+        JSON.stringify([env.tabs.tuneUnsaved.hidden,
+                        env.tabs.exportUnsaved.hidden]));
+
+  // The page opens on the knobs, so this is an edit to the panel behind the
+  // other tab -- which is exactly the case the mark exists for.
+  const wasSize1 = env.exportForm.elements.size1.value;
+  env.exportForm.elements.size1.value = "10";
+  env.exportForm.edit("size1");
+  check("an export edit marks the tab it is behind",
+        env.tabs.exportUnsaved.hidden === false,
+        String(env.tabs.exportUnsaved.hidden));
+  check("and the knobs, which are the panel on screen, say nothing",
+        env.tabs.tuneUnsaved.hidden === true,
+        String(env.tabs.tuneUnsaved.hidden));
+
+  env.tabs.press("export");
+  check("looking at it takes its mark down",
+        env.tabs.exportUnsaved.hidden === true,
+        String(env.tabs.exportUnsaved.hidden));
+
+  env.byName.gamma.value = "2";
+  env.listeners.input({ target: env.byName.gamma });
+  check("a knob edited from the export tab marks the tab it was made on",
+        env.tabs.tuneUnsaved.hidden === false,
+        String(env.tabs.tuneUnsaved.hidden));
+  check("and the tab you are on still says nothing about itself",
+        env.tabs.exportUnsaved.hidden === true,
+        String(env.tabs.exportUnsaved.hidden));
+
+  // Switching is one of the moments both have to be worked out again: nothing
+  // was edited, and which panel each mark is about has changed all the same.
+  env.tabs.press("tune");
+  check("going back takes the knobs' mark down and puts the export one up",
+        env.tabs.tuneUnsaved.hidden === true &&
+        env.tabs.exportUnsaved.hidden === false,
+        JSON.stringify([env.tabs.tuneUnsaved.hidden,
+                        env.tabs.exportUnsaved.hidden]));
+
+  // Compared rather than latched: a value put back is not work, however it got
+  // there, which is the same rule Save is lit by.
+  env.exportForm.elements.size1.value = wasSize1;
+  env.exportForm.edit("size1");
+  check("and putting the value back takes it down again",
+        env.tabs.exportUnsaved.hidden === true,
+        String(env.tabs.exportUnsaved.hidden));
 }
 
 // 59b. Leaving the panel the build ran in clears it too. The mark is for a

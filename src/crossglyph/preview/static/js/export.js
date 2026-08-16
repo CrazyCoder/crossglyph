@@ -2,7 +2,8 @@ import {form} from "./dom.js";
 import {familyEntries, familyPicker} from "./family.js";
 import {scheduleRender, undrawnCount} from "./render.js";
 import {progressBar, spellBytes} from "./progress.js";
-import {knobsDiffer, saveButton, saveKnobs, showSaveState} from "./save.js";
+import {knobsDiffer, saveButton, saveKnobs, savedNote,
+        showSaveState} from "./save.js";
 
 // --- export ---------------------------------------------------------------
 // What a build contains and where it goes, which is the same .conf the knobs
@@ -14,13 +15,21 @@ export const exportForm = document.getElementById("export");
 export const presetList = document.getElementById("presets");
 export const outField = exportForm.elements.out;
 export const builtNote = document.getElementById("built");
-// The panel's own bar. The island under the specimen has another, for the
+// The panel's own bar, in the foot of the panel rather than in the card: a
+// build is the one thing here that changes height while you watch it, and the
+// foot is where it can. The island under the specimen has another, for the
 // update, and neither run can be told anything by the other's clock. The mark
 // is on the tab that opens this panel, for the widths where the panel is
 // behind one: a build is minutes, and it must not be minutes of nothing said
 // because the reader went back to the knobs.
-const progress = progressBar(document.getElementById("progress"),
-                             document.getElementById("tab-busy"));
+//
+// The foot itself is handed over as the row -- the bar and the line are parts
+// of it, and it is what the tab takes out of the document -- and kept, since
+// its rule is the divider under the buttons whether or not anything is
+// running. See progressBar.
+const progress = progressBar(document.getElementById("buildbar"),
+                             document.getElementById("tab-busy"),
+                             {keep: true});
 export let presetNames = [];
 
 //: The ranges behind each preset, and the ones every build carries anyway.
@@ -286,11 +295,13 @@ export function showStep(step) {
     const size = made && step.bytes ? ` (${spellBytes(step.bytes)})` : "";
     const had = kept && step.current_bytes
       ? ` (${spellBytes(step.current_bytes)})` : "";
+    // Where they went is not in it: the note has one reserved line in the
+    // foot, an output path is most of a panel wide, and the box three rows up
+    // is already showing the folder this went to.
     builtNote.textContent =
       `${made} built${size}, ${kept} already current${had}`
       + (failed ? `, ${failed} failed` : "")
-      + (gone ? `, removed ${step.removed.join(", ")}` : "")
-      + ` → ${step.out}`;
+      + (gone ? `, removed ${step.removed.join(", ")}` : "");
   }
 }
 
@@ -333,7 +344,13 @@ export async function buildFamilies(family, force = false) {
     progress.start(`${force ? "rebuilding" : "planning"} ${label}…`);
     builtNote.textContent = "";
     if (!saveButton.hidden && knobsDiffer() && !(await saveKnobs())) {
-      builtNote.textContent = `not built: ${label} could not be saved`;
+      // With the reason, which is the half worth having: a refusal here is
+      // something to act on -- a name another family has taken, a size the
+      // device could not read -- and saveKnobs writes it under Save, which is
+      // a bar this tab does not show. Said here it is beside the press that
+      // failed. The foot grows for it, as it does for any other error.
+      builtNote.textContent = `not built: ${label} could not be saved`
+        + (savedNote.textContent ? `\n${savedNote.textContent}` : "");
       return;
     }
     await streamInto("/build", {family: family, force: force},

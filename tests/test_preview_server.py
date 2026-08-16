@@ -914,11 +914,12 @@ def test_what_boot_reads_is_what_the_modules_write():
             f"boot.js does not read {key.group(1)}, which {module} writes"
 
 
-def test_save_is_reachable_from_either_panel():
-    """It writes the whole .conf, the export panel's half of it included, so it
-    cannot live inside the knobs form. Below the width where all three columns
-    fit the two panels share one, and a Save in the knobs goes away with them
-    -- leaving the export panel with unsaved settings and no way to say so.
+def test_each_panel_commits_from_its_own_foot():
+    """A bar under a card is what commits what is in it, and each panel has
+    one: Save under the knobs, Build under the export panel. Neither press
+    belongs inside the form it acts on -- a save writes the whole .conf, the
+    export half included, and a build is the one thing on the page that changes
+    height while you watch it, which only a foot can absorb.
     """
     import re
 
@@ -933,6 +934,86 @@ def test_save_is_reachable_from_either_panel():
     assert foot, "there is no save bar"
     for part in ('id="save"', 'id="saved"'):
         assert part in foot.group(1), f"{part} is not in the save bar"
+
+    opened = html.index('<form id="export">')
+    export = html[opened:html.index("</form>", opened)]
+    build = html[html.index('<div id="buildbar">'):]
+    for part in ('id="build"', 'id="build-all"', 'id="built"',
+                 'class="bar"'):
+        assert part not in export, f"{part} is inside the export panel"
+        assert part in build, f"{part} is not in the build bar"
+
+
+def test_hiding_save_on_the_export_tab_never_touches_its_hidden_property():
+    """save.js sets `hidden` on that button to mean "this family has no .conf
+    to write to", and buildFamilies reads it to decide whether to save before a
+    run. A tab switch that set the same property to take the button off screen
+    would quietly stop builds writing the file the build then reads, which
+    looks exactly like a change that did nothing.
+
+    So the export tab hides it in the stylesheet, and save.js stays the only
+    place that assigns it.
+    """
+    from crossglyph.preview import server
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    assert ':root[data-panel="export"] #savebar { display: none; }' in css, \
+        "the export tab does not hide the save bar"
+
+    js = server.STATIC / "js"
+    assigns = {path.name for path in js.glob("*.js")
+               if "saveButton.hidden =" in path.read_text(encoding="utf-8")}
+    assert assigns == {"save.js"}, \
+        f"saveButton.hidden is assigned outside save.js: {assigns - {'save.js'}}"
+
+
+def test_the_build_bar_is_a_rule_until_it_runs():
+    """It is drawn in the foot whether or not anything is running, so that a
+    build changes what the foot says and never how tall it is. Two things carry
+    that: the rule is in the document from the first paint rather than hidden,
+    and it starts aria-hidden, since a progressbar sitting at no value all day
+    is a control that is not there.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    build = html[html.index('<div id="buildbar">'):]
+    bar = re.search(r"<div class=\"bar\"[^>]*>", build, re.S)
+    assert bar, "the build bar has no rule"
+    assert "hidden" not in bar.group(0).replace("aria-hidden", ""), \
+        "the build's rule starts out of the document"
+    assert 'aria-hidden="true"' in bar.group(0), \
+        "the build's rule starts as a progressbar rather than as a rule"
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    # The foot is made of --rule, so a bar in that tone is one nobody can see.
+    assert "#buildbar .bar { margin-top: .6rem; background: var(--line); }" \
+        in css, "the build's rule is not drawn against its own foot"
+
+
+def test_the_line_the_build_bar_rests_on_can_never_take_a_second():
+    """The reserved line opens on a word about the two presses, because an
+    empty one reads as a line that failed to fill. It is its own element and
+    not the note's first value: the note wraps, since an error arrives with its
+    own lines, and this one must stay one line however wide the reader's UI
+    font draws it. So it is cut short instead, and it goes for good once the
+    panel has something of its own to say.
+    """
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    build = html[html.index('<div id="buildbar">'):]
+    assert '<div class="rest">' in build, "the reserved line rests on nothing"
+
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    rest = css[css.index("#build-status .rest {"):]
+    rest = rest[:rest.index("}")]
+    assert "white-space: nowrap" in rest and "text-overflow: ellipsis" in rest, \
+        "the resting line can wrap to a second line and grow the foot"
+    assert "#build-status:has(#built:not(:empty)) .rest" in css, \
+        "the resting line outlives the first thing the panel has to say"
 
 
 def test_the_breakpoints_fit_what_they_lay_out():
@@ -967,6 +1048,12 @@ def test_the_breakpoints_fit_what_they_lay_out():
     # max-width query names the last width that still folds.
     two_at = min(float(w) for w in re.findall(r"max-width:\s*(\d+)px", css)) + 1
     panel = rem(r"#knobs \{\s*\n?\s*width: ([\d.]+)rem", css)
+    # Both side columns are counted at this one width below, so the export
+    # column has to actually be it. It is set on the wrapper rather than on the
+    # card, since the card and its foot have to stay the same width as each
+    # other, which puts it out of reach of the pattern above.
+    assert rem(r"#exportcol \{ width: ([\d.]+)rem", css) == panel, \
+        "the export column is not the width the arithmetic below assumes"
     gap = rem(r"column-gap: ([\d.]+)rem", css)
     padding = rem(r"body \{\s*\n\s*margin: 0; padding: ([\d.]+)rem", css)
     stage = rem(r"#stage \{[^}]*padding: ([\d.]+)rem", css)

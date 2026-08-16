@@ -294,8 +294,9 @@ font's own named instance if it has not, rather than to the first entry in the
 picker. The cross on the **Page** heading does the same for the section under
 it.
 
-The foot of the card is where **Save** is, rather than either panel, because it
-writes the whole `.conf`: a coverage tick lights it exactly as a slider does.
+**Save** is in that foot rather than inside the knobs, because it writes the
+whole `.conf` and not just the half above it: a coverage tick over on the
+export panel lights it exactly as a slider does.
 
 The export panel holds what a build needs and a page does not: the name, the
 sizes, the coverage intervals, the fallback families. What each of them means
@@ -306,9 +307,26 @@ family, and a dot on the folded heading says this one is not.
 It has a column of its own beside the page while the window is wide enough for
 three. Below that it folds in beside the font knobs, with **Tune** and
 **Export** tabs above the panel deciding which of the two is showing, and the
-page stays where it is either way. A build running behind the Export tab marks
-it, since a build is minutes and the panel it reports in may not be the one
-you are looking at.
+page stays where it is either way.
+
+It has a foot of its own, the same bar the knobs have: **Build** and **Build
+all**, the rule under them that a run fills, and one line saying what is being
+built or what the last build made. The rule and that line are there whether or
+not anything is running, so a build changes what the foot says and never how
+tall it is. Only an error grows it, which is the one time the panel is worth
+reading. What the two presses do is behind the **?** beside them.
+
+**Save** is not on that tab. A build writes the `.conf` before it starts, so
+pressing Build is pressing Save and then Build, and a second button for the
+first half of what the button beside it already does is one to press by
+mistake. What you lose is the lit Save that would have said the export
+settings are not in the file yet, so the tabs say it instead: a dot on **Tune**
+means a knob in there is unsaved, and a dot on **Export** means a setting in
+there is. A tab never marks itself, since the panel you are looking at says it
+for itself. A build running behind the Export tab marks it the same way, and
+supersedes the unsaved dot while it runs: a build is minutes, the panel it
+reports in may not be the one you are looking at, and by the time it matters
+the file has been written anyway.
 
 **name** is what the family is called once it is built, which is the name the
 reader picks from on a phone-sized screen rather than whatever the source files
@@ -329,10 +347,12 @@ of your choices already covers stays yours to untick, greyed with a note saying
 it adds nothing. Greek and Cyrillic are never carried: `reading` has the main
 blocks but not polytonic Greek or the Cyrillic Supplement, so ticking those
 still adds something. Only what you chose is written to the config. **Save**
-writes the lot back to the family's config, and Build then runs the same
-build the command line runs.
-Save first, then build: the build reads the config from disk, so anything you
-have not saved is not in it.
+writes the lot back to the family's config, and Build then runs the same build
+the command line runs. The `.conf` is the only channel a build has, since the
+server re-reads it from disk rather than taking anything from the page, so
+Build writes it first: a coverage tick that never reached the file would
+otherwise leave every size looking current, which reads as a build that did
+nothing when it means a change that was never seen.
 
 A build runs its sizes across a process pool, the same one the command line
 uses, so a family with four sizes takes about as long as its slowest one rather

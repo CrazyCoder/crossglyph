@@ -41,9 +41,9 @@ export function spellBytes(count) {
 }
 
 // One bar, over the row it is drawn in. Two of these exist -- the build's, in
-// the export panel, and the update's, in the island under the specimen -- and
-// each keeps its own start time, so what one reports says nothing about when
-// the other began.
+// the export panel's foot, and the update's, in the island under the specimen
+// -- and each keeps its own start time, so what one reports says nothing about
+// when the other began.
 //
 // `mark` is what a bar behind a tab leaves on that tab. It goes up when the
 // run starts and stays up past the end of it, because what it says is that
@@ -51,7 +51,16 @@ export function spellBytes(count) {
 // down when the run ends in plain sight -- watching it is having seen it --
 // and otherwise when the reader presses a tab. A bar nothing can hide gets
 // none.
-export function progressBar(row, mark) {
+//
+// `keep` is for a bar that is already part of what it is drawn on. The build's
+// is a rule in the foot of its panel, in the tone that foot's own border is
+// drawn in, so at rest it reads as the divider under the buttons and a run
+// only fills it: taking it out of the document between runs would make the
+// foot change height at both ends of every build, on the one card that has to
+// hold still. Idle it says nothing to a screen reader either, since a
+// progressbar sitting at no value all day is a control that is not there. The
+// update's bar has empty column under it and appears in the ordinary way.
+export function progressBar(row, mark, {keep = false} = {}) {
   const bar = row.querySelector(".bar");
   const fill = row.querySelector(".bar-fill");
   const what = row.querySelector(".progress-what");
@@ -66,7 +75,12 @@ export function progressBar(row, mark) {
     // it cannot say.
     start(text) {
       startedAt = performance.now();
-      row.hidden = false;
+      if (keep) row.dataset.running = ""; else row.hidden = false;
+      // Unguarded where its opposite in end() is not: a run always has
+      // something to report, and only a bar that stays on screen afterwards
+      // needs putting back out of the way. On the other one it removes an
+      // attribute that was never there.
+      bar.removeAttribute("aria-hidden");
       if (mark) mark.hidden = false;
       bar.classList.add("waiting");
       // At nothing, not at whatever the last run ended on: the first counted
@@ -82,7 +96,7 @@ export function progressBar(row, mark) {
     // `spell` is how the two numbers are said. Sizes are a count of themselves
     // and need nothing; bytes are not worth reading as digits.
     show(done, total, text, spell = String) {
-      row.hidden = false;
+      if (!keep) row.hidden = false;
       bar.classList.remove("waiting");
       fill.style.width = `${total > 0 ? Math.round(done / total * 100) : 0}%`;
       bar.setAttribute("aria-valuemax", String(total));
@@ -100,13 +114,24 @@ export function progressBar(row, mark) {
     // at some fraction under it would say the run is still going.
     end() {
       // Before the row goes, while there is still something to ask: an
-      // offsetParent is how an element says no ancestor of it is hidden.
+      // offsetParent is how an element says no ancestor of it is hidden. A
+      // kept row answers the same way, since what hides it is the tab.
       if (mark && row.offsetParent) mark.hidden = true;
-      row.hidden = true;
+      if (keep) delete row.dataset.running; else row.hidden = true;
       bar.classList.remove("waiting");
       // Emptied while it is out of the document, so the next run opens at
       // nothing rather than animating down from the last one's finish.
       fill.style.width = "0%";
+      // A kept bar has no such moment: it stays on screen, so what it was
+      // counting has to be put down by hand. The sentence a run leaves behind
+      // is the note's job, and it takes the same line.
+      if (keep) {
+        bar.setAttribute("aria-hidden", "true");
+        bar.removeAttribute("aria-valuenow");
+        bar.removeAttribute("aria-valuetext");
+        what.textContent = "";
+        count.textContent = "";
+      }
     },
   };
 }

@@ -7,6 +7,12 @@
 const tune = document.getElementById("tab-tune");
 const toExport = document.getElementById("tab-export");
 const busy = document.getElementById("tab-busy");
+// For start.js, which hangs the unsaved marks off the same presses: whether a
+// mark belongs on a tab depends on which panel is showing, so a switch is one
+// of the moments both of them have to be worked out again. That question is
+// save.js's, and reaching it from here would be this module reading across the
+// cycle -- so the handles go out and the wiring is done up there.
+export const tabButtons = [tune, toExport];
 
 function show(which) {
   document.documentElement.dataset.panel = which;

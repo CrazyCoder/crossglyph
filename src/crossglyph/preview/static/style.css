@@ -84,7 +84,7 @@
      taken, so the tabs and the card share one edge. */
   #tabs { grid-area: tabs; display: none;
           margin-bottom: calc(-.55rem - 1px); }
-  #knobs, #export { grid-area: panel; }
+  #knobs, #exportcol { grid-area: panel; }
   #savebar { grid-area: save; }
   #middle { grid-area: page; }
 
@@ -104,8 +104,10 @@
         "save   page export";
     }
     /* Out of the panel's cell and into its own column, which is the whole of
-       what "three columns" means here. */
-    #export { grid-area: export; }
+       what "three columns" means here. The card and its foot travel together:
+       they are one grid item, so the foot follows the card rather than the
+       shared row the knobs' foot sits in. */
+    #exportcol { grid-area: export; }
   }
 
   /* Below that the export panel is behind a tab, and one of the two is on
@@ -113,11 +115,28 @@
      without a script having to run first. */
   @media (max-width: 1769px) {
     #tabs { display: flex; }
-    #export { display: none; }
-    :root[data-panel="export"] #export { display: block; }
+    #exportcol { display: none; }
+    :root[data-panel="export"] #exportcol { display: block; }
     :root[data-panel="export"] #knobs { display: none; }
-    /* The mark says "something happened in there while you were elsewhere",
-       so it has nothing to say about the panel you are looking at. */
+    /* The knobs' foot is the row under the panel; this one travels inside its
+       own card's cell. So on the export tab that row is empty and its gap is
+       spent on nothing, which put nine pixels between the panel and whatever
+       is under it on one tab and not the other -- the page itself, at the
+       width where the columns have run out. Cancelled the way the tabs and the
+       save bar cancel the gaps they sit across. */
+    :root[data-panel="export"] #exportcol { margin-bottom: -.55rem; }
+    /* Save stands under the knobs and nowhere else: on the export tab the
+       press beside it writes the .conf before it builds, so a Save there is a
+       second way to do what Build already did.
+
+       Hidden in the stylesheet and never through the `hidden` property.
+       save.js sets that one to mean "this family has no .conf to write to",
+       and buildFamilies reads it to decide whether to save before a run --
+       so a tab switch that set it would quietly stop builds writing the file,
+       which is the exact failure the comment above that read warns about. */
+    :root[data-panel="export"] #savebar { display: none; }
+    /* A mark says "something in there, while you were elsewhere", so it has
+       nothing to say about the panel you are looking at. */
     :root[data-panel="export"] #tab-busy { display: none; }
 
     /* The query below is the no-script first layout. Once the reader has been
@@ -243,11 +262,18 @@
     background: var(--panel); color: var(--text);
     border-bottom-color: var(--panel); z-index: 1;
   }
-  /* What a build says while the panel it is running in is behind a tab. A
-     filled dot rather than a colour, like everything else here. */
-  #tab-busy { display: inline-block; width: .38rem; height: .38rem;
+  /* What the panel behind a tab has to say: a build running in there, or work
+     in there that is not in the .conf yet. One dot for both, and the same
+     filled dot the folds use for "something is set in here" -- at six pixels a
+     second treatment is a difference nobody can see, and the tab it sits on
+     with its label is what says which it is. */
+  .tab-mark { display: inline-block; width: .38rem; height: .38rem;
               border-radius: 50%; background: currentColor;
               margin-left: .4rem; vertical-align: .08rem; }
+  /* Never both on the one tab. A build writes the .conf before it starts, so
+     while it runs the unsaved mark is about to stop being true anyway, and
+     "this is building" is the more useful of the two things to say. */
+  #tab-busy:not([hidden]) + #export-unsaved { display: none; }
 
   #knobs {
     width: 30rem; background: var(--panel);
@@ -485,14 +511,18 @@
 
   /* Every action on the page is the same control: half the panel wide, in one
      of two columns, so a row of them lines up and a longer label makes a
-     longer word rather than a bigger button. The note each one writes goes
-     under the row -- sharing it made "Build all" two lines high the moment the
-     build had anything to say. */
+     longer word rather than a bigger button. The two feet are therefore the
+     same shape as each other, and Build lands where Reset does whichever tab
+     you came from.
+
+     The third track is the badge, which takes what it needs and leaves the
+     halves to the buttons. `> button` rather than `button`: the badge is one
+     too, and it is a sixth of their height. */
   .actions {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .5rem; margin-top: .9rem;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+    gap: .5rem; align-items: center;
   }
-  .actions button, #savebar button {
+  .actions > button, #savebar button {
     min-height: 2rem; padding: .35rem .7rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -506,25 +536,63 @@
   #save:not(:disabled):hover {
     background: var(--text); border-color: var(--text);
   }
-  /* The card's foot: the two presses side by side and, under them, whatever
-     the last save had to say. Drawn in the tone the panel already divides
-     itself with, so it reads as the bottom of the card rather than as a second
-     surface -- and it takes the card's bottom corners, overlapping its border
-     by a pixel the way the tabs take the top ones.
+  /* A card's foot: the presses that commit what is in it and, under them,
+     whatever the last one had to say. Drawn in the tone the panel already
+     divides itself with, so it reads as the bottom of the card rather than as
+     a second surface -- and it takes the card's bottom corners, overlapping
+     its border by a pixel the way the tabs take the top ones.
 
-     Nothing sits below it, so the note can come and go without moving
-     anything, which is why it needs no reserved line. */
-  #savebar {
-    margin-top: calc(-.55rem - 1px);
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .5rem; padding: .6rem .8rem;
+     Nothing sits below a foot. That is what lets both of them say something
+     without moving anything above them, and it is the rule anything added
+     later has to keep: below the bar, never inside it. */
+  #savebar, #buildbar {
+    padding: .6rem .8rem;
     background: var(--rule); border: 1px solid var(--line);
     border-radius: 0 0 10px 10px;
   }
+  #savebar {
+    margin-top: calc(-.55rem - 1px);
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+  }
+  /* The knobs' foot is a grid row of its own and cancels the gap above it.
+     This one is the next block inside the export column, where there is no
+     gap to cancel and only the shared border to sit on. */
+  #buildbar { margin-top: -1px; }
   #saved { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
   /* An empty note is not a short line, it is no line: left in, the grid gap
      above it adds half a row of nothing to the foot of every card. */
   #saved:empty { display: none; }
+
+  /* The rule under the buttons, which is the progress bar at rest. Its track
+     is the tone this bar's own border is drawn in: on the panel a rule is
+     --rule, and on a foot made of --rule that would be a bar you cannot see.
+     A build fills it in the knob tone, as every other filled control here. */
+  #buildbar .bar { margin-top: .6rem; background: var(--line); }
+  /* One line, reserved, whether or not there is anything in it. Both children
+     sit in the same grid cell's worth of space and neither carries a margin,
+     so a build starting or ending changes the words and nothing else. An error
+     is what grows it, and that is the one time this card should be read. */
+  #build-status {
+    display: grid; margin-top: .45rem;
+    font-size: 11.5px; line-height: 1.45; min-height: 1.45em;
+  }
+  #build-status .progress-line { margin-top: 0; }
+  /* Out while nothing is running, so the outcome of the last build has the
+     reserved line to itself rather than a second one under an empty pair. */
+  #buildbar:not([data-running]) .progress-line { display: none; }
+  /* What the line rests on before anything has happened. Cut short rather than
+     wrapped: it is the one thing in here written to a width, and a UI font
+     wider than the one this was measured in would otherwise take the second
+     line the whole foot is built to never need. */
+  #build-status .rest {
+    color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Gone as soon as the panel has something of its own to say, and it does not
+     come back: a standing hint is worth less than the last thing that ran. */
+  #build-status:has(#built:not(:empty)) .rest,
+  #buildbar[data-running] .rest { display: none; }
 
   textarea {
     width: 100%; height: 7rem; margin-top: .3rem; padding: .45rem .5rem;
@@ -715,8 +783,10 @@
      *and* everything about the build, which is the imbalance this replaces.
      Where the third column will not fit, this one folds in beside the knobs
      and the tab bar decides which of them is on screen. */
+  /* The width belongs to the column rather than to the card, so the card and
+     the foot under it cannot drift apart by an edit to one of them. */
+  #exportcol { width: 30rem; }
   #export {
-    width: 30rem;
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
@@ -751,10 +821,6 @@
     /* The tab an inch above already says Export, and a row emptied of its
        heading still holds the margin under it. */
     #export .head { display: none; }
-    /* The knobs are not on screen, so neither is the press that resets them.
-       Out of sight rather than out of the grid: Save stays in the half it was
-       in, and the foot is the same shape on either tab. */
-    :root[data-panel="export"] #reset-font { visibility: hidden; }
   }
   /* One control across the row rather than the panel's label-and-knob grid:
      these are text and lists, and they need the width. */
@@ -831,7 +897,9 @@
      panel's own left edge, which is where a tip that wide has to start to fit
      inside it. */
   .name:has(.explain), .section h2:has(.explain),
-  .row.wide.check .box:has(.explain) { position: relative; }
+  .row.wide.check .box:has(.explain), .actions:has(.explain) {
+    position: relative;
+  }
   /* Outlined, not filled. It answers a question nobody has yet, so it should
      be findable and not first: a solid disc beside a quiet label is the
      highest-contrast thing in the row, which is backwards. */
@@ -862,6 +930,13 @@
   .explain:hover .tip, .explain:focus-within .tip {
     visibility: visible; opacity: 1; pointer-events: auto;
   }
+  /* The one badge that is not beside a label with the rest of a panel under
+     it. A foot is the bottom of its column and its badge is at the right end
+     of the bar, so this tip opens upwards and hangs from that end: down and
+     from the left, it would leave the page on both axes at once. */
+  .explain.up .tip {
+    top: auto; bottom: calc(100% + .45rem); left: auto; right: -.5rem;
+  }
   /* Bold and nothing else: the box is already the inverse of the panel, and a
      second colour on it would have to be picked twice -- once per theme. */
   .tip code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -886,8 +961,9 @@
   #built, #fetched, #have-fallbacks { color: var(--muted); font-size: 11.5px; }
   /* An error arrives with its own lines: what went wrong, where it looked,
      what to do. Collapsed to one paragraph the path runs into the sentence
-     after it, which is how a message written to be read becomes a wall. */
-  #built { margin-top: .6rem; white-space: pre-line; }
+     after it, which is how a message written to be read becomes a wall. No
+     margin: the line it sits on is reserved by the block around it. */
+  #built { white-space: pre-line; }
 
   /* One of the panel's own rules, filling. Every row here is separated by one
      of these, so progress drawn in that material belongs to the panel, where a

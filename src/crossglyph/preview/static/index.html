@@ -31,15 +31,24 @@
 
 <!-- Which of the two panels this column is showing, for the widths where the
      export panel has folded in beside the knobs. Hidden where all three
-     columns fit, since there is nothing to switch between there. The mark on
-     Export is what a build says while the panel it is running in is behind a
-     tab. -->
+     columns fit, since there is nothing to switch between there.
+
+     A tab carries what the panel behind it has to say while you are not
+     looking at it, and never speaks about the panel you are on: the mark on
+     Export is a build running in there, and the mark on either is work in
+     there that is not in the .conf yet. Save is only on the Tune tab, so
+     unsaved export settings would otherwise be invisible from the tab that
+     holds the button that writes them. Building says it too, since a build
+     writes the .conf first -- which is why the busy mark supersedes the
+     unsaved one on Export rather than sitting beside it. -->
 <div id="tabs" role="group" aria-label="which panel">
   <button type="button" id="tab-tune" aria-pressed="true"
-          aria-controls="knobs">Tune</button>
+          aria-controls="knobs">Tune<span id="tune-unsaved" class="tab-mark"
+    hidden aria-label="unsaved changes"></span></button>
   <button type="button" id="tab-export" aria-pressed="false"
-          aria-controls="export">Export<span id="tab-busy" hidden
-    aria-label="a build is running"></span></button>
+          aria-controls="export">Export<span id="tab-busy" class="tab-mark"
+    hidden aria-label="a build is running"></span><span id="export-unsaved"
+    class="tab-mark" hidden aria-label="unsaved changes"></span></button>
 </div>
 
 <form id="knobs">
@@ -351,12 +360,17 @@
   </div>
 </form>
 
-<!-- The card's own foot rather than a bar under it. Save writes the whole
-     .conf, the export panel's half of it included, so it belongs to the column
-     and not to either panel: where the two share one, it has to be on screen
-     whichever of them is showing. Reset is beside it because these are the two
-     ends of the same thing -- one throws the knobs back to the converter's
-     defaults, the other writes them where a build will read them. -->
+<!-- The card's own foot rather than a bar under it. Reset and Save are the two
+     ends of one thing: one throws the knobs back to the converter's defaults,
+     the other writes them where a build will read them.
+
+     A save still writes the whole .conf, the export panel's half of it
+     included, but the button only stands under the knobs. Behind a tab the
+     export panel has a foot of its own, and Build writes the file before it
+     builds -- so a Save there would be a second press for what the press
+     beside it already does, offered at the one moment it is not needed. What
+     it costs is that unsaved export settings have nothing to say from that
+     tab, which is what the mark on Tune says instead. -->
 <div id="savebar">
   <button type="button" class="reset" id="reset-font">Reset font knobs</button>
   <button type="button" class="reset" id="save" disabled>Save</button>
@@ -572,7 +586,14 @@
 <!-- Beside the page rather than under it: the knobs decide how a glyph looks,
      this decides what gets built and where it lands, and the specimen belongs
      between the two rather than at the top of a column twice as long as the
-     one next to it. Both panels write the same .conf. -->
+     one next to it. Both panels write the same .conf.
+
+     The card and its foot are wrapped because a grid row is shared across
+     every column: give the foot a row of its own and it lands where the *left*
+     column's foot does, which is wherever the knobs happen to end, leaving a
+     hand's width of nothing between this card and its own bar. Stacked inside
+     one cell they follow this card instead. -->
+<div id="exportcol">
 <form id="export">
     <div class="head">
       <h2>Export</h2>
@@ -787,30 +808,80 @@
       <input class="mono" id="out" name="out" type="text">
     </div>
 
-    <!-- A build does the sizes whose inputs changed. Holding shift does the
-         lot, for the times the inputs are the same and the answer should not
-         be: a converter that has moved on, a face edited in place. -->
-    <div class="actions">
-      <button type="button" id="build"
-              title="Build this family. Hold shift to rebuild every size, current or not.">Build</button>
-      <button type="button" id="build-all"
-              title="Build every family in the folder. Hold shift to rebuild every size, current or not.">Build all</button>
-    </div>
-    <div class="hint">A build does the sizes whose inputs changed. Hold
-      <kbd>shift</kbd> to rebuild every size, current or not.</div>
-    <!-- Progress belongs to the press that started it, so it sits under the
-         two buttons and above the sentence they leave behind. The bar says
-         how far, the line under it says what is being built and how many are
-         left; the note below keeps the outcome, and only the outcome. -->
-    <div id="progress" class="progress" hidden>
-      <div class="bar" role="progressbar" aria-label="build progress"
-           aria-valuemin="0"><span class="bar-fill"></span></div>
-      <div class="progress-line">
-        <span class="progress-what"></span>
-        <span class="progress-count mono"></span>
-      </div>
-    </div>
-    <div id="built"></div>
 </form>
+
+<!-- The export panel's foot, and the same shape as the knobs' one: the bar is
+     what a column commits, so Build stands where Save stands rather than
+     floating in the card above two thirds of a panel of settings.
+
+     It is also the one place on the page where a running build can grow
+     without moving anything, which is why the progress and the sentence it
+     leaves are in here rather than in the card. Nothing sits below a foot --
+     the same rule the note under Save is already written to, and the one the
+     update's bar follows in the island under the specimen. Anything that
+     comes later, a download and its own bar among them, goes below this bar
+     and not inside it. -->
+<div id="buildbar">
+  <div class="actions">
+    <button type="button" id="build"
+            title="Build this family">Build</button>
+    <button type="button" id="build-all"
+            title="Build every family in the font source folder">Build all</button>
+    <!-- What the two presses do, in the badge the panel uses everywhere else
+         for something too long to sit on a label. It replaces a note that was
+         printed under the buttons in full, which cost two lines of the one
+         card that has to hold still and said what both titles already said. -->
+    <span class="explain up">
+      <button type="button" class="info" aria-label="What a build does"
+              aria-describedby="build-tip">?</button>
+      <span class="tip" id="build-tip" role="tooltip">
+        <strong>Build</strong> does this family. <strong>Build all</strong>
+        does every family in the font source folder.
+        <br><br>
+        A build only does the sizes whose inputs changed since the last one, so
+        pressing it again after a small edit is quick. Hold <kbd>shift</kbd>
+        and both buttons become <strong>Rebuild</strong>: every size is built
+        again, current or not. That is what you want when the inputs cannot
+        tell you anything has changed and something has anyway, a converter
+        that has moved on or a face edited in place.
+        <br><br>
+        Your settings are written to the .conf before the build starts, so
+        there is no need to save first.
+      </span>
+    </span>
+  </div>
+  <!-- Drawn whether or not anything is running, and that is the point: it is
+       2px of the tone every row in the panel is divided with, so at rest it is
+       one of those rules and a build only fills it. Nothing appears and
+       nothing moves. The one line under it is reserved for the same reason --
+       running, it is what is being built and how many are left; finished, it
+       is what the build made. An error is the one thing allowed past that
+       line, and the one time the card should be asking to be read. -->
+  <div class="bar" role="progressbar" aria-label="build progress"
+       aria-valuemin="0" aria-hidden="true"><span class="bar-fill"></span></div>
+  <div id="build-status">
+    <div class="progress-line">
+      <span class="progress-what"></span>
+      <span class="progress-count mono"></span>
+    </div>
+    <!-- What the reserved line rests on. An empty one reads as a line that
+         failed to fill rather than as one waiting to, so it opens on the
+         shortest true thing about the two presses above it -- the sentence the
+         badge beside them then answers at length.
+
+         Its own element rather than the note's first value: the note is set in
+         pre-line, since an error arrives with its own lines, and this one must
+         never take a second however wide the reader's UI font draws it. Here
+         it can be cut short instead, which nothing worth reading ever is.
+
+         It goes when the note has anything to say and does not come back. That
+         is the shape it wants: it is what to read while nothing has happened,
+         and once something has, that is worth more than a standing hint. -->
+    <div class="rest">Build does this family, Build all every family in the
+      folder.</div>
+    <div id="built"></div>
+  </div>
+</div>
+</div><!-- #exportcol: the card above and the foot above that -->
 
 <script type="module" src="js/app.js"></script>
