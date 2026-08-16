@@ -380,7 +380,7 @@
     </div>
   </div>
 
-  <div id="device-preview">
+  <div id="device-preview" class="fold-card">
     <div class="section">
       <h2><button type="button" id="device-toggle" data-fold="device"
                   aria-expanded="false" aria-controls="device-settings"><svg
@@ -394,15 +394,15 @@
           percentage to that size. Fit is for narrow windows. Paper and ink
           remap the four display levels without rerendering the font.</span></span>
       </h2>
-      <div class="device-quick">
-        <label class="device-field" for="device-model"><span>device</span>
+      <div class="fold-quick">
+        <label class="fold-field" for="device-model"><span>device</span>
           <select id="device-model" name="device" data-group="page"
                   data-device-setting form="knobs">
             <option value="x4" selected>X4</option>
             <option value="x3">X3</option>
           </select>
         </label>
-        <label class="device-field" for="device-color"><span>color</span>
+        <label class="fold-field" for="device-color"><span>color</span>
           <select id="device-color" data-device-setting>
             <option value="black" selected>black</option>
             <option value="white">white</option>
@@ -499,28 +499,37 @@
        a line and reading it back is one glance now instead of a look across the
        page. `form="knobs"` keeps it a control of the knob form from here, so
        /render receives it exactly as it did. -->
-  <div id="textbox">
-    <div class="head">
-      <h2>Text</h2>
-      <!-- Which specimen is in the box. Custom comes first and holds whatever
-           you type, so choosing a language never costs you your own text and
-           switching back returns it. The languages are filled in from
-           /defaults, in the order the server lists them: a specimen you
-           cannot read says nothing about a font you are choosing. -->
-      <select id="sample" aria-label="which sample text to show"
-              title="Which sample is in the box. Custom keeps whatever you type.">
-        <option value="">Custom</option></select>
+  <div id="textbox" class="fold-card">
+    <div class="section">
+      <h2><button type="button" id="text-toggle" data-fold="text"
+                  aria-expanded="false" aria-controls="text-settings"><svg
+        class="twist" viewBox="0 0 16 16" aria-hidden="true"><path
+        d="M6 3.2 11.2 8 6 12.8"/></svg>Text</button></h2>
+      <div class="fold-quick">
+        <!-- Which specimen is in the box. Custom comes first and holds whatever
+             you type, so choosing a language never costs you your own text and
+             switching back returns it. The languages are filled in from
+             /defaults, in the order the server lists them: a specimen you
+             cannot read says nothing about a font you are choosing. -->
+        <label class="fold-field" for="sample"><span>sample</span>
+          <select id="sample" aria-label="which sample text to show"
+                  title="Which sample is in the box. Custom keeps whatever you type.">
+            <option value="">Custom</option></select>
+        </label>
+      </div>
     </div>
-    <textarea name="text" form="knobs" data-group="root"></textarea>
-    <!-- Said only when there is something to say. A glyph nobody has takes no
-         width at all on the device, so a paragraph of them is blank space and
-         not a row of boxes: without this line, picking a language the family
-         cannot set looks like a page that failed to draw. -->
-    <div id="undrawn" class="hint warn" hidden></div>
-    <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
-      <code>*_both_*</code>. A face the font does not carry falls back to
-      regular, as it would on the device.</div>
-    <div id="status" class="mono">—</div>
+    <div id="text-settings">
+      <textarea name="text" form="knobs" data-group="root"></textarea>
+      <!-- Said only when there is something to say. A glyph nobody has takes no
+           width at all on the device, so a paragraph of them is blank space and
+           not a row of boxes: without this line, picking a language the family
+           cannot set looks like a page that failed to draw. -->
+      <div id="undrawn" class="hint warn" hidden></div>
+      <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
+        <code>*_both_*</code>. A face the font does not carry falls back to
+        regular, as it would on the device.</div>
+      <div id="status" class="mono">—</div>
+    </div>
   </div>
 
   <!-- What this install is, at the foot of the middle column. This is the one

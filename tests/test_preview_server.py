@@ -852,6 +852,21 @@ def test_every_fold_has_a_heading_that_opens_it():
             f"the {name} heading does not say what it controls"
 
 
+
+def test_folded_text_keeps_the_sample_picker_in_its_heading():
+    """The picker remains usable while the text and its notes are hidden."""
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    island = html.index('id="textbox"')
+    toggle = html.index('id="text-toggle"', island)
+    picker = html.index('id="sample"', toggle)
+    settings = html.index('id="text-settings"', picker)
+    textarea = html.index("<textarea", settings)
+
+    assert island < toggle < picker < settings < textarea
+
+
 def test_what_boot_reads_is_what_the_modules_write():
     """boot.js restores both of these before the first paint, and a module
     writes each one after a press. Two files per key, and the failure when they
@@ -972,7 +987,7 @@ def test_common_device_controls_remain_available_while_folded():
     from crossglyph.preview import server
 
     html = (server.STATIC / "index.html").read_text(encoding="utf-8")
-    preview = html.index('<div id="device-preview">')
+    preview = html.index('id="device-preview"')
     settings = html.index('<div id="device-settings">', preview)
     folded = html[preview:settings]
     for control in ("device-model", "device-color", "device-frame-shown"):

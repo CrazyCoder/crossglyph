@@ -17,8 +17,7 @@
     (choice === "system" &&
      matchMedia("(prefers-color-scheme: dark)").matches));
 
-  // Named one by one, and folded unless named. Both of these are settings
-  // somebody reaches for rarely, where the rows around them are what a session
-  // is actually for.
+  // Named one by one and folded unless named. The same list covers settings
+  // sections and the cards under the rendered page.
   document.documentElement.dataset.folds = remembered("crossglyph.folds", "");
 })();

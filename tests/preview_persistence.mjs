@@ -706,9 +706,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     progress: progressRow(),
     "tab-tune": pressStub("tune"),
     "tab-export": pressStub("export"),
-    // The two headings that fold the section under them.
+    // The headings that fold the section or card under them.
     "page-toggle": Object.assign(pressStub("page"), {dataset: {fold: "page"}}),
     "mod-toggle": Object.assign(pressStub("mod"), {dataset: {fold: "mod"}}),
+    "text-toggle": Object.assign(pressStub("text"), {dataset: {fold: "text"}}),
     "mod-dot": { hidden: true },
     // What a build leaves on the tab it ran behind.
     "tab-busy": { hidden: true },
@@ -836,7 +837,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       querySelectorAll: (selector) => {
         if (selector === "[data-fold]") {
           return [stubs["page-toggle"], stubs["mod-toggle"],
-                  stubs["device-toggle"]];
+                  stubs["device-toggle"], stubs["text-toggle"]];
         }
         if (selector === "[data-device-setting]") return deviceSettings;
         const deviceFor = selector.match(/^\[data-for="([^"]+)"\]$/)?.[1];
@@ -1079,8 +1080,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                    busy: stubs["tab-busy"],
                    press: (which) => presses[which]() },
            fold: { page: stubs["page-toggle"], mod: stubs["mod-toggle"],
-                   device: stubs["device-toggle"], dot: stubs["mod-dot"],
-                   press: (which) => presses[which]() },
+                   device: stubs["device-toggle"], text: stubs["text-toggle"],
+                   dot: stubs["mod-dot"], press: (which) => presses[which]() },
            progress: stubs.progress, bar: stubs.progress.bar,
            barFill: stubs.progress.fill,
            progressWhat: stubs.progress.what,
@@ -3945,20 +3946,30 @@ for (const { name, text } of sources) {
         String(env.tabs.busy.hidden));
 }
 
-// 60. The page settings fold away. They are the reader's own device settings,
-//     set once to match the device being judged against and then left, where
-//     everything above them is what a tuning session is for. The fold is
-//     written down: one that opens again on the next reload has saved nobody
-//     anything. Like the tabs, the attribute is on the root and the stylesheet
-//     does the folding -- which is what lets boot.js put it there before the
-//     first paint, rather than the section opening and shutting on every load.
+// 60. Folded sections open independently and remember that choice. The root
+//     attribute and stylesheet do the folding, which lets boot.js restore it
+//     before the first paint rather than flashing hidden content on every load.
 {
   const storage = fakeStorage();
   const env = await loaded(storage);
-  check("both headings say what the root says",
-        env.fold.page.attrs["aria-expanded"] === "false"
-        && env.fold.mod.attrs["aria-expanded"] === "false",
-        JSON.stringify([env.fold.page.attrs, env.fold.mod.attrs]));
+  check("all headings say what the root says",
+        env.fold.page.attrs["aria-expanded"] === "false" &&
+        env.fold.mod.attrs["aria-expanded"] === "false" &&
+        env.fold.device.attrs["aria-expanded"] === "false" &&
+        env.fold.text.attrs["aria-expanded"] === "false",
+        JSON.stringify([env.fold.page.attrs, env.fold.mod.attrs,
+                        env.fold.device.attrs, env.fold.text.attrs]));
+
+  env.fold.press("text");
+  check("the Text press opens its card", env.root.dataset.folds === "text",
+        env.root.dataset.folds);
+  check("the Text heading says so where a screen reader hears it",
+        env.fold.text.attrs["aria-expanded"] === "true",
+        env.fold.text.attrs["aria-expanded"]);
+  check("the Text fold is written down",
+        storage.data["crossglyph.folds"] === "text",
+        storage.data["crossglyph.folds"]);
+  env.fold.press("text");
 
   env.fold.press("page");
   check("a press opens that one", env.root.dataset.folds === "page",
@@ -3966,7 +3977,7 @@ for (const { name, text } of sources) {
   check("and says so where a screen reader hears it",
         env.fold.page.attrs["aria-expanded"] === "true",
         env.fold.page.attrs["aria-expanded"]);
-  check("and it is written down", storage.data["crossglyph.folds"] === "page",
+  check("and says so in storage", storage.data["crossglyph.folds"] === "page",
         storage.data["crossglyph.folds"]);
 
   env.fold.press("mod");

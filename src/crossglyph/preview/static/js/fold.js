@@ -1,8 +1,6 @@
-// Which sections are open. Both of them -- the page settings and the second
-// family -- are things you set once and leave, where the rows around them are
-// what a session is actually for, so they fold and start folded. The fold is
-// remembered: one that opens again on the next reload has saved nobody
-// anything.
+// Which sections are open. Folded sections start shut, and a section somebody
+// opened stays open on reload. The remembered list is shared because each card
+// opens and closes independently.
 //
 // The open ones are named in an attribute on the root and the stylesheet does
 // the folding, which is what lets boot.js put it there before the first paint.

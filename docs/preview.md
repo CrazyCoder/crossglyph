@@ -447,9 +447,13 @@ milliseconds. The page prints the elapsed time under the image.
 
 ## The sample text
 
-The picker over the text box holds one preset per language, and the page opens
-on one the browser says you read. A specimen you cannot read says nothing about
-a font you are choosing.
+The **Text** card starts folded and remembers whether it is open. Its language
+picker stays in the heading, so changing the specimen does not require opening
+the text and its notes.
+
+The picker holds one preset per language, and the page opens on one the browser
+says you read. A specimen you cannot read says nothing about a font you are
+choosing.
 
 Each preset is the pangram the device itself shows under Settings > Font,
 Article 1 of the Universal Declaration of Human Rights in that language, and a
