@@ -965,6 +965,28 @@ def test_every_asset_the_page_asks_for_is_one_the_server_will_serve():
             f"the server will not serve {ref}"
 
 
+def test_common_device_controls_remain_available_while_folded():
+    """The folded island keeps its common choices and hides only advanced ones."""
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    preview = html.index('<div id="device-preview">')
+    settings = html.index('<div id="device-settings">', preview)
+    folded = html[preview:settings]
+    for control in ("device-model", "device-color", "device-frame-shown"):
+        assert f'id="{control}"' in folded, control
+    for control in ("device-scale", "device-paper", "device-ink"):
+        assert f'id="{control}"' not in folded, control
+
+    frame = re.search(
+        r'<label class="device-frame-toggle".*?</label>', folded, re.S)
+    assert frame is not None
+    assert "<svg " in frame.group()
+    assert 'aria-label="Show reader frame"' in frame.group()
+
+
 def test_a_checkbox_knob_is_marked_rather_than_given_an_arrow():
     """The arrow sets a value aside so you can flick back to it. A switch has
     nothing to set aside -- the value it is not showing is the other one, one

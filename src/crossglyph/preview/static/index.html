@@ -394,12 +394,7 @@
           Paper and ink remap the four display levels without rerendering the
           font. Calibrate again after moving the window to another monitor.</span></span>
       </h2>
-      <button type="button" class="clear" id="reset-device"
-              title="Reset device preview"
-              aria-label="reset device preview">&#215;</button>
-    </div>
-    <div id="device-settings">
-      <div class="device-controls">
+      <div class="device-quick">
         <label class="device-field" for="device-model"><span>device</span>
           <select id="device-model" name="device" data-group="page"
                   data-device-setting form="knobs">
@@ -413,11 +408,24 @@
             <option value="white">white</option>
           </select>
         </label>
+        <label class="device-frame-toggle" for="device-frame-shown"
+               title="Show the selected reader body around its screen">
+          <input id="device-frame-shown" type="checkbox"
+                 aria-label="Show reader frame" data-device-setting checked>
+          <svg viewBox="0 0 18 18" aria-hidden="true">
+            <rect x="3" y="1.5" width="12" height="15" rx="1.8"/>
+            <rect x="5" y="3.5" width="8" height="9.5" rx=".6"/>
+            <path d="M7 14.7h4"/>
+          </svg>
+        </label>
+      </div>
+      <button type="button" class="clear" id="reset-device"
+              title="Reset device preview"
+              aria-label="reset device preview">&#215;</button>
+    </div>
+    <div id="device-settings">
+      <div class="device-controls">
         <div class="device-options">
-          <label class="device-check" for="device-frame-shown"
-                 title="Show the selected reader body around its screen">
-            <input id="device-frame-shown" type="checkbox"
-                   data-device-setting checked>frame</label>
           <label for="device-scale">scale</label>
           <select id="device-scale" data-device-setting>
             <option value="pixels" selected>1:1 pixels</option>

@@ -593,9 +593,9 @@
     border-radius: 10px; padding: .1rem 1rem 1rem;
   }
 
-  /* One folded card under the device. It stays compact when open: controls
-     wrap by available width instead of reserving the panel's four-column knob
-     grid, and explanations live behind the heading's help badge. */
+  /* One folded card under the device. Its common choices stay in the heading,
+     where the folded card already has room for them. Opening the card reveals
+     only the scale and tone controls that need more explanation and width. */
   #device-preview {
     width: 100%; padding: .1rem .8rem .5rem;
     background: var(--panel); border: 1px solid var(--line);
@@ -603,36 +603,56 @@
   }
   :root:not([data-folds~="device"]) #device-preview { padding-bottom: .1rem; }
   #device-preview .section {
-    border-top: 0; padding: .35rem 0 .25rem;
+    border-top: 0; gap: .35rem; padding: .35rem 0 .25rem;
   }
-  .device-controls {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .35rem .55rem; padding: .15rem 0 .4rem;
+  #device-preview .section h2 { min-width: max-content; }
+  .device-quick {
+    display: flex; align-items: center; gap: .35rem; margin-left: auto;
   }
-  .device-field {
-    display: grid; gap: .15rem; min-width: 0;
+  .device-field { display: block; min-width: 0; }
+  .device-field > span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
   }
-  .device-field > span, .device-options > label:not(.device-check),
-  .device-tones > label {
-    color: var(--muted); font-size: 10px;
-    text-transform: uppercase; letter-spacing: .08em;
+  .device-quick select {
+    width: auto; min-width: 0; height: 1.55rem;
+    padding: .12rem 1.3rem .12rem .35rem; font-size: 10.5px;
   }
-  .device-field select {
-    width: 100%; min-width: 0; padding: .18rem .3rem; font-size: 11px;
+  #device-model { width: 4rem; }
+  #device-color { width: 5rem; }
+  .device-frame-toggle {
+    position: relative; width: 1.55rem; height: 1.55rem; flex: none;
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--muted); background: var(--field);
+    border: 1px solid var(--line); border-radius: 4px;
   }
+  .device-frame-toggle:hover { color: var(--text); background: var(--hover); }
+  .device-frame-toggle:has(input:checked) {
+    color: var(--panel); background: var(--knob); border-color: var(--knob);
+  }
+  .device-frame-toggle:has(input:focus-visible) {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+  .device-frame-toggle input {
+    position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer;
+  }
+  .device-frame-toggle svg {
+    width: 14px; height: 14px; pointer-events: none;
+    fill: none; stroke: currentColor; stroke-width: 1.25;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .device-controls { padding: .15rem 0 .4rem; }
   .device-options {
-    grid-column: 1 / -1; display: grid;
-    grid-template-columns: auto auto minmax(5.5rem, 1fr) auto;
+    display: grid; grid-template-columns: auto minmax(5.5rem, 1fr) auto;
     align-items: center; gap: .35rem .45rem;
   }
-  #device-scale { width: 100%; min-width: 0; padding: .18rem .3rem;
-                  font-size: 11px; }
-  .device-check {
-    display: inline-flex; align-items: center; gap: .3rem; cursor: pointer;
+  .device-options > label, .device-tones > label {
     color: var(--muted); font-size: 10px;
     text-transform: uppercase; letter-spacing: .08em;
   }
-  .device-check input { margin: 0; }
+  #device-scale {
+    width: 100%; min-width: 0; padding: .18rem .3rem; font-size: 11px;
+  }
   #device-calibrate { padding: .18rem .45rem; font-size: 10.5px; }
   .device-tones {
     display: grid;

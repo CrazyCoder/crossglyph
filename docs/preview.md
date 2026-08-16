@@ -236,9 +236,11 @@ white can read heavy in white on black.
 
 The **Device preview** under the page puts the rendered screen into an X3 or
 X4 body. It starts folded. X4 is the default; choosing X3 redraws at its native
-528 by 792 pixels instead of resizing the X4's 480 by 800 output. **Color**
-selects the black or white body, and **Frame** removes the body while keeping
-the selected screen proportions and rounded corners.
+528 by 792 pixels instead of resizing the X4's 480 by 800 output. The body
+color follows the page's light or dark appearance until you select black or
+white. That choice is remembered independently from the page appearance. The
+reader icon removes the body while keeping the selected screen proportions and
+rounded corners.
 
 **Paper** and **Ink** remap the panel's four levels without rebuilding the
 font. Both run from 0% to 100% in the direction their labels imply: more paper

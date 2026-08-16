@@ -1,6 +1,6 @@
 import {showAbout} from "./about.js";
 import {familyPicker} from "./family.js";
-import {loadDevice, wireDevice} from "./device.js";
+import {loadDevice, syncDeviceColor, wireDevice} from "./device.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
         wireBuildButtons} from "./export.js";
@@ -11,6 +11,7 @@ import {wireResets} from "./resets.js";
 import {refreshReverts} from "./reverts.js";
 import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
 import {wireUntuned} from "./untuned.js";
+import {systemDark, themeButtons} from "./theme.js";
 import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 
 // Every listener that reaches across modules, in one place and after all of
@@ -21,6 +22,10 @@ import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 wireKnobs();
 wireRender();
 wireDevice(scheduleRender);
+for (const button of themeButtons) {
+  button.addEventListener("click", syncDeviceColor);
+}
+systemDark.addEventListener("change", syncDeviceColor);
 wireResets();
 wireUntuned();
 wireBuildButtons();

@@ -807,6 +807,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
+  const root = makeElement();
+  root.dataset.appearance = "system";
   const sandbox = {
     ...HOST,
     document: {
@@ -829,10 +831,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       //: Whether the tab is in the background. The page asks before it
       //: re-reads the folder, so a hidden one has to be able to say yes.
       hidden: false,
-      documentElement: {
-        dataset: { appearance: "system" },
-        classList: { toggle() {} },
-      },
+      documentElement: root,
       title: "",
     },
     // Coming back to the page is two different events -- a tab switch is the
@@ -1081,6 +1080,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              calibrationValue: stubs["device-calibration-value"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
+             change(control) { control.on.change(); },
              calibrate() { presses["device-calibrate"](); },
              reset() { clicks["reset-device"](); },
            },
@@ -4107,6 +4107,56 @@ for (const { name, text } of sources) {
         JSON.stringify(env.fetches.bodies.at(-1).axes));
 }
 
+// Frame color follows the page until the picker records a choice of its own.
+// Saving another device setting must not turn the derived color into a choice.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage);
+  const device = env.modules.get("device.js");
+  check("a light page starts with the white reader frame",
+        env.device.color.value === "white", env.device.color.value);
+
+  env.device.frame.checked = false;
+  env.device.edit(env.device.frame);
+  check("saving another device setting leaves frame color automatic",
+        !("color" in JSON.parse(storage.data["crossglyph.device"])),
+        storage.data["crossglyph.device"]);
+
+  env.root.classList.toggle("dark", true);
+  device.syncDeviceColor();
+  check("automatic frame color follows the dark page",
+        env.device.color.value === "black", env.device.color.value);
+
+  env.device.color.value = "white";
+  env.device.change(env.device.color);
+  check("a chosen frame color is remembered",
+        JSON.parse(storage.data["crossglyph.device"]).color === "white",
+        storage.data["crossglyph.device"]);
+  device.syncDeviceColor();
+  check("a chosen frame color can differ from the page",
+        env.device.color.value === "white", env.device.color.value);
+}
+
+// A model chosen through the select must survive a fresh page load, not only
+// write a value that no later page is known to consume.
+{
+  const storage = fakeStorage();
+  const first = await loaded(storage);
+  first.device.model.value = "x3";
+  first.device.change(first.device.model);
+  await settle();
+  check("the chosen reader model is saved",
+        JSON.parse(storage.data["crossglyph.device"]).device === "x3",
+        storage.data["crossglyph.device"]);
+
+  const reloaded = await loaded(storage);
+  check("the chosen reader model survives a page reload",
+        reloaded.device.model.value === "x3", reloaded.device.model.value);
+  check("the reloaded page draws with the chosen reader model",
+        reloaded.fetches.bodies.at(-1).page.device === "x3",
+        JSON.stringify(reloaded.fetches.bodies.at(-1).page));
+}
+
 // The device panel owns presentation settings, while its model also changes
 // the render core's native page geometry.
 {
@@ -4136,7 +4186,7 @@ for (const { name, text } of sources) {
         env.device.inkValue.value === "100%", env.device.inkValue.value);
 
   env.device.model.value = "x4";
-  env.device.edit(env.device.model);
+  env.device.change(env.device.model);
   await settle();
   check("changing reader redraws with its native geometry",
         env.fetches.bodies.at(-1).page.device === "x4",
@@ -4148,7 +4198,7 @@ for (const { name, text } of sources) {
   await settle();
   check("reset device preview restores its declared defaults",
         env.device.model.value === "x4" &&
-        env.device.color.value === "black" &&
+        env.device.color.value === "white" &&
         env.device.frame.checked &&
         env.device.scale.value === "pixels" &&
         env.device.paper.value === "84" && env.device.ink.value === "80");

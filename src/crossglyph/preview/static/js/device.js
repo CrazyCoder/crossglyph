@@ -60,6 +60,18 @@ function frameUrl() {
   return `device/${model.value}-${color.value}.png`;
 }
 
+let fixedColor = false;
+
+function themeColor() {
+  return document.documentElement.classList.contains("dark") ? "black" : "white";
+}
+
+export function syncDeviceColor() {
+  if (fixedColor) return;
+  color.value = themeColor();
+  layoutDevice();
+}
+
 function fitFactor(device, shown) {
   const width = shown ? device.frame.width : device.aperture.width;
   const height = shown ? device.frame.height : device.aperture.height;
@@ -177,11 +189,12 @@ function syncReadouts() {
 }
 
 function values() {
-  return {
-    device: model.value, color: color.value, frame: frameShown.checked,
-    scale: scale.value, paper: paper.value, ink: ink.value,
-    calibration: calibrationRange.value,
+  const state = {
+    device: model.value, frame: frameShown.checked, scale: scale.value,
+    paper: paper.value, ink: ink.value, calibration: calibrationRange.value,
   };
+  if (fixedColor) state.color = color.value;
+  return state;
 }
 
 function saveDevice() {
@@ -193,13 +206,17 @@ function validOption(select, value) {
 }
 
 export function loadDevice() {
+  fixedColor = false;
   const raw = attempt(() => localStorage.getItem(DEVICE_STORE), null);
   if (raw) {
     let saved = null;
     try { saved = JSON.parse(raw); } catch {}
     if (saved && typeof saved === "object") {
       if (validOption(model, saved.device)) model.value = saved.device;
-      if (validOption(color, saved.color)) color.value = saved.color;
+      if (validOption(color, saved.color)) {
+        color.value = saved.color;
+        fixedColor = true;
+      }
       if (validOption(scale, saved.scale)) scale.value = saved.scale;
       if (typeof saved.frame === "boolean") frameShown.checked = saved.frame;
       for (const [control, value] of [[paper, saved.paper], [ink, saved.ink],
@@ -210,6 +227,7 @@ export function loadDevice() {
       }
     }
   }
+  if (!fixedColor) color.value = themeColor();
   syncReadouts();
   layoutDevice();
 }
@@ -228,6 +246,8 @@ function resetDevice(scheduleRender) {
       control.value = control.defaultValue;
     }
   }
+  fixedColor = false;
+  color.value = themeColor();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncReadouts();
   paintDevicePage();
@@ -236,12 +256,17 @@ function resetDevice(scheduleRender) {
 }
 
 export function wireDevice(scheduleRender) {
-  model.addEventListener("input", () => {
+  model.addEventListener("change", () => {
     saveDevice();
     layoutDevice();
     scheduleRender();
   });
-  for (const control of [color, frameShown, scale]) {
+  color.addEventListener("change", () => {
+    fixedColor = true;
+    saveDevice();
+    layoutDevice();
+  });
+  for (const control of [frameShown, scale]) {
     control.addEventListener("input", () => {
       saveDevice();
       layoutDevice();
