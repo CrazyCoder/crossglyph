@@ -327,6 +327,11 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, capsys, monkeypatch):
 
     Runs against the checkout rather than a release, so `command()` resolves
     to this interpreter and the child is the code under test.
+
+    The root is this test's own directory rather than the checkout, because
+    the root is where the log is written and `spawn` truncates it: two tests
+    sharing one would have each emptying the other's log mid-run. The
+    workspace the server reads is CROSSGLYPH_HOME, which stays the checkout.
     """
     monkeypatch.setenv("CROSSGLYPH_HOME", str(REPO))
     # Armed for real: every probe below goes through the opener, and one that
@@ -340,10 +345,10 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, capsys, monkeypatch):
     opts = daemon.parse(["--port", str(port), "--no-open"], "start")
     daemon.settle(opts, None)
 
-    assert daemon.start(REPO, opts) == 0
+    assert daemon.start(tmp_path, opts) == 0
     said = capsys.readouterr().out
     try:
-        state, body = daemon.look(REPO)
+        state, body = daemon.look(tmp_path)
         assert state.port == port
         assert body["version"]
         # The server's own pid, not the one that was spawned. On Windows uv's
@@ -353,11 +358,11 @@ def test_a_real_server_starts_reports_and_stops(tmp_path, capsys, monkeypatch):
         # And the one the start printed, or `status` names a different process
         # a moment later and neither line can be trusted.
         assert f"pid {state.pid}" in said
-        assert daemon.status(REPO) == 0
+        assert daemon.status(tmp_path) == 0
     finally:
-        assert daemon.stop(REPO) == 0
-    assert daemon.look(REPO) == (None, None)
-    assert daemon.status(REPO) == 1
+        assert daemon.stop(tmp_path) == 0
+    assert daemon.look(tmp_path) == (None, None)
+    assert daemon.status(tmp_path) == 1
 
 
 def test_a_port_somebody_else_holds_is_refused_before_spawning(tmp_path,
@@ -474,17 +479,22 @@ def test_the_server_reports_its_own_pid():
 def test_the_log_can_be_read_while_the_server_is_still_up(tmp_path,
                                                           monkeypatch):
     """Python block-buffers stdout to a file, so without PYTHONUNBUFFERED the
-    log fills only at exit, which is the one moment nobody needs it."""
+    log fills only at exit, which is the one moment nobody needs it.
+
+    Its own root, for the reason the test above gives: the log this reads is
+    the one `spawn` truncates, so sharing a root with another spawning test
+    means reading an empty file whenever the two overlap.
+    """
     monkeypatch.setenv("CROSSGLYPH_HOME", str(REPO))
     monkeypatch.setattr(daemon, "state_path",
                         lambda root: tmp_path / daemon.STATE_NAME)
     opts = daemon.parse(["--port", str(free_port()), "--no-open"], "start")
     daemon.settle(opts, None)
-    assert daemon.start(REPO, opts) == 0
+    assert daemon.start(tmp_path, opts) == 0
     try:
-        assert "preview on" in daemon.log_tail(REPO)
+        assert "preview on" in daemon.log_tail(tmp_path)
     finally:
-        daemon.stop(REPO)
+        daemon.stop(tmp_path)
 
 
 def test_a_restart_with_nothing_running_is_a_start(tmp_path, monkeypatch):
