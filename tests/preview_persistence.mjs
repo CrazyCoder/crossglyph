@@ -718,13 +718,15 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { if (kind === "click") this.fire = fn; },
     },
   };
-  const fetches = { render: 0, checks: 0, applies: 0, defaults: 0, bodies: [],
-                    saves: [], builds: [], fallbacks: [] };
+  const fetches = { render: 0, checks: 0, applies: 0, defaults: 0,
+                    updateReads: 0, bodies: [], saves: [], builds: [],
+                    fallbacks: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
   let answer = true;
   const keys = [], keyups = [], returns = [];
+  let reloads = 0;
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
   };
@@ -758,6 +760,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     window: {
       addEventListener(kind, fn) { if (kind === "focus") returns.push(fn); },
     },
+    location: { reload() { reloads++; } },
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     createElement: () => ({ dataset: {}, style: {}, textContent: "", title: "" }),
     // The family-switch guard. Answering yes by default keeps every older
@@ -914,7 +917,16 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         }) } });
       }
       if (String(url).includes("/update")) {
-        return Promise.resolve({ json: () => Promise.resolve(
+        fetches.updateReads++;
+        const answers = opts.restartAnswers;
+        if (answers && fetches.updateReads > 1) {
+          const answer = answers[Math.min(
+            fetches.updateReads - 2, answers.length - 1)];
+          if (answer instanceof Error) return Promise.reject(answer);
+          return Promise.resolve({
+            ok: true, json: () => Promise.resolve(answer) });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(
           { ...ABOUT, ...(opts.about ?? {}) }) });
       }
       // The folder as it is now. `later` is what a second ask gets, which is
@@ -954,6 +966,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     console,
   };
   return { form, listeners, sandbox, byName, clicks, sliderList, fetches,
+           reloads: () => reloads,
            //: Come back to the page, as either event does.
            returning: () => { for (const fn of returns) fn(); },
            revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
@@ -3487,7 +3500,7 @@ for (const { name, text } of sources) {
         JSON.stringify(env.progressWhat.steps));
   check("the sentence says what to do next",
         env.about.updated.textContent ===
-          "2.0.0 installed. Restart CrossGlyph to use it.",
+          "2.0.0 installed. Close CrossGlyph and open it again to use the update.",
         env.about.updated.textContent);
   check("the line beside the version says it landed",
         env.about.state.textContent === "2.0.0 installed.",
@@ -3499,9 +3512,40 @@ for (const { name, text } of sources) {
   check("the button went out and came back",
         JSON.stringify(env.about.update.states) === "[true,false]",
         JSON.stringify(env.about.update.states));
+  check("a server that cannot hand itself off does not promise a reload",
+        env.reloads() === 0, String(env.reloads()));
 }
 
-// 58h1. A reload is told as much, and so is a second browser. What a restart
+// 58h1. A local running preview can hand the update to the installed version.
+//        The port disappears between processes, so polling tolerates a failed
+//        request and reloads only after that version answers.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, {
+    about: { available: "2.0.0", latest: "2.0.0" },
+    updateSteps: [
+      { event: "done", version: "2.0.0", converting: false, kept: [],
+        staged: [], where: "versions/2.0.0", restarting: true },
+    ],
+    restartAnswers: [
+      new TypeError("Failed to fetch"),
+      { ...ABOUT, version: "2.0.0", installed: "2.0.0" },
+    ],
+  });
+
+  await env.about.apply();
+
+  check("the page says the automatic restart is in progress",
+        env.about.updated.textContent ===
+          "2.0.0 installed. Restarting CrossGlyph...",
+        env.about.updated.textContent);
+  check("the vanished server is tried again",
+        env.fetches.updateReads === 3, String(env.fetches.updateReads));
+  check("the new version causes exactly one reload",
+        env.reloads() === 1, String(env.reloads()));
+}
+
+
+// 58h2. A reload is told as much, and so is a second browser. What a restart
 //       would run is read off the disk by the server, so the answer does not
 //       live in the page that pressed the button -- and an update done from
 //       the command line, while this page sat open, reaches it too.
@@ -3516,7 +3560,7 @@ for (const { name, text } of sources) {
         `update ${env.about.update.hidden}, check ${env.about.button.hidden}`);
 }
 
-// 58h0. And a check afterwards does not offer it again. This process is still
+// 58h3. And a check afterwards does not offer it again. This process is still
 //       the old version, so the manifest goes on looking newer to it for as
 //       long as it runs -- the page is the only thing that knows the release
 //       is already on the disk.

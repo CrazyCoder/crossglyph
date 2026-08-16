@@ -215,17 +215,14 @@ def alive(pid: int) -> bool:
 
 
 def command(root: pathlib.Path) -> list[str]:
-    """What to run for a background start, in the order that keeps updates working.
+    """What starts the current version during an ordinary background start.
 
-    The current version's own interpreter first, since that is what makes
-    `restart` land on a release installed since this process started. A
-    version that has never run has no `.venv` yet and only the launcher can
-    make one, because the launcher is what calls uv; that costs a sync once,
-    and every start after it takes the first line again.
-
-    `-m crossglyph` rather than the `crossglyph` console script: on Windows an
-    update replaces that shim while it is running, and a module inside the
-    package being started is not a file anything has to write over.
+    An environment that already exists is the shortest path and avoids the
+    console-script shim, which an update may replace while it is running. A
+    version that has never run normally goes through the root launcher so uv
+    can create that environment. The update handoff below deliberately uses
+    the new version's own uv wrapper instead: a foreground Windows launcher
+    may still be paused around the old Python process.
     """
     name = layout.current(root)
     if name:
@@ -240,6 +237,21 @@ def command(root: pathlib.Path) -> list[str]:
     return [sys.executable, "-m", "crossglyph"]
 
 
+def handoff_command(root: pathlib.Path, target: str) -> list[str] | None:
+    """Bootstrap `target` without touching a root launcher that may be live."""
+    directory = layout.version_dir(root, target)
+    python = directory / VENV_PYTHON
+    if python.is_file():
+        return [str(python), "-m", "crossglyph", "restart", "--no-open"]
+    uv = directory / "tools" / "uv.cmd"
+    if not uv.is_file():
+        return None
+    runner = ["cmd", "/c", str(uv)] if os.name == "nt" \
+        else ["/bin/sh", str(uv)]
+    return [*runner, "run", "--project", str(directory),
+            "crossglyph", "restart", "--no-open"]
+
+
 #: What keeps the child alive after this command returns, and off the screen.
 #:
 #: On Windows that is CREATE_NO_WINDOW, and not DETACHED_PROCESS, which is the
@@ -251,6 +263,31 @@ def command(root: pathlib.Path) -> list[str]:
 DETACH: dict = {"creationflags": (subprocess.CREATE_NO_WINDOW
                                   | subprocess.CREATE_NEW_PROCESS_GROUP)} \
     if os.name == "nt" else {"start_new_session": True}
+
+
+def handoff(root: pathlib.Path, target: str,
+            state: State) -> subprocess.Popen | None:
+    """Let the installed version stop this preview and replace it.
+
+    The root launcher's staged copy stays beside it. On Windows the launcher
+    that started a foreground preview is a cmd.exe still waiting for Python;
+    replacing its script would make it resume at the same byte offset in
+    different bytes. The target's private wrapper is new and cannot be open.
+    It creates the target environment before `restart` asks this server to
+    stop, after which daemon.start finds that environment and bypasses the
+    root launcher again.
+    """
+    command = handoff_command(root, target)
+    if command is None:
+        return None
+    save(root, state)
+    env = dict(os.environ, PYTHONUNBUFFERED="1",
+               CROSSGLYPH_HOME=str(root))
+    env.setdefault("CROSSGLYPH_FONTS", str(root / "fonts"))
+    return subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, cwd=str(root),
+                            env=env, close_fds=True, **DETACH)
 
 
 def spawn(root: pathlib.Path, argv: list[str]) -> subprocess.Popen:

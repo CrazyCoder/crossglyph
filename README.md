@@ -60,7 +60,9 @@ written over it.
 
 CrossGlyph looks for a newer release about once a day and says so when there
 is one. `crossglyph update`, or the button in the preview, installs it beside
-the version you are on and leaves your fonts and your settings alone;
+the version you are on and leaves your fonts and your settings alone. A local
+preview restarts on the new version and reloads the page; a command-line
+update waits for you to close CrossGlyph and open it again.
 `crossglyph update --rollback` goes back. Nothing is downloaded or installed
 until you ask, and one line in `update.conf` turns the looking off. See
 [docs/updating.md](docs/updating.md).

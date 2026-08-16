@@ -1829,12 +1829,16 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
             served["config"] = config
 
         def run(self):
+            served["state"] = server._restart_state
             served["ran"] = True
 
     monkeypatch.setattr("uvicorn.Server", Uvicorn)
     assert server.main(["--no-open"]) == 0
     assert served["ran"] and served["config"].host == "127.0.0.1"
     assert server._family in {"Probe", "Filler"}
+    assert "--family" in served["state"].rest
+    assert served["state"].port == 8000
+    assert server._restart_state is None
 
 
 def test_ctrl_c_stops_the_preview_without_a_traceback(two_families,
@@ -2420,6 +2424,39 @@ def test_applying_streams_a_line_at_a_time(client, monkeypatch):
                  {"event": "done", "version": "9.9.9", "kept": [], "staged": [],
                   "converting": False, "where": "versions/9.9.9"})
     assert [step["event"] for step in said] == ["plan", "step", "done"]
+    assert said[-1]["restarting"] is False
+
+
+def test_a_local_update_hands_the_running_preview_to_the_new_version(
+        monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from crossglyph import daemon
+    from crossglyph.preview import server
+
+    state = daemon.State(
+        pid=1234, host="127.0.0.1", port=8123,
+        rest=["--family", "notosans"], version="0.3.0", started=1.0)
+    handed = []
+    monkeypatch.setattr(server, "_restart_state", state)
+    monkeypatch.setattr(
+        server.upgrade, "steps",
+        lambda root: iter(({
+            "event": "done", "version": "9.9.9", "kept": [], "staged": [],
+            "converting": False, "where": "versions/9.9.9"},)))
+    monkeypatch.setattr(
+        server.daemon, "handoff_command",
+        lambda root, target: ["new-python", "-m", "crossglyph"])
+    monkeypatch.setattr(
+        server.daemon, "handoff",
+        lambda root, target, saved: handed.append((root, target, saved)))
+
+    with TestClient(server.app, client=("127.0.0.1", 55555)) as client:
+        said = [json.loads(line) for line in
+                client.post("/update").text.splitlines() if line]
+
+    assert said[-1]["restarting"] is True
+    assert handed == [(server.install.root(), "9.9.9", state)]
 
 
 def test_a_refusal_is_the_first_line_rather_than_a_status(client, monkeypatch):

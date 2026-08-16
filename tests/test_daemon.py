@@ -155,9 +155,54 @@ def test_a_release_starts_from_the_current_versions_own_python(tmp_path):
 
 
 def test_a_version_with_no_venv_yet_goes_through_the_launcher(tmp_path):
-    """An update unpacks the tree; only the launcher can call uv to fill it."""
+    """An ordinary first start goes through the launcher that calls uv."""
     a_release(tmp_path, "0.2.0", venv=False)
     assert str(tmp_path / daemon.LAUNCHER) in daemon.command(tmp_path)
+
+
+def test_update_handoff_uses_the_targets_private_python(tmp_path):
+    """The root launcher may be the batch file waiting on the old process."""
+    python = a_release(tmp_path, "0.2.0", venv=True)
+    assert daemon.handoff_command(tmp_path, "0.2.0") == [
+        str(python), "-m", "crossglyph", "restart", "--no-open"]
+
+
+def test_update_handoff_bootstraps_an_unopened_release_from_its_wrapper(
+        tmp_path):
+    a_release(tmp_path, "0.2.0", venv=False)
+    uv = tmp_path / "versions" / "0.2.0" / "tools" / "uv.cmd"
+    uv.parent.mkdir()
+    uv.write_text("", encoding="utf-8")
+
+    command = daemon.handoff_command(tmp_path, "0.2.0")
+
+    assert command is not None
+    assert str(uv) in command
+    expected = ["cmd", "/c"] if os.name == "nt" else ["/bin/sh", str(uv)]
+    assert command[:len(expected)] == expected
+    assert str(tmp_path / daemon.LAUNCHER) not in command
+    assert command[-4:] == [
+        str(tmp_path / "versions" / "0.2.0"),
+        "crossglyph", "restart", "--no-open"]
+
+
+def test_handoff_preserves_the_running_preview_for_restart(
+        tmp_path, monkeypatch):
+    a_release(tmp_path, "0.2.0", venv=True)
+    state = a_state(port=8123, rest=["--family", "notosans"])
+    launched = {}
+
+    def popen(command, **options):
+        launched.update(command=command, options=options)
+        return object()
+
+    monkeypatch.setattr(daemon.subprocess, "Popen", popen)
+    daemon.handoff(tmp_path, "0.2.0", state)
+
+    assert daemon.load(tmp_path) == state
+    assert launched["command"] == daemon.handoff_command(tmp_path, "0.2.0")
+    assert launched["options"]["cwd"] == str(tmp_path)
+    assert launched["options"]["env"]["CROSSGLYPH_HOME"] == str(tmp_path)
 
 
 def test_a_checkout_starts_from_the_interpreter_running_it(tmp_path):

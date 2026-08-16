@@ -22,6 +22,8 @@ const SHORT = 12;
 const MINUTE = 60, HOUR = 3600, DAY = 86400;
 
 const UNREACHABLE = "Could not reach the update server.";
+const RESTART_ATTEMPTS = 240;
+const RESTART_POLL_MS = 500;
 
 function count(value, unit) {
   return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
@@ -52,6 +54,7 @@ function checkedLine(about) {
 // the page that pressed the button; this holds it for the one moment the
 // server has not been asked again, which is the end of an update.
 let installed = null;
+let restartTarget = null;
 
 // Which leaves nothing to press. What is installed does not become what is
 // running until the tool is started again, and asking again can only find the
@@ -123,14 +126,40 @@ export function showUpdateStep(step) {
     installed = step.version;
     showInstalled();
     updateNote.textContent =
-      `${step.version} installed. Restart CrossGlyph to use it.` +
+      `${step.version} installed. ` +
+      (step.restarting
+        ? "Restarting CrossGlyph..."
+        : "Close CrossGlyph and open it again to use the update.") +
       keptLine(step.kept) +
       (step.staged.length
         ? ` ${step.staged.join(" and ")} will be replaced at the next launch.`
         : "") +
       (step.converting
         ? " The old source files at the root are no longer read." : "");
+    if (step.restarting) restartTarget = step.version;
   }
+}
+
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function waitForRestart(target) {
+  for (let attempt = 0; attempt < RESTART_ATTEMPTS; ++attempt) {
+    await pause(RESTART_POLL_MS);
+    try {
+      const response = await fetch("/update", {cache: "no-store"});
+      if (!response.ok) continue;
+      const next = await response.json();
+      if (next.version === target) {
+        globalThis.location.reload();
+        return;
+      }
+    } catch {
+      // The old server has stopped and the new one has not bound the port yet.
+    }
+  }
+  updateNote.textContent =
+    "The update is installed, but automatic restart did not finish. " +
+    "Close CrossGlyph and open it again to use the update.";
 }
 
 // Its own button, so this is a handle the module owns rather than a name
@@ -140,6 +169,7 @@ updateButton.addEventListener("click", async () => {
   // still looks pressable is one people press again, mid-swap.
   updateButton.disabled = true;
   updateNote.textContent = "";
+  restartTarget = null;
   progress.start("asking for the new release…");
   try {
     await streamInto("/update", {}, showUpdateStep, updateNote);
@@ -149,6 +179,7 @@ updateButton.addEventListener("click", async () => {
     progress.end();
     updateButton.disabled = false;
   }
+  if (restartTarget !== null) await waitForRestart(restartTarget);
 });
 
 button.addEventListener("click", () => {

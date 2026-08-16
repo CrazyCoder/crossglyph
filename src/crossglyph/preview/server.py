@@ -15,12 +15,18 @@ import json
 import os
 import pathlib
 import sys
+import time
 
 try:
     from fastapi import FastAPI, HTTPException, Request
-    from fastapi.responses import (FileResponse, JSONResponse, Response,
-                                   StreamingResponse)
+    from fastapi.responses import (
+        FileResponse,
+        JSONResponse,
+        Response,
+        StreamingResponse,
+    )
     from pydantic import BaseModel, Field
+    from starlette.background import BackgroundTask
 except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
     raise SystemExit(
         f"the preview needs its web dependencies ({exc.name}). Install them "
@@ -29,17 +35,43 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
 
-from .. import (fontbuild, fontconf, install, layout, updateconf, updates,
-                upgrade, version)
-from ..cpfont.convert import (BASE_INTERVALS, INTERVAL_PRESETS,
-                              FontBuildError, figure_glyph_overrides,
-                              gsub_ligature_sequences)
+from .. import (
+    daemon,
+    fontbuild,
+    fontconf,
+    install,
+    layout,
+    updateconf,
+    updates,
+    upgrade,
+    version,
+)
+from ..cpfont.convert import (
+    BASE_INTERVALS,
+    INTERVAL_PRESETS,
+    FontBuildError,
+    figure_glyph_overrides,
+    gsub_ligature_sequences,
+)
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing, stamp
-from . import (BOLD, BOLD_ITALIC, ITALIC, REGULAR, SAMPLE_TEXT, SAMPLES,
-               Drawable, PageSpec, build_font, coverage_for, faces_for,
-               fallback_split, page_codepoints, preview_page)
+from . import (
+    BOLD,
+    BOLD_ITALIC,
+    ITALIC,
+    REGULAR,
+    SAMPLE_TEXT,
+    SAMPLES,
+    Drawable,
+    PageSpec,
+    build_font,
+    coverage_for,
+    faces_for,
+    fallback_split,
+    page_codepoints,
+    preview_page,
+)
 
 app = FastAPI(title="CrossGlyph font preview")
 
@@ -1146,9 +1178,10 @@ def _startup(root: pathlib.Path) -> None:
     layout.tidy(root, updateconf.settings(root).keep_versions)
 
 
-#: The running uvicorn, so /shutdown has something to ask. Set by main(),
-#: which is why it is None under the test client and in --png runs.
+#: The running uvicorn and the command that can replace it. Both exist only
+#: while main() is inside Server.run(), not under the test client or in --png.
 _server = None
+_restart_state: daemon.State | None = None
 
 
 def _loopback(client: str) -> bool:
@@ -1190,20 +1223,41 @@ def shutdown(request: Request) -> dict:
 
 
 @app.post("/update")
-def update_apply() -> StreamingResponse:
-    """Install the newest release, saying how far it has got.
+def update_apply(request: Request) -> StreamingResponse:
+    """Install the newest release, then hand a local preview to that release.
 
     A line of JSON at a time, the way /build and /fallbacks answer, so the
     page reads it with the reader it already has and draws the bar it already
-    has. Nothing here decides whether the update is allowed: upgrade.steps
-    resolves the install kind and refuses as its first step, before it opens
-    the network.
+    has. upgrade.steps remains the one place that decides whether the update
+    is allowed. Restart is separate: it is offered only to a loopback browser
+    while a real server has enough state to reproduce itself.
     """
+    root = install.root()
+    state = _restart_state
+    local = _loopback(request.client.host if request.client else "")
+    target = None
+
     def lines():
-        for step in upgrade.steps(install.root()):
+        nonlocal target
+        for original in upgrade.steps(root):
+            step = original
+            if original.get("event") == "done":
+                version_name = original["version"]
+                can_restart = (local and state is not None
+                               and daemon.handoff_command(
+                                   root, version_name) is not None)
+                if can_restart:
+                    target = version_name
+                step = {**original, "restarting": can_restart}
             yield json.dumps(step) + "\n"
 
-    return StreamingResponse(lines(), media_type="application/x-ndjson")
+    def restart() -> None:
+        if target is not None and state is not None:
+            daemon.handoff(root, target, state)
+
+    return StreamingResponse(
+        lines(), media_type="application/x-ndjson",
+        background=BackgroundTask(restart))
 
 
 class OutRequest(BaseModel):
@@ -1492,6 +1546,21 @@ def _first_family() -> str | None:
     return configs[0].name if configs else None
 
 
+def _restart_rest(opts, source: pathlib.Path,
+                  family: str | None) -> list[str]:
+    """Preview arguments that remain valid from the install root."""
+    rest = ["--fonts", str(fontbuild.SOURCE_DIR.resolve())]
+    if family:
+        rest.extend(("--family", family))
+    else:
+        rest.extend(("--font", str(source.resolve())))
+    for name, flag in (("bold", "--bold"), ("italic", "--italic"),
+                       ("bold_italic", "--bold-italic")):
+        if value := getattr(opts, name):
+            rest.extend((flag, str(pathlib.Path(value).expanduser().resolve())))
+    return rest
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="crossglyph preview",
@@ -1593,14 +1662,14 @@ def main(argv=None) -> int:
 
     import uvicorn
 
+    root = install.root()
     # On a thread, so a slow or absent network and a large directory removal
-    # delay nothing anybody is waiting for. The page reads whatever the check
+    # delay nothing anybody is waiting on. The page reads whatever the check
     # has written by the time it asks, and picks the answer up on the next
     # load if it has not landed yet. Pruning is here rather than in the update
     # itself: at the moment the button is pressed, the version being replaced
     # is the one serving the page the press came from.
-    threading.Thread(target=_startup, args=(install.root(),),
-                     daemon=True).start()
+    threading.Thread(target=_startup, args=(root,), daemon=True).start()
     address = f"http://{opts.host}:{opts.port}"
     loaded = ", ".join(FACE_NAMES[style] for style in sorted(_sources))
     print(f"preview on {address}  ({source.name}: {loaded})")
@@ -1609,10 +1678,15 @@ def main(argv=None) -> int:
         # listening rather than racing it.
         threading.Timer(0.5, webbrowser.open, [address]).start()
     # Config and Server rather than uvicorn.run, which is the two of them and
-    # keeps neither: /shutdown needs the object to ask.
-    global _server
+    # keeps neither: /shutdown needs the object to ask. The restart state also
+    # makes a foreground preview reproducible by the detached update handoff.
+    global _server, _restart_state
     _server = uvicorn.Server(uvicorn.Config(
         app, host=opts.host, port=opts.port, log_level="warning"))
+    _restart_state = daemon.State(
+        pid=os.getpid(), host=opts.host, port=opts.port,
+        rest=_restart_rest(opts, source, family),
+        version=version.installed(), started=time.time())
     try:
         _server.run()
     except KeyboardInterrupt:
@@ -1620,4 +1694,7 @@ def main(argv=None) -> int:
         # graceful shutdown. uvicorn.run() catches it, but constructing the
         # Server here is what lets /shutdown address the live instance.
         pass
+    finally:
+        _server = None
+        _restart_state = None
     return 0

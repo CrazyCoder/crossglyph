@@ -75,24 +75,37 @@ reach the server, and a release you rolled back from.
 crossglyph update
 ```
 
-The **Update** button in the preview does the same thing, with a bar for the
-download.
+The **Update** button in a local preview downloads the release, installs it,
+restarts CrossGlyph on the same address and reloads the page after the new
+version answers. The port can disappear briefly between the two processes.
+The page waits through that gap rather than treating it as a failed update.
 
-It fetches the manifest, stops if there is nothing newer, downloads the
-release, checks it against the SHA-256 the manifest gave, unpacks it into
+`crossglyph update` does the same install from the command line, without
+restarting a process you may be using for something else.
+
+The updater fetches the manifest, stops if there is nothing newer, downloads
+the release, checks it against the SHA-256 the manifest gave, unpacks it into
 `versions/<new version>`, and writes that version into `current`.
 
 The version you were on stays where it is. `update.conf` and your `fonts`
 folder persist at the root, while the launcher and Docker configuration follow
-the rules below. What is installed does not become what the native launcher is
-running until you start CrossGlyph again.
+the rules below.
 
-The preview says so and stops offering the release, since it is already on the
-disk. That comes from the disk rather than from the page that pressed the
-button, so a reload, a second browser and an update run from the command line
-while the preview is open are all told the same thing: a server that goes on
-being the version it started as would otherwise find that release on every
-check and offer it again.
+If the preview cannot hand itself to the new version, it says to close
+CrossGlyph and open it again. This includes an update requested through a
+non-loopback address, because a remote page is not allowed to stop the server.
+The same instruction applies after `crossglyph update`. On that next launch,
+the native launcher runs the version named by `current`.
+
+Automatic handoff is a capability of the version that is running, not the one
+it has just downloaded. The first update from a release without that capability
+therefore asks you to close CrossGlyph and open it once. Later updates can
+restart in the page.
+
+The preview stops offering a release as soon as it is on disk. That fact comes
+from the disk rather than from the page that pressed the button, so a reload,
+a second browser and an update run from the command line while the preview is
+open are all told the same thing.
 
 An update interrupted anywhere leaves an install that still runs. The download
 goes to `versions/.tmp-<version>.zip` and the unpack to
