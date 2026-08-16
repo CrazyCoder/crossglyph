@@ -65,6 +65,16 @@ wrapper in the IntelliJ IDEA monorepo.
 
 Full text: https://www.apache.org/licenses/LICENSE-2.0
 
+## The device frames
+
+`src/crossglyph/preview/static/device/` contains geometry-normalized derivatives
+of the official XTEINK X3 and X4 front renderings.
+
+    Copyright XTEINK
+    All rights reserved.
+
+The device images are not licensed under CrossGlyph's MIT licence.
+
 ## The watermark bitmap
 
 `src/crossglyph/preview/server.py` carries the glyphs needed to render the

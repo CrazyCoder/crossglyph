@@ -1,5 +1,6 @@
 import {showAbout} from "./about.js";
 import {familyPicker} from "./family.js";
+import {loadDevice, wireDevice} from "./device.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
         wireBuildButtons} from "./export.js";
@@ -19,6 +20,7 @@ import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 // which cannot be.
 wireKnobs();
 wireRender();
+wireDevice(scheduleRender);
 wireResets();
 wireUntuned();
 wireBuildButtons();
@@ -41,6 +43,7 @@ function askAgain() {
 window.addEventListener("focus", askAgain);
 document.addEventListener("visibilitychange", askAgain);
 
+loadDevice();
 const remembered = loadPage();
 // Nothing has been set on this device, so the browser's own languages are the
 // best guess there is at which patterns to hyphenate with. Declared rather

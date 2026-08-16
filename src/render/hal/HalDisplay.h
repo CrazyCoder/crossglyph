@@ -17,46 +17,65 @@ class HalDisplay {
  public:
   enum RefreshMode { FULL_REFRESH, HALF_REFRESH, FAST_REFRESH };
 
-  // The framebuffer lives in a function-local static rather than a member.
-  //
-  // As a member of an `inline HalDisplay display;` it came out null in
-  // GfxRenderer's translation unit while being valid in api.cpp's -- so
-  // GfxRenderer::begin() captured nullptr, every pixel was dropped, and the
-  // only symptom was a blank image (the assert that would have caught it is
-  // compiled out at -O2). A function-local static inside an inline function is
-  // guaranteed to be one object across every translation unit, which is the
-  // property actually needed here.
+  // One fixed allocation sized for the larger X3 framebuffer. Changing the
+  // selected device changes only the active dimensions; the address stays
+  // stable, which is what GfxRenderer expects after begin().
+  static constexpr uint16_t X4_WIDTH = 800;
+  static constexpr uint16_t X4_HEIGHT = 480;
+  static constexpr uint16_t X3_WIDTH = 792;
+  static constexpr uint16_t X3_HEIGHT = 528;
+  static constexpr uint32_t MAX_BUFFER_SIZE =
+      X3_WIDTH / 8 * X3_HEIGHT;
+  // GfxRenderer uses these to initialize members before begin() replaces them
+  // with the active geometry.
+  static constexpr uint16_t DISPLAY_WIDTH = X4_WIDTH;
+  static constexpr uint16_t DISPLAY_HEIGHT = X4_HEIGHT;
+  static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
+  static constexpr uint32_t BUFFER_SIZE =
+      DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
+
   static uint8_t* storage() {
-    static uint8_t buffer[DISPLAY_WIDTH / 8 * DISPLAY_HEIGHT];
+    static uint8_t buffer[MAX_BUFFER_SIZE];
     return buffer;
   }
 
-  // The *panel*, which is landscape-native: X4 and X4 Pro are 800x480, X3 is
-  // 792x528 (crosspoint-simulator/src/EInkDisplay.h:28-32). The portrait
-  // 480x800 page everyone talks about is the logical canvas GfxRenderer
-  // produces by rotating onto this in its default Portrait orientation
-  // (GfxRenderer.cpp:218 -- phyX = y, phyY = panelHeight - 1 - x).
-  //
-  // Getting these the wrong way round costs nothing visible: every coordinate
-  // still lands inside the buffer, so nothing is clipped and nothing crashes;
-  // the page is simply drawn somewhere else.
-  static constexpr uint16_t DISPLAY_WIDTH = 800;
-  static constexpr uint16_t DISPLAY_HEIGHT = 480;
-  static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
-  static constexpr uint32_t BUFFER_SIZE = DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
+  // Keep mutable geometry in function-local statics for the same reason as
+  // the framebuffer: this inline HalDisplay is included by api.cpp and by the
+  // firmware renderer. Member state has been observed to split between those
+  // translation units in the wasm build, leaving the renderer on stale
+  // dimensions with no error.
+  static uint16_t& widthRef() {
+    static uint16_t width = X4_WIDTH;
+    return width;
+  }
+  static uint16_t& heightRef() {
+    static uint16_t height = X4_HEIGHT;
+    return height;
+  }
+
+  // The *panel* is landscape-native: X4 and X4 Pro are 800x480, X3 is
+  // 792x528 (crosspoint-simulator/src/EInkDisplay.h:28-32). The portrait page
+  // GfxRenderer exposes is the panel rotated into its default Portrait
+  // orientation.
+  void setGeometry(uint16_t width, uint16_t height) {
+    widthRef() = width;
+    heightRef() = height;
+  }
 
   void begin() {}
   void begin(bool) {}
 
   uint8_t* getFrameBuffer() const { return storage(); }
   void clearScreen(uint8_t color = 0xFF) const {
-    std::memset(storage(), color, BUFFER_SIZE);
+    std::memset(storage(), color, getBufferSize());
   }
 
-  uint16_t getDisplayWidth() const { return DISPLAY_WIDTH; }
-  uint16_t getDisplayHeight() const { return DISPLAY_HEIGHT; }
-  uint16_t getDisplayWidthBytes() const { return DISPLAY_WIDTH_BYTES; }
-  uint32_t getBufferSize() const { return BUFFER_SIZE; }
+  uint16_t getDisplayWidth() const { return widthRef(); }
+  uint16_t getDisplayHeight() const { return heightRef(); }
+  uint16_t getDisplayWidthBytes() const { return widthRef() / 8; }
+  uint32_t getBufferSize() const {
+    return static_cast<uint32_t>(getDisplayWidthBytes()) * heightRef();
+  }
 
   bool isInverted() const { return false; }
   void setInverted(bool) {}
@@ -66,7 +85,7 @@ class HalDisplay {
   // it is a no-op. Only releaseFrameBufferForBuild uses this, which the
   // preview never calls.
   uint8_t* lendFrameBufferStorage(uint32_t* sizeOut) {
-    if (sizeOut) *sizeOut = BUFFER_SIZE;
+    if (sizeOut) *sizeOut = getBufferSize();
     return storage();
   }
   void returnFrameBufferStorage() {}
@@ -104,6 +123,7 @@ class HalDisplay {
   bool supportsStripGrayscale() const { return false; }
   void presentIfNeeded() {}
   bool shouldQuit() const { return false; }
+
 };
 
 inline HalDisplay display;

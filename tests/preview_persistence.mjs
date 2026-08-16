@@ -391,6 +391,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // every block after it.
   defaults = structuredClone(defaults);
   const controls = [
+    // The render core changes geometry with the reader model. It belongs to
+    // the Page form even though the device panel owns and displays it.
+    makeControl({
+      name: "device", value: "x4", group: "page",
+      options: [{ value: "x4" }, { value: "x3" }],
+    }),
     makeControl({ name: "size", type: "number", value: "13", group: "root",
                   min: "6", max: "40", step: "0.25" }),
     makeControl({ name: "gamma", type: "number", value: "1",
@@ -625,6 +631,52 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     addEventListener(kind, fn) { this.on[kind] = fn; },
     click() { return this.on.click(); },
   };
+  const deviceModel = byName.device;
+  const deviceControl = (control) => {
+    control.dataset.deviceSetting = "";
+    return control;
+  };
+  deviceControl(deviceModel);
+  const deviceColor = deviceControl(makeControl({
+    name: "device-color", value: "black",
+    options: [{ value: "black" }, { value: "white" }],
+  }));
+  const deviceFrame = deviceControl(makeControl({
+    name: "device-frame-shown", type: "checkbox", checked: true,
+  }));
+  const deviceScale = deviceControl(makeControl({
+    name: "device-scale", value: "pixels",
+    options: [{ value: "pixels" }, { value: "device" }, { value: "fit" }],
+  }));
+  const devicePaper = deviceControl(makeControl({
+    name: "device-paper", type: "range", value: "84", min: "0", max: "100",
+  }));
+  const deviceInk = deviceControl(makeControl({
+    name: "device-ink", type: "range", value: "80", min: "0", max: "100",
+  }));
+  const deviceCalibration = deviceControl(makeControl({
+    name: "device-calibration-range", type: "range", value: "100",
+    min: "80", max: "120", step: ".5",
+  }));
+  const deviceSurface = makeElement();
+  const deviceCanvas = makeElement();
+  deviceCanvas.getBoundingClientRect = () => ({left: 0, top: 0});
+  deviceCanvas.getContext = () => ({
+    drawImage() {},
+    getImageData: () => ({
+      data: new Uint8ClampedArray([0, 0, 0, 255, 96, 96, 96, 255,
+                                  200, 200, 200, 255, 255, 255, 255, 255]),
+    }),
+    putImageData(pixels) { deviceCanvas.pixels = [...pixels.data]; },
+  });
+  const deviceFrameImage = makeElement();
+  const deviceCalibrate = Object.assign(pressStub("device-calibrate"),
+                                        {attrs: {"aria-expanded": "false"}});
+  const deviceReset = button("reset-device");
+  const deviceSettings = [
+    deviceModel, deviceColor, deviceFrame, deviceScale,
+    devicePaper, deviceInk, deviceCalibration,
+  ];
   const stubs = {
     save: saveButton,
     saved: { textContent: "" },
@@ -680,19 +732,44 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                                 { hidden: true }),
     "update-progress": progressRow(),
     updated: recording(),
+    "device-toggle": Object.assign(pressStub("device"),
+                                    {dataset: {fold: "device"}}),
+    "device-surface": deviceSurface,
+    "device-page": deviceCanvas,
+    "device-frame": deviceFrameImage,
+    "device-model": deviceModel,
+    "device-color": deviceColor,
+    "device-frame-shown": deviceFrame,
+    "device-scale": deviceScale,
+    "device-paper": devicePaper,
+    "device-ink": deviceInk,
+    "device-paper-value": {value: ""},
+    "device-ink-value": {value: ""},
+    "device-calibrate": deviceCalibrate,
+    "device-calibration": {hidden: true},
+    "device-calibration-range": deviceCalibration,
+    "device-calibration-value": {value: ""},
+    "device-ruler": makeElement(),
+    "reset-device": deviceReset,
     knobs: form,
     // The sheet, which is a control as well as an image: press and hold on it
     // shows the page untuned.
     page: {
       src: "", set: null, on: {}, classes: new Set(),
+      naturalWidth: 480, naturalHeight: 800,
       classList: {
         add(name) { stubs.page.classes.add(name); },
         remove(name) { stubs.page.classes.delete(name); },
         contains(name) { return stubs.page.classes.has(name); },
       },
       addEventListener(kind, fn) { this.on[kind] = fn; },
-      press(button = 0) { this.on.pointerdown({ button, preventDefault() {} }); },
-      release(how = "pointerup") { this.on[how](); },
+      press(button = 0) {
+        (deviceSurface.on.pointerdown || this.on.pointerdown)(
+          {button, preventDefault() {}});
+      },
+      release(how = "pointerup") {
+        (deviceSurface.on[how] || this.on[how])();
+      },
     },
     // The notice drawn over the sheet when a render fails, and the button on it.
     "page-error": {
@@ -736,10 +813,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       getElementById: id => stubs[id],
       createElement: makeElement,
       createTextNode: (text) => ({ textContent: text }),
-      // The fold reaches for its toggles by attribute rather than by id, so
-      // this is the one document-wide query the page makes.
-      querySelectorAll: (selector) => selector === "[data-fold]"
-        ? [stubs["page-toggle"], stubs["mod-toggle"]] : [],
+      // The folds and device reset are the two document-wide queries.
+      querySelectorAll: (selector) => {
+        if (selector === "[data-fold]") {
+          return [stubs["page-toggle"], stubs["mod-toggle"],
+                  stubs["device-toggle"]];
+        }
+        return selector === "[data-device-setting]" ? deviceSettings : [];
+      },
       addEventListener(kind, fn) {
         if (kind === "keydown") keys.push(fn);
         if (kind === "keyup") keyups.push(fn);
@@ -978,7 +1059,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                    busy: stubs["tab-busy"],
                    press: (which) => presses[which]() },
            fold: { page: stubs["page-toggle"], mod: stubs["mod-toggle"],
-                   dot: stubs["mod-dot"],
+                   device: stubs["device-toggle"], dot: stubs["mod-dot"],
                    press: (which) => presses[which]() },
            progress: stubs.progress, bar: stubs.progress.bar,
            barFill: stubs.progress.fill,
@@ -989,6 +1070,20 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            sheet: stubs.page,
+           device: {
+             model: deviceModel, color: deviceColor, frame: deviceFrame,
+             scale: deviceScale, paper: devicePaper, ink: deviceInk,
+             calibration: deviceCalibration, surface: deviceSurface,
+             canvas: deviceCanvas, frameImage: deviceFrameImage,
+             paperValue: stubs["device-paper-value"],
+             inkValue: stubs["device-ink-value"],
+             calibrationBox: stubs["device-calibration"],
+             calibrationValue: stubs["device-calibration-value"],
+             ruler: stubs["device-ruler"],
+             edit(control) { control.on.input(); },
+             calibrate() { presses["device-calibrate"](); },
+             reset() { clicks["reset-device"](); },
+           },
            about: { island: stubs.about, number: stubs["about-number"],
                     home: stubs["about-home"],
                     state: stubs["about-state"],
@@ -4010,6 +4105,59 @@ for (const { name, text } of sources) {
   check("and the page keeps drawing what the panel says",
         env.fetches.bodies.at(-1).axes.text === 900,
         JSON.stringify(env.fetches.bodies.at(-1).axes));
+}
+
+// The device panel owns presentation settings, while its model also changes
+// the render core's native page geometry.
+{
+  const storage = fakeStorage({"crossglyph.device": JSON.stringify({
+    device: "x3", color: "white", frame: false, scale: "device",
+    paper: "100", ink: "0", calibration: "110",
+  })});
+  const env = await loaded(storage);
+  check("the saved reader model reaches the render request",
+        env.fetches.bodies.at(-1).page.device === "x3",
+        JSON.stringify(env.fetches.bodies.at(-1).page));
+  check("device appearance comes back with the reader model",
+        env.device.color.value === "white" && !env.device.frame.checked &&
+        env.device.scale.value === "device");
+  check("tone controls use one percentage scale",
+        env.device.paperValue.value === "100%" &&
+        env.device.inkValue.value === "0%");
+  env.modules.get("device.js").paintDevicePage();
+  const noInk = env.device.canvas.pixels[0];
+
+  env.device.ink.value = "100";
+  env.device.edit(env.device.ink);
+  check("more ink makes the black plane darker",
+        env.device.canvas.pixels[0] < noInk,
+        `${env.device.canvas.pixels[0]} is not darker than ${noInk}`);
+  check("the ink readout follows the same direction as its slider",
+        env.device.inkValue.value === "100%", env.device.inkValue.value);
+
+  env.device.model.value = "x4";
+  env.device.edit(env.device.model);
+  await settle();
+  check("changing reader redraws with its native geometry",
+        env.fetches.bodies.at(-1).page.device === "x4",
+        JSON.stringify(env.fetches.bodies.at(-1).page));
+  check("device settings save independently from the font",
+        JSON.parse(storage.data["crossglyph.device"]).ink === "100");
+
+  env.device.reset();
+  await settle();
+  check("reset device preview restores its declared defaults",
+        env.device.model.value === "x4" &&
+        env.device.color.value === "black" &&
+        env.device.frame.checked &&
+        env.device.scale.value === "pixels" &&
+        env.device.paper.value === "84" && env.device.ink.value === "80");
+  check("default screen tones match the accurate white product photograph",
+        env.device.canvas.pixels.slice(0, 3).join() === "50,52,51" &&
+        env.device.canvas.pixels.slice(-4, -1).join() === "212,215,214",
+        env.device.canvas.pixels.join());
+  check("reset device preview removes its saved state",
+        !("crossglyph.device" in storage.data));
 }
 
 process.exit(failures ? 1 : 0);

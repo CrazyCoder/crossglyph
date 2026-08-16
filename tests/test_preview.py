@@ -369,6 +369,27 @@ def test_a_margin_outside_the_devices_range_is_refused():
         preview.PageSpec(margin=200).to_call_args()
 
 
+def test_an_unknown_device_is_refused():
+    from crossglyph import preview
+
+    with pytest.raises(ValueError, match="device"):
+        preview.PageSpec(device="x5").to_call_args()
+
+
+@needs
+def test_x3_and_x4_pages_use_their_native_geometry():
+    from crossglyph import preview
+
+    font = font_for(ONE_PARAGRAPH)
+    x3 = preview.preview_page(font, ONE_PARAGRAPH,
+                              spec=preview.PageSpec(device="x3"))
+    x4 = preview.preview_page(font, ONE_PARAGRAPH,
+                              spec=preview.PageSpec(device="x4"))
+
+    assert x3.size == (528, 792)
+    assert x4.size == (480, 800)
+
+
 @needs
 def test_the_module_is_reused_between_pages():
     assert render.shared_module() is render.shared_module()

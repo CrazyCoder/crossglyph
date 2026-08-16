@@ -44,10 +44,15 @@ ALIGNMENTS = {"justify": 0, "left": 1, "center": 2, "right": 3}
 #: (CrossPointSettings.cpp:268-280).
 LINE_SPACINGS = {"tight": 95, "normal": 100, "wide": 110}
 
+#: Reader ids as the render core numbers them.
+DEVICES = {"x4": 0, "x3": 1}
+
 
 @dataclasses.dataclass(frozen=True)
 class PageSpec:
     """How the page is laid out -- the reader's settings, not the font's."""
+
+    device: str = "x4"
 
     # The device's own shipped values (CrossPointSettings.h:217, 239-246), not
     # the prettier combination: hyphenation is off out of the box, and extra
@@ -79,8 +84,18 @@ class PageSpec:
     #: it applies to the reading surfaces and not to the menus over them.
     inverted: bool = False
 
+    def device_id(self) -> int:
+        """The render core's id for this reader, validated."""
+        try:
+            return DEVICES[self.device]
+        except KeyError:
+            raise ValueError(
+                f"unknown device {self.device!r}; "
+                f"expected one of {', '.join(sorted(DEVICES))}") from None
+
     def to_call_args(self) -> tuple[int, int, int, int, int]:
         """The five ints rc_page_set_spec takes, validated."""
+        self.device_id()
         if self.alignment not in ALIGNMENTS:
             raise ValueError(
                 f"unknown alignment {self.alignment!r}; "
@@ -335,6 +350,8 @@ def preview_page(font_bytes: bytes, text: str = SAMPLE_TEXT,
     """
     plain, styles = markup.parse(text)
     with render.exclusive() as module:
+        if module.call("rc_set_device", spec.device_id()) != 1:
+            raise ValueError(f"the render core rejected device {spec.device!r}")
         module.call("rc_page_set_spec", *spec.to_call_args())
         module.call("rc_page_set_language",
                     module.write(spec.language.encode("utf-8") + b"\x00"))

@@ -298,18 +298,16 @@
   /* The heading is the press that folds the section. A button inside the h2
      rather than instead of it: the section keeps its heading, and what opens
      it is a control rather than a word people have to guess is clickable. */
-  #page-toggle, #mod-toggle {
-    /* Each of these is a property a button does not inherit on its own, and
-       the heading beside it in the next panel does: `font` misses
-       text-transform, and the UA sets that one to none, so the word came out
-       in mixed case beside two headings in capitals. */
+  #page-toggle, #mod-toggle, #device-toggle {
     font: inherit; color: inherit; letter-spacing: inherit;
     text-transform: inherit;
     display: flex; align-items: center; gap: .4rem;
     padding: .1rem .3rem .1rem 0; margin-left: -.15rem;
     background: none; border: 0; border-radius: 4px;
   }
-  #page-toggle:hover, #mod-toggle:hover { color: var(--text); background: none; }
+  #page-toggle:hover, #mod-toggle:hover, #device-toggle:hover {
+    color: var(--text); background: none;
+  }
   /* A drawn chevron rather than a glyph. At the heading's 10px a text triangle
      is a comma with ideas, and this is the one mark on the panel that has to
      read as "there is more under here" at a glance. Stroked like the
@@ -322,6 +320,7 @@
   @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
   :root:not([data-folds~="page"]) #page-settings { display: none; }
   :root:not([data-folds~="mod"]) #mod-settings { display: none; }
+  :root:not([data-folds~="device"]) #device-settings { display: none; }
 
   /* Folded, and something under it is not what the device ships with. The same
      dot the rows carry, in the same column, said for the whole section because
@@ -532,24 +531,41 @@
 
   #status { margin-top: .7rem; color: var(--muted); font-size: 11.5px; }
 
-  /* The specimen, on a neutral stage. 480x800 device pixels, and the browser
-     must never resample it -- smoothing is exactly the lie this tool exists
-     to avoid. */
-  #stage { background: var(--panel); border: 1px solid var(--line);
-           border-radius: 10px; padding: .85rem; }
-  /* Press and hold shows it untuned, so the sheet must not be draggable or
-     selectable: either gesture takes the pointer and the release with it,
-     and the page stays untuned until something else is clicked. */
-  #page { box-sizing: content-box; display: block; image-rendering: pixelated;
-          background: var(--l0);
-          border: 1px solid var(--line);
-          user-select: none; -webkit-user-drag: none;
-          opacity: 0; transition: opacity .2s ease-out; }
-  /* Put up by the first page that arrives, and never taken down: the fade is
-     the sheet arriving on a reload, not something to sit through on every
-     turn of a knob. */
-  #page.shown { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) { #page { transition: none; } }
+  /* The rendered PNG remains at its native dimensions in the canvas. The
+     default scale maps those pixels to physical monitor pixels through DPR;
+     neither the canvas draw nor its placement may smooth them. */
+  #stage {
+    position: relative; display: grid; place-items: center;
+    min-width: 30rem; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: .85rem;
+  }
+  #device-surface {
+    position: relative; flex: none; user-select: none;
+    -webkit-user-drag: none; touch-action: none;
+  }
+  #device-page, #device-frame {
+    position: absolute; display: block; user-select: none;
+    -webkit-user-drag: none;
+  }
+  #device-page {
+    z-index: 1; background: rgb(160 161 165);
+    image-rendering: pixelated; opacity: 0;
+    transition: opacity .2s ease-out;
+  }
+  #device-page.shown { opacity: 1; }
+  #device-frame {
+    inset: 0 auto auto 0; z-index: 2; pointer-events: none;
+  }
+  /* The response image is only a decoded source for the canvas. Keeping it in
+     the DOM preserves its cheap browser decoder without giving it a second
+     painted copy to resample. */
+  #page {
+    position: fixed; width: 1px; height: 1px; left: -10px; top: -10px;
+    opacity: 0; pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #device-page { transition: none; }
+  }
 
   /* A failed render is said where the page would have been, because that is
      where the eye already is. Over the sheet rather than instead of it: the
@@ -571,10 +587,83 @@
      that prose instead, and the page sat at the left of a stage wider than it
      was. */
   #middle { display: flex; flex-direction: column; gap: .55rem;
-            width: min-content; }
+            width: min-content; min-width: 30rem; }
   #textbox {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: .1rem 1rem 1rem;
+  }
+
+  /* One folded card under the device. It stays compact when open: controls
+     wrap by available width instead of reserving the panel's four-column knob
+     grid, and explanations live behind the heading's help badge. */
+  #device-preview {
+    width: 100%; padding: .1rem .8rem .5rem;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  :root:not([data-folds~="device"]) #device-preview { padding-bottom: .1rem; }
+  #device-preview .section {
+    border-top: 0; padding: .35rem 0 .25rem;
+  }
+  .device-controls {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem .55rem; padding: .15rem 0 .4rem;
+  }
+  .device-field {
+    display: grid; gap: .15rem; min-width: 0;
+  }
+  .device-field > span, .device-options > label:not(.device-check),
+  .device-tones > label {
+    color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  .device-field select {
+    width: 100%; min-width: 0; padding: .18rem .3rem; font-size: 11px;
+  }
+  .device-options {
+    grid-column: 1 / -1; display: grid;
+    grid-template-columns: auto auto minmax(5.5rem, 1fr) auto;
+    align-items: center; gap: .35rem .45rem;
+  }
+  #device-scale { width: 100%; min-width: 0; padding: .18rem .3rem;
+                  font-size: 11px; }
+  .device-check {
+    display: inline-flex; align-items: center; gap: .3rem; cursor: pointer;
+    color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  .device-check input { margin: 0; }
+  #device-calibrate { padding: .18rem .45rem; font-size: 10.5px; }
+  .device-tones {
+    display: grid;
+    grid-template-columns: auto minmax(4rem, 1fr) 2.2rem auto minmax(4rem, 1fr) 2.2rem;
+    align-items: center; gap: .35rem .45rem;
+    border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;
+  }
+  .device-tones input { width: 100%; min-width: 0; }
+  .device-tones output, #device-calibration-value {
+    color: var(--muted); font: 10.5px/1 ui-monospace, "Cascadia Mono",
+      Consolas, monospace; text-align: right;
+  }
+  #device-calibration {
+    display: grid; grid-template-columns: 1fr 2.8rem;
+    align-items: center; gap: .35rem .5rem;
+    border-top: 1px solid var(--rule); margin-top: .35rem;
+    padding-top: .45rem;
+  }
+  #device-ruler {
+    grid-column: 1 / -1; position: relative; max-width: 100%;
+    height: 1.1rem; border-top: 1px solid var(--text);
+  }
+  #device-ruler::before, #device-ruler::after {
+    content: ""; position: absolute; top: -.25rem; height: .5rem;
+    border-left: 1px solid var(--text);
+  }
+  #device-ruler::before { left: 0; }
+  #device-ruler::after { right: 0; }
+  #device-ruler span {
+    position: absolute; inset: .05rem 0 auto; text-align: center;
+    color: var(--muted); font-size: 10px;
   }
   /* A heading with one control beside it. Both of these name the panel under
      them rather than setting anything in it, so a row of their own would push

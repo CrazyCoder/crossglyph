@@ -47,7 +47,8 @@ export function loadSize() {
 }
 
 export function pageControls() {
-  return [...form.elements].filter(el => el.name && el.dataset.group === "page");
+  return [...form.elements].filter(el =>
+    el.name && el.dataset.group === "page" && !el.dataset.deviceSetting);
 }
 
 export function savePage() {

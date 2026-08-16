@@ -365,18 +365,90 @@
 
 <div id="middle">
   <div id="stage">
-    <!-- An empty SVG, so the element is never a source-less img: the browser
-         draws its own broken-image mark for one of those, and it appears on
-         every reload before the first render can answer. This is the sheet at
-         its size with nothing on it yet, which is the truth. -->
-    <img id="page" width="480" height="800" alt="the page as the device draws it"
-         src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%2F%3E">
-    <!-- Hidden until something goes wrong. A sheet that silently stays blank
-         is one nobody can act on, and the reason is usually a sentence long. -->
+    <div id="device-surface">
+      <canvas id="device-page" width="480" height="800"
+              aria-label="the page as the selected device draws it"></canvas>
+      <img id="device-frame" alt="" draggable="false">
+      <!-- Kept off screen as the decoded response that feeds the canvas. -->
+      <img id="page" width="480" height="800" alt=""
+           src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%2F%3E">
+    </div>
     <div id="page-error" hidden>
       <p class="what"></p>
       <p class="why mono"></p>
       <button type="button" class="reset" id="retry">Try again</button>
+    </div>
+  </div>
+
+  <div id="device-preview">
+    <div class="section">
+      <h2><button type="button" id="device-toggle" data-fold="device"
+                  aria-expanded="false" aria-controls="device-settings"><svg
+        class="twist" viewBox="0 0 16 16" aria-hidden="true"><path
+        d="M6 3.2 11.2 8 6 12.8"/></svg>Device preview</button>
+        <span class="explain"><button type="button" class="info"
+          aria-label="About device preview">?</button><span class="tip"
+          role="tooltip">1:1 pixels maps one reader pixel to one monitor pixel
+          and does not resample the page. Device size uses the reader body
+          dimensions and the ruler calibration. Fit is for narrow windows.
+          Paper and ink remap the four display levels without rerendering the
+          font. Calibrate again after moving the window to another monitor.</span></span>
+      </h2>
+      <button type="button" class="clear" id="reset-device"
+              title="Reset device preview"
+              aria-label="reset device preview">&#215;</button>
+    </div>
+    <div id="device-settings">
+      <div class="device-controls">
+        <label class="device-field" for="device-model"><span>device</span>
+          <select id="device-model" name="device" data-group="page"
+                  data-device-setting form="knobs">
+            <option value="x4" selected>X4</option>
+            <option value="x3">X3</option>
+          </select>
+        </label>
+        <label class="device-field" for="device-color"><span>color</span>
+          <select id="device-color" data-device-setting>
+            <option value="black" selected>black</option>
+            <option value="white">white</option>
+          </select>
+        </label>
+        <div class="device-options">
+          <label class="device-check" for="device-frame-shown"
+                 title="Show the selected reader body around its screen">
+            <input id="device-frame-shown" type="checkbox"
+                   data-device-setting checked>frame</label>
+          <label for="device-scale">scale</label>
+          <select id="device-scale" data-device-setting>
+            <option value="pixels" selected>1:1 pixels</option>
+            <option value="device">device size</option>
+            <option value="fit">fit</option>
+          </select>
+          <button type="button" class="reset" id="device-calibrate"
+                  aria-expanded="false"
+                  title="Adjust a 100 mm ruler to match a physical ruler">Calibrate</button>
+        </div>
+      </div>
+      <div class="device-tones">
+        <label for="device-paper">paper</label>
+        <input id="device-paper" type="range" min="0" max="100"
+               step="1" value="84" data-device-setting>
+        <output id="device-paper-value" for="device-paper">84%</output>
+        <label for="device-ink">ink</label>
+        <input id="device-ink" type="range" min="0" max="100"
+               step="1" value="80" data-device-setting>
+        <output id="device-ink-value" for="device-ink">80%</output>
+      </div>
+      <div id="device-calibration" hidden>
+        <div id="device-ruler" title="Adjust until this line measures 100 mm">
+          <span>100 mm</span>
+        </div>
+        <input id="device-calibration-range" type="range" min="80" max="120"
+               step=".5" value="100" data-device-setting
+               aria-label="device-size calibration percent">
+        <output id="device-calibration-value"
+                for="device-calibration-range">100%</output>
+      </div>
     </div>
   </div>
 

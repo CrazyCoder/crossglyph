@@ -232,6 +232,33 @@ minus a value, which would ask for greys this panel cannot make. It is worth
 looking at a font both ways, since a face that is comfortable in black on
 white can read heavy in white on black.
 
+### Device preview
+
+The **Device preview** under the page puts the rendered screen into an X3 or
+X4 body. It starts folded. X4 is the default; choosing X3 redraws at its native
+528 by 792 pixels instead of resizing the X4's 480 by 800 output. **Color**
+selects the black or white body, and **Frame** removes the body while keeping
+the selected screen proportions and rounded corners.
+
+**Paper** and **Ink** remap the panel's four levels without rebuilding the
+font. Both run from 0% to 100% in the direction their labels imply: more paper
+is lighter, and more ink is darker. Their defaults reproduce the four tones
+measured from XTEINK's X4 front photograph.
+
+**Scale** has three meanings:
+
+- **1:1 pixels** maps one reader pixel to one physical monitor pixel, accounting
+  for the browser's device pixel ratio. It does not resample the screen.
+- **Device size** uses the reader body's documented dimensions and the
+  calibrated browser ruler. Press **Calibrate**, hold a physical ruler against
+  the line, and adjust it to 100 mm. Calibrate again after moving the window to
+  a monitor with a different scale.
+- **Fit** scales the selected body or bare screen into the available window.
+
+These choices, the tone values and the calibration are remembered in this
+browser. **Reset device preview** restores the X4 black frame, 1:1 pixels and
+the photographed tones. It does not change the font or its saved config.
+
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that
 is which size you are working at rather than tuning. Holding is a look and not

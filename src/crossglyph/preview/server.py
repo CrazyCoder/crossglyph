@@ -593,6 +593,7 @@ def families() -> list[dict]:
 
 
 class PageKnobs(BaseModel):
+    device: str = "x4"
     margin: int = 5
     alignment: str = "justify"
     hyphenation: bool = False
@@ -1525,7 +1526,7 @@ def index() -> FileResponse:
 #: What the page is allowed to ask for beside itself. A whitelist of suffixes
 #: rather than a static mount: this serves one directory of hand-written files,
 #: and a path that escapes it is a bug worth a 404 rather than a file.
-ASSET_SUFFIXES = {".css", ".js", ".svg"}
+ASSET_SUFFIXES = {".css", ".js", ".png", ".svg"}
 
 
 @app.get("/{asset:path}")
@@ -1707,6 +1708,8 @@ def main(argv=None) -> int:
     # point and the slider steps a quarter point.
     parser.add_argument("--size", type=float, default=13,
                         help="point size for --png (default: %(default)s)")
+    parser.add_argument("--device", choices=("x4", "x3"), default="x4",
+                        help="reader geometry for --png (default: %(default)s)")
     parser.add_argument("--png", metavar="PATH",
                         help="write one page and exit, instead of serving")
     parser.add_argument("--fonts", default=None,
@@ -1778,7 +1781,8 @@ def main(argv=None) -> int:
         page = preview_page(build_font(
             _sources, opts.size,
             axes={style: dict(coords) for style, coords
-                  in axes_for(_family or "", opts.size)}))
+                  in axes_for(_family or "", opts.size)}),
+            spec=PageSpec(device=opts.device))
         _watermark(page).save(opts.png)
         print(f"wrote {opts.png}")
         return 0

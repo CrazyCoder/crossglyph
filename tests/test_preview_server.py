@@ -99,16 +99,20 @@ def test_png_output_carries_the_watermark(tmp_path, monkeypatch):
     output = tmp_path / "page.png"
     monkeypatch.setattr(server, "_sources", {0: source})
     monkeypatch.setattr(server, "set_font_source", lambda *a, **k: None)
+    seen = {}
     monkeypatch.setattr(server, "build_font", lambda *a, **k: b"font")
     monkeypatch.setattr(
         server, "preview_page",
-        lambda *a, **k: Image.new("L", (480, 800), 255))
+        lambda *a, **k: seen.setdefault("spec", k["spec"]) and
+        Image.new("L", (528, 792), 255))
     monkeypatch.setattr(server, "axes_for", lambda *a, **k: ())
 
-    assert server.main(["--font", str(source), "--png", str(output)]) == 0
+    assert server.main(["--font", str(source), "--device", "x3",
+                        "--png", str(output)]) == 0
     page = Image.open(output)
     assert ImageChops.difference(
         page, Image.new("L", page.size, 255)).getbbox()
+    assert seen["spec"].device == "x3"
 
 
 @needs
@@ -118,6 +122,19 @@ def test_the_page_spec_reaches_the_render(client):
     wide = client.post("/render",
                        json={"size": 13, "page": {"line_spacing": "wide"}})
     assert tight.content != wide.content
+
+
+@needs
+def test_the_device_selects_native_page_geometry(client):
+    from PIL import Image
+
+    x3 = client.post("/render",
+                     json={"size": 13, "page": {"device": "x3"}})
+    x4 = client.post("/render",
+                     json={"size": 13, "page": {"device": "x4"}})
+
+    assert Image.open(io.BytesIO(x3.content)).size == (528, 792)
+    assert Image.open(io.BytesIO(x4.content)).size == (480, 800)
 
 
 @needs
@@ -460,6 +477,41 @@ def test_the_page_and_its_modules_are_never_cached(client):
         assert response.headers["cache-control"] == "no-store", path
 
 
+@pytest.mark.parametrize(
+    ("device", "size", "aperture", "body_ratio"),
+    [
+        ("x4", (1147, 1820), (139, 114, 997, 1544), 69 / 111),
+        ("x3", (1204, 1820), (134, 132, 1070, 1536), 63.7 / 97.6),
+    ],
+)
+def test_device_frames_carry_normalized_geometry(
+        client, device, size, aperture, body_ratio):
+    from PIL import Image, ImageStat
+
+    for color in ("black", "white"):
+        response = client.get(f"/device/{device}-{color}.png")
+        assert response.status_code == 200
+        frame = Image.open(io.BytesIO(response.content)).convert("RGBA")
+        assert frame.size == size
+        left, top, right, bottom = aperture
+        alpha = frame.getchannel("A")
+        assert alpha.getpixel(((left + right) // 2,
+                               (top + bottom) // 2)) == 0
+        assert alpha.getpixel((left, top)) > 0, \
+            "the screen aperture lost its rounded corner"
+        opaque = alpha.point(lambda value: 255 if value >= 128 else 0).getbbox()
+        assert opaque is not None
+        ratio = (opaque[2] - opaque[0]) / (opaque[3] - opaque[1])
+        assert ratio == pytest.approx(body_ratio, abs=.006)
+        body = frame.crop((size[0] // 4, 25, size[0] * 3 // 4, 100))
+        red, green, blue = ImageStat.Stat(body.convert("RGB")).mean
+        tone = (red + green + blue) / 3
+        expected = (10, 22) if color == "black" else (210, 230)
+        assert expected[0] <= tone <= expected[1]
+        assert green >= red and blue >= red, \
+            "the frame lost the product photograph's cool neutral tint"
+
+
 @needs
 def test_the_sample_text_is_offered_to_the_page(client):
     """The text box starts empty and falls back to the server's sample, so the
@@ -489,19 +541,25 @@ def test_rendering_without_a_font_source_says_so():
 
 
 def _controls():
-    """Every named control in the *knob* form, with the group it posts under.
+    """Every named control associated with the *knob* form.
 
-    Scoped to that form: the export panel below the page is a second form with
-    names of its own, and they answer to a different half of the server.
+    The specimen text and reader model use ``form="knobs"`` from outside the
+    form's box. Browsers include them in ``form.elements`` just like controls
+    nested inside it. The export panel is a second form and stays out.
     """
     import re
 
     from crossglyph.preview import server
 
-    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
-    html = html[html.index('<form id="knobs">'):html.index("</form>")]
+    page = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    inside = page[page.index('<form id="knobs">'):page.index("</form>")]
+    tags = re.findall(r"<(?:input|select|textarea)\b[^>]*>", inside)
+    tags += [
+        tag for tag in re.findall(r"<(?:input|select|textarea)\b[^>]*>", page)
+        if 'form="knobs"' in tag
+    ]
     found = {}
-    for tag in re.findall(r"<(?:input|select|textarea)\b[^>]*>", html):
+    for tag in tags:
         name = re.search(r'name="([^"]+)"', tag)
         if not name:
             continue

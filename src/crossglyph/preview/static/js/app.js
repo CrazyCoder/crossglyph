@@ -3,6 +3,7 @@
 // top-level work: the handles they take and the listeners they set.
 import "./dom.js";
 import "./remember.js";
+import "./device.js";
 import "./knobs.js";
 import "./render.js";
 import "./resets.js";

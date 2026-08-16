@@ -101,19 +101,23 @@ void addWords(ParsedText& parsed, const char* utf8) {
 /// (CrossPointSettings.h:249, EpubReaderActivity.cpp:1195-1199). The status
 /// bar is deliberately not modelled -- it is chrome, not type.
 constexpr int kScreenMargin = 5;
+int g_screenMargin = kScreenMargin;
 int g_marginLeft = 0, g_marginTop = 0, g_marginRight = 0, g_marginBottom = 0;
 float g_lineCompression = 1.0f;
 bool g_marginsResolved = false;
 
-void resolveMargins() {
-  if (g_marginsResolved) return;
+void applyMargins() {
   int top = 0, right = 0, bottom = 0, left = 0;
   g_renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
-  g_marginTop = top + kScreenMargin;
-  g_marginRight = right + kScreenMargin;
-  g_marginBottom = bottom + kScreenMargin;
-  g_marginLeft = left + kScreenMargin;
+  g_marginTop = top + g_screenMargin;
+  g_marginRight = right + g_screenMargin;
+  g_marginBottom = bottom + g_screenMargin;
+  g_marginLeft = left + g_screenMargin;
   g_marginsResolved = true;
+}
+
+void resolveMargins() {
+  if (!g_marginsResolved) applyMargins();
 }
 
 /// Lay one paragraph out into `into`. A ParsedText consumes its words
@@ -150,6 +154,33 @@ int rc_init() {
     g_renderer.begin();
     started = true;
   }
+  return 1;
+}
+
+/// Select the reader geometry. The framebuffer allocation does not move;
+/// GfxRenderer::begin() only refreshes its dimensions and write stride.
+/// 0 is X4/X4 Pro (800x480 panel), 1 is X3 (792x528 panel).
+int rc_set_device(int device_id) {
+  rc_init();
+  uint16_t width = 0;
+  uint16_t height = 0;
+  if (device_id == 0) {
+    width = HalDisplay::X4_WIDTH;
+    height = HalDisplay::X4_HEIGHT;
+  } else if (device_id == 1) {
+    width = HalDisplay::X3_WIDTH;
+    height = HalDisplay::X3_HEIGHT;
+  } else {
+    return 0;
+  }
+  if (display.getDisplayWidth() == width &&
+      display.getDisplayHeight() == height) {
+    return 1;
+  }
+  display.setGeometry(width, height);
+  g_renderer.begin();
+  g_marginsResolved = false;
+  g_lines.clear();
   return 1;
 }
 
@@ -264,9 +295,9 @@ int rc_screen_height() { rc_init(); return g_renderer.getScreenHeight(); }
 /// The framebuffer's own layout: 800x480, one bit per pixel, MSB first. The
 /// host has to un-rotate this to get the page back (phyX = y,
 /// phyY = panelHeight - 1 - x, from GfxRenderer.cpp:218).
-int rc_panel_width() { return HalDisplay::DISPLAY_WIDTH; }
-int rc_panel_height() { return HalDisplay::DISPLAY_HEIGHT; }
-int rc_framebuffer_size() { return HalDisplay::BUFFER_SIZE; }
+int rc_panel_width() { return display.getDisplayWidth(); }
+int rc_panel_height() { return display.getDisplayHeight(); }
+int rc_framebuffer_size() { return display.getBufferSize(); }
 const uint8_t* rc_framebuffer() { return display.getFrameBuffer(); }
 
 /// Draw text into the framebuffer in one render mode, and leave it there.
@@ -424,13 +455,8 @@ int rc_layout_line(int index, char* out, int cap) {
 int rc_page_set_spec(int margin, int alignment, int hyphenation,
                      int extra_paragraph_spacing, int line_compression_x100) {
   rc_init();
-  int top = 0, right = 0, bottom = 0, left = 0;
-  g_renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
-  g_marginTop = top + margin;
-  g_marginRight = right + margin;
-  g_marginBottom = bottom + margin;
-  g_marginLeft = left + margin;
-  g_marginsResolved = true;
+  g_screenMargin = margin;
+  applyMargins();
   g_alignment = static_cast<CssTextAlign>(alignment);
   g_hyphenation = hyphenation != 0;
   g_extraParagraphSpacing = extra_paragraph_spacing != 0;

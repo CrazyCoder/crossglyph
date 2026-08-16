@@ -1,4 +1,5 @@
 import {form, img, lineHeightAuto, status} from "./dom.js";
+import {showRenderedPage} from "./device.js";
 import {exportForm, exportSettings} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
@@ -137,6 +138,8 @@ export async function renderNow() {
   const next = URL.createObjectURL(await response.blob());
   if (url) URL.revokeObjectURL(url);
   img.src = url = next;
+  await showRenderedPage();
+  if (mine !== latest) return;
   // The sheet is blank until a page has been drawn on it. Set here rather than
   // on the img's own load, because the empty placeholder it starts on loads
   // too -- and it is the page arriving that is worth showing, not the element.

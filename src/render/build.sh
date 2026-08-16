@@ -71,7 +71,7 @@ CXX_SRCS="$ROOT/src/render/api.cpp \
 C_SRCS="$FW/lib/MiniBidi/minibidi.c \
   $FW/lib/uzlib/src/tinflate.c"
 
-EXPORTS='["_malloc","_free","_rc_abi_version","_rc_probe_sum","_rc_init",
+EXPORTS='["_malloc","_free","_rc_abi_version","_rc_probe_sum","_rc_init","_rc_set_device",
 "_rc_font_load","_rc_font_advance_y","_rc_font_ascender","_rc_font_descender",
 "_rc_font_prewarm","_rc_font_cached_glyphs",
 "_rc_render","_rc_framebuffer","_rc_framebuffer_size",

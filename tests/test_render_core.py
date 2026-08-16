@@ -375,6 +375,25 @@ def test_the_page_is_portrait_and_the_panel_is_landscape():
             module.call("rc_panel_height")) == (800, 480)
     assert module.call("rc_framebuffer_size") == 800 // 8 * 480
 
+@needs_wasm
+def test_device_geometry_switches_without_stale_dimensions():
+    module = render.load_module()
+
+    assert module.call("rc_set_device", 1) == 1
+    assert (module.call("rc_screen_width"),
+            module.call("rc_screen_height")) == (528, 792)
+    assert (module.call("rc_panel_width"),
+            module.call("rc_panel_height")) == (792, 528)
+    assert module.call("rc_framebuffer_size") == 792 // 8 * 528
+    assert module.call("rc_probe_write_target") == \
+        module.call("rc_probe_framebuffer_ptr")
+
+    assert module.call("rc_set_device", 0) == 1
+    assert (module.call("rc_screen_width"),
+            module.call("rc_screen_height")) == (480, 800)
+    assert module.call("rc_framebuffer_size") == 800 // 8 * 480
+    assert module.call("rc_set_device", 2) == 0
+
 
 @needs_wasm
 def test_a_single_pixel_reaches_the_framebuffer():

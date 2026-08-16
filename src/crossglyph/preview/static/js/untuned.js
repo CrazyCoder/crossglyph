@@ -1,4 +1,5 @@
-import {form, img} from "./dom.js";
+import {form} from "./dom.js";
+import {surface} from "./device.js";
 import {KNOB_KEYS, bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, stashed} from "./reverts.js";
 import {compareAxes} from "./variable.js";
 
@@ -60,8 +61,8 @@ export function releaseUntuned() {
   heldFrom = null;
 }
 
-//: Wired by the entry point rather than on import: `img` belongs to dom.js,
-//: and a module body can run while a module it imports is still evaluating.
+//: Wired by the entry point rather than on import: the device surface belongs
+//: to device.js, and a module body can run while an import is still evaluating.
 export function wireUntuned() {
   compare.addEventListener("click", toggleCompare);
 
@@ -77,7 +78,7 @@ export function wireUntuned() {
     toggleCompare();
   });
 
-  img.addEventListener("pointerdown", (event) => {
+  surface.addEventListener("pointerdown", (event) => {
     // The left button only: a right-click is a menu, and a middle one is the
     // browser's own. An image is draggable and text is selectable, either of
     // which swallows the release and leaves the page stuck untuned.
@@ -89,6 +90,6 @@ export function wireUntuned() {
   // pointerup here, and there is no state worth keeping for a gesture that
   // has left.
   for (const kind of ["pointerup", "pointercancel", "pointerleave"]) {
-    img.addEventListener(kind, releaseUntuned);
+    surface.addEventListener(kind, releaseUntuned);
   }
 }
