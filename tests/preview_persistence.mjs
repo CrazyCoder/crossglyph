@@ -1728,6 +1728,61 @@ for (const { name, text } of sources) {
         env.byName.gamma.value === "2.5", env.byName.gamma.value);
 }
 
+// 23b. Untuned is a layer above each control's own arrow. Turning that whole
+//      panel comparison off must not restore a value the arrow had set aside.
+//      Numeric, select and compound controls share the path, so keep all three
+//      representative shapes in the regression.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Sample");
+  await settle();
+  const auto = env.sandbox.document.getElementById("lh-auto");
+  const cases = [
+    {
+      name: "gamma",
+      edit() { env.byName.gamma.value = "1.05"; },
+      stock() { return env.byName.gamma.value === "1"; },
+      edited() { return env.byName.gamma.value === "1.05"; },
+    },
+    {
+      name: "hinting",
+      edit() { env.byName.hinting.value = "light"; },
+      stock() { return env.byName.hinting.value === "normal"; },
+      edited() { return env.byName.hinting.value === "light"; },
+    },
+    {
+      name: "line_height",
+      edit() {
+        auto.checked = false;
+        env.byName.line_height.value = "1.2";
+      },
+      stock() { return auto.checked === true; },
+      edited() {
+        return auto.checked === false && env.byName.line_height.value === "1.2";
+      },
+    },
+  ];
+
+  for (const one of cases) {
+    one.edit();
+    env.listeners.input({target: env.byName[one.name]});
+    const arrow = env.revertList.find(r => r.dataset.reset === one.name);
+    arrow.click();
+    check(`${one.name} is set aside at stock`,
+          one.stock() && arrow.dataset.state === "on");
+  }
+
+  env.compare.fire();
+  env.compare.fire();
+  for (const one of cases) {
+    const arrow = env.revertList.find(r => r.dataset.reset === one.name);
+    check(`Untuned leaves ${one.name} set aside`,
+          one.stock() && arrow.dataset.state === "on");
+    arrow.click();
+    check(`${one.name} still restores its own value`, one.edited());
+  }
+}
+
 // 24. Saving posts the panel, and takes its new baseline from the answer.
 {
   const env = await loaded(fakeStorage());
@@ -2439,6 +2494,17 @@ for (const { name, text } of sources) {
   arrow.on.click();
   await settle();
   check("the axis arrow shows the config value",
+        field.value === "105" && arrow.dataset.state === "on",
+        `${field.value}/${arrow.dataset.state}`);
+  env.compare.fire();
+  await settle();
+  check("Untuned can sit above an axis already set aside",
+        field.value === "100" && arrow.dataset.state === "on" &&
+          /stock value/.test(arrow.title),
+        `${field.value}/${arrow.dataset.state}/${arrow.title}`);
+  env.compare.fire();
+  await settle();
+  check("leaving Untuned returns to the visible config value",
         field.value === "105" && arrow.dataset.state === "on",
         `${field.value}/${arrow.dataset.state}`);
   arrow.on.click();

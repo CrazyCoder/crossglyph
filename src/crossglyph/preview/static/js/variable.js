@@ -74,10 +74,12 @@ export function refreshAxisReverts() {
   }
 }
 
-function bypassAxis(tag, target = axisTarget(tag)) {
+function bypassAxis(tag, target = axisTarget(tag), untuned = false) {
   const field = axisFields.get(tag);
   if (!field || !target) return;
-  stashed.set(axisKey(tag), {value: field.value, source: target.source});
+  stashed.set(axisKey(tag), {
+    value: field.value, source: target.source, untuned,
+  });
   setAxis(tag, target.value);
 }
 
@@ -86,6 +88,25 @@ function restoreAxis(tag) {
   if (!held) return;
   stashed.delete(key);
   setAxis(tag, held.value);
+}
+
+function bypassUntunedAxis(tag, value) {
+  const key = axisKey(tag), held = stashed.get(key);
+  if (held) {
+    held.untuned = {value: axisFields.get(tag).value};
+    setAxis(tag, value);
+  } else {
+    bypassAxis(tag, {value, source: "stock"}, true);
+  }
+}
+
+function restoreUntunedAxis(tag) {
+  const key = axisKey(tag), held = stashed.get(key);
+  if (!held || !held.untuned) return;
+  const value = held.untuned === true ? held.value : held.untuned.value;
+  if (held.untuned === true) stashed.delete(key);
+  else delete held.untuned;
+  setAxis(tag, value);
 }
 
 function toggleAxis(tag) {
@@ -98,12 +119,11 @@ export function compareAxes(on) {
     const axis = axisSpec(tag), field = axisFields.get(tag);
     if (!axis || !field) continue;
     if (on) {
-      if (Number(field.value) !== Number(axis.default) &&
-          !stashed.has(axisKey(tag))) {
-        bypassAxis(tag, {value: axis.default, source: "stock"});
+      if (Number(field.value) !== Number(axis.default)) {
+        bypassUntunedAxis(tag, axis.default);
       }
     } else {
-      restoreAxis(tag);
+      restoreUntunedAxis(tag);
     }
   }
   refreshAxisReverts();

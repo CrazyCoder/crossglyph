@@ -146,7 +146,10 @@ export function showRevertState(button, held, target) {
   const off = Boolean(held);
   button.hidden = !(off || target);
   button.dataset.state = off ? "on" : "off";
-  const source = off ? held.source : target && target.source;
+  // Untuned can sit above a per-control comparison. The visible layer is
+  // stock even though the older stash still points at the config.
+  const source = off ? (held.untuned ? "stock" : held.source)
+                     : target && target.source;
   const what = source === "stock" ? "the stock value" : "what the config has";
   button.title = off
     ? `Showing ${what}. Click to put your value back.`
@@ -177,7 +180,7 @@ export function restoreKnob(name) {
   setKnob(name, held);
 }
 
-export function bypassKnob(name, target, source) {
+export function bypassKnob(name, target, source, untuned = false) {
   // A caller naming a target has already said which baseline it wants; untuned
   // is the one that does, and factory is what it means.
   const pick = target ? {state: target, source: source ?? "stock"}
@@ -189,8 +192,30 @@ export function bypassKnob(name, target, source) {
   // it is pressed and the two cannot be dropped separately -- five places drop
   // a stash, and a second map beside it would have to be right in all of them.
   // setKnob reads value, checked and auto, and ignores the rest.
-  stashed.set(name, {...currentState(name), source: pick.source});
+  stashed.set(name, {...currentState(name), source: pick.source, untuned});
   setKnob(name, pick.state);
+}
+
+export function bypassUntunedKnob(name) {
+  const factory = factoryState(name);
+  if (!knobModified(name, factory)) return;
+  const held = stashed.get(name);
+  if (held) {
+    // Preserve the arrow's older comparison underneath this whole-panel look.
+    held.untuned = currentState(name);
+    setKnob(name, factory);
+  } else {
+    bypassKnob(name, factory, "stock", true);
+  }
+}
+
+export function restoreUntunedKnob(name) {
+  const held = stashed.get(name);
+  if (!held || !held.untuned) return;
+  const state = held.untuned === true ? held : held.untuned;
+  if (held.untuned === true) stashed.delete(name);
+  else delete held.untuned;
+  setKnob(name, state);
 }
 
 for (const button of reverts) {

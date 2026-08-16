@@ -1,6 +1,6 @@
 import {form} from "./dom.js";
 import {surface} from "./device.js";
-import {KNOB_KEYS, bypassKnob, factoryState, knobModified, refreshReverts, restoreKnob, stashed} from "./reverts.js";
+import {KNOB_KEYS, bypassUntunedKnob, refreshReverts, restoreUntunedKnob} from "./reverts.js";
 import {compareAxes} from "./variable.js";
 
 // --- comparing the whole tuning -------------------------------------------
@@ -29,11 +29,9 @@ export function toggleCompare() {
       // Against factory, not against the config: untuned answers "what did
       // this face look like before anyone touched it", which includes what
       // the .conf has been saying for months.
-      if (knobModified(name, factoryState(name)) && !stashed.has(name)) {
-        bypassKnob(name, factoryState(name));
-      }
+      bypassUntunedKnob(name);
     } else {
-      restoreKnob(name);
+      restoreUntunedKnob(name);
     }
   }
   compareAxes(on);
