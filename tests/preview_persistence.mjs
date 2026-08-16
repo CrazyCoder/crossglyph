@@ -815,7 +815,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   };
   const fetches = { render: 0, checks: 0, applies: 0, defaults: 0,
                     updateReads: 0, bodies: [], saves: [], builds: [],
-                    fallbacks: [] };
+                    fallbacks: [], bodyReads: [], objectUrls: [], revoked: [] };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
@@ -873,6 +873,28 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       if (String(url).includes("/render")) {
         fetches.render++;
         posted(options);
+        const deferred = opts.deferredRenderBodies?.[fetches.render - 1];
+        if (deferred) {
+          let resolve, reject;
+          const reading = new Promise((yes, no) => {
+            resolve = yes;
+            reject = no;
+          });
+          fetches.bodyReads.push({resolve, reject});
+          if (!deferred.ignoreAbort) {
+            options.signal.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }
+          const response = {
+            ok: deferred.ok, status: deferred.status ?? (deferred.ok ? 200 : 503),
+            headers: {get: () => "0"},
+          };
+          response[deferred.ok ? "blob" : "text"] = () => reading;
+          return Promise.resolve(response);
+        }
         // A server that is not there at all: fetch rejects rather than
         // answering, which is what a stopped process looks like from here.
         if (opts.renderThrows) {
@@ -1045,8 +1067,31 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       }
     },
     performance: { now: () => 0 },
-    URL: { createObjectURL: () => "blob:x", revokeObjectURL() {} },
-    AbortController: class { abort() {} signal = null; },
+    URL: {
+      createObjectURL(blob) {
+        const url = `blob:${fetches.objectUrls.length + 1}`;
+        fetches.objectUrls.push({url, blob});
+        return url;
+      },
+      revokeObjectURL(url) { fetches.revoked.push(url); },
+    },
+    AbortController: class {
+      constructor() {
+        const listeners = [];
+        this.signal = {
+          aborted: false,
+          addEventListener(kind, listener) {
+            if (kind === "abort") listeners.push(listener);
+          },
+        };
+        this.listeners = listeners;
+      }
+      abort() {
+        if (this.signal.aborted) return;
+        this.signal.aborted = true;
+        for (const listener of this.listeners) listener();
+      }
+    },
     // A real enough timer: deferred to the next tick, and genuinely
     // cancellable. Running the callback on the spot would hide the one thing
     // worth asserting about a slider -- that a burst of events coalesces into
@@ -2488,6 +2533,45 @@ for (const { name, text } of sources) {
   await settle();
   check("a render that worked takes the notice away",
         env.pageError.hidden === true, String(env.pageError.hidden));
+}
+
+// 41d. A newer render can abort the old one after its headers have arrived.
+//      Reading the body is part of the request too: neither a PNG nor an error
+//      body interrupted there may escape as an unhandled rejection.
+for (const deferred of [
+  {ok: true, label: "PNG"},
+  {ok: false, status: 503, label: "error"},
+]) {
+  const env = await loaded(fakeStorage(), undefined,
+                           {deferredRenderBodies: [deferred], renderOk: true});
+  check(`the first ${deferred.label} body is being read`,
+        env.fetches.bodyReads.length === 1);
+  env.byName.gamma.value = "1.4";
+  env.listeners.input({target: env.byName.gamma});
+  await settle();
+  await settle();
+  check(`aborting the ${deferred.label} body lets the newer page paint`,
+        env.sheet.src === "blob:1" && env.pageError.hidden === true,
+        `${env.sheet.src} / ${env.pageError.hidden}`);
+}
+
+// 41e. Aborting is advisory once a response body is already completing. If an
+//      old read resolves anyway, it must stop before revoking the newer page's
+//      URL or assigning its own image.
+{
+  const env = await loaded(fakeStorage(), undefined, {
+    deferredRenderBodies: [{ok: true, ignoreAbort: true}], renderOk: true,
+  });
+  env.byName.gamma.value = "1.4";
+  env.listeners.input({target: env.byName.gamma});
+  await settle();
+  await settle();
+  const newest = env.sheet.src;
+  env.fetches.bodyReads[0].resolve({stale: true});
+  await settle();
+  check("a stale body cannot replace or revoke the newer page",
+        env.sheet.src === newest && !env.fetches.revoked.includes(newest),
+        `${env.sheet.src} / ${env.fetches.revoked.join()}`);
 }
 
 // 42. The language only says which patterns hyphenate, so with the switch

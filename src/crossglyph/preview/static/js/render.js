@@ -113,29 +113,34 @@ export async function renderNow() {
   // request instead: nobody is going to look at it.
   if (inFlight) inFlight.abort();
   inFlight = new AbortController();
-  let response;
+  let response, payload;
   try {
     response = await fetch("/render", {
       method: "POST", headers: {"content-type": "application/json"},
       body: JSON.stringify(body()), signal: inFlight.signal});
+    if (mine !== latest) return;
+    // Abort covers the body as well as the headers. A superseded response can
+    // be interrupted in either read, and neither is an error worth reporting.
+    payload = response.ok ? await response.blob() : await failureText(response);
   } catch (error) {
     // An abort is this page's own doing: a newer render replaced this one, and
     // it is about to paint.
-    if (error.name === "AbortError") return;
+    if (error.name === "AbortError" || mine !== latest) return;
     showPageError("The preview server is not answering.",
                   "It may have stopped. Start it again, then press Try again.");
     status.textContent = "no answer";
     return;
   }
-  // A slow request that lost the race must not paint over a newer page.
+  // Body reads can finish after a newer response. Stop before touching the
+  // shared blob URL or image: either would replace state the newer page owns.
   if (mine !== latest) return;
   if (!response.ok) {
-    showPageError(failureHeadline(response.status), await failureText(response));
+    showPageError(failureHeadline(response.status), payload);
     status.textContent = `${response.status}`;
     return;
   }
   showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
-  const next = URL.createObjectURL(await response.blob());
+  const next = URL.createObjectURL(payload);
   if (url) URL.revokeObjectURL(url);
   img.src = url = next;
   await showRenderedPage();
