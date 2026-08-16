@@ -35,6 +35,7 @@ except ModuleNotFoundError as exc:      # pragma: no cover - install guidance
 
 import freetype
 from fontTools.ttLib import TTFont, TTLibError
+from PIL import Image, ImageDraw, ImageFont
 
 from .. import (
     daemon,
@@ -56,7 +57,7 @@ from ..cpfont.convert import (
 )
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
-from ..render import RenderCoreMissing, stamp
+from ..render import RenderCoreMissing, image, stamp
 from . import (
     BOLD,
     BOLD_ITALIC,
@@ -89,6 +90,23 @@ STYLE_NAMES = {style: name for name, style in STYLE_IDS.items()}
 
 _sources: dict[int, pathlib.Path] = {}
 _family: str | None = None
+
+#: Presentation metadata sits above the simulated framebuffer. Keep the label
+#: process-stable: an update only changes the version after the preview restarts.
+WATERMARK = f"CrossGlyph {version.installed()}"
+WATERMARK_FONT = ImageFont.load_default(size=12)
+WATERMARK_INSET = 5
+
+
+def _watermark(page: Image.Image, *, inverted: bool = False,
+               label: str = WATERMARK) -> Image.Image:
+    """Add the generator and version to the bottom-right of a rendered page."""
+    mask = Image.new("1", page.size)
+    ImageDraw.Draw(mask).text(
+        (page.width - WATERMARK_INSET, page.height - WATERMARK_INSET),
+        label, font=WATERMARK_FONT, fill=1, anchor="rb")
+    page.paste(image.LIGHT if inverted else image.DARK, mask=mask)
+    return page
 
 
 def set_font_source(path: pathlib.Path | str | None, *,
@@ -738,7 +756,8 @@ def render(request: RenderRequest) -> Response:
         # the coverage, and whether a face supplies one does not depend on what
         # else was asked for, so the two agree over the codepoints they share.
         undrawn = drawable.undrawn & page_codepoints(request.text)
-        page = preview_page(font, request.text, spec)
+        page = _watermark(preview_page(font, request.text, spec),
+                          inverted=spec.inverted)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
     # advanceY the .cpfont format cannot hold, which generate_cpfont_multistyle
@@ -1717,10 +1736,11 @@ def main(argv=None) -> int:
     set_font_source(source, family=family, **faces)
 
     if opts.png:
-        preview_page(build_font(
+        page = preview_page(build_font(
             _sources, opts.size,
             axes={style: dict(coords) for style, coords
-                  in axes_for(_family or "", opts.size)})).save(opts.png)
+                  in axes_for(_family or "", opts.size)}))
+        _watermark(page).save(opts.png)
         print(f"wrote {opts.png}")
         return 0
 

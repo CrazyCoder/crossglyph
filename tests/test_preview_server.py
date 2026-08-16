@@ -39,12 +39,68 @@ def client():
 
 @needs
 def test_posting_knobs_returns_a_png(client):
-    from PIL import Image
+    from PIL import Image, ImageChops
 
     response = client.post("/render", json={"size": 13})
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
-    assert Image.open(io.BytesIO(response.content)).size == (480, 800)
+    page = Image.open(io.BytesIO(response.content))
+    assert page.size == (480, 800)
+    corner = page.crop((page.width // 2, page.height - 30,
+                        page.width, page.height))
+    assert ImageChops.difference(
+        corner, Image.new("L", corner.size, 255)).getbbox(), \
+        "the generated PNG has no watermark in its bottom-right corner"
+
+
+def test_the_watermark_names_the_running_version_and_respects_night_mode():
+    from PIL import Image, ImageChops
+
+    from crossglyph import version
+    from crossglyph.preview import server
+    from crossglyph.render import image
+
+    assert server.WATERMARK == f"CrossGlyph {version.installed()}"
+
+    paper = Image.new("L", (480, 800), image.WHITE)
+    day = server._watermark(paper.copy())
+    changed = ImageChops.difference(paper, day).getbbox()
+    assert changed is not None
+    left, top, right, bottom = changed
+    assert left > paper.width // 2
+    assert top > paper.height - 30
+    assert right <= paper.width - server.WATERMARK_INSET
+    assert bottom <= paper.height - server.WATERMARK_INSET
+    day_levels = {value for value, count in enumerate(day.histogram()) if count}
+    assert day_levels == {image.DARK, image.WHITE}
+
+    black = Image.new("L", paper.size, image.BLACK)
+    night = server._watermark(black.copy(), inverted=True)
+    assert ImageChops.difference(black, night).getbbox() is not None
+    night_levels = {value for value, count in enumerate(night.histogram()) if count}
+    assert night_levels == {image.BLACK, image.LIGHT}
+
+
+def test_png_output_carries_the_watermark(tmp_path, monkeypatch):
+    from PIL import Image, ImageChops
+
+    from crossglyph.preview import server
+
+    source = tmp_path / "font.ttf"
+    source.touch()
+    output = tmp_path / "page.png"
+    monkeypatch.setattr(server, "_sources", {0: source})
+    monkeypatch.setattr(server, "set_font_source", lambda *a, **k: None)
+    monkeypatch.setattr(server, "build_font", lambda *a, **k: b"font")
+    monkeypatch.setattr(
+        server, "preview_page",
+        lambda *a, **k: Image.new("L", (480, 800), 255))
+    monkeypatch.setattr(server, "axes_for", lambda *a, **k: ())
+
+    assert server.main(["--font", str(source), "--png", str(output)]) == 0
+    page = Image.open(output)
+    assert ImageChops.difference(
+        page, Image.new("L", page.size, 255)).getbbox()
 
 
 @needs
@@ -64,7 +120,16 @@ def test_one_bit_rendering_reaches_the_render(client):
     response = client.post("/render",
                            json={"size": 13, "page": {"antialiased": False}})
     page = Image.open(io.BytesIO(response.content))
-    levels = {value for value, count in enumerate(page.histogram()) if count}
+    framebuffer = (
+        page.crop((0, 0, page.width // 2, page.height)),
+        page.crop((page.width // 2, 0, page.width, page.height - 30)),
+    )
+    levels = {
+        value
+        for region in framebuffer
+        for value, count in enumerate(region.histogram())
+        if count
+    }
     assert levels <= {0, 255}
 
 

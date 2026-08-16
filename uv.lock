@@ -88,7 +88,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "fonttools", specifier = ">=4.50" },
     { name = "freetype-py", specifier = ">=2.5.1" },
-    { name = "pillow", specifier = ">=10" },
+    { name = "pillow", specifier = ">=10.1" },
     { name = "uvicorn", specifier = ">=0.30" },
     { name = "wasmtime", specifier = ">=47" },
 ]

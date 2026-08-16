@@ -16,6 +16,10 @@
 ./crossglyph.sh preview --family notosans --png page.png  # one page, no server
 ```
 
+Every rendered PNG carries `CrossGlyph X.Y.Z` in gray at the bottom right.
+CrossGlyph adds the watermark after the device render, so it is not part of
+the simulated framebuffer.
+
 `--fonts` is the same flag `build` takes and answers the same question: which
 folder holds the families. Unset, it is `$CROSSGLYPH_FONTS`, and unset again
 it is the `fonts` folder beside the launcher.
