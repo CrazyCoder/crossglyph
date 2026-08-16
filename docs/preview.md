@@ -243,23 +243,23 @@ reader icon removes the body while keeping the selected screen proportions and
 rounded corners.
 
 **Paper** and **Ink** remap the panel's four levels without rebuilding the
-font. Both run from 0% to 100% in the direction their labels imply: more paper
-is lighter, and more ink is darker. Their defaults reproduce the four tones
-measured from XTEINK's X4 front photograph.
+font. Both run from 50% to 100% in the direction their labels imply: more paper
+is lighter, and more ink is darker. Both default to 90%.
 
-**Scale** has three meanings:
+**Scale** has four meanings:
 
 - **1:1 pixels** maps one reader pixel to one physical monitor pixel, accounting
   for the browser's device pixel ratio. It does not resample the screen.
-- **Device size** uses the reader body's documented dimensions and the
-  calibrated browser ruler. Press **Calibrate**, hold a physical ruler against
-  the line, and adjust it to 100 mm. Calibrate again after moving the window to
-  a monitor with a different scale.
+- **Device size** uses the reader body's documented dimensions at 100%.
 - **Fit** scales the selected body or bare screen into the available window.
+- **Custom** applies 50% to 150% of the documented device size. It shows a
+  100 mm ruler and the same slider and stepper controls as the numeric tuning
+  knobs. Hold a physical ruler against the line and adjust until they match.
+  Repeat this after moving the window to a monitor with a different scale.
 
-These choices, the tone values and the calibration are remembered in this
-browser. **Reset device preview** restores the X4 black frame, 1:1 pixels and
-the photographed tones. It does not change the font or its saved config.
+These choices and the tone values are remembered in this browser. **Reset
+device preview** restores the X4 frame, 1:1 pixels and 90% tones. It does not
+change the font or its saved config.
 
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that

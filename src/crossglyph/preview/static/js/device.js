@@ -1,4 +1,5 @@
 import {img} from "./dom.js";
+import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
 
 export const DEVICE_STORE = "crossglyph.device";
@@ -11,13 +12,12 @@ const color = document.getElementById("device-color");
 const frameShown = document.getElementById("device-frame-shown");
 const scale = document.getElementById("device-scale");
 const paper = document.getElementById("device-paper");
+const paperSlider = document.getElementById("device-paper-slider");
 const ink = document.getElementById("device-ink");
-const paperValue = document.getElementById("device-paper-value");
-const inkValue = document.getElementById("device-ink-value");
-const calibrate = document.getElementById("device-calibrate");
+const inkSlider = document.getElementById("device-ink-slider");
 const calibration = document.getElementById("device-calibration");
 const calibrationRange = document.getElementById("device-calibration-range");
-const calibrationValue = document.getElementById("device-calibration-value");
+const calibrationSlider = document.getElementById("device-calibration-slider");
 const ruler = document.getElementById("device-ruler");
 const reset = document.getElementById("reset-device");
 
@@ -85,8 +85,9 @@ function sourceFactor(device, shown) {
   if (scale.value === "pixels") {
     return device.native.width / device.aperture.width / dpr();
   }
-  if (scale.value === "device") {
-    const correction = Number(calibrationRange.value) / 100;
+  if (scale.value === "device" || scale.value === "custom") {
+    const correction = scale.value === "custom"
+      ? Number(calibrationRange.value) / 100 : 1;
     return CSS_PIXELS_PER_MM * correction * device.body.heightMm /
       device.body.height;
   }
@@ -180,10 +181,9 @@ export async function showRenderedPage() {
   paintDevicePage();
 }
 
-function syncReadouts() {
-  paperValue.value = `${paper.value}%`;
-  inkValue.value = `${ink.value}%`;
-  calibrationValue.value = `${Number(calibrationRange.value)}%`;
+function syncNumericControls() {
+  for (const field of [paper, ink, calibrationRange]) showSlider(field);
+  calibration.hidden = scale.value !== "custom";
   ruler.style.width = `${100 * CSS_PIXELS_PER_MM *
     Number(calibrationRange.value) / 100}px`;
 }
@@ -199,6 +199,22 @@ function values() {
 
 function saveDevice() {
   attempt(() => localStorage.setItem(DEVICE_STORE, JSON.stringify(values())));
+}
+
+function wireNumber(field, slider, changed) {
+  const set = (control, value) => setNumeric(control, value, changed);
+  pairSlider(field, slider, set);
+  for (const button of document.querySelectorAll(`[data-for="${field.id}"]`)) {
+    wireStepper(button, field, Number(button.dataset.dir), set);
+  }
+  field.addEventListener("input", () => {
+    const value = Number(field.value);
+    if (field.value !== "" && Number.isFinite(value)) {
+      showSlider(field);
+      changed(field);
+    }
+  });
+  field.addEventListener("change", () => set(field, numberOf(field)));
 }
 
 function validOption(select, value) {
@@ -228,7 +244,7 @@ export function loadDevice() {
     }
   }
   if (!fixedColor) color.value = themeColor();
-  syncReadouts();
+  syncNumericControls();
   layoutDevice();
 }
 
@@ -249,7 +265,7 @@ function resetDevice(scheduleRender) {
   fixedColor = false;
   color.value = themeColor();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
-  syncReadouts();
+  syncNumericControls();
   paintDevicePage();
   layoutDevice();
   if (changedDevice) scheduleRender();
@@ -266,33 +282,25 @@ export function wireDevice(scheduleRender) {
     saveDevice();
     layoutDevice();
   });
-  for (const control of [frameShown, scale]) {
-    control.addEventListener("input", () => {
-      saveDevice();
-      layoutDevice();
-    });
-  }
-  for (const control of [paper, ink]) {
-    control.addEventListener("input", () => {
-      syncReadouts();
-      saveDevice();
-      paintDevicePage();
-    });
-  }
-  calibrationRange.addEventListener("input", () => {
-    syncReadouts();
+  frameShown.addEventListener("input", () => {
     saveDevice();
     layoutDevice();
   });
-  calibrate.addEventListener("click", () => {
-    const open = calibration.hidden;
-    calibration.hidden = !open;
-    calibrate.setAttribute("aria-expanded", String(open));
-    if (open && scale.value !== "device") {
-      scale.value = "device";
-      saveDevice();
-      layoutDevice();
-    }
+  scale.addEventListener("change", () => {
+    syncNumericControls();
+    saveDevice();
+    layoutDevice();
+  });
+  const toneChanged = () => {
+    saveDevice();
+    paintDevicePage();
+  };
+  wireNumber(paper, paperSlider, toneChanged);
+  wireNumber(ink, inkSlider, toneChanged);
+  wireNumber(calibrationRange, calibrationSlider, () => {
+    syncNumericControls();
+    saveDevice();
+    layoutDevice();
   });
   reset.addEventListener("click", () => resetDevice(scheduleRender));
   globalThis.addEventListener?.("resize", layoutDevice);

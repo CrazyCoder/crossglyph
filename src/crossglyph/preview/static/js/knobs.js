@@ -14,7 +14,7 @@ export function decimalsOf(step) {
   return dot < 0 ? 0 : String(step).length - dot - 1;
 }
 
-export function setField(field, value) {
+export function setNumeric(field, value, changed) {
   const step = Number(field.step) || 1;
   const min = field.min === "" ? -Infinity : Number(field.min);
   const max = field.max === "" ? Infinity : Number(field.max);
@@ -28,6 +28,15 @@ export function setField(field, value) {
     Math.min(max, Math.max(min, snapped)).toFixed(decimalsOf(field.step))));
   if (next !== field.value) {
     field.value = next;
+    changed(field);
+  }
+  // Unconditionally, so a drag that snapped or clamped does not leave the
+  // slider sitting off the value it is showing.
+  showSlider(field);
+}
+
+export function setField(field, value) {
+  setNumeric(field, value, () => {
     // Same rule as editing the field by hand, and it has to be here too:
     // assigning .value fires no input event, so a knob moved with the steppers
     // would otherwise keep the value its arrow set aside and jump back to that
@@ -36,10 +45,7 @@ export function setField(field, value) {
     // fires for a change you made.
     stashed.delete(field.name);
     knobChanged(field);
-  }
-  // Unconditionally, so a drag that snapped or clamped does not leave the
-  // slider sitting off the value it is showing.
-  showSlider(field);
+  });
 }
 
 // The slider's value and its filled track, which have to move together or the
@@ -53,23 +59,23 @@ export function showSlider(field) {
   slider.style.setProperty("--fill", `${Math.round(fraction * 100)}%`);
 }
 
-export function stepBy(field, direction, coarse) {
+export function stepBy(field, direction, coarse, set = setField) {
   const step = (Number(field.step) || 1) * (coarse ? 10 : 1);
-  setField(field, Number(field.value) + step * direction);
+  set(field, Number(field.value) + step * direction);
 }
 
 // A held stepper repeats, which is what keeps a field as quick to sweep as the
 // slider it replaced. A function rather than a loop body, because the axis
 // rows a variable font brings are built after this runs and need the same.
-export function wireStepper(button, field, direction) {
+export function wireStepper(button, field, direction, set = setField) {
   let delay = null, repeat = null;
   const stop = () => { clearTimeout(delay); clearInterval(repeat); repeat = null; };
   button.addEventListener("pointerdown", (event) => {
     if (field.disabled) return;
     const coarse = event.shiftKey;
-    stepBy(field, direction, coarse);
+    stepBy(field, direction, coarse, set);
     delay = setTimeout(() => {
-      repeat = setInterval(() => stepBy(field, direction, coarse), 55);
+      repeat = setInterval(() => stepBy(field, direction, coarse, set), 55);
     }, 400);
   });
   for (const kind of ["pointerup", "pointerleave", "pointercancel"]) {
@@ -100,9 +106,9 @@ export function wireKnobs() {
 // The slider and the field are one control in two halves, and pairing them is
 // what makes showSlider and setField work on either. Built rows register here
 // the way the markup's own rows are registered below.
-export function pairSlider(field, slider) {
+export function pairSlider(field, slider, set = setField) {
   sliders.set(field, slider);
-  slider.addEventListener("input", () => setField(field, Number(slider.value)));
+  slider.addEventListener("input", () => set(field, Number(slider.value)));
 }
 
 // A numeric knob, built rather than declared: `− [ value ] +` with a slider

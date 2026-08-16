@@ -987,6 +987,33 @@ def test_common_device_controls_remain_available_while_folded():
     assert 'aria-label="Show reader frame"' in frame.group()
 
 
+
+def test_device_numeric_controls_use_the_shared_stepper():
+    """Device percentages get the same range, field and two buttons as knobs."""
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    controls = {
+        "device-paper": ("50", "100"),
+        "device-ink": ("50", "100"),
+        "device-calibration-range": ("50", "150"),
+    }
+    for control, (minimum, maximum) in controls.items():
+        assert f'data-slider-for="{control}"' in html
+        assert html.count(f'data-for="{control}"') == 2
+        field = re.search(
+            rf'<input class="mono" id="{control}"[^>]+>', html)
+        assert field is not None, control
+        assert 'type="number"' in field.group()
+        assert f'min="{minimum}"' in field.group()
+        assert f'max="{maximum}"' in field.group()
+
+    assert '<option value="custom">custom</option>' in html
+    assert 'id="device-calibrate"' not in html
+
+
 def test_a_checkbox_knob_is_marked_rather_than_given_an_arrow():
     """The arrow sets a value aside so you can flick back to it. A switch has
     nothing to set aside -- the value it is not showing is the other one, one

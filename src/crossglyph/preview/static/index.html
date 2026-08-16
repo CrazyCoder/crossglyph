@@ -389,10 +389,10 @@
         <span class="explain"><button type="button" class="info"
           aria-label="About device preview">?</button><span class="tip"
           role="tooltip">1:1 pixels maps one reader pixel to one monitor pixel
-          and does not resample the page. Device size uses the reader body
-          dimensions and the ruler calibration. Fit is for narrow windows.
-          Paper and ink remap the four display levels without rerendering the
-          font. Calibrate again after moving the window to another monitor.</span></span>
+          and does not resample the page. Device size uses the reader body's
+          documented dimensions. Custom shows a 100 mm ruler and applies its
+          percentage to that size. Fit is for narrow windows. Paper and ink
+          remap the four display levels without rerendering the font.</span></span>
       </h2>
       <div class="device-quick">
         <label class="device-field" for="device-model"><span>device</span>
@@ -431,31 +431,65 @@
             <option value="pixels" selected>1:1 pixels</option>
             <option value="device">device size</option>
             <option value="fit">fit</option>
+            <option value="custom">custom</option>
           </select>
-          <button type="button" class="reset" id="device-calibrate"
-                  aria-expanded="false"
-                  title="Adjust a 100 mm ruler to match a physical ruler">Calibrate</button>
         </div>
       </div>
       <div class="device-tones">
-        <label for="device-paper">paper</label>
-        <input id="device-paper" type="range" min="0" max="100"
-               step="1" value="84" data-device-setting>
-        <output id="device-paper-value" for="device-paper">84%</output>
-        <label for="device-ink">ink</label>
-        <input id="device-ink" type="range" min="0" max="100"
-               step="1" value="80" data-device-setting>
-        <output id="device-ink-value" for="device-ink">80%</output>
+        <div class="device-number">
+          <label class="name" for="device-paper">paper <span class="unit">%</span></label>
+          <input id="device-paper-slider" type="range"
+                 data-slider-for="device-paper" min="50" max="100" step="1"
+                 value="90" tabindex="-1" aria-hidden="true">
+          <span class="stepper">
+            <button type="button" class="step mono" data-for="device-paper"
+                    data-dir="-1" aria-label="decrease paper">−</button>
+            <input class="mono" id="device-paper" type="number"
+                   min="50" max="100" step="1" value="90" inputmode="numeric"
+                   data-device-setting>
+            <button type="button" class="step mono" data-for="device-paper"
+                    data-dir="1" aria-label="increase paper">+</button>
+          </span>
+        </div>
+        <div class="device-number">
+          <label class="name" for="device-ink">ink <span class="unit">%</span></label>
+          <input id="device-ink-slider" type="range"
+                 data-slider-for="device-ink" min="50" max="100" step="1"
+                 value="90" tabindex="-1" aria-hidden="true">
+          <span class="stepper">
+            <button type="button" class="step mono" data-for="device-ink"
+                    data-dir="-1" aria-label="decrease ink">−</button>
+            <input class="mono" id="device-ink" type="number"
+                   min="50" max="100" step="1" value="90" inputmode="numeric"
+                   data-device-setting>
+            <button type="button" class="step mono" data-for="device-ink"
+                    data-dir="1" aria-label="increase ink">+</button>
+          </span>
+        </div>
       </div>
       <div id="device-calibration" hidden>
         <div id="device-ruler" title="Adjust until this line measures 100 mm">
           <span>100 mm</span>
         </div>
-        <input id="device-calibration-range" type="range" min="80" max="120"
-               step=".5" value="100" data-device-setting
-               aria-label="device-size calibration percent">
-        <output id="device-calibration-value"
-                for="device-calibration-range">100%</output>
+        <div class="device-number">
+          <label class="name" for="device-calibration-range">scale <span class="unit">%</span></label>
+          <input id="device-calibration-slider" type="range"
+                 data-slider-for="device-calibration-range"
+                 min="50" max="150" step=".5" value="100"
+                 tabindex="-1" aria-hidden="true">
+          <span class="stepper">
+            <button type="button" class="step mono"
+                    data-for="device-calibration-range" data-dir="-1"
+                    aria-label="decrease custom scale">−</button>
+            <input class="mono" id="device-calibration-range" type="number"
+                   min="50" max="150" step=".5" value="100"
+                   inputmode="decimal" data-device-setting
+                   aria-label="custom device scale percent">
+            <button type="button" class="step mono"
+                    data-for="device-calibration-range" data-dir="1"
+                    aria-label="increase custom scale">+</button>
+          </span>
+        </div>
       </div>
     </div>
   </div>

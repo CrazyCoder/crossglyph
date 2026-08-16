@@ -632,7 +632,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     click() { return this.on.click(); },
   };
   const deviceModel = byName.device;
+  deviceModel.id = "device-model";
   const deviceControl = (control) => {
+    control.id = control.id || control.name;
     control.dataset.deviceSetting = "";
     return control;
   };
@@ -646,18 +648,36 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   }));
   const deviceScale = deviceControl(makeControl({
     name: "device-scale", value: "pixels",
-    options: [{ value: "pixels" }, { value: "device" }, { value: "fit" }],
+    options: [{ value: "pixels" }, { value: "device" }, { value: "fit" },
+              { value: "custom" }],
   }));
   const devicePaper = deviceControl(makeControl({
-    name: "device-paper", type: "range", value: "84", min: "0", max: "100",
+    name: "device-paper", type: "number", value: "90", min: "50", max: "100",
   }));
   const deviceInk = deviceControl(makeControl({
-    name: "device-ink", type: "range", value: "80", min: "0", max: "100",
+    name: "device-ink", type: "number", value: "90", min: "50", max: "100",
   }));
   const deviceCalibration = deviceControl(makeControl({
-    name: "device-calibration-range", type: "range", value: "100",
-    min: "80", max: "120", step: ".5",
+    name: "device-calibration-range", type: "number", value: "100",
+    min: "50", max: "150", step: ".5",
   }));
+  const deviceSlider = (id, field) => ({
+    id, dataset: {sliderFor: field.id}, value: field.value,
+    min: field.min, max: field.max, step: field.step,
+    style: {props: {}, setProperty(key, value) { this.props[key] = value; }},
+    addEventListener(kind, fn) { if (kind === "input") this.fire = fn; },
+  });
+  const devicePaperSlider = deviceSlider("device-paper-slider", devicePaper);
+  const deviceInkSlider = deviceSlider("device-ink-slider", deviceInk);
+  const deviceCalibrationSlider =
+    deviceSlider("device-calibration-slider", deviceCalibration);
+  const deviceStepList = [devicePaper, deviceInk, deviceCalibration]
+    .flatMap(field => [-1, 1].map(direction => ({
+      dataset: {for: field.id, dir: String(direction)},
+      on: {},
+      addEventListener(kind, fn) { this.on[kind] = fn; },
+      press(shiftKey = false) { this.on.pointerdown({shiftKey}); },
+    })));
   const deviceSurface = makeElement();
   const deviceCanvas = makeElement();
   deviceCanvas.getBoundingClientRect = () => ({left: 0, top: 0});
@@ -670,8 +690,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     putImageData(pixels) { deviceCanvas.pixels = [...pixels.data]; },
   });
   const deviceFrameImage = makeElement();
-  const deviceCalibrate = Object.assign(pressStub("device-calibrate"),
-                                        {attrs: {"aria-expanded": "false"}});
   const deviceReset = button("reset-device");
   const deviceSettings = [
     deviceModel, deviceColor, deviceFrame, deviceScale,
@@ -742,13 +760,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-frame-shown": deviceFrame,
     "device-scale": deviceScale,
     "device-paper": devicePaper,
+    "device-paper-slider": devicePaperSlider,
     "device-ink": deviceInk,
-    "device-paper-value": {value: ""},
-    "device-ink-value": {value: ""},
-    "device-calibrate": deviceCalibrate,
+    "device-ink-slider": deviceInkSlider,
     "device-calibration": {hidden: true},
     "device-calibration-range": deviceCalibration,
-    "device-calibration-value": {value: ""},
+    "device-calibration-slider": deviceCalibrationSlider,
     "device-ruler": makeElement(),
     "reset-device": deviceReset,
     knobs: form,
@@ -821,7 +838,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
           return [stubs["page-toggle"], stubs["mod-toggle"],
                   stubs["device-toggle"]];
         }
-        return selector === "[data-device-setting]" ? deviceSettings : [];
+        if (selector === "[data-device-setting]") return deviceSettings;
+        const deviceFor = selector.match(/^\[data-for="([^"]+)"\]$/)?.[1];
+        return deviceFor
+          ? deviceStepList.filter(button => button.dataset.for === deviceFor)
+          : [];
       },
       addEventListener(kind, fn) {
         if (kind === "keydown") keys.push(fn);
@@ -1074,14 +1095,17 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              scale: deviceScale, paper: devicePaper, ink: deviceInk,
              calibration: deviceCalibration, surface: deviceSurface,
              canvas: deviceCanvas, frameImage: deviceFrameImage,
-             paperValue: stubs["device-paper-value"],
-             inkValue: stubs["device-ink-value"],
+             paperSlider: devicePaperSlider, inkSlider: deviceInkSlider,
+             calibrationSlider: deviceCalibrationSlider,
              calibrationBox: stubs["device-calibration"],
-             calibrationValue: stubs["device-calibration-value"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
              change(control) { control.on.change(); },
-             calibrate() { presses["device-calibrate"](); },
+             step(control, direction, shiftKey = false) {
+               deviceStepList.find(button =>
+                 button.dataset.for === control.id &&
+                 Number(button.dataset.dir) === direction).press(shiftKey);
+             },
              reset() { clicks["reset-device"](); },
            },
            about: { island: stubs.about, number: stubs["about-number"],
@@ -4161,8 +4185,8 @@ for (const { name, text } of sources) {
 // the render core's native page geometry.
 {
   const storage = fakeStorage({"crossglyph.device": JSON.stringify({
-    device: "x3", color: "white", frame: false, scale: "device",
-    paper: "100", ink: "0", calibration: "110",
+    device: "x3", color: "white", frame: false, scale: "custom",
+    paper: "100", ink: "50", calibration: "110",
   })});
   const env = await loaded(storage);
   check("the saved reader model reaches the render request",
@@ -4170,20 +4194,63 @@ for (const { name, text } of sources) {
         JSON.stringify(env.fetches.bodies.at(-1).page));
   check("device appearance comes back with the reader model",
         env.device.color.value === "white" && !env.device.frame.checked &&
-        env.device.scale.value === "device");
-  check("tone controls use one percentage scale",
-        env.device.paperValue.value === "100%" &&
-        env.device.inkValue.value === "0%");
-  env.modules.get("device.js").paintDevicePage();
-  const noInk = env.device.canvas.pixels[0];
+        env.device.scale.value === "custom");
+  check("custom scale keeps its controls visible",
+        !env.device.calibrationBox.hidden);
+  check("tone controls use the shared 50 to 100 percent range",
+        env.device.paper.min === "50" && env.device.paper.max === "100" &&
+        env.device.ink.min === "50" && env.device.ink.max === "100");
+  check("custom scale covers 50 to 150 percent",
+        env.device.calibration.min === "50" &&
+        env.device.calibration.max === "150");
+  check("loaded numeric controls and sliders agree",
+        env.device.paper.value === "100" &&
+        env.device.paperSlider.value === "100" &&
+        env.device.ink.value === "50" &&
+        env.device.inkSlider.value === "50" &&
+        env.device.calibration.value === "110" &&
+        env.device.calibrationSlider.value === "110");
 
-  env.device.ink.value = "100";
-  env.device.edit(env.device.ink);
+  const customHeight = parseFloat(env.device.surface.style.height);
+  env.device.scale.value = "device";
+  env.device.change(env.device.scale);
+  const deviceHeight = parseFloat(env.device.surface.style.height);
+  check("device size is fixed while custom applies its percentage",
+        Math.abs(customHeight / deviceHeight - 1.1) < 1e-9,
+        `${customHeight} / ${deviceHeight}`);
+  check("only custom scale shows the calibration controls",
+        env.device.calibrationBox.hidden);
+  env.device.scale.value = "custom";
+  env.device.change(env.device.scale);
+
+  env.modules.get("device.js").paintDevicePage();
+  const lighterInk = env.device.canvas.pixels[0];
+  env.device.inkSlider.value = "100";
+  env.device.inkSlider.fire();
+  check("the shared slider updates the numeric field",
+        env.device.ink.value === "100", env.device.ink.value);
   check("more ink makes the black plane darker",
-        env.device.canvas.pixels[0] < noInk,
-        `${env.device.canvas.pixels[0]} is not darker than ${noInk}`);
-  check("the ink readout follows the same direction as its slider",
-        env.device.inkValue.value === "100%", env.device.inkValue.value);
+        env.device.canvas.pixels[0] < lighterInk,
+        `${env.device.canvas.pixels[0]} is not darker than ${lighterInk}`);
+  check("the shared slider saves the device value",
+        JSON.parse(storage.data["crossglyph.device"]).ink === "100",
+        storage.data["crossglyph.device"]);
+
+  env.device.paper.value = "50";
+  env.device.edit(env.device.paper);
+  env.device.step(env.device.paper, -1);
+  check("the paper stepper stops at 50 percent",
+        env.device.paper.value === "50" &&
+        env.device.paperSlider.value === "50");
+  const rulerBefore = env.device.ruler.style.width;
+  env.device.step(env.device.calibration, 1, true);
+  check("the custom stepper takes a coarse half-percent step",
+        env.device.calibration.value === "115" &&
+        env.device.calibrationSlider.value === "115",
+        env.device.calibration.value);
+  check("the custom stepper updates the ruler",
+        env.device.ruler.style.width !== rulerBefore,
+        env.device.ruler.style.width);
 
   env.device.model.value = "x4";
   env.device.change(env.device.model);
@@ -4191,8 +4258,6 @@ for (const { name, text } of sources) {
   check("changing reader redraws with its native geometry",
         env.fetches.bodies.at(-1).page.device === "x4",
         JSON.stringify(env.fetches.bodies.at(-1).page));
-  check("device settings save independently from the font",
-        JSON.parse(storage.data["crossglyph.device"]).ink === "100");
 
   env.device.reset();
   await settle();
@@ -4201,10 +4266,16 @@ for (const { name, text } of sources) {
         env.device.color.value === "white" &&
         env.device.frame.checked &&
         env.device.scale.value === "pixels" &&
-        env.device.paper.value === "84" && env.device.ink.value === "80");
-  check("default screen tones match the accurate white product photograph",
-        env.device.canvas.pixels.slice(0, 3).join() === "50,52,51" &&
-        env.device.canvas.pixels.slice(-4, -1).join() === "212,215,214",
+        env.device.calibrationBox.hidden &&
+        env.device.paper.value === "90" && env.device.ink.value === "90" &&
+        env.device.calibration.value === "100");
+  check("reset keeps numeric fields and sliders together",
+        env.device.paperSlider.value === "90" &&
+        env.device.inkSlider.value === "90" &&
+        env.device.calibrationSlider.value === "100");
+  check("default screen tones follow the 90 percent endpoints",
+        env.device.canvas.pixels.slice(0, 3).join() === "25,27,26" &&
+        env.device.canvas.pixels.slice(-4, -1).join() === "228,231,230",
         env.device.canvas.pixels.join());
   check("reset device preview removes its saved state",
         !("crossglyph.device" in storage.data));
