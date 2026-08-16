@@ -17,10 +17,10 @@ dependencies = ["pillow>=10", "fonttools>=4.50",
 crossglyph = "crossglyph.cli:main"
 
 [dependency-groups]
-# httpx is what fastapi's TestClient needs. pytest-xdist is for the full run
+# httpx2 is what Starlette's TestClient needs. pytest-xdist is for the full run
 # only: its per-worker startup costs more than a scoped run takes, so it is
 # deliberately not in addopts.
-dev = ["pytest>=8", "pytest-xdist>=3", "httpx>=0.27"]
+dev = ["pytest>=8", "pytest-xdist>=3", "httpx2>=2"]
 
 [build-system]
 requires = ["hatchling"]

@@ -111,7 +111,7 @@ def _greys_on_page(font_bytes, text="Hamburgefonstiv illustration"):
     from crossglyph.preview import PageSpec, preview_page
 
     page = preview_page(font_bytes, text, PageSpec(margin=6))
-    return set(page.convert("L").getdata())
+    return set(page.convert("L").get_flattened_data())
 
 
 def test_mono_rasterizing_builds_a_font_with_two_levels():
