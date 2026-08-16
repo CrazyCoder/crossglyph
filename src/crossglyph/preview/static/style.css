@@ -670,9 +670,10 @@
     border-top: 1px solid var(--rule); margin-top: .35rem;
     padding-top: .55rem;
   }
+  .device-ruler-scroll { overflow-x: auto; padding-top: .25rem; }
   #device-calibration .device-number { margin-top: .4rem; }
   #device-ruler {
-    position: relative; max-width: 100%; justify-self: center;
+    position: relative; margin: 0 auto;
     height: 1.1rem; border-top: 1px solid var(--text);
   }
   #device-ruler::before, #device-ruler::after {

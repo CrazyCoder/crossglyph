@@ -89,6 +89,27 @@ def test_the_watermark_names_the_running_version_and_respects_night_mode():
     assert night_levels == {image.BLACK, image.LIGHT}
 
 
+@needs
+def test_the_render_endpoint_uses_a_light_watermark_in_night_mode(client):
+    from PIL import Image
+
+    from crossglyph.preview import server
+    from crossglyph.render import image
+
+    response = client.post(
+        "/render", json={"size": 13, "page": {"inverted": True}})
+    assert response.status_code == 200
+    page = Image.open(io.BytesIO(response.content))
+    mask_x, mask_y = next(
+        (x, y)
+        for y in range(server.WATERMARK_MASK.height)
+        for x in range(server.WATERMARK_MASK.width)
+        if server.WATERMARK_MASK.getpixel((x, y)))
+    left = page.width - server.WATERMARK_INSET - server.WATERMARK_MASK.width
+    top = page.height - server.WATERMARK_INSET - server.WATERMARK_MASK.height
+    assert page.getpixel((left + mask_x, top + mask_y)) == image.LIGHT
+
+
 def test_png_output_carries_the_watermark(tmp_path, monkeypatch):
     from PIL import Image, ImageChops
 
@@ -126,7 +147,7 @@ def test_the_page_spec_reaches_the_render(client):
 
 @needs
 def test_the_device_selects_native_page_geometry(client):
-    from PIL import Image
+    from PIL import Image, ImageChops
 
     x3 = client.post("/render",
                      json={"size": 13, "page": {"device": "x3"}})
@@ -135,6 +156,12 @@ def test_the_device_selects_native_page_geometry(client):
 
     assert Image.open(io.BytesIO(x3.content)).size == (528, 792)
     assert Image.open(io.BytesIO(x4.content)).size == (480, 800)
+    for name, response in (("X3", x3), ("X4", x4)):
+        page = Image.open(io.BytesIO(response.content))
+        content = page.crop((0, 0, page.width, page.height - 30))
+        assert ImageChops.difference(
+            content, Image.new("L", content.size, 255)).getbbox(), \
+            f"{name} selected its geometry but drew no text"
 
 
 @needs

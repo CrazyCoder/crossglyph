@@ -4253,14 +4253,14 @@ for (const { name, text } of sources) {
   check("the paper stepper stops at 50 percent",
         env.device.paper.value === "50" &&
         env.device.paperSlider.value === "50");
-  const rulerBefore = env.device.ruler.style.width;
   env.device.step(env.device.calibration, 1, true);
   check("the custom stepper takes a coarse half-percent step",
         env.device.calibration.value === "115" &&
         env.device.calibrationSlider.value === "115",
         env.device.calibration.value);
-  check("the custom stepper updates the ruler",
-        env.device.ruler.style.width !== rulerBefore,
+  check("the custom stepper updates the ruler to its calibrated length",
+        Math.abs(parseFloat(env.device.ruler.style.width)
+          - 100 * 96 / 25.4 * 1.15) < .001,
         env.device.ruler.style.width);
 
   env.device.model.value = "x4";

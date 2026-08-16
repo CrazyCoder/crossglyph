@@ -287,13 +287,14 @@ int rc_probe_text_width(const char* utf8) {
   return g_renderer.getTextWidth(kFontId, utf8);
 }
 
-/// The logical page you draw into: 480x800 portrait. GfxRenderer rotates this
-/// onto the landscape panel, so these are not the framebuffer's dimensions.
+/// The selected reader's logical portrait page: 480x800 for X4, 528x792 for
+/// X3. GfxRenderer rotates this onto the landscape panel, so these are not the
+/// framebuffer's dimensions.
 int rc_screen_width() { rc_init(); return g_renderer.getScreenWidth(); }
 int rc_screen_height() { rc_init(); return g_renderer.getScreenHeight(); }
 
-/// The framebuffer's own layout: 800x480, one bit per pixel, MSB first. The
-/// host has to un-rotate this to get the page back (phyX = y,
+/// The selected panel's landscape layout, one bit per pixel, MSB first. The
+/// host has to un-rotate it to get the page back (phyX = y,
 /// phyY = panelHeight - 1 - x, from GfxRenderer.cpp:218).
 int rc_panel_width() { return display.getDisplayWidth(); }
 int rc_panel_height() { return display.getDisplayHeight(); }

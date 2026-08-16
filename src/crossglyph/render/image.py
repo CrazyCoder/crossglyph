@@ -8,10 +8,10 @@ a simulator screenshot of the same text are directly comparable.
 
 Two things about the framebuffer the passes land in:
 
-* It is in *panel* layout, 800x480 landscape, one bit per pixel, MSB first. The
-  480x800 page everything else talks about is logical, and GfxRenderer rotates
-  onto the panel as it draws (GfxRenderer.cpp:218). Un-rotating is this
-  module's job.
+* It is in the selected reader's *panel* layout, one bit per pixel, MSB first:
+  800x480 for X4 or 792x528 for X3. The portrait page is logical, and
+  GfxRenderer rotates onto the landscape panel as it draws
+  (GfxRenderer.cpp:218). Un-rotating is this module's job.
 * The BW pass paints -- it starts from white paper and *clears* a bit for ink.
   The grey planes mark -- they start empty and *set* a bit for a pixel that
   needs shading (GfxRenderer.cpp:452-458). Hence the different clear bytes, and

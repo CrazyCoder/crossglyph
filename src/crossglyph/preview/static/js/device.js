@@ -153,23 +153,23 @@ export function paintDevicePage() {
   const paperLevel = Math.round(Number(paper.value) * 255 / 100);
   const inkLevel = Math.round((100 - Number(ink.value)) * 255 / 100);
   const inkRgb = rgb(inkLevel, false), paperRgb = rgb(paperLevel, true);
-  const cache = new Map();
-  for (let offset = 0; offset < pixels.data.length; offset += 4) {
-    const source = pixels.data[offset];
-    let mapped = cache.get(source);
-    if (!mapped) {
-      mapped = inkRgb.map((channel, index) =>
-        tone(source, channel, paperRgb[index]));
-      cache.set(source, mapped);
+  const palette = new Uint8ClampedArray(256 * 3);
+  for (let source = 0; source < 256; ++source) {
+    const base = source * 3;
+    for (let channel = 0; channel < 3; ++channel) {
+      palette[base + channel] =
+        tone(source, inkRgb[channel], paperRgb[channel]);
     }
-    pixels.data[offset] = mapped[0];
-    pixels.data[offset + 1] = mapped[1];
-    pixels.data[offset + 2] = mapped[2];
+  }
+  for (let offset = 0; offset < pixels.data.length; offset += 4) {
+    const base = pixels.data[offset] * 3;
+    pixels.data[offset] = palette[base];
+    pixels.data[offset + 1] = palette[base + 1];
+    pixels.data[offset + 2] = palette[base + 2];
     pixels.data[offset + 3] = 255;
   }
   context.putImageData(pixels, 0, 0);
   canvas.classList.add("shown");
-  layoutDevice();
 }
 
 export async function showRenderedPage() {
@@ -179,6 +179,7 @@ export async function showRenderedPage() {
     return;
   }
   paintDevicePage();
+  layoutDevice();
 }
 
 function syncNumericControls() {
