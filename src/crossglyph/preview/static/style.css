@@ -89,12 +89,12 @@
   #middle { grid-area: page; }
 
   /* Three columns while they fit, and the arithmetic is the whole rule: two
-     30rem panels, the page at 480 device pixels plus the stage's padding, the
-     gaps between them, the page's own padding, and a scrollbar, which the
+     30rem panels, the widest reader frame at 1:1 pixels, the stage's padding,
+     the gaps between them, the page's own padding, and a scrollbar, which the
      media query counts as width the layout has and the layout does not. Widen
-     a panel without moving this and the third column wraps again -- which is
-     what test_the_breakpoints_fit_what_they_lay_out is for. */
-  @media (min-width: 1580px) {
+     a panel or a frame without moving this and the third column overflows --
+     which is what test_the_breakpoints_fit_what_they_lay_out is for. */
+  @media (min-width: 1770px) {
     body {
       grid-template-columns: 30rem min-content 30rem;
       grid-template-rows: auto auto 1fr;
@@ -111,7 +111,7 @@
   /* Below that the export panel is behind a tab, and one of the two is on
      screen at a time. Tune with nothing said, so the page opens on the knobs
      without a script having to run first. */
-  @media (max-width: 1579px) {
+  @media (max-width: 1769px) {
     #tabs { display: flex; }
     #export { display: none; }
     :root[data-panel="export"] #export { display: block; }
@@ -121,9 +121,9 @@
     :root[data-panel="export"] #tab-busy { display: none; }
   }
 
-  /* Narrower than the panel and the page side by side: one column, the page
-     under the panel, as the wrap used to leave it. */
-  @media (max-width: 1078px) {
+  /* Narrower than the panel and the widest reader frame side by side: one
+     column, with the page under the panel. */
+  @media (max-width: 1275px) {
     body {
       grid-template-columns: 30rem;
       grid-template-areas: "chrome" "tabs" "panel" "save" "page";
@@ -580,13 +580,12 @@
   #page-error .what { margin: 0; font-weight: 600; }
   #page-error .why { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 
-  /* The middle column: the page, and under it the text it is drawing. Its
-     width has to come from the specimen -- 480 device pixels plus the stage's
-     own padding -- and `min-content` is that figure without naming it: the
-     page cannot narrow, while the prose in the box below can wrap to any
-     width. Left to size itself the column took the width of the widest line of
-     that prose instead, and the page sat at the left of a stage wider than it
-     was. */
+  /* The middle column follows the rendered reader surface. `min-content`
+     lets a 1:1 frame widen it while the 30rem minimum keeps smaller physical
+     and fitted previews aligned with the panels. The prose below can wrap to
+     either width. Left to size itself the column instead followed the widest
+     line of that prose, and the preview sat at the left of a stage wider than
+     it was. */
   #middle { display: flex; flex-direction: column; gap: .55rem;
             width: min-content; min-width: 30rem; }
   /* The two folded cards under the device. Their common choices stay in the

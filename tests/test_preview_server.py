@@ -937,11 +937,10 @@ def test_save_is_reachable_from_either_panel():
 
 def test_the_breakpoints_fit_what_they_lay_out():
     """The page shows three columns above a width, two below it and one below
-    that. Both widths are arithmetic -- the panels, the sheet and the stage
-    around it, the gaps between them and the page's padding -- and nothing
-    recomputes them: widen a panel or narrow a gap and they have to move with
-    it, or a column comes back to wrapping under another, which is the whole
-    thing the folding exists to stop.
+    that. Both widths are arithmetic -- the panels, the widest reader frame,
+    the stage around it, the gaps between them and the page's padding -- and
+    nothing recomputes them: widen a panel or frame and the breakpoint has to
+    move with it, or the page overflows horizontally.
 
     Neither of the other suites can see this. The probe drives a stub DOM with
     no stylesheet, and a browser would have to be opened at exactly the wrong
@@ -953,6 +952,8 @@ def test_the_breakpoints_fit_what_they_lay_out():
 
     css = (server.STATIC / "style.css").read_text(encoding="utf-8")
     html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    device_js = (server.STATIC / "js" / "device.js").read_text(
+        encoding="utf-8")
 
     def rem(pattern: str, text: str) -> float:
         found = re.search(pattern, text)
@@ -968,8 +969,17 @@ def test_the_breakpoints_fit_what_they_lay_out():
     padding = rem(r"body \{\s*\n\s*margin: 0; padding: ([\d.]+)rem", css)
     stage = rem(r"#stage \{[^}]*padding: ([\d.]+)rem", css)
     sheet = float(re.search(r'id="page" width="(\d+)"', html).group(1))
-    # The sheet's own border, which the stage's box adds to the two paddings.
-    page_column = sheet + 2 + 2 * stage + 2
+    geometries = re.findall(
+        r"native:\s*\{width:\s*(\d+).*?"
+        r"frame:\s*\{width:\s*(\d+).*?"
+        r"aperture:\s*\{[^}]*width:\s*(\d+)",
+        device_js, re.DOTALL)
+    assert geometries
+    widest_surface = max(float(frame) * float(native) / float(aperture)
+                         for native, frame, aperture in geometries)
+    # The stage's border adds to its two paddings. The hidden source image is
+    # smaller than the widest visible frame, but remains part of the contract.
+    page_column = max(sheet, widest_surface) + 2 * stage + 2
 
     # A media query counts the scrollbar as width the layout does not get, and
     # this page always has one. A breakpoint with less headroom than that fires
