@@ -234,6 +234,12 @@ white can read heavy in white on black.
 
 ### Device preview
 
+<p align="center">
+  <a href="images/device-preview.png"><img src="images/device-preview.png"
+     width="50%"
+     alt="A rendered page inside the white Xteink X4 frame, with the device preview controls below"></a>
+</p>
+
 The **Device preview** under the page puts the rendered screen into an X3 or
 X4 body. It starts folded. X4 is the default; choosing X3 redraws at its native
 528 by 792 pixels instead of resizing the X4's 480 by 800 output. The body
