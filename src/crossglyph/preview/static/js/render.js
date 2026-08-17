@@ -1,6 +1,6 @@
 import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
-import {exportForm, exportSettings} from "./export.js";
+import {exportForm, exportSettings, presetBoxes} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
@@ -34,15 +34,21 @@ export function body() {
   // has them: ticking the box is a change you want to see. They reach the
   // build only for a codepoint this family lacks, so on a page that is all in
   // the family they cost nothing and change nothing.
+  // The panel is hidden exactly when this family has no config to read one
+  // from, which is also when there is no coverage to hold the page to. So the
+  // one guard answers both: send what it shows, or say nothing and let the
+  // server draw the text as it comes.
   const settings = exportForm.hidden ? null : exportSettings();
   if (settings) {
     out.fallbacks = settings.fallbacks;
     out.fallback1 = settings.fallback1;
     out.fallback2 = settings.fallback2;
-    // Which coverage the build would carry, which is what decides whether the
-    // 15.7 MB CJK face is one of the bundled ones. The preview still
-    // rasterizes the text and nothing else.
+    // Coverage decides what the page draws and not only what a build writes:
+    // the preview rasterizes the text less anything this coverage would leave
+    // out, so a family cannot look finished here and reach the device
+    // unreadable.
     out.intervals = settings.intervals;
+    out.ranges = settings.ranges;
   }
   return out;
 }
@@ -105,6 +111,35 @@ export function showUndrawn(count) {
     + `fallback faces, and press Fetch beside it if they are not here yet.`;
 }
 
+export const uncoveredNote = document.getElementById("uncovered");
+
+// What this coverage would leave out of the built font. A different fault from
+// the one above and a different answer: the family has the glyph, the build
+// would not carry it, and the fix is a tick rather than a download. Named
+// rather than left to be worked out, and not ticked here: coverage decides
+// what a build writes, so it is not a setting to change behind somebody's
+// back.
+export function showUncovered(count, presets) {
+  const named = new Set((presets || "").split(",").filter(Boolean));
+  // The boxes themselves, so the answer is where the answer is applied. Only
+  // "implied" is toggled by syncPresetCoverage, so this survives a redraw of
+  // the row and clears itself the moment the page can draw everything.
+  for (const box of presetBoxes()) {
+    box.parentElement.classList.toggle("needed", count > 0 && named.has(box.value));
+  }
+  uncoveredNote.hidden = !count;
+  if (!count) return;
+  const where = named.size
+    ? `Tick ${[...named].join(" and ")} under Export to carry ${
+        count === 1 ? "it" : "them"}.`
+    : "No coverage preset carries them, so this needs a range under Export.";
+  uncoveredNote.textContent =
+    `${count} character${count === 1 ? " is" : "s are"} outside the coverage `
+    + `you have ticked, so the page is blank where ${
+        count === 1 ? "it is" : "they are"} and the built font would be too. `
+    + where;
+}
+
 export async function renderNow() {
   const mine = ++latest;
   const started = performance.now();
@@ -140,6 +175,8 @@ export async function renderNow() {
     return;
   }
   showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
+  showUncovered(Number(response.headers.get("x-uncovered")) || 0,
+                response.headers.get("x-coverage-fix"));
   // Decoded straight from the response bytes, off the DOM: no element, no
   // object URL, no load or decode() state whose lifetime a later render has
   // to manage. The canvas keeps the previous page until this one is ready.

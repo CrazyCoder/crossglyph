@@ -339,11 +339,18 @@ A second family counts as a name, being called after the first one. The picker
 follows a rename as soon as it is saved, and so does any family falling back to
 the one that moved.
 
-Coverage decides what a build writes and not what the page draws. A preview
-build is sized to the text in the box, so unticking a range the text does not
-use leaves the render byte for byte the same while changing the font Build
-produces. The fallback ticks are the other way round: those do show on the
-page, because they decide who supplies a character the family has not got.
+The page draws what a build of this coverage would draw. A preview build is
+still sized to the text in the box rather than to the whole coverage, which is
+what keeps it to a few dozen glyphs, but it is held to what the coverage would
+carry: untick a range the text uses and the page goes blank where those
+characters are, exactly as the built font would. A family cannot look finished
+here and reach the device unreadable.
+
+When that happens the note under the box says how many characters it is and
+which preset would carry them, and the preset's own tick is marked in the
+coverage row, so the answer is where the answer gets applied. Nothing is
+ticked for you: coverage is what a build writes, and that is not a setting to
+change behind somebody's back.
 
 The coverage presets overlap, and the row says so rather than leaving it to be
 worked out: `reading` is the converter's `default` block and a good deal more,

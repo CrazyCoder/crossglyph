@@ -68,10 +68,13 @@ from . import (
     Drawable,
     PageSpec,
     build_font,
+    built_coverage,
     coverage_for,
     faces_for,
     fallback_split,
+    narrowed,
     page_codepoints,
+    presets_covering,
     preview_page,
 )
 
@@ -621,10 +624,15 @@ class RenderRequest(BaseModel):
     fallbacks: bool = False
     fallback1: str = ""
     fallback2: str = ""
-    #: The coverage the build would carry, which decides whether the 15.7 MB
-    #: CJK face is among the bundled ones. Not what the preview rasterizes --
-    #: that is the text, always.
-    intervals: str = ""
+    #: The coverage the build would carry. It decides whether the 15.7 MB CJK
+    #: face is among the bundled ones, and it narrows what the page draws: the
+    #: preview rasterizes the text, less anything this coverage would leave out
+    #: of the built font, so what is on screen is what the device would show.
+    #: None means the panel has not said yet, which is not the same as nothing
+    #: ticked and must not blank the page.
+    intervals: str | None = None
+    #: Raw `(0xAAAA-0xBBBB)` ranges from the same panel, added to `intervals`.
+    ranges: str | None = None
     #: A variable family's axis controls as the panel shows them: `text` and
     #: `bold` are weights, anything else is an axis tag. Empty for a static
     #: family, and for a variable one it means "whatever the config says".
@@ -779,7 +787,14 @@ def render(request: RenderRequest) -> Response:
         sources = faces_for(request.text, sources)
         keyed = tuple(sorted((style, str(path))
                              for style, path in sources.items()))
-        coverage = coverage_for(request.text, sources)
+        # What the text needs, then what this coverage would actually build of
+        # it. Narrowed before the faces are asked, so a character the build
+        # would drop is drawn the way the device draws it: not at all.
+        wanted = coverage_for(request.text, sources)
+        built = built_coverage(request.intervals, request.ranges)
+        coverage = narrowed(wanted, built)
+        uncovered: frozenset[int] = frozenset() if built is None else (
+            frozenset(page_codepoints(request.text)) - built)
         offered = fallbacks_for(request)
         drawable = resolved_fallbacks(keyed, coverage, offered)
         font = build_font_cached(
@@ -846,8 +861,15 @@ def render(request: RenderRequest) -> Response:
     # and the body is a PNG with nowhere to put it. Latin-1 is all a header
     # may carry, which is the other reason this is a count and not the
     # characters themselves.
+    # Two ways a character comes out blank, and they have different answers:
+    # no face on the list has it, or the coverage would not have built it.
+    # The second names the presets that would carry it, so a blank page says
+    # which box to tick rather than leaving it to be worked out.
     return Response(buffer.getvalue(), media_type="image/png",
-                    headers={"x-undrawn": str(len(undrawn))})
+                    headers={"x-undrawn": str(len(undrawn)),
+                             "x-uncovered": str(len(uncovered)),
+                             "x-coverage-fix":
+                                 ",".join(presets_covering(uncovered))})
 
 
 #: What the panel is allowed to write back, in the .conf's own spelling.

@@ -538,6 +538,11 @@
            not a row of boxes: without this line, picking a language the family
            cannot set looks like a page that failed to draw. -->
       <div id="undrawn" class="hint warn" hidden></div>
+      <!-- The other reason a page comes out blank, and the one with an answer:
+           the family can draw it, but the coverage would not build it. Said
+           separately because the fix is a different one, and named so it is a
+           tick rather than a hunt. -->
+      <div id="uncovered" class="hint warn" hidden></div>
       <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
         <code>*_both_*</code>. A face the font does not carry falls back to
         regular, as it would on the device.</div>
@@ -705,12 +710,10 @@
             Extra Unicode ranges, for books that need them. More coverage means
             a larger file and a longer build.
             <br><br>
-            These ticks change the font a build writes, not the page above it.
-            The preview draws the text in the box from the family itself, so
-            ticking a range you are not looking at changes nothing on screen
-            and everything in the built file. The fallback ticks below do show
-            on the page, since they decide who supplies a character the family
-            has not got.
+            The page above draws what a build of these ticks would draw. Untick
+            a range the text uses and it goes blank there, the way the built
+            font would, and the note under the text box says which tick would
+            carry it.
             <br><br>
             Base coverage is in every build first: ASCII and
             basic Latin plus Unicode punctuation, which keeps letters, numbers,

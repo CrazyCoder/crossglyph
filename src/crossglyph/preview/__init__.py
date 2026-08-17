@@ -11,6 +11,7 @@ firmware's own engine through crossglyph.render. See docs/preview.md.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import pathlib
 import tempfile
 import typing
@@ -249,6 +250,72 @@ def as_intervals(codepoints: set[int]) -> tuple[tuple[int, int], ...]:
         else:
             intervals.append((code, code))
     return tuple(intervals)
+
+
+@functools.lru_cache(maxsize=16)
+def built_coverage(intervals: str | None,
+                   ranges: str | None = None) -> frozenset[int] | None:
+    """Every codepoint a build of this coverage would carry, or None.
+
+    None means the caller did not say, and a caller that did not say must not
+    be narrowed to nothing: the export panel sends its coverage only once it
+    has read a family's config, and a first paint that guessed "" would blank
+    every non-Latin page before anybody had touched a control.
+
+    Base coverage and the replacement character are in every build, which
+    resolve_intervals adds, so ASCII survives whatever is ticked.
+    """
+    if intervals is None:
+        return None
+    spec = ",".join(part for part in (intervals, ranges) if part)
+    resolved = cpfont.arabic.implied_coverage(cpfont.resolve_intervals(spec))
+    return frozenset(code for low, high in resolved
+                     for code in range(low, high + 1))
+
+
+def narrowed(coverage: tuple[tuple[int, int], ...],
+             built: frozenset[int] | None) -> tuple[tuple[int, int], ...]:
+    """The text's coverage, less whatever this build would not carry.
+
+    What makes the page honest. A preview is sized to the text rather than to
+    the coverage, which is what keeps it to a few dozen glyphs; without this it
+    would also draw characters the built font will not have, so a family could
+    look finished on screen and reach the device unreadable.
+    """
+    if built is None:
+        return coverage
+    return as_intervals({code for low, high in coverage
+                         for code in range(low, high + 1) if code in built})
+
+
+def presets_covering(codepoints: frozenset[int]) -> tuple[str, ...]:
+    """The fewest coverage presets that would carry these, best first.
+
+    Named so a blank page can say which box to tick. Greedy rather than
+    optimal: the answer is read by somebody deciding what to turn on, and one
+    preset too many costs them nothing.
+    """
+    wanted = set(codepoints)
+    reach = {}
+    for name, spans in cpfont.INTERVAL_PRESETS.items():
+        if name == "base":
+            continue                    # in every build already
+        carries = {code for low, high in spans for code in range(low, high + 1)}
+        reach[name] = (carries & wanted, sum(h - l + 1 for l, h in spans))
+
+    chosen: list[str] = []
+    while wanted:
+        # Most of what is still missing, and among equals the narrowest preset:
+        # `default` carries Cyrillic, but somebody who pasted Russian wants to
+        # be told to tick Cyrillic, which is the smaller font and the plainer
+        # answer. The size compared is the whole preset's, not the part that
+        # overlaps, or every candidate ties.
+        name = max(reach, key=lambda n: (len(reach[n][0] & wanted), -reach[n][1]))
+        if not reach[name][0] & wanted:
+            break                       # nothing left that a preset can carry
+        chosen.append(name)
+        wanted -= reach[name][0]
+    return tuple(chosen)
 
 
 class Drawable(typing.NamedTuple):

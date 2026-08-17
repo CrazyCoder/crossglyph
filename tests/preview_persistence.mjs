@@ -805,6 +805,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     retry: button("retry"),
     status: { textContent: "" },
     undrawn: { textContent: "", hidden: true },
+    uncovered: { textContent: "", hidden: true },
     "lh-auto": { checked: true, defaultChecked: true, addEventListener() {} },
     faces: { textContent: "" },
     // One badge per style, rebuilt whenever the choice changes.
@@ -932,11 +933,17 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         if (opts.renderOk) {
           return Promise.resolve({
             ok: true, status: 200, blob: () => Promise.resolve({fresh: true}),
-            // How many characters the page could not draw. A real answer
-            // always carries it; `undrawn` in the options is how a test asks
-            // for a page with holes in it.
-            headers: { get: (name) => (name === "x-undrawn"
-                                       ? String(opts.undrawn ?? 0) : null) },
+            // How many characters the page could not draw, and how many of
+            // those the coverage would not have built. A real answer always
+            // carries all three; `undrawn`, `uncovered` and `coverageFix` in
+            // the options are how a test asks for a page with holes in it.
+            headers: {
+              get: (name) => (
+                name === "x-undrawn" ? String(opts.undrawn ?? 0)
+                : name === "x-uncovered" ? String(opts.uncovered ?? 0)
+                : name === "x-coverage-fix" ? (opts.coverageFix ?? "")
+                : null),
+            },
           });
         }
         // Never resolves: the page draws the blob it gets back, and there is
@@ -3159,6 +3166,44 @@ for (const deferred of [
         note.textContent);
   check("and saying what to do about it",
         note.textContent.includes("press Fetch"), note.textContent);
+}
+
+// 60b. The other reason a page is blank, and the one with an answer: the
+//      coverage would not build those characters. Said apart from the missing
+//      glyph case because the fix is a tick and not a download, and the preset
+//      that carries them is named rather than left to be worked out.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, uncovered: 45,
+                             coverageFix: "arabic" });
+  const note = env.sandbox.document.getElementById("uncovered");
+  check("a page the coverage would not build says so", note.hidden === false);
+  check("counting them",
+        note.textContent.startsWith("45 characters are outside"),
+        note.textContent);
+  check("naming the tick that would carry them",
+        note.textContent.includes("Tick arabic under Export"), note.textContent);
+  check("and saying the built font would be blank too",
+        note.textContent.includes("built font would be too"), note.textContent);
+}
+
+// 60c. Nothing to say when the coverage carries the page, which is every
+//      page somebody has not misconfigured.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  check("no coverage note on a page that draws",
+        env.sandbox.document.getElementById("uncovered").hidden === true);
+}
+
+// 60d. No preset carries them, so there is no tick to offer and the note says
+//      what there is instead of naming nothing.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, uncovered: 2, coverageFix: "" });
+  const note = env.sandbox.document.getElementById("uncovered");
+  check("a range rather than a tick when no preset carries them",
+        note.textContent.includes("needs a range under Export"),
+        note.textContent);
 }
 
 // 61. One is not "1 characters", and the note is read by somebody already

@@ -2938,3 +2938,75 @@ def test_the_endpoint_does_not_decide_who_may_apply(client, monkeypatch):
                         lambda root, *a, **kw: seen.append(root) or iter(()))
     client.post("/update", json={})
     assert seen == [server.install.root()]
+
+
+# --- the page shows what the build would carry -----------------------------
+
+
+def _joining(tmp_path):
+    import fontsmith
+    return fontsmith.joining_font(tmp_path / "joining.ttf")
+
+
+@needs_core
+def test_coverage_the_build_would_drop_is_dropped_from_the_page(tmp_path):
+    """The page and the device have to agree, or a family looks finished here
+    and reaches the reader unreadable.
+
+    Unticking a range used to leave the render byte for byte the same, because
+    a preview build is sized to the text rather than to the coverage. It is
+    still sized to the text; it is now also held to what a build of that
+    coverage would carry.
+    """
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    server._sources.clear()
+    server._sources[0] = _joining(tmp_path)
+    client = TestClient(server.app)
+    arabic_text = "\u0628\u0628\u0628 abc"
+
+    carried = client.post("/render", json={"text": arabic_text, "size": 16,
+                                           "intervals": "base,arabic"})
+    dropped = client.post("/render", json={"text": arabic_text, "size": 16,
+                                           "intervals": "base"})
+    assert carried.status_code == dropped.status_code == 200
+    assert carried.content != dropped.content, \
+        "unticking a range the text uses has to change the page"
+    assert carried.headers["x-uncovered"] == "0"
+    assert int(dropped.headers["x-uncovered"]) > 0
+    assert dropped.headers["x-coverage-fix"] == "arabic"
+
+
+@needs_core
+def test_a_panel_that_has_not_said_its_coverage_draws_everything(tmp_path):
+    """Absent is not the same as nothing ticked.
+
+    The export panel sends its coverage once it has read a family's config,
+    and a family with no config never sends one. Guessing empty there would
+    blank every non-Latin page before anybody touched a control.
+    """
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    server._sources.clear()
+    server._sources[0] = _joining(tmp_path)
+    client = TestClient(server.app)
+    body = {"text": "\u0628\u0628\u0628 abc", "size": 16}
+
+    silent = client.post("/render", json=body)
+    everything = client.post("/render", json={**body, "intervals": "base,arabic"})
+    assert silent.headers["x-uncovered"] == "0"
+    assert silent.content == everything.content
+
+
+def test_the_named_fix_is_a_preset_that_would_actually_carry_them():
+    from crossglyph.preview import presets_covering
+
+    assert presets_covering(frozenset({0x0628, 0x0645})) == ("arabic",)
+    assert presets_covering(frozenset({0x0410})) == ("cyrillic",)
+    assert presets_covering(frozenset()) == ()
+    # Nothing in any preset: said as nothing rather than as a wrong tick.
+    assert presets_covering(frozenset({0xE000})) == ()
