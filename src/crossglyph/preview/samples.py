@@ -15,6 +15,10 @@ one is built the same way:
 * a short English paragraph, so a reader whose font has to carry both scripts
   can see them beside each other, and so every preset shows digits.
 
+Three presets add a paragraph of their own digits: English and Russian because
+the `figures` knob is what it shows, and Arabic because the tail's digits are
+Latin and say nothing about whether a face carries the Arabic-Indic ten.
+
 Emphasis sits inside running text rather than on a line of its own, because
 that is where you can tell whether an italic is the right weight beside its own
 roman. A face the font does not carry falls back to regular, as it does on the
@@ -59,6 +63,22 @@ def _preset(pangram: str, article: str) -> str:
 #: order the picker lists them, which is alphabetical by English name rather
 #: than by the endonym shown -- sorting 日本語 against Suomi has no answer.
 SAMPLES: dict[str, Sample] = {
+    "ar": Sample("العربية", "\n".join([
+        # The pangram every Arabic type specimen shows: all twenty-eight
+        # letters, and enough of them joining to show a face's initial, medial
+        # and final forms in one line.
+        "نص حكيم له سر قاطع وذو شأن عظيم مكتوب على ثوب أخضر ومغلف بجلد أزرق",
+        # Second, as in English and Russian, so the digits land on the first
+        # page rather than past its end. Arabic-Indic digits rather than the
+        # English tail's Latin ones: they are a separate ten glyphs in a
+        # separate block, and a face can carry the Latin set and none of these.
+        "الأرقام: ٠ ١ ٢ ٣ ٤ ٥ ٦ ٧ ٨ ٩، كما في الصفحة ١١٨ من طبعة سنة ١٩٤٧.",
+        # Bold and no italic: Arabic is not set in italic, and the faces that
+        # ship one for it are rare. The English tail carries the italic.
+        "يولد جميع الناس أحرارًا متساوين في الكرامة والحقوق. وقد وهبوا عقلاً "
+        "وضميرًا وعليهم أن يعامل بعضهم بعضًا *بروح الإخاء*.",
+        _ENGLISH_TAIL])),
+
     "zh-Hans": Sample("简体中文", _preset(
         # No pangram exists for a script of this size. The Thousand Character
         # Classic is the closest thing the tradition has: a thousand

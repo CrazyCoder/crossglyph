@@ -2421,8 +2421,11 @@ def test_every_preset_is_long_enough_to_wrap():
 
 def test_every_preset_either_hyphenates_or_is_a_script_that_does_not():
     """A preset whose language the page cannot hyphenate is fine, and there are
-    four of them. A preset whose language the page *can* hyphenate but does not
-    offer would be one the picker could never follow."""
+    five of them: the three CJK ones and Korean, which do not break words that
+    way, and Arabic, which justifies by stretching the joins between letters
+    rather than by breaking a word in two. A preset whose language the page
+    *can* hyphenate but does not offer would be one the picker could never
+    follow."""
     import re
 
     from crossglyph.preview import server
@@ -2432,7 +2435,8 @@ def test_every_preset_either_hyphenates_or_is_a_script_that_does_not():
     offered = set(re.findall(r'<option value="(\w*)"', picker.group(0)))
 
     unhyphenated = {tag for tag in _samples() if tag not in offered}
-    assert unhyphenated == {"ja", "ko", "zh-Hans", "zh-Hant"}, unhyphenated
+    assert unhyphenated == {"ar", "ja", "ko", "zh-Hans", "zh-Hant"}, \
+        unhyphenated
 
 
 def test_the_presets_say_the_same_as_the_device_does():
@@ -2453,9 +2457,9 @@ def test_the_presets_say_the_same_as_the_device_does():
 
     # The four CJK presets have no translation to read: the firmware carries
     # none, and their opening lines are named in samples.py.
-    named = {"en": "english", "fi": "finnish", "fr": "french", "de": "german",
-             "it": "italian", "pl": "polish", "ru": "russian", "es": "spanish",
-             "sv": "swedish", "uk": "ukrainian"}
+    named = {"ar": "arabic", "en": "english", "fi": "finnish", "fr": "french",
+             "de": "german", "it": "italian", "pl": "polish", "ru": "russian",
+             "es": "spanish", "sv": "swedish", "uk": "ukrainian"}
     for tag, stem in named.items():
         path = translations / f"{stem}.yaml"
         if not path.is_file():
