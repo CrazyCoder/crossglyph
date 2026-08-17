@@ -4,6 +4,7 @@ import re
 import freetype
 import pytest
 
+import fontpaths
 import fontsmith
 from crossglyph.cpfont import arabic, convert
 from crossglyph.render import stamp
@@ -256,3 +257,50 @@ def test_a_composite_form_draws_both_of_its_pieces(tmp_path):
 
     assert _ink(decomposed, isolated) > _ink(plain, isolated) * 1.5, \
         "a mark plus a base must draw more than the base alone"
+
+
+# --- the per-glyph size cap ------------------------------------------------
+
+
+def test_an_oversized_glyph_is_skipped_rather_than_killing_the_build(capfd):
+    """EpdGlyph packs width and height as uint8, so 255 px is the ceiling.
+
+    Noto Sans Arabic's bismillah is one glyph drawn as a whole phrase and is
+    312 px wide at 32 px. It used to raise struct.error out of the packer,
+    naming no codepoint and suggesting nothing.
+    """
+    from crossglyph.preview import REGULAR, build_font
+
+    face = fontpaths.arabic_with_wide_ligature()
+    if face is None:
+        pytest.skip(f"no engine checkout at {fontpaths.FIRMWARE_ARABIC}")
+    font = build_font({REGULAR: face}, 32.0,
+                      coverage=((0x0020, 0x0020), (0xFDFD, 0xFDFD)))
+    assert font, "the build must survive a glyph it cannot hold"
+    assert "FDFD" in capfd.readouterr().err
+
+
+def test_a_glyph_inside_the_cap_is_still_drawn():
+    """The guard must not be a licence to drop ordinary glyphs."""
+    from crossglyph.preview import REGULAR, build_font
+    from crossglyph.render import image
+
+    face = fontpaths.arabic_with_wide_ligature()
+    if face is None:
+        pytest.skip(f"no engine checkout at {fontpaths.FIRMWARE_ARABIC}")
+    font = build_font({REGULAR: face}, 32.0,
+                      coverage=((0x0020, 0x0020), (0xFDFA, 0xFDFA)))
+    page = image.render_png(font, "ﷺ")
+    assert sum(1 for v in page.convert("L").getdata() if v < 250) > 0
+
+
+def test_the_arabic_preset_reaches_the_honorific_ligatures():
+    """U+FDFA and U+FDFB are ordinary in Arabic prose and small at every size.
+
+    They were excluded only to dodge the neighbour that overflows the cap,
+    which is now handled where it belongs.
+    """
+    covered = {cp for start, end in convert.resolve_intervals("arabic")
+               for cp in range(start, end + 1)}
+    assert 0xFDFA in covered
+    assert 0xFDFB in covered

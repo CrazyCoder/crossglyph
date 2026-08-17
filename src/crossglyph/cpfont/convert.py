@@ -62,7 +62,11 @@ INTERVAL_PRESETS = {
     "greek":       [(0x0370, 0x03FF), (0x1F00, 0x1FFF)],
     "cyrillic":    [(0x0400, 0x04FF), (0x0500, 0x052F)],
     "hebrew":      [(0x0590, 0x05FF), (0xFB1D, 0xFB4F)],
-    "arabic":      [(0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF), (0xFB50, 0xFDF9), (0xFE70, 0xFEFF)],
+    # The Forms-A range runs to the end of the block. The honorific ligatures
+    # at its top are ordinary in Arabic prose and small at every size; what
+    # made the range stop short was their neighbour U+FDFD, one glyph drawn as
+    # a whole phrase, which is handled at GLYPH_SIZE_CAP instead.
+    "arabic":      [(0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF)],
     "georgian":    [(0x10A0, 0x10FF), (0x2D00, 0x2D2F)],
     "armenian":    [(0x0530, 0x058F)],
     "ethiopic":    [(0x1200, 0x137F), (0x1380, 0x139F), (0x2D80, 0x2DDF)],
@@ -1144,6 +1148,24 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
             bitmap = f
 
+            # FORK: EpdGlyph packs width and height as uint8, so a glyph over
+            # GLYPH_SIZE_CAP on either axis has nowhere to go. Only one glyph
+            # reaches this in practice, and only at large sizes: an Arabic
+            # ligature drawn as a whole phrase, such as U+FDFD. A device that
+            # cannot store it draws nothing for it either way, so this stores
+            # the empty entry rather than aborting a whole family over one
+            # glyph. Without it the packer raises struct.error, which names no
+            # codepoint and suggests nothing.
+            if bitmap.width > GLYPH_SIZE_CAP or bitmap.rows > GLYPH_SIZE_CAP:
+                print(f"WARNING: U+{code_point:04X} renders "
+                      f"{bitmap.width}x{bitmap.rows} px, over the "
+                      f"{GLYPH_SIZE_CAP} px per-glyph cap; drawn as blank",
+                      file=sys.stderr)
+                glyph = GlyphProps(0, 0, 0, 0, 0, 0, total_bitmap_size,
+                                   code_point)
+                all_glyphs.append((glyph, b''))
+                continue
+
             # Build 4-bit greyscale bitmap (same logic as fontconvert.py).
             #
             # FreeType returns the buffer with bitmap.pitch as the row stride
@@ -1343,6 +1365,10 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 # EpdGlyph struct: 16 bytes, little-endian
 GLYPH_STRUCT_FORMAT = "<BBHhhH2xI"
 assert struct.calcsize(GLYPH_STRUCT_FORMAT) == 16
+
+#: FORK: the first two fields above are width and height as uint8, which is
+#: what caps how large a single glyph can be.
+GLYPH_SIZE_CAP = 0xFF
 
 
 def pack_style_sections(sd):

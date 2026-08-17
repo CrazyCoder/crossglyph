@@ -23,6 +23,13 @@ FIRMWARE_TTF = (stamp.FIRMWARE / "lib" / "EpdFont" / "builtinFonts"
                 / "source" / "NotoSans" / "NotoSans-Regular.ttf")
 
 
+#: The firmware's Arabic face. Its bismillah ligature is one glyph drawn as a
+#: whole phrase, and the only one in practice wide enough to reach the
+#: .cpfont per-glyph size cap.
+FIRMWARE_ARABIC = (stamp.FIRMWARE / "lib" / "EpdFont" / "builtinFonts"
+                   / "source" / "NotoSansArabic" / "NotoSansArabic-Regular.ttf")
+
+
 def _declared(variable: str) -> pathlib.Path | None:
     named = os.environ.get(variable)
     if not named:
@@ -48,6 +55,11 @@ def noto() -> pathlib.Path | None:
     negative lineGap, and its declared band exceeds its pitch by a pixel.
     """
     return FIRMWARE_TTF if FIRMWARE_TTF.is_file() else None
+
+
+def arabic_with_wide_ligature() -> pathlib.Path | None:
+    """A face whose U+FDFD is wider than a .cpfont glyph can be, or None."""
+    return FIRMWARE_ARABIC if FIRMWARE_ARABIC.is_file() else None
 
 
 def italic() -> pathlib.Path | None:
