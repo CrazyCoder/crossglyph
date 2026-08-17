@@ -535,6 +535,7 @@ def _extract_kerning(font_path, codepoints, ppem, figure_subs=None):
 
     # Collect raw kerning values in font design units
     raw_kern = {}  # (left_glyph_name, right_glyph_name) -> design_units
+    skipped = {}   # FORK: unsupported GPOS lookup type -> subtables seen
 
     # 1. Legacy kern table
     if 'kern' in font:
@@ -576,10 +577,21 @@ def _extract_kerning(font_path, codepoints, ppem, figure_subs=None):
                     if effective_type == 2:
                         _extract_pairpos_subtable(actual, glyph_to_cp, raw_kern)
                     else:
-                        print(f"  Debug: skipping unsupported GPOS kern lookupType="
-                              f"{effective_type} (outer={lookup.LookupType}, Format={actual.Format})",
-                              file=sys.stderr)
+                        skipped[effective_type] = skipped.get(effective_type, 0) + 1
 
+    # FORK: one line rather than one per subtable, as the ligature walk does
+    # below. A face that reaches the kern feature through mark attachment or a
+    # contextual rule has one of these for every subtable, which on
+    # Scheherazade is ninety-odd lines at every page redraw. The lookup type is
+    # the whole of what a reader can act on, so the count and the types are
+    # what survive; the outer type is always 9 or the effective one, and the
+    # subtable format says nothing once the type is unsupported.
+    if skipped:
+        kinds = ", ".join(str(kind) for kind in sorted(skipped))
+        print(f"kerning: {sum(skipped.values())} GPOS subtables skipped, "
+              f"unsupported lookup "
+              f"{'type' if len(skipped) == 1 else 'types'} {kinds}",
+              file=sys.stderr)
     font.close()
 
     # Scale design-unit kerning values to 4.4 fixed-point pixels.
@@ -729,7 +741,7 @@ def figure_glyph_overrides(font_path):
         font.close()
 
 
-def gsub_ligature_sequences(font_path):
+def gsub_ligature_sequences(font_path, report=True):
     """Every ligature rule the font carries: input codepoints -> output codepoint.
 
     FORK: split out of extract_ligatures_fonttools, which is this walk plus a
@@ -739,6 +751,9 @@ def gsub_ligature_sequences(font_path):
     set is dropped by that filter, so a text-derived build would silently lose
     the ligatures it was meant to show. Costs about half a millisecond after
     fontTools is imported.
+
+    `report` names what was dropped. The coverage pass asks the same question
+    the build does, so a render that left it on in both said everything twice.
     """
     from fontTools.ttLib import TTFont
 
@@ -805,7 +820,7 @@ def gsub_ligature_sequences(font_path):
     # codepoint -- and none of them is actionable: the format addresses a
     # ligature by codepoint, so one without is unreachable however the font is
     # rebuilt. At a page redraw that is fifty lines of log per keystroke.
-    if dropped:
+    if dropped and report:
         print(f"ligatures: {dropped} not reachable by codepoint, skipped",
               file=sys.stderr)
     font.close()
@@ -822,7 +837,8 @@ def ligature_codepoints(font_path, codepoints):
     """
     codepoints = set(codepoints)
     return {lig_cp
-            for seq, lig_cp in gsub_ligature_sequences(font_path).items()
+            for seq, lig_cp in gsub_ligature_sequences(font_path,
+                                                       report=False).items()
             if all(cp in codepoints for cp in seq)}
 
 

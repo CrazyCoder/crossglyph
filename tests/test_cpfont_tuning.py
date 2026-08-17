@@ -640,3 +640,23 @@ def test_a_font_without_pnum_is_honestly_unmoved(tmp_path):
 def test_default_figures_are_byte_identical(tmp_path):
     assert _figures(tmp_path, CFF).read_bytes() == \
         _figures(tmp_path, CFF, Tuning(figures="default")).read_bytes()
+
+
+def test_unsupported_kern_lookups_are_reported_once(capfd, tmp_path):
+    """One line for the walk, not one per subtable.
+
+    A face reaching the kern feature through mark attachment has one of these
+    for every subtable it carries. Scheherazade has ninety-three, and the
+    preview redraws on every keystroke.
+    """
+    import fontpaths
+    from crossglyph.cpfont import convert
+
+    face = fontpaths.arabic_with_wide_ligature()
+    if face is None:
+        pytest.skip(f"no engine checkout at {fontpaths.FIRMWARE_ARABIC}")
+    convert.extract_kerning_fonttools(str(face), list(range(0x0600, 0x0700)),
+                                      ppem=33)
+    said = [line for line in capfd.readouterr().err.splitlines()
+            if "kern" in line.lower()]
+    assert len(said) <= 1, f"one line expected, got {len(said)}"
