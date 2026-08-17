@@ -534,14 +534,13 @@ def test_device_frames_carry_normalized_geometry(
         # alpha here would have passed on the very frames that were broken.
         green = frame.getchannel("G")
         middle = (top + bottom) // 2
-        for edge, reference in ((left, left - 16), (right, right + 15)):
-            outside = green.getpixel((reference, middle))
-            for offset in (2, 3, 4, 5):
-                beside = green.getpixel(
-                    (edge - offset if edge == left else edge + offset - 1, middle))
-                assert abs(beside - outside) <= 20, (
-                    f"the bezel jumps from {outside} to {beside} as it meets the "
-                    f"aperture, which is the grey line this pipeline removed")
+        for edge, outward in ((left - 1, -1), (right, 1)):
+            reference = green.getpixel((edge + outward * 15, middle))
+            for offset in (1, 2, 3, 4):
+                beside = green.getpixel((edge + outward * offset, middle))
+                assert abs(beside - reference) <= 20, (
+                    f"the bezel jumps from {reference} to {beside} as it meets "
+                    f"the aperture, which is the grey line this pipeline removed")
 
         # The body is fitted to the canvas margin, which is what fixes the
         # frame's size; anti-aliasing puts the silhouette within a pixel of it.

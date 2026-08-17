@@ -1349,6 +1349,17 @@ for (const { name, text } of sources) {
   const bad = await run(fakeStorage({"crossglyph.size": "99"}));
   check("an invalid stored size leaves the default standing",
         bad.byName.size.value === "13", bad.byName.size.value);
+
+  // A page store written before the device select was excluded still carries a
+  // device. Applying it puts that stale value over the reader's chosen one a
+  // moment after the page settles, which is how a reader who picked X4 kept
+  // finding X3 after every refresh. The device store owns this control.
+  const stale = await run(fakeStorage({
+    "crossglyph.page": JSON.stringify({margin: "22", device: "x3"}),
+    "crossglyph.device": JSON.stringify({device: "x4"}),
+  }));
+  check("a stale device in the page store does not override the device store",
+        stale.byName.device.value === "x4", stale.byName.device.value);
 }
 
 // 3. Resetting the page settings restores them and forgets them.
