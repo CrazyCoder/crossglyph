@@ -112,6 +112,22 @@ def _sources(variant: Variant) -> dict:
             for style in STYLES if style in config.styles}
 
 
+def _synthesized(variant: Variant) -> dict:
+    """What the build resolved through a face's own shaping, not its cmap.
+
+    Recorded because the synthesis is automatic and has no setting of its own:
+    without this a .cpfont holds glyphs at codepoints no source face carries,
+    and nothing in the workspace says where they came from.
+
+    Counted per style, since a family whose bold joins and whose regular does
+    not is a family with something wrong in it.
+    """
+    config: Config = variant.config
+    forms = sum(len(cpfont.arabic.presentation_forms(config.styles[style]))
+                for style in STYLES if style in config.styles)
+    return {"arabic_forms": forms} if forms else {}
+
+
 def _settings(variant: Variant) -> dict:
     """Every value the build resolved, knobs and shape both.
 
@@ -184,6 +200,10 @@ def describe(variant: Variant, directory: pathlib.Path,
         "config": config.path.name,
         "settings": _settings(variant),
         "sources": _sources(variant),
+        # Omitted rather than zero, so the key appearing at all means a face
+        # needed repairing and says how much.
+        **({"synthesized": synthesized}
+           if (synthesized := _synthesized(variant)) else {}),
         "fallbacks": list(fallbacks or []),
         "files": _files(variant, directory, sizes),
     }
