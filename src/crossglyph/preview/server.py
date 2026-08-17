@@ -725,7 +725,14 @@ def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
                               f"fall back to")
         faces.append(str(regular))
     if request.fallbacks:
-        faces.extend(_bundled_faces(str(fontbuild.SOURCE_DIR), request.intervals))
+        # Not said and nothing ticked pick the same faces here: the coverage
+        # only decides whether a CJK script was asked for, and neither answers
+        # yes. The distinction the render draws on belongs to built_coverage,
+        # which is the only place it means anything -- and a None reaching the
+        # split below is an AttributeError out of a request nobody has to send
+        # wrongly to make.
+        faces.extend(_bundled_faces(str(fontbuild.SOURCE_DIR),
+                                    request.intervals or ""))
     return tuple(faces)
 
 

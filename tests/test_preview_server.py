@@ -3067,3 +3067,24 @@ def test_a_codepoint_no_preset_carries_names_none_rather_than_raising():
     assert presets_covering(frozenset({0xE000})) == ()
     # Mixed: the one that is carried is still named, the other is dropped.
     assert presets_covering(frozenset({0xE000, 0x0628})) == ("arabic",)
+
+
+@needs_core
+def test_fallbacks_without_a_coverage_still_render(tmp_path):
+    """Coverage is optional on a render and the fallback ticks are not tied
+    to it, so the two arrive apart and the pair has to hold.
+
+    Making coverage nullable put a None into the split that decides whether a
+    CJK face was asked for, which is an AttributeError and a 500 out of a
+    request nobody has to send wrongly to make.
+    """
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    server._sources.clear()
+    server._sources[0] = _joining(tmp_path)
+    client = TestClient(server.app)
+    answer = client.post("/render", json={"text": "abc", "size": 16,
+                                          "fallbacks": True})
+    assert answer.status_code in (200, 503), answer.text

@@ -664,3 +664,36 @@ def test_latin_coverage_is_left_alone(tmp_path):
     covered = {code for low, high in preview.coverage_for("ab", path)
                for code in range(low, high + 1)}
     assert covered == {ord("a"), ord("b"), ord(" "), ord("-")}
+
+
+def test_the_stylesheet_has_no_stray_comment_or_brace():
+    """A CSS syntax error is silent: the parser drops the rule it was in the
+    middle of, resyncs at the next brace, and the page just looks a little
+    wrong somewhere nobody is looking.
+
+    This file is edited by hand and its comments are paragraphs, so the way it
+    breaks is a `*/` closing a comment that was already closed. That ate a
+    box-shadow and left the declaration after it working, which reads as a
+    selector that does not match rather than as a file that does not parse.
+    """
+    from crossglyph.preview import server
+
+    text = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    stripped, at, depth = [], 0, 0
+    while at < len(text):
+        opened = text.find("/*", at)
+        if opened < 0:
+            stripped.append(text[at:])
+            break
+        stripped.append(text[at:opened])
+        closed = text.find("*/", opened + 2)
+        assert closed > 0, f"unclosed comment at offset {opened}"
+        at = closed + 2
+    code = "".join(stripped)
+
+    assert "*/" not in code, \
+        "a comment terminator outside a comment: the rule after it is dropped"
+    for index, char in enumerate(code):
+        depth += (char == "{") - (char == "}")
+        assert depth >= 0, f"a closing brace too many at offset {index}"
+    assert depth == 0, f"{depth} unclosed block(s)"
