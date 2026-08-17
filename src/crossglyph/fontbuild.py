@@ -25,7 +25,7 @@ import typing
 
 from . import cpfont, fontconf, fontstamp, provenance, spacefont
 from .fontconf import (STYLES, Config, FontConfigError, Variant, parse_config,
-                       size_label, size_spelling)
+                       size_with_label)
 
 #: The tool's own root, which is where an unpacked release keeps its workspace.
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -471,12 +471,9 @@ class Job:
     @property
     def label(self) -> str:
         """Family and size, and the whole number the file is named for when
-        that is not the same thing. A fractional size is rasterized as asked
-        and shipped under its rounded label, so a line saying only 13.25 does
-        not name the file it wrote. See fontconf.size_label."""
-        spelled = f"{self.variant.name} {size_spelling(self.size)}"
-        label = size_label(self.size)
-        return spelled if label == self.size else f"{spelled} (ships as {label})"
+        that is not the same thing: a line saying only 13.25 does not name the
+        file it wrote. See fontconf.size_with_label."""
+        return f"{self.variant.name} {size_with_label(self.size)}"
 
 
 def default_jobs() -> int:

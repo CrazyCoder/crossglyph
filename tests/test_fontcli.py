@@ -78,6 +78,19 @@ def test_a_fractional_size_names_the_file_it_will_write(workspace, tmp_path,
     assert "16 (ships as" not in said
 
 
+def test_the_up_to_date_line_names_it_as_well(workspace, tmp_path, capsys):
+    """The third line asking the same question. A run that built nothing still
+    says what is already on the card, and it is no more able to say which file
+    that is than the other two were."""
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 13.25\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    out = tmp_path / "out"
+    assert build(workspace, out) == 0
+    capsys.readouterr()
+    assert build(workspace, out) == 0
+    assert "up to date 13.25 (ships as 13)" in capsys.readouterr().out
+
+
 def test_the_built_line_names_it_too(workspace, tmp_path, capsys):
     """The same question at the other end: which file did that just write."""
     (workspace / "conf" / "probe.conf").write_text(

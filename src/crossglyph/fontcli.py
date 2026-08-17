@@ -9,8 +9,7 @@ import time
 
 from . import fontbuild
 from .cpfont.tuning import Tuning
-from .fontconf import (STYLES, Config, FontConfigError, size_label,
-                       size_spelling)
+from .fontconf import STYLES, Config, FontConfigError, size_with_label
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,12 +69,8 @@ def describe(config: Config) -> None:
         print(f"  NOTE      no {', '.join(missing)} face; emphasis will not show")
     for variant in config.variants():
         # A fractional size is named for the whole number it rounds to, so the
-        # list alone does not say which files this builds. See fontconf.size_label.
-        sizes = " ".join(
-            size_spelling(size)
-            + ("" if size_label(size) == size
-               else f" (ships as {size_label(size)})")
-            for size in variant.sizes)
+        # list alone does not say which files this builds.
+        sizes = " ".join(size_with_label(size) for size in variant.sizes)
         print(f"  -> {variant.name}: {sizes}")
 
 
@@ -141,7 +136,7 @@ def main(argv=None) -> int:
                   f"(size no longer in the config)")
         if plan.report.skipped:
             print(f"{plan.variant.name}: up to date "
-                  f"{' '.join(str(s) for s in plan.report.skipped)}")
+                  f"{' '.join(size_with_label(s) for s in plan.report.skipped)}")
 
     workers = fontbuild.worker_count(len(jobs), opts.jobs)
     if jobs:

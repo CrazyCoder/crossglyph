@@ -697,3 +697,29 @@ def test_the_stylesheet_has_no_stray_comment_or_brace():
         depth += (char == "{") - (char == "}")
         assert depth >= 0, f"a closing brace too many at offset {index}"
     assert depth == 0, f"{depth} unclosed block(s)"
+
+
+def test_the_size_boxes_take_what_the_size_knob_can_reach():
+    """The export panel snaps its size boxes to the knob's step and range, and
+    holds those three numbers of its own because the knob is markup and the
+    boxes are script.
+
+    Widening the knob alone would leave a size somebody can look at and cannot
+    ship, which is the one thing this whole rule exists to prevent, and nothing
+    at runtime would say so.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    page = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    script = (server.STATIC / "js" / "export.js").read_text(encoding="utf-8")
+    knob = re.search(r'<input class="mono" id="size"[^>]*>', page, re.S)
+    assert knob, "the size knob is not where this test looks for it"
+    declared = dict(re.findall(r'(min|max|step)="([\d.]+)"', knob.group(0)))
+    held = dict(re.findall(r"SIZE_(STEP|MIN|MAX)\s*=\s*([\d.]+)", script))
+    assert declared and len(held) == 3, f"{declared} {held}"
+    for attribute, name in (("step", "STEP"), ("min", "MIN"), ("max", "MAX")):
+        assert float(declared[attribute]) == float(held[name]), \
+            f"the knob's {attribute} is {declared[attribute]}, the boxes " \
+            f"hold SIZE_{name} = {held[name]}"

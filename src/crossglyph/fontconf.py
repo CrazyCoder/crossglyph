@@ -657,6 +657,19 @@ def size_spelling(size: float) -> str:
     return str(int(size)) if float(size).is_integer() else str(float(size))
 
 
+def size_with_label(size: float) -> str:
+    """A size, and the whole number its file is named for when that differs.
+
+    Every line the builder prints about a size is answering "which file is
+    that", so the sentence lives here rather than being spelled out at each
+    of them. A whole size is its own label and gets nothing, which is what
+    keeps an ordinary build's output the list it always was.
+    """
+    label = size_label(size)
+    spelled = size_spelling(size)
+    return spelled if label == size else f"{spelled} (ships as {label})"
+
+
 def parse_sizes(raw: str, where: str) -> list[float]:
     tokens = [t for t in re.split(r"[,\s]+", raw.strip()) if t]
     # int() has to be inside the try as well: float() happily returns nan and
