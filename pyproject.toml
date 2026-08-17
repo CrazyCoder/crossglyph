@@ -7,6 +7,10 @@ dependencies = ["pillow>=10", "fonttools>=4.50",
                 # 2.5.x bundles FreeType 2.13, which is what the tuning knobs
                 # (FT_Property_Set stem darkening, FT_Outline_Embolden) need.
                 "freetype-py>=2.5.1",
+                # Resolves a font's own Arabic joining rules at build time.
+                # The device has no shaper and asks for shaped codepoints, so
+                # the shaping has to happen before the font ships.
+                "uharfbuzz>=0.56",
                 # Runs the render core, the firmware's own drawing code built
                 # to wasm. See docs/preview.md.
                 "wasmtime>=47",

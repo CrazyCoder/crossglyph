@@ -27,6 +27,14 @@ def _glyph_name(codepoint: int) -> str:
     return f"u{codepoint:04X}"
 
 
+def _draw(pen):
+    pen.moveTo(BOX[0])
+    for point in BOX[1:]:
+        pen.lineTo(point)
+    pen.closePath()
+    return pen
+
+
 def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
              figures: bool = False, cff: bool = False, family: str = "Probe",
              style: str = "Regular") -> pathlib.Path:
@@ -62,14 +70,7 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
     codepoints = sorted(set(codepoints))
     names = [_glyph_name(code) for code in codepoints]
 
-    def draw(pen):
-        pen.moveTo(BOX[0])
-        for point in BOX[1:]:
-            pen.lineTo(point)
-        pen.closePath()
-        return pen
-
-    box = draw(TTGlyphPen(None)).glyph()
+    box = _draw(TTGlyphPen(None)).glyph()
     empty = TTGlyphPen(None).glyph()
 
     # Unmapped alternates, which is what a proportional figure is: reachable
@@ -82,7 +83,7 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
     builder.setupCharacterMap(dict(zip(codepoints, names)))
     if cff:
         charstrings = {
-            name: draw(T2CharStringPen(ADVANCE, None)).getCharString()
+            name: _draw(T2CharStringPen(ADVANCE, None)).getCharString()
             for name in (".notdef", *names, *narrow)}
         builder.setupCFF(f"{family}-{style}".replace(" ", ""), {},
                          charstrings, {})
@@ -125,6 +126,98 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
             + f"\n}} {tag};\n" for tag, rules in blocks), encoding="utf-8")
         addOpenTypeFeatures(builder.font, str(feature))
         feature.unlink()
+
+    builder.save(str(path))
+    return path
+
+
+#: Letters the joining fixture carries. Two dual-joining, which take all four
+#: forms, and one right-joining, which takes two. Real codepoints, because
+#: HarfBuzz picks its Arabic shaper from the character's own Unicode joining
+#: property and would leave an invented one alone.
+DUAL_JOINING = (0x0628, 0x062C)
+RIGHT_JOINING = (0x0627,)
+JOINING_LETTERS = DUAL_JOINING + RIGHT_JOINING
+
+#: What each feature does to a letter, in the order a face declares them.
+_JOINING_FEATURES = (("init", DUAL_JOINING), ("medi", DUAL_JOINING),
+                     ("fina", JOINING_LETTERS))
+
+
+def joining_font(path: pathlib.Path, *, decompose=(), family: str = "Probe",
+                 style: str = "Regular") -> pathlib.Path:
+    """A face that joins through GSUB and carries no presentation forms.
+
+    This is the shape of font the synthesis exists for. Scheherazade New and
+    ReadexPro both hold their joining rules and none of the Presentation
+    Forms-B codepoints a CrossPoint device asks by, so a build that only reads
+    the cmap finds nothing to draw for any of them.
+
+    The form glyphs deliberately have no cmap entry, the way a real face leaves
+    them, so they can only be reached by running the font's own rules.
+
+    `decompose` names letters spelled as a mark plus a base, which is how
+    Scheherazade spells the hamza alefs and how Noto spells most of its
+    alphabet. Shaping one of those yields a run of two glyphs rather than one.
+    Each form gets an advance of its own, so a composed glyph whose second
+    piece was dropped is narrower than one that kept it.
+    """
+    from fontTools.feaLib.builder import addOpenTypeFeatures
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
+
+    codepoints = sorted({*JOINING_LETTERS, ord(" ")})
+    names = [_glyph_name(code) for code in codepoints]
+    forms = [f"{_glyph_name(code)}.{tag}"
+             for tag, letters in _JOINING_FEATURES for code in letters]
+    marks = [f"{_glyph_name(code)}.mark" for code in decompose]
+
+    box = _draw(TTGlyphPen(None)).glyph()
+    empty = TTGlyphPen(None).glyph()
+
+    builder = FontBuilder(UPEM, isTTF=True)
+    builder.setupGlyphOrder([".notdef", *names, *forms, *marks])
+    builder.setupCharacterMap(dict(zip(codepoints, names)))
+    builder.setupGlyf({".notdef": empty,
+                       **{name: box for name in (*names, *forms, *marks)}})
+    builder.setupHorizontalMetrics({
+        **{name: (ADVANCE, 80) for name in (".notdef", *names)},
+        # A width per form, so a form that resolved to the wrong glyph shows up
+        # as a width and not only as a glyph id.
+        **{name: (ADVANCE - 40 * index, 80) for index, name in enumerate(forms)},
+        # A real mark carries no advance and is placed by GPOS. This one
+        # advances, so a composed run that lost its second piece is measurably
+        # narrower than one that kept it.
+        **{name: (ADVANCE, 80) for name in marks}})
+    builder.setupHorizontalHeader(ascent=800, descent=-200)
+    builder.setupOS2(sTypoAscender=800, sTypoDescender=-200,
+                     usWinAscent=800, usWinDescent=200)
+    builder.setupNameTable({"familyName": family, "styleName": style,
+                            "psName": f"{family}-{style}".replace(" ", "")})
+    builder.setupPost()
+
+    # `script arab` rather than the default alone: HarfBuzz resolves an Arabic
+    # run under the arab script tag, and a feature registered nowhere it looks
+    # is a feature it never applies.
+    blocks = [
+        "languagesystem DFLT dflt;",
+        "languagesystem arab dflt;",
+    ]
+    for tag, letters in _JOINING_FEATURES:
+        rules = "\n".join(
+            f"    sub {_glyph_name(code)} by {_glyph_name(code)}.{tag};"
+            for code in letters)
+        blocks.append(f"feature {tag} {{\n    script arab;\n{rules}\n}} {tag};")
+    if marks:
+        rules = "\n".join(
+            f"    sub {_glyph_name(code)} by {_glyph_name(code)}.mark "
+            f"{_glyph_name(code)};" for code in decompose)
+        blocks.append(f"feature ccmp {{\n    script arab;\n{rules}\n}} ccmp;")
+
+    feature = path.with_suffix(".fea")
+    feature.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    addOpenTypeFeatures(builder.font, str(feature))
+    feature.unlink()
 
     builder.save(str(path))
     return path

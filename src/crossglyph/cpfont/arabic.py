@@ -14,6 +14,8 @@ agree against shapetypes[] itself.
 """
 from __future__ import annotations
 
+import functools
+import typing
 import unicodedata
 from collections.abc import Iterable
 
@@ -93,3 +95,88 @@ def implied_coverage(intervals) -> tuple[tuple[int, int], ...]:
         else:
             merged.append((code, code))
     return tuple(merged)
+
+
+# --- resolving a face's own joining rules ---------------------------------
+
+#: Forces a joining context without contributing a letter of its own.
+ZWJ = "‍"
+
+#: The string that puts a letter in each joining context, and which character
+#: of it the letter is. A zero-width joiner on a side makes the shaper treat
+#: that side as connected, which is how a form is asked for out of context.
+_CONTEXTS = {
+    ISOLATED: ("{c}", 0),
+    FINAL: (ZWJ + "{c}", 1),
+    INITIAL: ("{c}" + ZWJ, 0),
+    MEDIAL: (ZWJ + "{c}" + ZWJ, 1),
+}
+
+
+class GlyphRun(typing.NamedTuple):
+    """One shaped form: the glyphs that draw it, and what it advances by.
+
+    Offsets and advance are in font units, so a run is independent of the size
+    being rasterized and can be resolved once per face rather than once per
+    size.
+    """
+    pieces: tuple[tuple[int, int, int], ...]
+    advance: int
+
+
+def _shape(blob, upem, text):
+    """[(glyph, cluster, x_offset, y_offset, x_advance)], in font units."""
+    import uharfbuzz as hb
+
+    font = hb.Font(hb.Face(blob))
+    font.scale = (upem, upem)
+    buffer = hb.Buffer()
+    buffer.add_str(text)
+    buffer.guess_segment_properties()
+    hb.shape(font, buffer)
+    return [(info.codepoint, info.cluster, pos.x_offset, pos.y_offset,
+             pos.x_advance)
+            for info, pos in zip(buffer.glyph_infos, buffer.glyph_positions)]
+
+
+@functools.lru_cache(maxsize=8)
+def presentation_forms(font_path) -> dict[int, GlyphRun]:
+    """{codepoint the device asks for: the run of glyphs that draws it}.
+
+    Only forms the face does not already carry are worth resolving, so a face
+    that cmaps the presentation forms outright returns nothing and pays one
+    cmap walk for the question. A face with no Arabic pays the same and no
+    more.
+    """
+    import uharfbuzz as hb
+    from fontTools.ttLib import TTFont
+
+    path = str(font_path)
+    with TTFont(path, fontNumber=0, lazy=True) as ttf:
+        cmap = set(ttf.getBestCmap() or {})
+        upem = ttf["head"].unitsPerEm
+    if not any(SHAPE_FIRST <= code <= SHAPE_LAST for code in cmap):
+        return {}
+
+    blob = hb.Blob.from_file_path(path)
+    # A joiner draws something in most faces, usually a space, and HarfBuzz
+    # merges its cluster into the letter's. So it has to be dropped by which
+    # glyph it is rather than by where it sits.
+    joiner = {glyph for glyph, *_ in _shape(blob, upem, ZWJ)}
+
+    resolved: dict[int, GlyphRun] = {}
+    for (base, form), code in PRESENTATION_FORMS.items():
+        if base not in cmap or code in cmap:
+            continue
+        template, at = _CONTEXTS[form]
+        shaped = [piece
+                  for piece in _shape(blob, upem, template.format(c=chr(base)))
+                  if piece[1] == at and piece[0] not in joiner]
+        if not shaped:
+            continue
+        pieces, advance = [], 0
+        for glyph, _cluster, x_offset, y_offset, x_advance in shaped:
+            pieces.append((glyph, advance + x_offset, y_offset))
+            advance += x_advance
+        resolved[code] = GlyphRun(tuple(pieces), advance)
+    return resolved

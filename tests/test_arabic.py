@@ -3,6 +3,7 @@ import re
 
 import pytest
 
+import fontsmith
 from crossglyph.cpfont import arabic
 from crossglyph.render import stamp
 
@@ -101,3 +102,65 @@ def test_implied_coverage_adds_the_forms_and_keeps_the_letters():
 def test_implied_coverage_leaves_a_latin_build_alone():
     latin = ((0x0020, 0x007E),)
     assert arabic.implied_coverage(latin) == latin
+
+
+# --- resolving a face's own joining rules ---------------------------------
+
+
+def test_a_joining_face_yields_a_run_for_every_form(tmp_path):
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    forms = arabic.presentation_forms(path)
+
+    # The dual-joining letter contributes all four of its codepoints.
+    for form in (arabic.ISOLATED, arabic.FINAL, arabic.INITIAL, arabic.MEDIAL):
+        assert arabic.PRESENTATION_FORMS[(0x0628, form)] in forms
+    # The right-joining one contributes only the two it has.
+    assert arabic.PRESENTATION_FORMS[(0x0627, arabic.ISOLATED)] in forms
+    assert arabic.PRESENTATION_FORMS[(0x0627, arabic.FINAL)] in forms
+
+
+def test_a_simple_form_is_one_glyph(tmp_path):
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    forms = arabic.presentation_forms(path)
+    run = forms[arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]]
+    assert len(run.pieces) == 1
+    assert run.advance > 0
+
+
+def test_each_joining_form_reaches_its_own_glyph(tmp_path):
+    """A form that resolved to the same glyph as another did not resolve."""
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    forms = arabic.presentation_forms(path)
+    reached = {forms[arabic.PRESENTATION_FORMS[(0x0628, form)]].pieces[0][0]
+               for form in (arabic.ISOLATED, arabic.FINAL,
+                            arabic.INITIAL, arabic.MEDIAL)}
+    assert len(reached) == 4, "each joining form must reach its own glyph"
+
+
+def test_a_decomposed_letter_yields_a_multi_glyph_run(tmp_path):
+    """Scheherazade spells the hamza alefs this way, and so does Noto."""
+    path = tmp_path / "decomposed.ttf"
+    fontsmith.joining_font(path, decompose=(0x0627,))
+    forms = arabic.presentation_forms(path)
+    run = forms[arabic.PRESENTATION_FORMS[(0x0627, arabic.ISOLATED)]]
+    assert len(run.pieces) == 2, "a mark plus a base is two glyphs"
+    # The second piece sits past the first rather than on top of it, which is
+    # what the composed bitmap has to be wide enough to hold.
+    assert run.pieces[1][1] > run.pieces[0][1]
+
+
+def test_a_face_that_already_carries_a_form_is_left_alone(tmp_path):
+    """Nothing to repair, so nothing is synthesized and nothing is paid for."""
+    path = tmp_path / "haspresentation.ttf"
+    isolated = arabic.PRESENTATION_FORMS[(0x0628, arabic.ISOLATED)]
+    fontsmith.box_font(path, [0x0628, isolated, ord(" ")])
+    assert isolated not in arabic.presentation_forms(path)
+
+
+def test_a_face_with_no_arabic_yields_nothing(tmp_path):
+    path = tmp_path / "latin.ttf"
+    fontsmith.box_font(path, [ord("a"), ord("b"), ord(" ")])
+    assert arabic.presentation_forms(path) == {}
