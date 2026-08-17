@@ -35,23 +35,26 @@ function syncPreviewColumns() {
     Number(root.scrollWidth) > available ? "one" : "two";
 }
 
-// Geometry is in each normalized frame PNG's own pixels. The assets correct the
-// source renders to the documented body aspect and carry an aperture with the
-// native screen aspect. Runtime scaling is therefore one uniform factor.
+// Geometry in each frame PNG's own pixels, emitted by fb2xt's frame renderer
+// from the same run that produced the pixels, so the two cannot disagree. The
+// aperture is the outer bound of the screen hole, including its anti-aliased
+// rim: the page underlaps the frame rather than stopping at it, which is what
+// keeps a dark line from appearing down each side of the page. Runtime scaling
+// is one uniform factor.
 export const DEVICES = {
   x4: {
     native: {width: 480, height: 800},
-    frame: {width: 1147, height: 1820},
-    aperture: {x: 139, y: 114, width: 858, height: 1430, radius: 16},
-    body: {x: 16, y: 16, width: 1115, height: 1788,
-           widthMm: 69, heightMm: 111},
+    frame: {width: 1118, height: 1820},
+    aperture: {x: 118, y: 100, width: 873, height: 1455, radius: 16},
+    body: {x: 8, y: 8, width: 1091, height: 1804,
+           widthMm: 69.15, heightMm: 114.31},
   },
   x3: {
     native: {width: 528, height: 792},
-    frame: {width: 1204, height: 1820},
-    aperture: {x: 134, y: 132, width: 936, height: 1404, radius: 16},
-    body: {x: 16, y: 16, width: 1172, height: 1788,
-           widthMm: 63.7, heightMm: 97.6},
+    frame: {width: 1209, height: 1820},
+    aperture: {x: 130, y: 122, width: 948, height: 1422, radius: 16},
+    body: {x: 19, y: 19, width: 1171, height: 1793,
+           widthMm: 63.74, heightMm: 97.59},
   },
 };
 

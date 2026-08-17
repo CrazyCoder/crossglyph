@@ -4818,9 +4818,12 @@ for (const deferred of [
         env.device.paperSlider.value === "90" &&
         env.device.inkSlider.value === "90" &&
         env.device.calibrationSlider.value === "100");
+  // The endpoints carry the tint measured off the device: red above blue with
+  // green highest, a warm greenish white rather than the cool one this used to
+  // assert. fb2xt's frame renderer applies the same constant to the frames.
   check("default screen tones follow the 90 percent endpoints",
-        env.device.canvas.pixels.slice(0, 3).join() === "25,27,26" &&
-        env.device.canvas.pixels.slice(-4, -1).join() === "228,231,230",
+        env.device.canvas.pixels.slice(0, 3).join() === "27,28,24" &&
+        env.device.canvas.pixels.slice(-4, -1).join() === "231,232,228",
         env.device.canvas.pixels.join());
   check("reset device preview removes its saved state",
         !("crossglyph.device" in storage.data));

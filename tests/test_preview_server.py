@@ -505,14 +505,17 @@ def test_the_page_and_its_modules_are_never_cached(client):
 
 
 @pytest.mark.parametrize(
-    ("device", "size", "aperture", "body_ratio"),
+    ("device", "size", "hole", "margin"),
     [
-        ("x4", (1147, 1820), (139, 114, 997, 1544), 69 / 111),
-        ("x3", (1204, 1820), (134, 132, 1070, 1536), 63.7 / 97.6),
+        ("x4", (1118, 1820), (118, 105, 990, 1551), 8),
+        ("x3", (1209, 1820), (132, 123, 1077, 1544), 8),
     ],
 )
 def test_device_frames_carry_normalized_geometry(
-        client, device, size, aperture, body_ratio):
+        client, device, size, hole, margin):
+    """The frames are rendered from the official models by fb2xt, which emits
+    the geometry from the same run that produced the pixels. What matters here
+    is that the shipped file still agrees with what the preview was told."""
     from PIL import Image, ImageStat
 
     for color in ("black", "white"):
@@ -520,23 +523,37 @@ def test_device_frames_carry_normalized_geometry(
         assert response.status_code == 200
         frame = Image.open(io.BytesIO(response.content)).convert("RGBA")
         assert frame.size == size
-        left, top, right, bottom = aperture
+        left, top, right, bottom = hole
         alpha = frame.getchannel("A")
-        assert alpha.getpixel(((left + right) // 2,
-                               (top + bottom) // 2)) == 0
-        assert alpha.getpixel((left, top)) > 0, \
-            "the screen aperture lost its rounded corner"
+        assert alpha.getpixel(((left + right) // 2, (top + bottom) // 2)) == 0
+
+        # Nothing opaque may survive just outside the hole. The frames this
+        # replaced left three columns of screen material there, which showed as
+        # grey lines down a night-mode page.
+        for offset in (2, 3, 4):
+            for x in (left - offset, right + offset - 1):
+                assert alpha.getpixel((x, (top + bottom) // 2)) == 255, \
+                    "the bezel beside the aperture is not solid"
+
+        # The body is fitted to the canvas margin, which is what fixes the
+        # frame's size; anti-aliasing puts the silhouette within a pixel of it.
         opaque = alpha.point(lambda value: 255 if value >= 128 else 0).getbbox()
         assert opaque is not None
-        ratio = (opaque[2] - opaque[0]) / (opaque[3] - opaque[1])
-        assert ratio == pytest.approx(body_ratio, abs=.006)
+        assert opaque[0] == pytest.approx(margin, abs=2)
+        assert opaque[1] == pytest.approx(margin, abs=2)
+        assert opaque[2] == pytest.approx(size[0] - margin, abs=2)
+        assert opaque[3] == pytest.approx(size[1] - margin, abs=2)
+
         body = frame.crop((size[0] // 4, 25, size[0] * 3 // 4, 100))
         red, green, blue = ImageStat.Stat(body.convert("RGB")).mean
         tone = (red + green + blue) / 3
         expected = (10, 22) if color == "black" else (210, 230)
         assert expected[0] <= tone <= expected[1]
-        assert green >= red and blue >= red, \
-            "the frame lost the product photograph's cool neutral tint"
+        # Measured off the device on white paper in shade: green highest, then
+        # red, then blue. A warm greenish white, not the cool one this asserted
+        # before anybody measured it.
+        assert green >= red >= blue, \
+            "the frame lost the tint measured off the device"
 
 
 @needs
