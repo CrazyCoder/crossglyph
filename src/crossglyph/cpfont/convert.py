@@ -158,6 +158,104 @@ def resolve_intervals(preset_str):
     return merged
 
 
+class RasterGlyph(namedtuple("RasterGlyph",
+                             "width rows pitch buffer pixel_mode "
+                             "left top advance")):
+    """One rendered glyph, however many outlines went into it.
+
+    FORK: a synthesized Arabic form can be several glyphs with offsets, so the
+    rasterizing loop cannot read a single FreeType slot. Both paths build one
+    of these instead. The bitmap field names match FT_Bitmap's on purpose, so
+    the loop that reads them did not have to change.
+    """
+
+
+def raster_from_slot(slot):
+    """FORK: one FreeType glyph slot, as the loop wants to read it."""
+    bitmap = slot.bitmap
+    return RasterGlyph(bitmap.width, bitmap.rows, bitmap.pitch,
+                       bytes(bitmap.buffer), bitmap.pixel_mode,
+                       slot.bitmap_left, slot.bitmap_top,
+                       slot.linearHoriAdvance)
+
+
+def scale_units(value, face):
+    """FORK: font units to 26.6 pixels, the way FreeType scales them itself."""
+    return (value * face.size.x_scale + 0x8000) >> 16
+
+
+def scale_advance(value, face):
+    """FORK: font units to 16.16 pixels, the unit linearHoriAdvance is in.
+
+    x_scale maps font units to 26.6, so 16.16 is the same product shifted ten
+    places less. A composed glyph reports its advance the way a slot does,
+    because the packer downstream reads only the one field.
+    """
+    return (value * face.size.x_scale) >> 6
+
+
+def _coverage_rows(piece):
+    """FORK: a glyph's coverage as one byte per pixel, however it was rendered.
+
+    A mono render is one bit per pixel, most significant first, and the pitch
+    can be negative when the rows are stored bottom-up. Both have to be undone
+    before two glyphs can be blended.
+    """
+    import freetype
+
+    rows = []
+    for y in range(piece.rows):
+        start = (y if piece.pitch >= 0 else piece.rows - 1 - y) * abs(piece.pitch)
+        if piece.pixel_mode == freetype.FT_PIXEL_MODE_MONO:
+            rows.append([255 if piece.buffer[start + (x >> 3)] & (0x80 >> (x & 7))
+                         else 0 for x in range(piece.width)])
+        else:
+            rows.append(list(piece.buffer[start:start + piece.width]))
+    return rows
+
+
+def compose_raster(drawn, face, advance):
+    """FORK: blend rendered pieces at their shaped offsets into one bitmap.
+
+    Offsets arrive in font units and land on whole pixels, which is as fine as
+    the target can be: the device places one bitmap per codepoint and has no
+    subpixel positioning to lose.
+
+    The result is reported as greyscale even when the pieces were rendered
+    mono, because blending needs a byte per pixel. The values are still only 0
+    and 255, so the thresholds downstream reach the same two levels they would
+    have reached from the bits.
+    """
+    import freetype
+
+    placed = []
+    for piece, x_offset, y_offset in drawn:
+        if not (piece.width and piece.rows):
+            continue
+        placed.append((piece,
+                       piece.left + (scale_units(x_offset, face) >> 6),
+                       piece.top + (scale_units(y_offset, face) >> 6)))
+    if not placed:
+        return RasterGlyph(0, 0, 0, b"", freetype.FT_PIXEL_MODE_GRAY, 0, 0,
+                           advance)
+
+    left = min(x for _, x, _ in placed)
+    top = max(y for _, _, y in placed)
+    right = max(x + piece.width for piece, x, _ in placed)
+    bottom = min(y - piece.rows for piece, _, y in placed)
+    width, rows = right - left, top - bottom
+
+    canvas = bytearray(width * rows)
+    for piece, x, y in placed:
+        for row_index, row in enumerate(_coverage_rows(piece)):
+            start = (top - y + row_index) * width + (x - left)
+            for column, value in enumerate(row):
+                if value > canvas[start + column]:
+                    canvas[start + column] = value
+    return RasterGlyph(width, rows, width, bytes(canvas),
+                       freetype.FT_PIXEL_MODE_GRAY, left, top, advance)
+
+
 def resolve_style_coverage(primary_face, fallback_faces, intervals,
                            synthesized=frozenset()):
     """Resolve intervals against primary coverage, then optional fallback chain.
@@ -965,10 +1063,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # Arabic, and for one that carries the shaped codepoints already.
     arabic_runs = presentation_forms(fontfile)
 
-    def load_glyph_for_face(target_face, code_point, face_index=0):
-        glyph_index = figure_overrides[face_index].get(code_point) or 0
-        if not glyph_index:
-            glyph_index = target_face.get_char_index(code_point)
+    def load_one_glyph(target_face, glyph_index):
         if glyph_index > 0:
             target_face.load_glyph(glyph_index, load_flags)
             if embolden:
@@ -993,6 +1088,31 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                                          render_mode)
             return target_face
         return None
+
+    def load_glyph_for_face(target_face, code_point, face_index=0):
+        # FORK: a shaped Arabic form is drawn from the face's own glyphs, which
+        # may be one glyph or several with offsets. A run of one is the same
+        # code as a run of many, so a face that spells a letter whole and one
+        # that spells it as a mark plus a base cannot behave differently.
+        run = arabic_runs.get(code_point) if face_index == 0 else None
+        if run is not None:
+            drawn = []
+            for glyph_index, x_offset, y_offset in run.pieces:
+                if load_one_glyph(target_face, glyph_index) is None:
+                    continue
+                drawn.append((raster_from_slot(target_face.glyph),
+                              x_offset, y_offset))
+            if not drawn:
+                return None
+            return compose_raster(drawn, target_face,
+                                  scale_advance(run.advance, target_face))
+
+        glyph_index = figure_overrides[face_index].get(code_point) or 0
+        if not glyph_index:
+            glyph_index = target_face.get_char_index(code_point)
+        if load_one_glyph(target_face, glyph_index) is None:
+            return None
+        return raster_from_slot(target_face.glyph)
 
     # Validate intervals against the primary font first, then let the fallback
     # font fill any holes. That keeps the primary family authoritative while
@@ -1022,7 +1142,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 all_glyphs.append((glyph, b''))
                 continue
 
-            bitmap = f.glyph.bitmap
+            bitmap = f
 
             # Build 4-bit greyscale bitmap (same logic as fontconvert.py).
             #
@@ -1099,7 +1219,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 pixels2b.append(px)
 
             packed = bytes(pixels2b)
-            advance = fp4_from_ft16_16(f.glyph.linearHoriAdvance) + tracking
+            advance = fp4_from_ft16_16(f.advance) + tracking
             if code_point == 0x20:
                 # As CSS word-spacing does, this stacks on letter-spacing. The
                 # device takes the word gap from this glyph
@@ -1109,8 +1229,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 width=bitmap.width,
                 height=bitmap.rows,
                 advance_x=max(0, min(0xFFFF, advance)),
-                left=f.glyph.bitmap_left,
-                top=f.glyph.bitmap_top,
+                left=f.left,
+                top=f.top,
                 data_length=len(packed),
                 data_offset=total_bitmap_size,
                 code_point=code_point,

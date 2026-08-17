@@ -153,6 +153,28 @@ def test_a_decomposed_letter_yields_a_multi_glyph_run(tmp_path):
     assert run.pieces[1][1] > run.pieces[0][1]
 
 
+def test_lam_alef_resolves_as_a_pair(tmp_path):
+    """The device asks for the pair by its own codepoint, not for two letters.
+
+    Missing this left every "wala" in a page of ordinary prose with a hole in
+    it, which the letter-by-letter tests could not see.
+    """
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    forms = arabic.presentation_forms(path)
+    for form in (arabic.ISOLATED, arabic.FINAL):
+        run = forms[arabic.LAM_ALEF[(0x0627, form)]]
+        assert run.pieces, "the pair drew nothing"
+        assert run.advance > 0
+
+
+def test_lam_alef_is_skipped_when_the_face_has_no_lam(tmp_path):
+    path = tmp_path / "nolam.ttf"
+    fontsmith.box_font(path, [0x0627, ord(" ")])
+    assert arabic.LAM_ALEF[(0x0627, arabic.ISOLATED)] not in \
+        arabic.presentation_forms(path)
+
+
 def test_a_face_that_already_carries_a_form_is_left_alone(tmp_path):
     """Nothing to repair, so nothing is synthesized and nothing is paid for."""
     path = tmp_path / "haspresentation.ttf"
@@ -194,3 +216,43 @@ def test_an_unsynthesized_missing_codepoint_is_still_dropped(tmp_path):
         face, [], [(initial, initial)], synthesized=frozenset())
 
     assert intervals == [], "nothing can draw it, so it must not be built"
+
+
+# --- rasterizing a form from its run ---------------------------------------
+
+
+def _ink(face_path, codepoint, size=16.0):
+    """Pixels the device paints for one codepoint, drawn by that face.
+
+    Measured through the render core rather than read out of the .cpfont, so
+    what is asserted is what a reader would actually show.
+    """
+    from crossglyph.preview import REGULAR, build_font
+    from crossglyph.render import image
+
+    font_bytes = build_font({REGULAR: face_path}, size,
+                            coverage=((0x0020, 0x0020), (codepoint, codepoint)))
+    page = image.render_png(font_bytes, chr(codepoint))
+    return sum(1 for value in page.convert("L").getdata() if value < 250)
+
+
+def test_a_synthesized_form_rasterizes_to_ink(tmp_path):
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
+    assert _ink(path, initial) > 0, "the form drew nothing"
+
+
+def test_a_composite_form_draws_both_of_its_pieces(tmp_path):
+    """Both pieces have to land, not just the first one the run names."""
+    decomposed = tmp_path / "decomposed.ttf"
+    fontsmith.joining_font(decomposed, decompose=(0x0627,))
+    plain = tmp_path / "plain.ttf"
+    fontsmith.joining_font(plain)
+
+    isolated = arabic.PRESENTATION_FORMS[(0x0627, arabic.ISOLATED)]
+    assert len(arabic.presentation_forms(decomposed)[isolated].pieces) == 2
+    assert len(arabic.presentation_forms(plain)[isolated].pieces) == 1
+
+    assert _ink(decomposed, isolated) > _ink(plain, isolated) * 1.5, \
+        "a mark plus a base must draw more than the base alone"

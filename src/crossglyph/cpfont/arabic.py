@@ -139,6 +139,20 @@ def _shape(blob, upem, text):
             for info, pos in zip(buffer.glyph_infos, buffer.glyph_positions)]
 
 
+def _run(shaped) -> GlyphRun:
+    """Shaped output as one run, each glyph placed past the one before it.
+
+    Arabic shapes right to left, but HarfBuzz reports a run in visual order,
+    so accumulating the advances left to right lays the pieces out as they are
+    drawn.
+    """
+    pieces, advance = [], 0
+    for glyph, _cluster, x_offset, y_offset, x_advance in shaped:
+        pieces.append((glyph, advance + x_offset, y_offset))
+        advance += x_advance
+    return GlyphRun(tuple(pieces), advance)
+
+
 @functools.lru_cache(maxsize=8)
 def presentation_forms(font_path) -> dict[int, GlyphRun]:
     """{codepoint the device asks for: the run of glyphs that draws it}.
@@ -174,9 +188,20 @@ def presentation_forms(font_path) -> dict[int, GlyphRun]:
                   if piece[1] == at and piece[0] not in joiner]
         if not shaped:
             continue
-        pieces, advance = [], 0
-        for glyph, _cluster, x_offset, y_offset, x_advance in shaped:
-            pieces.append((glyph, advance + x_offset, y_offset))
-            advance += x_advance
-        resolved[code] = GlyphRun(tuple(pieces), advance)
+        resolved[code] = _run(shaped)
+
+    # A lam followed by an alef is a ligature the device asks for by its own
+    # codepoint, so it has to be resolved as a pair rather than a letter. A
+    # face with a real lam-alef rule shapes it to one glyph; a face without
+    # gives back the two joined halves, which compose to the same picture.
+    for (alef, form), code in LAM_ALEF.items():
+        if LAM not in cmap or alef not in cmap or code in cmap:
+            continue
+        prefix = ZWJ if form == FINAL else ""
+        shaped = [piece
+                  for piece in _shape(blob, upem,
+                                      prefix + chr(LAM) + chr(alef))
+                  if piece[0] not in joiner]
+        if shaped:
+            resolved[code] = _run(shaped)
     return resolved

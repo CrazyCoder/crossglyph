@@ -135,7 +135,7 @@ def box_font(path: pathlib.Path, codepoints, *, kern=None, ligatures=None,
 #: forms, and one right-joining, which takes two. Real codepoints, because
 #: HarfBuzz picks its Arabic shaper from the character's own Unicode joining
 #: property and would leave an invented one alone.
-DUAL_JOINING = (0x0628, 0x062C)
+DUAL_JOINING = (0x0628, 0x062C, 0x0644)
 RIGHT_JOINING = (0x0627,)
 JOINING_LETTERS = DUAL_JOINING + RIGHT_JOINING
 
