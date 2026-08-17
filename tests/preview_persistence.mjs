@@ -2330,6 +2330,18 @@ for (const { name, text } of sources) {
   check("which follows its suffix", modNote.textContent.includes("AltoAlt_14"),
         modNote.textContent);
 
+  // The heading and this note name the same second family or the panel is
+  // saying two things at once, and a save posts the suffix trimmed.
+  const heading = env.sandbox.document.getElementById("mod-name");
+  fields.mod_suffix.value = " ";
+  env.exportForm.edit("mod_suffix");
+  check("and a suffix of nothing but space is the default in both places",
+        heading.textContent === "AltoMod"
+        && modNote.textContent.includes("AltoMod_14"),
+        `${heading.textContent} | ${modNote.textContent}`);
+  fields.mod_suffix.value = "";
+  env.exportForm.edit("mod_suffix");
+
   // It is a fact about the family on the panel, so switching family replaces
   // it rather than leaving the last one's answer standing.
   env.family.choose("Sample");

@@ -202,6 +202,23 @@ def test_the_label_rounds_half_up_not_half_to_even():
     assert fontconf.size_label(13) == 13
 
 
+def test_a_size_spells_back_to_the_size_it_was():
+    """The spelling is not only a display: it fills the website's size boxes,
+    a save writes those back, and the note under them works the filename out
+    from what is in them. So a lossy spelling moves the size and misnames the
+    file. %g rounded 13.4999999 to 13.5, which labels as 14 where the size
+    itself labels as 13."""
+    for raw in ["13", "13.5", "13.25", "13.4999999"]:
+        size = fontconf.parse_sizes(raw, "sizes")[0]
+        spelled = fontconf.size_spelling(size)
+        assert fontconf.parse_sizes(spelled, "sizes")[0] == size, spelled
+        assert fontconf.size_label(float(spelled)) == fontconf.size_label(size)
+    # And a whole size is still spelled whole, which is what keeps every
+    # ordinary config printing the way it always has.
+    assert fontconf.size_spelling(13) == "13"
+    assert fontconf.size_spelling(13.5) == "13.5"
+
+
 def test_two_sizes_that_round_together_are_refused(tmp_path):
     fonts = tmp_path / "src"
     fonts.mkdir()

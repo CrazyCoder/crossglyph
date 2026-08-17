@@ -646,8 +646,15 @@ def size_label(size: float) -> int:
 
 
 def size_spelling(size: float) -> str:
-    """A size as a config writes it: 13, or 13.5 when it really is fractional."""
-    return f"{size:g}"
+    """A size as a config writes it: 13, or 13.5 when it really is fractional.
+
+    What this prints parses back to the number it was given. It is not only a
+    display: it fills the website's size boxes and a save writes those back, so
+    a spelling that rounded would move the size behind the reader. %g gives six
+    significant digits, which turns 13.4999999 into 13.5 -- a different size,
+    and one that labels as 14 where the size itself labels as 13.
+    """
+    return str(int(size)) if float(size).is_integer() else str(float(size))
 
 
 def parse_sizes(raw: str, where: str) -> list[float]:
