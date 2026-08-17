@@ -198,10 +198,16 @@ workspace explains.
 
 A single glyph cannot exceed 255 pixels on either side, because that is what
 the `.cpfont` format has room for. One glyph in practice reaches it: the
-bismillah at U+FDFD, an entire phrase drawn as one ornament, which passes 255
-pixels above roughly 28 pt. It is skipped with a warning naming the codepoint
-and the rest of the family builds. The honorific ligatures beside it, U+FDFA
-and U+FDFB, are 14 to 37 pixels at every size and are always included.
+bismillah at U+FDFD, an entire phrase drawn as one ornament rather than a
+letter. In Noto Sans Arabic it is 244 pixels wide at 12 pt and passes the
+limit at about 12.6, so every ordinary reading size above 12 pt drops it. The
+build says so, naming the codepoint and the size it measured, and carries on:
+a glyph the device could not store draws nothing there either way, and one
+ornament is not worth failing a family over.
+
+The honorific ligatures beside it, U+FDFA and U+FDFB, are nowhere near the
+limit: 27 and 26 pixels at 12 pt, 40 and 38 at 18 pt. They are included at
+every size.
 
 ### What actually decides the size
 

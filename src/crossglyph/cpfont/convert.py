@@ -34,7 +34,7 @@ import argparse
 import dataclasses
 from collections import namedtuple
 
-from .arabic import presentation_forms
+from .arabic import implied_coverage, presentation_forms
 from .tuning import Tuning
 from .version import CPFONT_VERSION
 
@@ -150,11 +150,19 @@ def resolve_intervals(preset_str):
 
     # Always add replacement character
     all_intervals.append((0xFFFD, 0xFFFD))
+    return merge_intervals(all_intervals)
 
-    # Sort and merge overlapping/adjacent intervals
-    all_intervals.sort()
+
+def merge_intervals(intervals):
+    """Sorted, with overlapping and adjacent runs joined into one.
+
+    FORK: split out of resolve_intervals so every path into a build can be
+    held to it. The .cpfont interval table is searched on the assumption that
+    it ascends, so an unsorted one packs without complaint and produces a file
+    the reader rejects with nothing to say about why.
+    """
     merged = []
-    for start, end in all_intervals:
+    for start, end in sorted(tuple(pair) for pair in intervals):
         if merged and start <= merged[-1][1] + 1:
             merged[-1] = (merged[-1][0], max(merged[-1][1], end))
         else:
@@ -261,37 +269,41 @@ def compose_raster(drawn, face, advance):
 
 
 def resolve_style_coverage(primary_face, fallback_faces, intervals,
-                           synthesized=frozenset()):
+                           synthesized=()):
     """Resolve intervals against primary coverage, then optional fallback chain.
 
     Returns (validated_intervals, codepoint_sources, source_codepoints).
     codepoint_sources maps codepoint -> source index (0 = primary, 1+ = fallbacks).
     Each fallback face only fills holes left by earlier faces in the chain.
 
-    FORK: `synthesized` is codepoints the primary face draws through its own
-    shaping rather than through a cmap entry. CrossPoint asks for shaped Arabic
-    codepoints, and a face that joins through GSUB has no cmap entry at any of
-    them, so without this every form is dropped here before it can be drawn.
-    See arabic.presentation_forms.
+    FORK: `synthesized` is one set of codepoints per source face, primary
+    first, holding what that face draws through its own shaping rather than
+    through a cmap entry. CrossPoint asks for shaped Arabic codepoints, and a
+    face that joins through GSUB has no cmap entry at any of them, so without
+    this every form is dropped here before it can be drawn. Per face rather
+    than for the primary alone, or an Arabic family named as a fallback would
+    draw a replacement box where the primary has no Arabic at all. See
+    arabic.presentation_forms.
     """
     validated_intervals = []
     codepoint_sources = {}
     source_codepoints = [set()]
     source_codepoints.extend(set() for _ in fallback_faces)
+    faces = [primary_face, *fallback_faces]
+    shaped = list(synthesized) + [frozenset()] * (len(faces) - len(synthesized))
 
     for i_start, i_end in intervals:
         run_start = None
         run_end = None
         for code_point in range(i_start, i_end + 1):
             source_index = None
-            if (code_point in synthesized
-                    or primary_face.get_char_index(code_point) > 0):
-                source_index = 0
-            else:
-                for idx, fallback_face in enumerate(fallback_faces, start=1):
-                    if fallback_face is not None and fallback_face.get_char_index(code_point) > 0:
-                        source_index = idx
-                        break
+            for idx, source_face in enumerate(faces):
+                if source_face is None:
+                    continue
+                if (code_point in shaped[idx]
+                        or source_face.get_char_index(code_point) > 0):
+                    source_index = idx
+                    break
 
             if source_index is None:
                 if run_start is not None:
@@ -1060,12 +1072,23 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     else:
         figure_overrides = [{} for _ in source_faces]
 
-    # FORK: the shaped Arabic codepoints CrossPoint will ask this face for.
+    # FORK: the shaped Arabic codepoints CrossPoint will ask each face for.
     # A modern Arabic face carries its joining rules and none of the shaped
     # codepoints, and the device has no shaper, so the rules are run here and
     # the result filed where the device looks. Empty for a face with no
     # Arabic, and for one that carries the shaped codepoints already.
-    arabic_runs = presentation_forms(fontfile)
+    #
+    # Per source face, as the figures above are, so an Arabic family used as
+    # somebody's fallback is repaired the same way it would be as a primary.
+    arabic_runs = [presentation_forms(path)
+                   for path in [fontfile] + list(fallback_fontfiles or [])]
+
+    # FORK: asking for Arabic letters is asking for the shapes they are drawn
+    # by, since the device converts a letter before it looks a glyph up. A
+    # build holding the letters and not the shapes draws a replacement box for
+    # every word. Normalized as well, so a caller that assembled its own
+    # coverage cannot hand the packer an unsorted table.
+    intervals = merge_intervals(implied_coverage(intervals))
 
     def load_one_glyph(target_face, glyph_index):
         if glyph_index > 0:
@@ -1098,7 +1121,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         # may be one glyph or several with offsets. A run of one is the same
         # code as a run of many, so a face that spells a letter whole and one
         # that spells it as a mark plus a base cannot behave differently.
-        run = arabic_runs.get(code_point) if face_index == 0 else None
+        run = arabic_runs[face_index].get(code_point)
         if run is not None:
             drawn = []
             for glyph_index, x_offset, y_offset in run.pieces:
@@ -1123,7 +1146,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # still widening glyph coverage for SD-card fonts.
     print(f"  [{style_label}] Validating intervals against font coverage...", file=sys.stderr)
     intervals, codepoint_sources, source_codepoints = resolve_style_coverage(
-        face, fallback_faces, intervals, synthesized=frozenset(arabic_runs))
+        face, fallback_faces, intervals,
+        synthesized=[frozenset(runs) for runs in arabic_runs])
     total_glyphs = sum(end - start + 1 for start, end in intervals)
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
     coverage_parts = [f"{len(source_codepoints[0])} primary"]
@@ -1149,13 +1173,14 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             bitmap = f
 
             # FORK: EpdGlyph packs width and height as uint8, so a glyph over
-            # GLYPH_SIZE_CAP on either axis has nowhere to go. Only one glyph
-            # reaches this in practice, and only at large sizes: an Arabic
-            # ligature drawn as a whole phrase, such as U+FDFD. A device that
-            # cannot store it draws nothing for it either way, so this stores
-            # the empty entry rather than aborting a whole family over one
-            # glyph. Without it the packer raises struct.error, which names no
-            # codepoint and suggests nothing.
+            # GLYPH_SIZE_CAP on either axis has nowhere to go. One glyph
+            # reaches it in practice: U+FDFD, an Arabic ligature drawn as a
+            # whole phrase, which in Noto Sans Arabic passes 255 px at about
+            # 12.6 pt and so is over at every ordinary reading size. A device
+            # that cannot store it draws nothing for it either way, so this
+            # stores the empty entry rather than aborting a whole family over
+            # one glyph. Without it the packer raises struct.error, which names
+            # no codepoint and suggests nothing.
             if bitmap.width > GLYPH_SIZE_CAP or bitmap.rows > GLYPH_SIZE_CAP:
                 print(f"WARNING: U+{code_point:04X} renders "
                       f"{bitmap.width}x{bitmap.rows} px, over the "
@@ -1168,16 +1193,16 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
             # Build 4-bit greyscale bitmap (same logic as fontconvert.py).
             #
-            # FreeType returns the buffer with bitmap.pitch as the row stride
-            # in bytes, which can be negative when the bitmap is stored
-            # bottom-up. Iterating bitmap.buffer linearly assumes
+            # pitch is the row stride in bytes, and it can be negative when the
+            # rows are stored bottom-up. Iterating the buffer linearly assumes
             # pitch == width and a top-down layout — that holds in the common
             # case but breaks on padded or flipped bitmaps and corrupts the
             # output. Walk by (row, col) using the real pitch instead.
             #
-            # Cache bitmap.buffer in a local — ctypes struct field access
-            # creates a new Python wrapper object each time, so re-evaluating
-            # it per pixel is catastrophically slow.
+            # FORK: the buffer is copied out of the FreeType slot once per
+            # glyph, in raster_from_slot, and read here as plain bytes. Reading
+            # a ctypes array per pixel instead is catastrophically slow, since
+            # each field access builds a new Python wrapper.
             pixels4g = []
             px = 0
             buf = bitmap.buffer

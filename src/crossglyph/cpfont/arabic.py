@@ -15,6 +15,7 @@ agree against shapetypes[] itself.
 from __future__ import annotations
 
 import functools
+import os
 import typing
 import unicodedata
 from collections.abc import Iterable
@@ -80,9 +81,17 @@ def implied_coverage(intervals) -> tuple[tuple[int, int], ...]:
     """The same coverage, plus the shapes those letters will be asked by.
 
     An implication rather than a guess: the device converts a letter before it
-    draws it, so a build holding the letters and not their shapes has nothing
-    it can draw. Nothing is added for coverage with no Arabic in it.
+    draws it, so a build holding the letters and not their shapes draws a
+    replacement box for every word. Nothing is added for coverage with no
+    Arabic in it.
     """
+    # Answered from the interval bounds before anything is expanded, so a CJK
+    # build does not materialize twenty thousand codepoints to learn it has no
+    # Arabic in it.
+    if not any(start <= SHAPE_LAST and end >= SHAPE_FIRST
+               for start, end in intervals):
+        return tuple(tuple(pair) for pair in intervals)
+
     covered = {cp for start, end in intervals for cp in range(start, end + 1)}
     asked = forms_for(covered) - covered
     if not asked:
@@ -153,7 +162,6 @@ def _run(shaped) -> GlyphRun:
     return GlyphRun(tuple(pieces), advance)
 
 
-@functools.lru_cache(maxsize=8)
 def presentation_forms(font_path) -> dict[int, GlyphRun]:
     """{codepoint the device asks for: the run of glyphs that draws it}.
 
@@ -161,11 +169,31 @@ def presentation_forms(font_path) -> dict[int, GlyphRun]:
     that cmaps the presentation forms outright returns nothing and pays one
     cmap walk for the question. A face with no Arabic pays the same and no
     more.
+
+    Cached on the file's own modification time and size as well as its path,
+    because the answer is glyph ids: a font replaced in place under a running
+    preview would otherwise be drawn with the glyph ids of the font it
+    replaced, which is a page of wrong letters rather than an obvious failure.
+    """
+    path = str(font_path)
+    try:
+        stat = os.stat(path)
+        stamp = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        stamp = None
+    return _resolve_forms(path, stamp)
+
+
+@functools.lru_cache(maxsize=64)
+def _resolve_forms(path: str, _stamp) -> dict[int, GlyphRun]:
+    """The body of presentation_forms, keyed by which bytes were on disk.
+
+    Sized for a build with the whole bundled fallback set in the chain, so one
+    face per style does not evict the rest.
     """
     import uharfbuzz as hb
     from fontTools.ttLib import TTFont
 
-    path = str(font_path)
     with TTFont(path, fontNumber=0, lazy=True) as ttf:
         cmap = set(ttf.getBestCmap() or {})
         upem = ttf["head"].unitsPerEm
@@ -183,12 +211,16 @@ def presentation_forms(font_path) -> dict[int, GlyphRun]:
         if base not in cmap or code in cmap:
             continue
         template, at = _CONTEXTS[form]
-        shaped = [piece
-                  for piece in _shape(blob, upem, template.format(c=chr(base)))
-                  if piece[1] == at and piece[0] not in joiner]
-        if not shaped:
-            continue
-        resolved[code] = _run(shaped)
+        drawn = [piece
+                 for piece in _shape(blob, upem, template.format(c=chr(base)))
+                 if piece[0] not in joiner]
+        # Prefer the letter's own cluster, but do not require it. A shaper is
+        # free to merge the joiner's cluster into the letter's, and a face that
+        # provoked that would otherwise resolve nothing at all here and fail as
+        # a blank page rather than as an error.
+        shaped = [piece for piece in drawn if piece[1] == at] or drawn
+        if shaped:
+            resolved[code] = _run(shaped)
 
     # A lam followed by an alef is a ligature the device asks for by its own
     # codepoint, so it has to be resolved as a pair rather than a letter. A

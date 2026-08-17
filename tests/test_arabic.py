@@ -201,7 +201,7 @@ def test_a_synthesized_codepoint_survives_coverage_resolution(tmp_path):
     initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
 
     intervals, sources, _ = convert.resolve_style_coverage(
-        face, [], [(initial, initial)], synthesized=frozenset({initial}))
+        face, [], [(initial, initial)], synthesized=[frozenset({initial})])
 
     assert intervals == [(initial, initial)]
     assert sources[initial] == 0, "the primary face is what synthesizes it"
@@ -214,9 +214,40 @@ def test_an_unsynthesized_missing_codepoint_is_still_dropped(tmp_path):
     initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
 
     intervals, _, _ = convert.resolve_style_coverage(
-        face, [], [(initial, initial)], synthesized=frozenset())
+        face, [], [(initial, initial)], synthesized=[frozenset()])
 
     assert intervals == [], "nothing can draw it, so it must not be built"
+
+
+def test_a_fallback_face_synthesizes_its_own_forms(tmp_path):
+    """An Arabic family named as somebody's fallback is repaired too.
+
+    Resolving only the primary drew a replacement box for every Arabic word
+    whenever the primary was the Latin face it usually is.
+    """
+    latin = tmp_path / "latin.ttf"
+    fontsmith.box_font(latin, [ord("a"), ord(" ")])
+    joining = tmp_path / "joining.ttf"
+    fontsmith.joining_font(joining)
+    initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
+
+    intervals, sources, _ = convert.resolve_style_coverage(
+        freetype.Face(str(latin)), [freetype.Face(str(joining))],
+        [(initial, initial)],
+        synthesized=[frozenset(), frozenset({initial})])
+
+    assert intervals == [(initial, initial)]
+    assert sources[initial] == 1, "the fallback is what synthesizes it"
+
+
+def test_synthesized_may_name_fewer_faces_than_the_chain_has(tmp_path):
+    """A short list must not raise on the faces it does not reach."""
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    face = freetype.Face(str(path))
+    intervals, _, _ = convert.resolve_style_coverage(
+        face, [freetype.Face(str(path))], [(0x0628, 0x0628)], synthesized=[])
+    assert intervals == [(0x0628, 0x0628)]
 
 
 # --- rasterizing a form from its run ---------------------------------------
@@ -257,6 +288,59 @@ def test_a_composite_form_draws_both_of_its_pieces(tmp_path):
 
     assert _ink(decomposed, isolated) > _ink(plain, isolated) * 1.5, \
         "a mark plus a base must draw more than the base alone"
+
+
+def _page_ink(face, coverage, text, fallbacks=(), size=16.0):
+    """Ink a page of `text` carries, built from this face and coverage."""
+    from crossglyph.preview import REGULAR, build_font
+    from crossglyph.render import image
+
+    font = build_font({REGULAR: face}, size, coverage=coverage,
+                      fallbacks=tuple(str(p) for p in fallbacks))
+    page = image.render_png(font, text)
+    return sum(1 for v in page.convert("L").getdata() if v < 250)
+
+
+#: One joined word the fixture can draw, and the coverage its letters need.
+WORD = "ببب"
+
+
+def test_asking_for_the_letters_asks_for_their_shapes(tmp_path):
+    """Coverage naming Arabic letters and not their shapes drew a box a word.
+
+    The device converts a letter before it looks a glyph up, so a build with
+    the letters alone has nothing at any codepoint it asks for. This is an
+    implication of the coverage, not a preset somebody has to know to add.
+    """
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    letters = tuple(convert.merge_intervals(
+        convert.resolve_intervals("base") + [(0x0600, 0x06FF)]))
+    forms = {code for low, high in convert.merge_intervals(
+        arabic.implied_coverage(letters)) for code in range(low, high + 1)}
+
+    assert arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)] in forms
+    # The build resolves the same implication for itself, so a caller that
+    # passed only the letters still gets a page rather than boxes.
+    assert _page_ink(path, letters, WORD) > 0
+
+
+def test_unsorted_coverage_still_builds_a_font_the_reader_accepts(tmp_path):
+    """The interval table is searched as though it ascends.
+
+    An unsorted one packed without complaint and produced a file the render
+    core rejected outright, saying nothing about which end was wrong.
+    """
+    path = tmp_path / "latin.ttf"
+    fontsmith.box_font(path, [ord(" "), ord("a"), 0x00E9])
+    scrambled = ((0x0061, 0x0061), (0x0020, 0x0020), (0x00E9, 0x00E9))
+    assert _page_ink(path, scrambled, "aé") > 0
+
+
+def test_merge_intervals_sorts_and_joins_what_touches():
+    assert convert.merge_intervals([(5, 6), (1, 2), (3, 4)]) == [(1, 6)]
+    assert convert.merge_intervals([(10, 20), (1, 2)]) == [(1, 2), (10, 20)]
+    assert convert.merge_intervals([(1, 9), (3, 5)]) == [(1, 9)]
 
 
 # --- the per-glyph size cap ------------------------------------------------
