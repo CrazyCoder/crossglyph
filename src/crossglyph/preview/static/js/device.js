@@ -151,9 +151,14 @@ function tone(value, low, high) {
   return Math.round(low + ratio * (high - low));
 }
 
-function rgb(level, paperTone) {
-  return [Math.max(0, level - (paperTone ? 2 : 1)),
-          Math.min(255, level + 1), level];
+// Measured off the white device photographed on white paper in shade, each
+// patch balanced against paper at its own height: the body reads a cast of
+// (+0.7, +1.8, -2.4) and its e-ink panel (+1.0, +1.3, -2.4). Body and paper are
+// the same hue, so one transform serves both, and the rendered device frames
+// carry this same constant.
+function rgb(level) {
+  return [Math.min(255, level + 1), Math.min(255, level + 2),
+          Math.max(0, level - 2)];
 }
 
 //: The decoded page the canvas draws, replaced whole by each render. A bitmap
@@ -173,7 +178,7 @@ export function paintDevicePage() {
   // Both controls measure "more": more paper is lighter, more ink is darker.
   const paperLevel = Math.round(Number(paper.value) * 255 / 100);
   const inkLevel = Math.round((100 - Number(ink.value)) * 255 / 100);
-  const inkRgb = rgb(inkLevel, false), paperRgb = rgb(paperLevel, true);
+  const inkRgb = rgb(inkLevel), paperRgb = rgb(paperLevel);
   const palette = new Uint8ClampedArray(256 * 3);
   for (let source = 0; source < 256; ++source) {
     const base = source * 3;
