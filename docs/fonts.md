@@ -171,14 +171,15 @@ rules need. Fonts split into two camps on this. Older ones store every shape
 under its own codepoint, which is what the device expects. Newer ones, and most
 good Arabic faces today, store one shape plus the rules, and the device finds
 nothing where it looks. Scheherazade New and ReadexPro are in the second camp,
-and until this was handled they drew a page of blanks.
+and until this was handled they drew a page of blanks, or of replacement boxes
+wherever the build had one of those to draw instead.
 
 So the rules are run here instead, once, while the font is built, and each
-resulting shape is stored where the device will ask for it. **This is
-automatic. There is no setting, and it works with any Arabic face.** Where a
-face spells a letter as a base plus a separate mark, which is how the alef with
-hamza and the alef with madda are usually drawn, the pieces are combined into
-one picture first.
+resulting shape is stored where the device will ask for it. This is automatic:
+there is no setting, and it works with any Arabic face. Where a face spells a
+letter as a base plus a separate mark, which is how the alef with hamza and the
+alef with madda are usually drawn, the pieces are combined into one picture
+first.
 
 The one thing to do yourself is put `arabic` in `intervals`, exactly as you
 would for Greek or Cyrillic. It is the choice to carry Arabic at all, and it
@@ -190,7 +191,12 @@ intervals = reading, arabic
 
 Note that `reading` on its own contains no Arabic whatsoever. A family built
 with the default coverage draws nothing for an Arabic book, however good the
-face is.
+face is. Asking for the letters is enough, by preset or by a raw `ranges`
+entry: the shapes they are drawn by follow from the letters and are added for
+you.
+
+A face named in `fallback_regular` is repaired the same way, so a Latin family
+that borrows its Arabic from one still gets joined text.
 
 The built family records what it repaired, under `synthesized` in
 `.crossglyph.json`, so a font never carries shapes that nothing in the
