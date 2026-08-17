@@ -6,13 +6,14 @@ rasterization controls -- gamma, anti-aliasing thresholds, weight, slant,
 hinting, stem darkening -- that upstream has no place for, and because a live
 preview cannot afford to spawn a subprocess per keystroke.
 """
+from . import arabic
 from .convert import (INTERVAL_PRESETS, FontBuildError,
                       figure_glyph_overrides, generate_cpfont_multistyle,
                       gsub_ligature_sequences, ligature_codepoints,
                       resolve_intervals)
 from .version import CPFONT_VERSION
 
-__all__ = ["CPFONT_VERSION", "INTERVAL_PRESETS", "FontBuildError",
+__all__ = ["CPFONT_VERSION", "INTERVAL_PRESETS", "FontBuildError", "arabic",
            "figure_glyph_overrides", "generate_cpfont_multistyle",
            "gsub_ligature_sequences", "ligature_codepoints",
            "resolve_intervals"]
