@@ -705,6 +705,13 @@
             Extra Unicode ranges, for books that need them. More coverage means
             a larger file and a longer build.
             <br><br>
+            These ticks change the font a build writes, not the page above it.
+            The preview draws the text in the box from the family itself, so
+            ticking a range you are not looking at changes nothing on screen
+            and everything in the built file. The fallback ticks below do show
+            on the page, since they decide who supplies a character the family
+            has not got.
+            <br><br>
             Base coverage is in every build first: ASCII and
             basic Latin plus Unicode punctuation, which keeps letters, numbers,
             spaces, smart quotes, dashes and ellipses available without adding
@@ -722,10 +729,12 @@
             (♪ ♫ ♬), stars (★) and dingbats (✓).
             <br><br>
             <strong>Arabic</strong>: Arabic, Farsi and Urdu letterforms,
-            including the Persian and Urdu letters and presentation forms.
-            Joined rendering depends on the reader's text shaping and not on
-            coverage alone, so isolated codepoints may still draw
-            disconnected.
+            including the Persian and Urdu letters and the joined shapes a
+            reader asks for. Arabic joins up, and the reader looks a joined
+            shape up rather than working it out, so the build resolves those
+            from the font's own rules and stores them. That happens on its
+            own, for any Arabic face. Ticking this is the whole of what you
+            have to do.
             <br><br>
             Where a character comes from: the main family is
             checked first, then fallback 1, then fallback 2, then the bundled

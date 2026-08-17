@@ -339,6 +339,12 @@ A second family counts as a name, being called after the first one. The picker
 follows a rename as soon as it is saved, and so does any family falling back to
 the one that moved.
 
+Coverage decides what a build writes and not what the page draws. A preview
+build is sized to the text in the box, so unticking a range the text does not
+use leaves the render byte for byte the same while changing the font Build
+produces. The fallback ticks are the other way round: those do show on the
+page, because they decide who supplies a character the family has not got.
+
 The coverage presets overlap, and the row says so rather than leaving it to be
 worked out: `reading` is the converter's `default` block and a good deal more,
 so ticking it shows Default, Latin Extended, Symbols and Vietnamese as carried,
