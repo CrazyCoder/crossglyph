@@ -200,10 +200,12 @@ def scale_advance(value, face):
     """FORK: font units to 16.16 pixels, the unit linearHoriAdvance is in.
 
     x_scale maps font units to 26.6, so 16.16 is the same product shifted ten
-    places less. A composed glyph reports its advance the way a slot does,
-    because the packer downstream reads only the one field.
+    places less. Rounded rather than truncated, which is FT_MulDiv by 64 and
+    so exactly what FreeType put in linearHoriAdvance: the two paths into the
+    packer have to agree to the bit, or Arabic is spaced unlike every other
+    script in the same font.
     """
-    return (value * face.size.x_scale) >> 6
+    return (value * face.size.x_scale + 32) >> 6
 
 
 def _coverage_rows(piece):
@@ -229,9 +231,10 @@ def _coverage_rows(piece):
 def compose_raster(drawn, face, advance):
     """FORK: blend rendered pieces at their shaped offsets into one bitmap.
 
-    Offsets arrive in font units and land on whole pixels, which is as fine as
-    the target can be: the device places one bitmap per codepoint and has no
-    subpixel positioning to lose.
+    Offsets arrive in font units and land on the nearest whole pixel, which is
+    as fine as the target can be: the device places one bitmap per codepoint
+    and has no subpixel positioning to lose. Nearest rather than truncated, or
+    every mark drifts the same way by up to a pixel.
 
     The result is reported as greyscale even when the pieces were rendered
     mono, because blending needs a byte per pixel. The values are still only 0
@@ -245,8 +248,8 @@ def compose_raster(drawn, face, advance):
         if not (piece.width and piece.rows):
             continue
         placed.append((piece,
-                       piece.left + (scale_units(x_offset, face) >> 6),
-                       piece.top + (scale_units(y_offset, face) >> 6)))
+                       piece.left + ((scale_units(x_offset, face) + 32) >> 6),
+                       piece.top + ((scale_units(y_offset, face) + 32) >> 6)))
     if not placed:
         return RasterGlyph(0, 0, 0, b"", freetype.FT_PIXEL_MODE_GRAY, 0, 0,
                            advance)

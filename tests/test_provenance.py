@@ -193,3 +193,26 @@ def test_an_arabic_family_records_what_was_synthesized(built_arabic):
     otherwise hold glyphs at codepoints no source face carries and nothing in
     the workspace would say where they came from."""
     assert built_arabic["built"]["synthesized"]["arabic_forms"] > 0
+
+
+def test_fallbacks_are_recorded_by_filename_not_by_path(tmp_path):
+    """The record names faces. It reads them too, but that is not what it
+    writes: a path names one machine and the filename names the face."""
+    from fontsmith import box_font, joining_font
+
+    box_font(tmp_path / "Plain-Regular.ttf", [0x20, 0x41], family="Plain")
+    joining_font(tmp_path / "Joins-Regular.ttf", family="Joins")
+    (tmp_path / "plain.conf").write_text(
+        "sizes = 12\nintervals = base, arabic\nfallbacks = no\n"
+        "fallback_regular = Joins-Regular.ttf\n", encoding="utf-8")
+    out = tmp_path / "out"
+    config = fontconf.parse_config(tmp_path / "plain.conf")
+    list(fontbuild.build_families([config], out))
+    block = json.loads((out / "Plain" / fontstamp.STAMP_NAME)
+                       .read_text(encoding="utf-8"))["built"]
+
+    assert block["fallbacks"] == ["Joins-Regular.ttf"]
+    assert not any("/" in name or "\\" in name for name in block["fallbacks"])
+    # The Arabic came from the fallback, and the record has to account for it
+    # rather than reporting a family that repaired nothing.
+    assert block["synthesized"]["arabic_forms"] > 0

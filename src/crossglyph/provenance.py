@@ -112,27 +112,27 @@ def _sources(variant: Variant) -> dict:
             for style in STYLES if style in config.styles}
 
 
-def _synthesized(variant: Variant) -> dict:
+def _synthesized(variant: Variant, fallbacks: list[str]) -> dict:
     """What the build resolved through a face's own shaping, not its cmap.
 
     Recorded because the synthesis is automatic and has no setting of its own:
     without this a .cpfont holds glyphs at codepoints no source face carries,
     and nothing in the workspace says where they came from.
 
-    Counted per style, since a family whose bold joins and whose regular does
-    not is a family with something wrong in it.
+    Every face the build drew from, the fallbacks included, since a Latin
+    family whose Arabic comes from a fallback is repaired exactly as an Arabic
+    family is and would otherwise account for none of it.
 
     A face this cannot read contributes nothing rather than raising. This runs
     after the fonts are already built and written, so the build has read every
     face it needed; a report is not allowed to be the step that fails one.
     """
     config: Config = variant.config
+    faces = [config.styles[style] for style in STYLES if style in config.styles]
     forms = 0
-    for style in STYLES:
-        if style not in config.styles:
-            continue
+    for face in faces + list(fallbacks):
         try:
-            forms += len(cpfont.arabic.presentation_forms(config.styles[style]))
+            forms += len(cpfont.arabic.presentation_forms(face))
         except Exception:                   # noqa: BLE001 -- see above
             continue
     return {"arabic_forms": forms} if forms else {}
@@ -200,8 +200,13 @@ def _files(variant: Variant, directory: pathlib.Path,
 def describe(variant: Variant, directory: pathlib.Path,
              sizes: typing.Iterable[float],
              fallbacks: list[str] | None = None) -> dict:
-    """The provenance block for one built family."""
+    """The provenance block for one built family.
+
+    `fallbacks` are whole paths, and are recorded by filename: the record
+    names the faces, and the count below has to read them.
+    """
     config: Config = variant.config
+    faces = list(fallbacks or [])
     stamped = datetime.datetime.now(datetime.timezone.utc)
     return {
         "at": stamped.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -213,7 +218,7 @@ def describe(variant: Variant, directory: pathlib.Path,
         # Omitted rather than zero, so the key appearing at all means a face
         # needed repairing and says how much.
         **({"synthesized": synthesized}
-           if (synthesized := _synthesized(variant)) else {}),
-        "fallbacks": list(fallbacks or []),
+           if (synthesized := _synthesized(variant, faces)) else {}),
+        "fallbacks": [pathlib.Path(face).name for face in faces],
         "files": _files(variant, directory, sizes),
     }

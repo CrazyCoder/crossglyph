@@ -337,6 +337,31 @@ def test_unsorted_coverage_still_builds_a_font_the_reader_accepts(tmp_path):
     assert _page_ink(path, scrambled, "aé") > 0
 
 
+def test_a_synthesized_form_advances_as_its_own_glyph_does(tmp_path):
+    """Two paths report an advance, and text is even only if they agree.
+
+    The cmap path reports FreeType's linearHoriAdvance and the synthesized one
+    reports the shaper's advance scaled to match. A disagreement would space
+    Arabic differently from every other script in the same font.
+    """
+    import freetype
+
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    face = freetype.Face(str(path))
+    face.set_char_size(16 * 64, 16 * 64, 150, 150)
+
+    checked = 0
+    for run in arabic.presentation_forms(path).values():
+        if len(run.pieces) != 1:
+            continue
+        face.load_glyph(run.pieces[0][0], freetype.FT_LOAD_DEFAULT)
+        assert convert.scale_advance(run.advance, face) == \
+            face.glyph.linearHoriAdvance
+        checked += 1
+    assert checked > 5, "almost nothing was compared"
+
+
 def test_merge_intervals_sorts_and_joins_what_touches():
     assert convert.merge_intervals([(5, 6), (1, 2), (3, 4)]) == [(1, 6)]
     assert convert.merge_intervals([(10, 20), (1, 2)]) == [(1, 2), (10, 20)]
