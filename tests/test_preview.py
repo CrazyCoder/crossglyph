@@ -633,3 +633,34 @@ def test_a_ligature_the_font_cannot_form_is_not_a_hole_in_the_page():
     # And nothing that is not on the page.
     plain, _ = preview.markup.parse(text)
     assert asked - set(preview.ESSENTIAL_CODEPOINTS) <= set(map(ord, plain))
+
+
+def test_arabic_coverage_includes_the_shapes_the_device_will_ask_for(tmp_path):
+    """A build sized to the letters typed can draw none of them.
+
+    The device shapes Arabic before it looks a glyph up, so it asks for a
+    joined form and never for the letter. This is the same argument as the
+    ligature outputs above: a codepoint nobody types and the page needs.
+    """
+    import fontsmith
+    from crossglyph import preview
+    from crossglyph.cpfont import arabic
+
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    covered = {code for low, high in preview.coverage_for("\u0628\u0628", path)
+               for code in range(low, high + 1)}
+    assert 0x0628 in covered, "the letter that was typed must survive"
+    assert arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)] in covered
+
+
+def test_latin_coverage_is_left_alone(tmp_path):
+    """Nothing Arabic in the text, so nothing Arabic in the build."""
+    import fontsmith
+    from crossglyph import preview
+
+    path = tmp_path / "latin.ttf"
+    fontsmith.box_font(path, [ord("a"), ord("b"), ord(" "), ord("-")])
+    covered = {code for low, high in preview.coverage_for("ab", path)
+               for code in range(low, high + 1)}
+    assert covered == {ord("a"), ord("b"), ord(" "), ord("-")}

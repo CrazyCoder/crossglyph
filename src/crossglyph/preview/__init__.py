@@ -124,9 +124,12 @@ def coverage_for(text: str,
     at, not an alphabet you are not.
 
     Three things the text does not say for itself go in too: the space and the
-    hyphen (see ESSENTIAL_CODEPOINTS), and the output codepoints of any
-    ligature the text can trigger -- nobody types U+FB01, and a ligature whose
-    output is missing from the build is dropped rather than drawn.
+    hyphen (see ESSENTIAL_CODEPOINTS), the output codepoints of any ligature
+    the text can trigger -- nobody types U+FB01, and a ligature whose output is
+    missing from the build is dropped rather than drawn -- and, for Arabic, the
+    joined shape of every letter on the page. The device shapes Arabic before
+    it looks a glyph up, so it asks for the shape and never for the letter, and
+    a build holding only what was typed holds nothing it can draw.
 
     Markup marks are stripped first, so `*bold*` does not order an asterisk.
     """
@@ -147,7 +150,7 @@ def coverage_for(text: str,
                 f"Try re-exporting the font or uploading a different file."
             ) from exc
 
-    return as_intervals(codepoints)
+    return cpfont.arabic.implied_coverage(as_intervals(codepoints))
 
 
 def faces_for(text: str,
