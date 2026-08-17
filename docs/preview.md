@@ -177,8 +177,8 @@ hyphenation on, off        was re-established after the cost-
 
 With hyphenation off the reader never breaks inside a word. With it on and no
 language, it breaks at hyphens the text already carries and adds none of its
-own -- exactly what the device does with a book whose language it does not
-recognise, which is worth being able to look at. A language on top of that
+own, which is exactly what the device does with a book whose language it does
+not recognise and is worth being able to look at. A language on top of that
 adds its patterns.
 
 The **Page** section folds, and starts folded. These are settings you match to
@@ -396,11 +396,13 @@ A build reports as it goes, which matters because one with the fallbacks on
 runs for minutes: the bar under the two buttons fills with the sizes done, and
 the line under it names the family and size in hand, the count, and once there
 is enough of the run to judge by, what is left. The sentence that stays when
-it finishes says what was built, what was already current, and where it went,
-with the bytes beside each count: a card has a fixed amount of room, and a
-build is when somebody wants to know what a family costs on it. The two
+it finishes says what was built, what was already current and anything that
+failed, with the bytes beside each count: a card has a fixed amount of room,
+and a build is when somebody wants to know what a family costs on it. The two
 numbers are separate because they answer different things, what this run
-wrote and what the sizes it left alone already take up.
+wrote and what the sizes it left alone already take up. Where it all went is
+not in that line, since the foot keeps one line for it and an output path is
+most of a panel wide; the box three rows up is already showing the folder.
 
 A build also tidies the output folder against the workspace: a family you
 renamed, dropped, or took the second size list off leaves a whole directory
@@ -541,15 +543,19 @@ device gives a glyph nobody has no width at all, so a paragraph of them is
 blank space rather than a row of boxes, and a page with a hole in it looks
 exactly like a page that failed to draw.
 
-The remedy is under Export: **bundled fallback faces**, which is a dozen Noto
+The remedy is under Export: **bundled fallback faces**, which is thirteen Noto
 faces covering most scripts, and the **Fetch** button beside it when they are
-not in the workspace yet. A fetch takes the page into account, so pressing
-**Fetch** on a Japanese sample brings the 15.7 MB CJK face as well and turns
-the box on,
-rather than leaving you to work out which coverage would have asked for it. One
-CJK face answers Japanese, Korean and both Chinese scripts. It is a slow
-download, so the same bar the build uses says how far it has got, and the
-button is out until it finishes.
+not in the workspace yet. Whichever of the two is the move left to make is
+marked the way an unticked coverage preset is, so the answer is where the
+answer gets applied; naming a family in **fallback 1** answers it as well, and
+is the only answer left once the bundled faces are on and have no glyph either.
+
+A fetch takes the page into account, so pressing **Fetch** on a Japanese sample
+brings the 15.7 MB CJK face as well and turns the box on, rather than leaving
+you to work out which coverage would have asked for it. One CJK face answers
+Japanese, Korean and both Chinese scripts. It is a slow download, so the same
+bar the build uses says how far it has got, and the button is out until it
+finishes.
 
 ## What this is not
 

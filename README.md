@@ -33,6 +33,9 @@ the point size.
   about a second, one process per size
 - thirteen Noto faces on request, so a missing arrow or Greek letter is not a
   hole in the page
+- Arabic comes out joined with any face, because the joining rules a modern one
+  stores are run here and the joined shapes built in, which the device has no
+  room to do for itself
 - nothing installed system wide, since the launcher fetches uv, Python and the
   dependencies into a cache directory you can delete
 
@@ -145,9 +148,9 @@ offers three of them.
 ## Fallback faces
 
 CrossPoint draws nothing for a codepoint no font in the chain has, so a family
-that lacks an arrow leaves a gap where it should be. Twelve Noto faces fill
-those holes, covering Hebrew, Armenian, Georgian, Ethiopic, Cherokee, Tifinagh,
-Coptic, mathematics, symbols and emoji.
+that lacks an arrow leaves a gap where it should be. Thirteen Noto faces fill
+those holes, covering Hebrew, Arabic, Armenian, Georgian, Ethiopic, Cherokee,
+Tifinagh, Coptic, mathematics, symbols and emoji.
 
 They are OFL licensed and unmodified, so they are downloaded rather than
 shipped here:

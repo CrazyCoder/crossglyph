@@ -622,8 +622,8 @@ next run retries exactly that one.
 ## What a built family says about itself
 
 The same `.crossglyph.json` carries a `built` block recording how the family
-was made. A family folder is a thing people copy -- onto a card, into a zip,
-to somebody who liked how it looked -- and what travels with it is four
+was made. A family folder is a thing people copy, onto a card, into a zip, or
+to somebody who liked how it looked, and what travels with it is four
 `.cpfont` files whose only metadata is a name and a size. This is the rest.
 
 ```json
@@ -656,13 +656,24 @@ string is a claim and a filename is a label. `licence_url` and `designer` are
 the first two questions a font someone handed you raises. `glyphs` answers
 what is in it without opening anything. `instance` is which face of a variable
 file a slot was drawn at, without which a reproduction of a Merriweather build
-comes back visibly lighter and nothing says why -- with `instance_name` beside
+comes back visibly lighter and nothing says why, with `instance_name` beside
 it, because "Medium" is what somebody searching for that face would type and
 `wght 500` is what they would have to translate first. The `subfamily` cannot
 stand in for it: on a variable file that describes the default instance, which
 is Thin for Bitter and not what anybody built. And `point_size` appears for
 a fractional size, because the filename cannot hold one: the device parses the
 label with `strtol`, so a family built at 13.5 ships as `_14`.
+
+A `synthesized` block appears above `fallbacks` when a face needed repairing,
+and says how much: `"synthesized": {"arabic_forms": 125}` is a build of
+Scheherazade New, which stores joining rules rather than joined shapes.
+`arabic_forms` counts the shapes the build resolved by running a face's own
+shaping instead of reading its character map, across every face it drew from,
+the fallbacks included. A face that already carries those shapes contributes
+nothing, so an Arabic build whose only Arabic face is the bundled Noto one has
+no such block. Nothing switches the repair on, so without this line a `.cpfont`
+holds glyphs at codepoints no source face carries and nothing in the workspace
+says where they came from.
 
 It is written when a build produces something, so a folder that is already
 current keeps the record of the run that made it. Nothing reads it back yet.
