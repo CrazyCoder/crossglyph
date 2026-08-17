@@ -132,10 +132,23 @@ size out of the filename with `strtol` into a `uint8_t`
 (`SdCardFontRegistry.cpp:85`), so a fractional size could not be named there.
 Nothing reads a point size out of the file itself, so `sizes = 13.5` writes
 `Family_14.cpfont`, and the device offers "14" while rendering 13.5 pt glyphs.
-Rounding is half up.
+Rounding is half up. `--list` and the line each size prints as it is built both
+name the label when it differs from the size, so the file a build is about to
+write, or has just written, is never left to be worked out:
+
+```
+  -> Family: 13.5 (ships as 14) 16
+  Family 13.5 (ships as 14) (0.4 MB, 354 glyphs, 3s)
+```
 
 Two sizes that round to the same label are refused rather than silently
 overwriting each other, so `sizes = 13.5 14` is an error.
+
+The separator here is a comma or a space, so a decimal comma is two sizes:
+`sizes = 13,25` builds 13 pt and 25 pt, and nothing can tell it apart from
+somebody asking for exactly that. Write the fraction with a dot. The website's
+size boxes hold one size each and do read a comma as a decimal point, since
+there the two cannot be confused.
 
 ## Coverage
 

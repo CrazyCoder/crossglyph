@@ -631,7 +631,8 @@
           <span class="tip" id="sizes-tip" role="tooltip">
             The reader's Font Size setting lists every size the family carries,
             one entry each. Not the size on the left, which is only what you
-            are tuning at.
+            are tuning at. A box takes a fraction, in the quarter points that
+            knob steps in, and rounds anything between them.
           </span>
         </span></span>
       <div class="sizes">
@@ -644,6 +645,11 @@
         <label><span>Extra Large</span>
           <input class="mono" id="size4" name="size4" type="text" inputmode="decimal"></label>
       </div>
+      <!-- What a fractional size will be called on the card, which the boxes
+           above cannot say for themselves: the filename carries the whole
+           number it rounds to. Shown only when one of them is fractional, and
+           marked as a warning when two land on the same name. -->
+      <div class="hint" id="ships-as" hidden></div>
     </div>
     <!-- Only for a family that carries more than the four boxes above, which a
          CJK one does: the reader borrows it at 8, 10 and 12 for the interface.
@@ -690,6 +696,7 @@
         <label><span>Extra Large</span>
           <input class="mono" id="mod4" name="mod4" type="text" inputmode="decimal"></label>
       </div>
+      <div class="hint" id="mod-ships-as" hidden></div>
     </div>
     <!-- The same carry the first family has, for the same reason: four boxes
          and a config with five sizes in it means a save writing a shorter list

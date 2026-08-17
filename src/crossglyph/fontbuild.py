@@ -24,7 +24,8 @@ import time
 import typing
 
 from . import cpfont, fontconf, fontstamp, provenance, spacefont
-from .fontconf import STYLES, Config, FontConfigError, Variant, parse_config
+from .fontconf import (STYLES, Config, FontConfigError, Variant, parse_config,
+                       size_label, size_spelling)
 
 #: The tool's own root, which is where an unpacked release keeps its workspace.
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -398,7 +399,7 @@ def ensure_space_font(widths: dict[int, float] | None = None) -> pathlib.Path:
 STYLE_IDS = {"regular": 0, "bold": 1, "italic": 2, "bolditalic": 3}
 
 
-def build_kwargs(variant: Variant, size: int, out_dir: pathlib.Path) -> dict:
+def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
     """Arguments for one generate_cpfont_multistyle call: one family, one size.
 
     generate_cpfont_multistyle takes every fallback for style 0 and appends
@@ -445,9 +446,9 @@ def build_kwargs(variant: Variant, size: int, out_dir: pathlib.Path) -> dict:
 @dataclasses.dataclass
 class Report:
     variant: str
-    built: list[int] = dataclasses.field(default_factory=list)
-    skipped: list[int] = dataclasses.field(default_factory=list)
-    failed: list[int] = dataclasses.field(default_factory=list)
+    built: list[float] = dataclasses.field(default_factory=list)
+    skipped: list[float] = dataclasses.field(default_factory=list)
+    failed: list[float] = dataclasses.field(default_factory=list)
     removed: list[pathlib.Path] = dataclasses.field(default_factory=list)
     error: str | None = None
     #: Bytes written this run: the sizes in `built`, and not the ones already
@@ -465,11 +466,17 @@ class Report:
 class Job:
     """One size of one family: the unit of work, and of parallelism."""
     variant: Variant
-    size: int
+    size: float
 
     @property
     def label(self) -> str:
-        return f"{self.variant.name} {self.size}"
+        """Family and size, and the whole number the file is named for when
+        that is not the same thing. A fractional size is rasterized as asked
+        and shipped under its rounded label, so a line saying only 13.25 does
+        not name the file it wrote. See fontconf.size_label."""
+        spelled = f"{self.variant.name} {size_spelling(self.size)}"
+        label = size_label(self.size)
+        return spelled if label == self.size else f"{spelled} (ships as {label})"
 
 
 def default_jobs() -> int:
@@ -587,7 +594,7 @@ def plan_variant(variant: Variant, out_dir: pathlib.Path,
 
 
 def finalize_variant(variant: Variant, out_dir: pathlib.Path,
-                     failed: set[int]) -> None:
+                     failed: set[float]) -> None:
     """Record what is now current, and what it was made from.
 
     Sizes that failed are left out, so the next run retries exactly those and

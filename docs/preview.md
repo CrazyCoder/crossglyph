@@ -339,6 +339,27 @@ A second family counts as a name, being called after the first one. The picker
 follows a rename as soon as it is saved, and so does any family falling back to
 the one that moved.
 
+**sizes** is what the reader's Font Size setting will list, one entry per box,
+and it is not the **size** knob on the left, which is only the size you are
+looking at. A box takes a fraction. The **size** knob steps a quarter point,
+because a whole point is 2.08 px/em at 150 DPI and about a 10% jump at reading
+sizes, and these boxes take the same quarter points over the same 6 to 40
+range: step through the page until 13.25 looks better than 13, then put 13.25
+in the box. Anything between two steps rounds to the nearer one when you leave
+the box, and anything outside the range is pulled back into it, so the sizes
+you ship are sizes you were able to look at first. A comma is a decimal point
+in one of those boxes, since each holds a single size; in **more sizes**, which
+is a list, it still separates one from the next, and so does a space.
+
+A fractional size is rasterized at the size you asked for and shipped under the
+whole number it rounds to, half up. The device parses the size out of the
+filename into a single byte and cannot hold a fraction there, so 13.25 builds
+`Family_13.cpfont` and the Font Size list reads 13 while the glyphs are 13.25
+pt. The line under the boxes says so whenever a size is fractional, naming the
+file each one will write. Two sizes that round to the same label would write
+over each other, so that line turns into a warning and the save refuses it:
+13.5 and 13.75 are both 14.
+
 The page draws what a build of this coverage would draw. A preview build is
 still sized to the text in the box rather than to the whole coverage, which is
 what keeps it to a few dozen glyphs, but it is held to what the coverage would

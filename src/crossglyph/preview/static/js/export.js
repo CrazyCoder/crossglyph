@@ -140,6 +140,48 @@ export const modName = document.getElementById("mod-name");
 export const modDot = document.getElementById("mod-dot");
 export const sizeNumbers = (text) => String(text).split(/[,\s]+/).filter(Boolean);
 
+//: The step the size knob moves in, and the range it covers. These boxes hold
+//: sizes that are meant to have been looked at first, so they take what that
+//: knob can reach and nothing between its steps: a size you cannot preview is
+//: a size you cannot check before it ships.
+export const SIZE_STEP = 0.25, SIZE_MIN = 6, SIZE_MAX = 40;
+
+// One size, as this panel will hold it: snapped to the quarter point and held
+// inside the previewable range.
+//
+// A comma is a decimal point here rather than a separator. Each of these boxes
+// holds one size, so `13,25` in one of them can only mean 13.25 -- and that is
+// what a keyboard laid out for Russian or German types. The config's own
+// separator is comma-or-space, where the same string means two sizes, so the
+// panel is the only place that can tell them apart.
+//
+// Anything that is not a number is handed back as typed. The save runs it
+// through the converter's own parser and names the problem, which is a better
+// answer than a box that empties itself.
+export function snapSize(text) {
+  const typed = String(text).trim();
+  if (!typed) return "";
+  const value = Number(typed.replace(",", "."));
+  if (!Number.isFinite(value)) return typed;
+  const held = Math.min(SIZE_MAX, Math.max(
+    SIZE_MIN, Math.round(value / SIZE_STEP) * SIZE_STEP));
+  // toFixed rounds off the arithmetic, String(Number(...)) drops the padding
+  // it adds: a quarter-point box should read 13.25 and 14, not 14.00.
+  return String(Number(held.toFixed(2)));
+}
+
+// The spill field, which is a list rather than one size: comma keeps meaning
+// "and" in there, and every entry snaps the same way.
+export function snapSizeList(text) {
+  return sizeNumbers(text).map(snapSize).join(" ");
+}
+
+//: The whole number a size ships under, which is what the filename carries and
+//: what the device lists. Half up, matching fontconf.size_label -- the device
+//: parses the label out of the filename with strtol into a uint8_t, so a
+//: fractional size cannot be named there at all.
+export const sizeLabel = (size) => Math.floor(size + 0.5);
+
 export function fillSizeBoxes(fields, text, spill) {
   const sizes = sizeNumbers(text);
   fields.forEach((name, index) => {
@@ -167,6 +209,15 @@ export function showSizes(settings) {
   moreRow.hidden = !more.value;
   modMoreRow.hidden = !modMore.value;
   showModState();
+  showShipsAs();
+}
+
+// What this family is called once it is built. The name in the box rather than
+// the one in the picker, so a rename you have typed but not saved shows what
+// the build would produce.
+export function familyLabel() {
+  return exportForm.elements.name.value.trim() || familyPicker.value
+         || "this family";
 }
 
 // The suffix only names something when there is a second family to name, and a
@@ -175,14 +226,60 @@ export function showModState() {
   const sizes = joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more);
   const suffix = exportForm.elements.mod_suffix;
   suffix.disabled = !sizes;
-  // Built on the name in the box rather than the one in the picker, so a
-  // rename you have typed but not saved shows what both families would be
-  // called -- they are one build, and the second is named after the first.
-  const family = exportForm.elements.name.value.trim() || familyPicker.value;
+  // They are one build, and the second family is named after the first.
   modName.textContent = sizes
-    ? (family || "this family") + (suffix.value || "Mod")
+    ? familyLabel() + (suffix.value || "Mod")
     : "a second family";
   modDot.hidden = !sizes;
+}
+
+export const shipsAs = document.getElementById("ships-as");
+export const modShipsAs = document.getElementById("mod-ships-as");
+
+// What a fractional size will be called on the card. The boxes cannot say it
+// for themselves: 13.25 is rasterized at 13.25 and shipped as `Family_13`,
+// because the device parses the size out of the filename and cannot hold a
+// fraction there. Without this the first time anybody learns which entry in the
+// Font Size list is which is on the device.
+//
+// It also puts the collision in front of the person while they are typing.
+// Quarter points make one easy -- 13.5 and 13.75 are both 14 -- and the save
+// refuses it, so the only other place to find out is a press of Save that does
+// nothing.
+export function spellShipsAs(note, text, family) {
+  const sizes = sizeNumbers(text).map(Number).filter(Number.isFinite);
+  const bunched = new Map();
+  for (const size of sizes) {
+    const label = sizeLabel(size);
+    bunched.set(label, [...(bunched.get(label) || []), size]);
+  }
+  const clash = [...bunched.entries()].find(([, group]) => group.length > 1);
+  const fractional = sizes.filter(size => sizeLabel(size) !== size);
+  note.classList.toggle("warn", Boolean(clash));
+  note.hidden = !clash && fractional.length === 0;
+  if (note.hidden) return;
+  if (clash) {
+    const [label, group] = clash;
+    const all = group.length === 2 ? `${group[0]} and ${group[1]} both ship`
+                                   : `${group.join(", ")} all ship`;
+    note.textContent = `${all} as ${family}_${label}, so they cannot both be `
+      + `built. Saving will refuse this.`;
+    return;
+  }
+  const said = fractional.map(
+    (size, at) => `${size}${at === 0 ? " ships" : ""} as `
+                  + `${family}_${sizeLabel(size)}`);
+  note.textContent = `${said.join(", ")}, which is what the device lists `
+    + `${fractional.length === 1 ? "it" : "them"} as.`;
+}
+
+export function showShipsAs() {
+  spellShipsAs(shipsAs, joinSizeBoxes(SIZE_FIELDS, exportForm.elements.size_more),
+               familyLabel());
+  spellShipsAs(modShipsAs,
+               joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more),
+               familyLabel()
+               + (exportForm.elements.mod_suffix.value.trim() || "Mod"));
 }
 
 // The config spells coverage as one comma-separated string, because that is
@@ -421,6 +518,9 @@ export function exportEdited(field) {
   }
   // Typing a second family's first size is what turns its suffix on.
   showModState();
+  // Both notes, whatever changed: the name is in the text they carry, and the
+  // suffix is in the second one's.
+  showShipsAs();
   showSaveState();
   // Everything here reaches the page and not only the build. The fallbacks
   // decide which face fills for the family; the coverage decides what the page
@@ -435,6 +535,26 @@ export function exportEdited(field) {
 }
 
 exportForm.addEventListener("input", (event) => exportEdited(event.target));
+
+//: A size box, left. Snapping on the way out rather than on every keystroke:
+//: correcting 13.3 to 13.25 while somebody is still typing 13.375 would fight
+//: the keyboard. This is the same moment the knobs snap in, which is what
+//: makes the two halves of the page agree about what a size can be.
+export function sizeLeft(field) {
+  const name = field && field.name;
+  const one = SIZE_FIELDS.includes(name) || MOD_FIELDS.includes(name);
+  const list = name === "size_more" || name === "mod_more";
+  if (!one && !list) return;
+  const next = one ? snapSize(field.value) : snapSizeList(field.value);
+  if (next === field.value) return;
+  field.value = next;
+  // By the same road a keystroke takes: a value the panel corrected is still a
+  // value the config has not got, and the note under the boxes is about what
+  // is in them now rather than what was typed into them.
+  exportEdited(field);
+}
+
+exportForm.addEventListener("change", (event) => sizeLeft(event.target));
 
 // The faces are not vendored: they are large, unmodified and OFL, so they are
 // fetched once into the font source folder. The offer only appears when they

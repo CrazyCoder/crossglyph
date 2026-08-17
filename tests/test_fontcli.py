@@ -59,3 +59,30 @@ def test_it_is_said_once_however_many_sizes_wanted_them(workspace, tmp_path,
         encoding="utf-8")
     assert build(workspace, tmp_path / "out", jobs="4") == 2
     assert capsys.readouterr().err.count("crossglyph fetch-fallbacks") == 1
+
+
+def test_a_fractional_size_names_the_file_it_will_write(workspace, tmp_path,
+                                                        capsys):
+    """`--list` is what you read before copying a build to a card, and a size
+    of 13.25 writes Probe_13.cpfont. Saying only 13.25 leaves the one number
+    the device will show unstated."""
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 13.25 16\nintervals = base\nfallbacks = no\n",
+        encoding="utf-8")
+    fontcli.main(["--fonts", str(workspace), "-o", str(tmp_path / "out"),
+                  "--list"])
+    said = capsys.readouterr().out
+    assert "13.25 (ships as 13)" in said
+    # A whole size is its own label, and a parenthesis after every one of them
+    # would be noise on the line this is meant to make readable.
+    assert "16 (ships as" not in said
+
+
+def test_the_built_line_names_it_too(workspace, tmp_path, capsys):
+    """The same question at the other end: which file did that just write."""
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 13.25\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    out = tmp_path / "out"
+    assert build(workspace, out) == 0
+    assert "Probe 13.25 (ships as 13)" in capsys.readouterr().out
+    assert (out / "Probe" / "Probe_13.cpfont").is_file()

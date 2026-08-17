@@ -564,6 +564,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     addEventListener(kind, fn) { this.on[kind] = fn; },
     // What the page listens for: a change to any control in here offers a save.
     edit(field) { this.on.input({ target: exportFields[field] }); },
+    // And leaving one, which is when a size box snaps to the quarter point.
+    leave(field) { this.on.change({ target: exportFields[field] }); },
   };
   const presetList = {
     children: [],
@@ -761,6 +763,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "more-row": { hidden: false },
     "mod-more-row": { hidden: false },
     "mod-name": { textContent: "" },
+    // What a fractional size will be called on the card, one note per family.
+    // Real elements: the note marks itself as a warning for a collision, so
+    // its classes are read as well as its text.
+    "ships-as": makeElement(),
+    "mod-ships-as": makeElement(),
     // The variable-font block, and the row per axis it builds inside it.
     variable: { hidden: false },
     "axis-text-row": { hidden: false },
@@ -2216,6 +2223,119 @@ for (const { name, text } of sources) {
   check("and a save writes the whole second list back",
         env.fetches.saves.at(-1).export.sizes_mod === "9 10 12 14 16 18",
         env.fetches.saves.at(-1).export.sizes_mod);
+}
+
+// 30b3. The size boxes take what the size knob can reach and nothing between
+//       its steps: a size nobody could preview is one nobody could check
+//       before it shipped. Snapped on the way out of the box rather than on
+//       every keystroke, or correcting 13.3 would fight somebody typing
+//       13.375.
+{
+  const env = await loaded(fakeStorage());
+  const fields = env.exportForm.elements;
+  const leave = (name, typed) => {
+    fields[name].value = typed;
+    env.exportForm.edit(name);
+    env.exportForm.leave(name);
+    return fields[name].value;
+  };
+  check("a quarter point is left alone", leave("size3", "13.25") === "13.25",
+        fields.size3.value);
+  check("and anything between two of them lands on the nearer",
+        leave("size3", "13.3") === "13.25", fields.size3.value);
+  check("halfway goes up, as the label's own rounding does",
+        leave("size3", "13.125") === "13.25", fields.size3.value);
+  // The one that is aimed at a keyboard rather than at a mistake: 13,25 is
+  // how a Russian or German layout writes it, and the config's own separator
+  // is comma-or-space, where the same string is two sizes. A box holds one
+  // size, so this is the only place the two can be told apart.
+  check("a decimal comma is a decimal point in a box that holds one size",
+        leave("size3", "13,25") === "13.25", fields.size3.value);
+  check("above what the page can draw is pulled back into it",
+        leave("size3", "200") === "40", fields.size3.value);
+  check("and below it likewise", leave("size3", "2") === "6",
+        fields.size3.value);
+  check("an empty box stays empty rather than becoming a size",
+        leave("size3", "") === "", fields.size3.value);
+  // Handed back rather than swallowed: the save runs it through the
+  // converter's own parser and names the problem, which beats a box that
+  // silently empties itself.
+  check("and something that is not a number is left for the save to refuse",
+        leave("size3", "big") === "big", fields.size3.value);
+  check("the overflow row snaps every entry, where a comma still means "
+        + "\"and\"", leave("size_more", "16.3 18,20") === "16.25 18 20",
+        fields.size_more.value);
+  check("and the second family's boxes follow the same rule",
+        leave("mod1", "15.6") === "15.5", fields.mod1.value);
+}
+
+// 30b4. What a fractional size will be called on the card. 13.25 is rasterized
+//       at 13.25 and shipped as `Family_13`, because the device parses the
+//       size out of the filename and cannot hold a fraction there -- so
+//       without this the first place anyone learns which Font Size entry is
+//       which is the device.
+{
+  const env = await loaded(fakeStorage());
+  const fields = env.exportForm.elements;
+  const note = env.sandbox.document.getElementById("ships-as");
+  const modNote = env.sandbox.document.getElementById("mod-ships-as");
+  // Alto opens at 12 and 13, which are their own labels.
+  check("a list of whole sizes says nothing", note.hidden === true);
+
+  fields.size3.value = "15.5";
+  env.exportForm.edit("size3");
+  check("a fractional size says what the device will list it as",
+        note.hidden === false && note.textContent
+          === "15.5 ships as Alto_16, which is what the device lists it as.",
+        note.textContent);
+  check("and it is not a warning", note.classes.has("warn") === false);
+
+  fields.size4.value = "17.25";
+  env.exportForm.edit("size4");
+  check("two of them are both named", note.textContent
+        === "15.5 ships as Alto_16, 17.25 as Alto_17, which is what the "
+          + "device lists them as.", note.textContent);
+
+  fields.name.value = "Alt";
+  env.exportForm.edit("name");
+  check("the file follows the name being typed, saved or not",
+        note.textContent.includes("Alt_16"), note.textContent);
+  fields.name.value = "Alto";
+  env.exportForm.edit("name");
+
+  // Quarter points make this easy to walk into -- 15.5 and 15.75 are both 16 --
+  // and the save refuses it, so without the note the only way to find out is a
+  // press of Save that does nothing.
+  fields.size4.value = "15.75";
+  env.exportForm.edit("size4");
+  check("two sizes landing on one name are a warning, ahead of the refusal",
+        note.classes.has("warn") === true && note.textContent
+          === "15.5 and 15.75 both ship as Alto_16, so they cannot both be "
+            + "built. Saving will refuse this.", note.textContent);
+  fields.size4.value = "";
+  env.exportForm.edit("size4");
+  check("and clearing one of them takes the warning down",
+        note.classes.has("warn") === false && note.hidden === false,
+        note.textContent);
+
+  // The second family is named after the first, so its note has to be.
+  fields.mod1.value = "13.5";
+  env.exportForm.edit("mod1");
+  check("the second family gets its own note, under its own name",
+        modNote.textContent
+          === "13.5 ships as AltoMod_14, which is what the device lists it "
+            + "as.", modNote.textContent);
+  fields.mod_suffix.value = "Alt";
+  env.exportForm.edit("mod_suffix");
+  check("which follows its suffix", modNote.textContent.includes("AltoAlt_14"),
+        modNote.textContent);
+
+  // It is a fact about the family on the panel, so switching family replaces
+  // it rather than leaving the last one's answer standing.
+  env.family.choose("Sample");
+  check("and a family whose sizes are whole clears it",
+        note.hidden === true && modNote.hidden === true,
+        `${note.textContent} | ${modNote.textContent}`);
 }
 
 // 30c. The second family: the same faces at other sizes, listed beside this one
