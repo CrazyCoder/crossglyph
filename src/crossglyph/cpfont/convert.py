@@ -34,6 +34,7 @@ import argparse
 import dataclasses
 from collections import namedtuple
 
+from .arabic import presentation_forms
 from .tuning import Tuning
 from .version import CPFONT_VERSION
 
@@ -157,12 +158,19 @@ def resolve_intervals(preset_str):
     return merged
 
 
-def resolve_style_coverage(primary_face, fallback_faces, intervals):
+def resolve_style_coverage(primary_face, fallback_faces, intervals,
+                           synthesized=frozenset()):
     """Resolve intervals against primary coverage, then optional fallback chain.
 
     Returns (validated_intervals, codepoint_sources, source_codepoints).
     codepoint_sources maps codepoint -> source index (0 = primary, 1+ = fallbacks).
     Each fallback face only fills holes left by earlier faces in the chain.
+
+    FORK: `synthesized` is codepoints the primary face draws through its own
+    shaping rather than through a cmap entry. CrossPoint asks for shaped Arabic
+    codepoints, and a face that joins through GSUB has no cmap entry at any of
+    them, so without this every form is dropped here before it can be drawn.
+    See arabic.presentation_forms.
     """
     validated_intervals = []
     codepoint_sources = {}
@@ -174,7 +182,8 @@ def resolve_style_coverage(primary_face, fallback_faces, intervals):
         run_end = None
         for code_point in range(i_start, i_end + 1):
             source_index = None
-            if primary_face.get_char_index(code_point) > 0:
+            if (code_point in synthesized
+                    or primary_face.get_char_index(code_point) > 0):
                 source_index = 0
             else:
                 for idx, fallback_face in enumerate(fallback_faces, start=1):
@@ -949,6 +958,13 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     else:
         figure_overrides = [{} for _ in source_faces]
 
+    # FORK: the shaped Arabic codepoints CrossPoint will ask this face for.
+    # A modern Arabic face carries its joining rules and none of the shaped
+    # codepoints, and the device has no shaper, so the rules are run here and
+    # the result filed where the device looks. Empty for a face with no
+    # Arabic, and for one that carries the shaped codepoints already.
+    arabic_runs = presentation_forms(fontfile)
+
     def load_glyph_for_face(target_face, code_point, face_index=0):
         glyph_index = figure_overrides[face_index].get(code_point) or 0
         if not glyph_index:
@@ -982,7 +998,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # font fill any holes. That keeps the primary family authoritative while
     # still widening glyph coverage for SD-card fonts.
     print(f"  [{style_label}] Validating intervals against font coverage...", file=sys.stderr)
-    intervals, codepoint_sources, source_codepoints = resolve_style_coverage(face, fallback_faces, intervals)
+    intervals, codepoint_sources, source_codepoints = resolve_style_coverage(
+        face, fallback_faces, intervals, synthesized=frozenset(arabic_runs))
     total_glyphs = sum(end - start + 1 for start, end in intervals)
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
     coverage_parts = [f"{len(source_codepoints[0])} primary"]

@@ -1,10 +1,11 @@
 """Arabic presentation forms: the table, and the coverage it implies."""
 import re
 
+import freetype
 import pytest
 
 import fontsmith
-from crossglyph.cpfont import arabic
+from crossglyph.cpfont import arabic, convert
 from crossglyph.render import stamp
 
 #: The firmware's own shaping table, which ours has to agree with.
@@ -164,3 +165,32 @@ def test_a_face_with_no_arabic_yields_nothing(tmp_path):
     path = tmp_path / "latin.ttf"
     fontsmith.box_font(path, [ord("a"), ord("b"), ord(" ")])
     assert arabic.presentation_forms(path) == {}
+
+
+# --- coverage resolution ---------------------------------------------------
+
+
+def test_a_synthesized_codepoint_survives_coverage_resolution(tmp_path):
+    """Without this the forms are dropped before anything is rasterized."""
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    face = freetype.Face(str(path))
+    initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
+
+    intervals, sources, _ = convert.resolve_style_coverage(
+        face, [], [(initial, initial)], synthesized=frozenset({initial}))
+
+    assert intervals == [(initial, initial)]
+    assert sources[initial] == 0, "the primary face is what synthesizes it"
+
+
+def test_an_unsynthesized_missing_codepoint_is_still_dropped(tmp_path):
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    face = freetype.Face(str(path))
+    initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
+
+    intervals, _, _ = convert.resolve_style_coverage(
+        face, [], [(initial, initial)], synthesized=frozenset())
+
+    assert intervals == [], "nothing can draw it, so it must not be built"
