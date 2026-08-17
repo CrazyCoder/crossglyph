@@ -45,7 +45,7 @@ export const DEVICES = {
   x4: {
     native: {width: 480, height: 800},
     frame: {width: 1118, height: 1820},
-    aperture: {x: 118, y: 100, width: 873, height: 1455, radius: 16},
+    aperture: {x: 117, y: 100, width: 873, height: 1455, radius: 16},
     body: {x: 8, y: 8, width: 1091, height: 1804,
            widthMm: 69.15, heightMm: 114.31},
   },
