@@ -44,6 +44,22 @@ FALLBACK_URL = ("https://raw.githubusercontent.com/crosspoint-reader/"
                 "crosspoint-tools/master/scripts/font-builder/"
                 "default-fallback-fonts/")
 
+#: Faces upstream's folder does not carry, and where they do live. Arabic is
+#: not in the set the website's converter ships, so a fetch of it has to go to
+#: the project that publishes it. Hinted, because the hinting knobs are the
+#: point at reading sizes.
+FALLBACK_SOURCES = {
+    "NotoSansArabic-Regular.ttf":
+        "https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
+        "main/fonts/NotoSansArabic/hinted/ttf/NotoSansArabic-Regular.ttf",
+}
+
+
+def fallback_source(name: str) -> str:
+    """Where one bundled fallback face is fetched from."""
+    return FALLBACK_SOURCES.get(name, FALLBACK_URL + name)
+
+
 #: Carried along so the licence travels with the fonts, as the OFL requires.
 FALLBACK_LICENCE = "OFL.txt"
 
@@ -71,6 +87,7 @@ OUTPUT_NAME = "cpfonts"
 BUNDLED_FALLBACKS = (
     "NotoSans-Regular.ttf",
     "NotoSansHebrew-Regular.ttf",
+    "NotoSansArabic-Regular.ttf",
     "NotoSansArmenian-Regular.ttf",
     "NotoSansGeorgian-Regular.ttf",
     "NotoSansEthiopic-Regular.ttf",
@@ -90,6 +107,12 @@ CJK_FALLBACKS = {
     "cjk-sc": ("NotoSansCJKsc-Regular.otf", "NotoSansCJKjp-Regular.otf"),
 }
 DEFAULT_CJK_FALLBACK = ("NotoSansCJKjp-Regular.otf",)
+
+#: Faces whose absence is not an error. The CJK one because it is 15.7 MB and
+#: only earns that when a CJK script was asked for; the Arabic one because
+#: upstream's folder does not carry it, so a workspace filled from there before
+#: FALLBACK_SOURCES existed has every other face and not this one.
+OPTIONAL_FALLBACKS = DEFAULT_CJK_FALLBACK + ("NotoSansArabic-Regular.ttf",)
 
 
 class FontBuildError(RuntimeError):
@@ -183,6 +206,10 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
     The one appended to every build is a catch-all, so it is skipped when it is
     not there rather than failing a Latin family over it; anything else missing
     was requested outright, and that is an error with the fetch in it.
+
+    OPTIONAL_FALLBACKS says which those are. A CJK face still counts as
+    requested once a CJK script is in the coverage, which is what the flag
+    below is for.
     """
     asked_for_cjk = any(preset in intervals.lower() for preset in CJK_FALLBACKS)
     paths, missing = [], []
@@ -190,8 +217,9 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
         path = directory / name
         if path.is_file():
             paths.append(path)
-        elif not asked_for_cjk and name in DEFAULT_CJK_FALLBACK:
-            continue                    # nobody asked for CJK; carry on
+        elif name in OPTIONAL_FALLBACKS and not (
+                asked_for_cjk and name in DEFAULT_CJK_FALLBACK):
+            continue                    # not fetched, and not asked for
         else:
             missing.append(name)
     if missing:
@@ -251,8 +279,10 @@ def fetch_steps(source: pathlib.Path | str | None = None, intervals: str = "",
                 text: str = "") -> typing.Iterator[dict]:
     """Fetch the bundled faces, saying how far it has got.
 
-    Downloaded from the same OFL files the website's own converter ships. The
-    licence travels with them.
+    Downloaded from the same OFL files the website's own converter ships,
+    except for the faces in FALLBACK_SOURCES, which that folder does not carry
+    and which come from the project publishing them. The licence travels with
+    them either way.
 
     Sizes are read first so the progress is in bytes rather than in files. One
     file is usually four fifths of the download, so counting files would race
@@ -277,7 +307,7 @@ def fetch_steps(source: pathlib.Path | str | None = None, intervals: str = "",
     # to go on, so an absent length counts as nothing rather than stopping.
     total = 0
     for name, _ in wanted:
-        ask = urllib.request.Request(FALLBACK_URL + name, method="HEAD")
+        ask = urllib.request.Request(fallback_source(name), method="HEAD")
         with urllib.request.urlopen(ask, timeout=30) as answer:
             headers = getattr(answer, "headers", None)
             total += int((headers.get("content-length") if headers else 0) or 0)
@@ -289,7 +319,7 @@ def fetch_steps(source: pathlib.Path | str | None = None, intervals: str = "",
         # Written aside and moved into place, so an interrupted fetch cannot
         # leave a half a font that every later run treats as present.
         part = path.with_name(path.name + ".part")
-        with urllib.request.urlopen(FALLBACK_URL + name, timeout=60) as answer:
+        with urllib.request.urlopen(fallback_source(name), timeout=60) as answer:
             with part.open("wb") as out:
                 while chunk := answer.read(262144):
                     out.write(chunk)

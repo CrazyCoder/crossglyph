@@ -640,3 +640,29 @@ def test_renaming_the_bundled_family_does_not_offer_it_again(tmp_path):
 
     assert [c.name for c in fontbuild.offered(tmp_path)[0]] \
         == ["Literata2", "Probe"]
+
+
+def test_the_bundled_set_carries_an_arabic_face():
+    assert "NotoSansArabic-Regular.ttf" in fontbuild.BUNDLED_FALLBACKS
+
+
+def test_the_arabic_face_is_fetched_from_where_it_actually_lives():
+    """Upstream's fallback folder has no Arabic face and 404s for one."""
+    url = fontbuild.fallback_source("NotoSansArabic-Regular.ttf")
+    assert url.startswith("https://")
+    assert "notofonts" in url
+    assert url.endswith("NotoSansArabic-Regular.ttf")
+
+
+def test_every_other_face_still_comes_from_upstream():
+    assert fontbuild.fallback_source("NotoSansHebrew-Regular.ttf") == \
+        fontbuild.FALLBACK_URL + "NotoSansHebrew-Regular.ttf"
+
+
+def test_a_missing_arabic_face_does_not_fail_a_latin_build(tmp_path):
+    """The treatment CJK already gets: not fetched yet is not an error."""
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        if name not in fontbuild.OPTIONAL_FALLBACKS:
+            (tmp_path / name).write_bytes(b"")
+    wanted = fontbuild.wanted_fallbacks("reading", tmp_path)
+    assert all(path.name != "NotoSansArabic-Regular.ttf" for path in wanted)
