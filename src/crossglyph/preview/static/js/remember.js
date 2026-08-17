@@ -46,9 +46,15 @@ export function loadSize() {
   if (value !== null) form.elements.size.value = value;
 }
 
+// The device controls carry `data-device-setting` with no value, so their
+// dataset entry is the empty string: asking whether it is truthy answers no for
+// a control that plainly has the attribute. Ask whether it is there instead. A
+// device select that slips through here gets saved into the page store and
+// applied back over the top of loadDevice a moment later, so the reader's
+// choice reverts a second or two after the page settles.
 export function pageControls() {
   return [...form.elements].filter(el =>
-    el.name && el.dataset.group === "page" && !el.dataset.deviceSetting);
+    el.name && el.dataset.group === "page" && !("deviceSetting" in el.dataset));
 }
 
 export function savePage() {

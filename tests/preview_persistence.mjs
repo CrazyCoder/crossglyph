@@ -1323,6 +1323,13 @@ for (const { name, text } of sources) {
         JSON.stringify(saved));
   check("view size is remembered separately",
         store.data["crossglyph.size"] === "18", JSON.stringify(store.data));
+  // The device select sits in the page group but belongs to the device store.
+  // Saved here as well, it is applied back over loadDevice a moment after the
+  // page settles, and the reader's chosen device reverts on its own. It slipped
+  // through once because `data-device-setting` has no value, so asking whether
+  // the dataset entry was truthy answered no for a control that carries it.
+  check("the device select is not remembered as a page knob",
+        !("device" in saved), JSON.stringify(saved));
 }
 
 // 2. A fresh load restores them.
