@@ -3010,3 +3010,60 @@ def test_the_named_fix_is_a_preset_that_would_actually_carry_them():
     assert presets_covering(frozenset()) == ()
     # Nothing in any preset: said as nothing rather than as a wrong tick.
     assert presets_covering(frozenset({0xE000})) == ()
+
+
+@needs_core
+def test_a_range_being_typed_into_does_not_fail_the_page(tmp_path):
+    """The field holds half a range for as long as it takes to type one.
+
+    Resolving the whole spec answered `(0x06` with a 422 and a line on the log,
+    four times on the way to a range that is fine, while the page redrew on
+    every keystroke.
+    """
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    server._sources.clear()
+    server._sources[0] = _joining(tmp_path)
+    client = TestClient(server.app)
+    body = {"text": "\u0628\u0628\u0628 abc", "size": 16, "intervals": "base"}
+
+    for half in ["(", "(0x", "(0x06", "(0x0600-", "nonsense"]:
+        answer = client.post("/render", json={**body, "ranges": half})
+        assert answer.status_code == 200, f"{half!r} took the page down"
+        # Not in force yet, so the page is narrowed by the ticks alone.
+        assert int(answer.headers["x-uncovered"]) > 0, half
+
+    whole = client.post("/render", json={**body, "ranges": "(0x0600-0x06FF)"})
+    assert whole.status_code == 200
+    assert whole.headers["x-uncovered"] == "0", \
+        "a range that parses has to take effect"
+
+
+def test_naming_a_preset_is_cheap_on_a_page_with_nothing_wrong():
+    """Asked on every render, so the usual answer costs nothing to reach.
+
+    Expanding every preset to compare it spent three and a half milliseconds a
+    keystroke listing a CJK block nobody had asked about.
+    """
+    import time
+
+    from crossglyph.preview import presets_covering
+
+    start = time.perf_counter()
+    for _ in range(50):
+        assert presets_covering(frozenset()) == ()
+    assert (time.perf_counter() - start) / 50 < 0.001
+
+
+def test_a_codepoint_no_preset_carries_names_none_rather_than_raising():
+    """Reached from a render, so an answer of "nothing" cannot be an exception.
+
+    Private use, and any block the presets do not name.
+    """
+    from crossglyph.preview import presets_covering
+
+    assert presets_covering(frozenset({0xE000})) == ()
+    # Mixed: the one that is carried is still named, the other is dropped.
+    assert presets_covering(frozenset({0xE000, 0x0628})) == ("arabic",)

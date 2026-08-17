@@ -21,6 +21,7 @@ import freetype
 from PIL import Image
 
 from .. import cpfont, render
+from ..cpfont import convert
 from ..cpfont.tuning import Tuning
 from ..render import image
 from . import markup
@@ -264,10 +265,21 @@ def built_coverage(intervals: str | None,
 
     Base coverage and the replacement character are in every build, which
     resolve_intervals adds, so ASCII survives whatever is ticked.
+
+    A raw range that does not parse is left out rather than raised over. The
+    ranges field holds half a range for as long as it takes to type one, and
+    the page redraws on every keystroke: resolving the whole spec would answer
+    `(0x06` with a 422 and a line on the log, four times on the way to a range
+    that is fine. The ticks still narrow the page while the range is being
+    finished, and a range that is wrong rather than unfinished is caught by the
+    build, which is the thing it would break.
     """
     if intervals is None:
         return None
-    spec = ",".join(part for part in (intervals, ranges) if part)
+    typed = [token.strip() for token in (ranges or "").split(",")]
+    spec = ",".join([part for part in [intervals] if part]
+                    + [token for token in typed
+                       if convert.parse_hex_range(token)])
     resolved = cpfont.arabic.implied_coverage(cpfont.resolve_intervals(spec))
     return frozenset(code for low, high in resolved
                      for code in range(low, high + 1))
@@ -294,17 +306,31 @@ def presets_covering(codepoints: frozenset[int]) -> tuple[str, ...]:
     Named so a blank page can say which box to tick. Greedy rather than
     optimal: the answer is read by somebody deciding what to turn on, and one
     preset too many costs them nothing.
+
+    Asked on every render, so it answers an empty set without touching the
+    presets, and tests the few codepoints it does have against each preset's
+    spans rather than expanding the presets to compare them. Expanding cost
+    three and a half milliseconds a keystroke on a page with nothing wrong with
+    it, most of it spent listing the twenty thousand codepoints of a CJK block
+    nobody had asked about.
     """
     wanted = set(codepoints)
+    if not wanted:
+        return ()
     reach = {}
     for name, spans in cpfont.INTERVAL_PRESETS.items():
         if name == "base":
             continue                    # in every build already
-        carries = {code for low, high in spans for code in range(low, high + 1)}
-        reach[name] = (carries & wanted, sum(h - l + 1 for l, h in spans))
+        hits = {code for code in wanted
+                if any(low <= code <= high for low, high in spans)}
+        if hits:
+            reach[name] = (hits, sum(high - low + 1 for low, high in spans))
 
     chosen: list[str] = []
-    while wanted:
+    # `reach` holds only presets that carry something, so it is empty when no
+    # preset carries any of this: a private use character, or a block no preset
+    # names. max() of nothing raises, and this is reached from a render.
+    while wanted and reach:
         # Most of what is still missing, and among equals the narrowest preset:
         # `default` carries Cyrillic, but somebody who pasted Russian wants to
         # be told to tick Cyrillic, which is the smaller font and the plainer
