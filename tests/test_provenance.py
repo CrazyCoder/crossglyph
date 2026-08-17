@@ -163,3 +163,33 @@ def test_a_rewrite_with_no_record_keeps_the_one_already_there(tmp_path, built):
     kept = json.loads((directory / fontstamp.STAMP_NAME)
                       .read_text(encoding="utf-8"))
     assert kept["built"]["config"] == "probe.conf"
+
+
+@pytest.fixture
+def built_arabic(tmp_path):
+    """A family whose faces join through GSUB and carry no shaped codepoints."""
+    from fontsmith import joining_font
+
+    for style in ("Regular", "Bold"):
+        joining_font(tmp_path / f"Joins-{style}.ttf",
+                     family="Joins", style=style)
+    (tmp_path / "joins.conf").write_text(
+        "sizes = 12\nintervals = base, arabic\nfallbacks = no\n",
+        encoding="utf-8")
+    out = tmp_path / "out"
+    config = fontconf.parse_config(tmp_path / "joins.conf")
+    list(fontbuild.build_families([config], out))
+    return json.loads((out / "Joins" / fontstamp.STAMP_NAME)
+                      .read_text(encoding="utf-8"))
+
+
+def test_a_latin_family_records_no_synthesis(built):
+    """Nothing was repaired, so there is nothing to account for."""
+    assert "synthesized" not in built["built"]
+
+
+def test_an_arabic_family_records_what_was_synthesized(built_arabic):
+    """The synthesis is automatic and has no setting, so a .cpfont would
+    otherwise hold glyphs at codepoints no source face carries and nothing in
+    the workspace would say where they came from."""
+    assert built_arabic["built"]["synthesized"]["arabic_forms"] > 0

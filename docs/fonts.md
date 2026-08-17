@@ -77,7 +77,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `mod_suffix` | `Mod` | suffix for that second family |
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
-| `fallbacks` | `no` | append the twelve bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
+| `fallbacks` | `no` | append the thirteen bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
@@ -158,6 +158,50 @@ overwriting each other, so `sizes = 13.5 14` is an error.
 `base`, which is ASCII plus General Punctuation, is added by the converter
 itself and must not be listed. `reading` already covers `default` plus Greek,
 Cyrillic, mathematics, arrows, box drawing, dashes and CJK quote marks.
+
+### Arabic
+
+Arabic is written joined up, like cursive, so a letter takes a different shape
+depending on where it sits in a word: one at the start, another in the middle,
+another at the end, another standing alone. A reader has to pick the right one.
+
+CrossPoint picks it and then looks that shape up by a codepoint of its own,
+because it has no room on the device for the rule engine a font's own joining
+rules need. Fonts split into two camps on this. Older ones store every shape
+under its own codepoint, which is what the device expects. Newer ones, and most
+good Arabic faces today, store one shape plus the rules, and the device finds
+nothing where it looks. Scheherazade New and ReadexPro are in the second camp,
+and until this was handled they drew a page of blanks.
+
+So the rules are run here instead, once, while the font is built, and each
+resulting shape is stored where the device will ask for it. **This is
+automatic. There is no setting, and it works with any Arabic face.** Where a
+face spells a letter as a base plus a separate mark, which is how the alef with
+hamza and the alef with madda are usually drawn, the pieces are combined into
+one picture first.
+
+The one thing to do yourself is put `arabic` in `intervals`, exactly as you
+would for Greek or Cyrillic. It is the choice to carry Arabic at all, and it
+costs file size, so it is not assumed.
+
+```
+intervals = reading, arabic
+```
+
+Note that `reading` on its own contains no Arabic whatsoever. A family built
+with the default coverage draws nothing for an Arabic book, however good the
+face is.
+
+The built family records what it repaired, under `synthesized` in
+`.crossglyph.json`, so a font never carries shapes that nothing in the
+workspace explains.
+
+A single glyph cannot exceed 255 pixels on either side, because that is what
+the `.cpfont` format has room for. One glyph in practice reaches it: the
+bismillah at U+FDFD, an entire phrase drawn as one ornament, which passes 255
+pixels above roughly 28 pt. It is skipped with a warning naming the codepoint
+and the rest of the family builds. The honorific ligatures beside it, U+FDFA
+and U+FDFB, are 14 to 37 pixels at every size and are always included.
 
 ### What actually decides the size
 
@@ -623,7 +667,7 @@ that:
 | path | `lib/EpdFont/scripts/` | `scripts/font-builder/` | forked from the website's |
 | base coverage | none implicit | `base` always injected | as the website |
 | presets | `ascii`, `latin1`, `cjk`, `builtin`, `punctuation` | `default`, `arabic`, `thai`, `bengali`, `cjk-sc`, `cjk-tc`, `cjk-jp` | as the website |
-| fallbacks | one per style | two user families and twelve bundled Noto | as the website, plus the space font and the pan-CJK face on demand |
+| fallbacks | one per style | two user families and thirteen bundled Noto | as the website, plus the space font and the pan-CJK face on demand |
 | sizes | whole points | four whole points, with 8 and 10 appended to a CJK build | as many as you like, `13.5` included, and a second family at other sizes |
 | variable fonts | the file's default instance | the file's default instance | the instance the designer named for the slot, `opsz` following the size, coordinates pinnable per slot |
 | quantizer | fixed | `--darken-aa`, one darker preset | `gamma` and all three `thresholds` |
