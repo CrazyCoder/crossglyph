@@ -36,11 +36,17 @@ function syncPreviewColumns() {
 }
 
 // Geometry in each frame PNG's own pixels, emitted by fb2xt's frame renderer
-// from the same run that produced the pixels, so the two cannot disagree. The
-// aperture is the outer bound of the screen hole, including its anti-aliased
-// rim: the page underlaps the frame rather than stopping at it, which is what
-// keeps a dark line from appearing down each side of the page. Runtime scaling
-// is one uniform factor.
+// from the same run that produced the pixels, so the two cannot disagree.
+//
+// The aperture is not the screen hole. It is the smallest rectangle carrying
+// the panel's exact proportions that still contains that hole, centred on it,
+// and it is what the page is drawn into. Two reasons. The page overlaps the
+// hole's anti-aliased rim instead of stopping at it, which is what keeps a dark
+// line from appearing down each side. And 1:1 scales by native.width divided by
+// aperture.width and applies that one factor to both axes, so an aperture of
+// any other shape lands the page on fractional device pixels: the glass is
+// 0.60304 against the panel's 0.6, which put 800 source rows into 796. The
+// overhang tucks under the frame, which draws above the page.
 export const DEVICES = {
   x4: {
     native: {width: 480, height: 800},

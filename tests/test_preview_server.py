@@ -507,7 +507,7 @@ def test_the_page_and_its_modules_are_never_cached(client):
 @pytest.mark.parametrize(
     ("device", "size", "hole", "margin"),
     [
-        ("x4", (1118, 1820), (118, 105, 990, 1551), 8),
+        ("x4", (1118, 1820), (118, 105, 989, 1551), 8),
         ("x3", (1209, 1820), (132, 123, 1077, 1544), 8),
     ],
 )
@@ -527,13 +527,21 @@ def test_device_frames_carry_normalized_geometry(
         alpha = frame.getchannel("A")
         assert alpha.getpixel(((left + right) // 2, (top + bottom) // 2)) == 0
 
-        # Nothing opaque may survive just outside the hole. The frames this
-        # replaced left three columns of screen material there, which showed as
-        # grey lines down a night-mode page.
-        for offset in (2, 3, 4):
-            for x in (left - offset, right + offset - 1):
-                assert alpha.getpixel((x, (top + bottom) // 2)) == 255, \
-                    "the bezel beside the aperture is not solid"
+        # The bezel must not change colour as it meets the hole. The frames this
+        # replaced left three columns of screen material there, at 195 to 203
+        # against a bezel of 13, which showed as grey lines down each side of a
+        # night-mode page. Those columns were fully opaque, so asking about
+        # alpha here would have passed on the very frames that were broken.
+        green = frame.getchannel("G")
+        middle = (top + bottom) // 2
+        for edge, reference in ((left, left - 16), (right, right + 15)):
+            outside = green.getpixel((reference, middle))
+            for offset in (2, 3, 4, 5):
+                beside = green.getpixel(
+                    (edge - offset if edge == left else edge + offset - 1, middle))
+                assert abs(beside - outside) <= 20, (
+                    f"the bezel jumps from {outside} to {beside} as it meets the "
+                    f"aperture, which is the grey line this pipeline removed")
 
         # The body is fitted to the canvas margin, which is what fixes the
         # frame's size; anti-aliasing puts the silhouette within a pixel of it.
