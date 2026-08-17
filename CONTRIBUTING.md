@@ -51,8 +51,8 @@ they run:
 | `CROSSGLYPH_TEST_OTF` | an OTF with a CFF outline, ligatures and a `pnum` feature |
 
 A firmware checkout beside this one supplies NotoSans, which a few metrics
-tests read directly, and NotoSansArabic, which the per-glyph size cap test
-reads for the one glyph large enough to reach it. The same checkout carries
+tests read directly, and NotoSansArabic, which the two per-glyph size cap tests
+read for the one glyph large enough to reach it. The same checkout carries
 `lib/MiniBidi/minibidi.c`, which one test parses to check our Arabic form table
 against the firmware that reads it. Those three skip without it and say so.
 
