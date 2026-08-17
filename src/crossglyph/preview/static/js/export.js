@@ -422,11 +422,14 @@ export function exportEdited(field) {
   // Typing a second family's first size is what turns its suffix on.
   showModState();
   showSaveState();
-  // The fallbacks reach the page as well as the build, so changing which face
-  // fills for the family redraws it. A coverage tick only matters while the
-  // bundled set is on, since that is the list it decides.
-  if (FALLBACK_FIELDS.has(field.name) ||
-      (field.dataset.preset && exportForm.elements.fallbacks.checked)) {
+  // Everything here reaches the page and not only the build. The fallbacks
+  // decide which face fills for the family; the coverage decides what the page
+  // is allowed to draw at all, so a tick redraws whether the bundled set is on
+  // or not. It used to redraw only while that set was on, back when coverage
+  // did nothing but choose which bundled faces to load -- which left ticking
+  // the range a blank page had just asked for doing nothing at all.
+  if (FALLBACK_FIELDS.has(field.name) || field.dataset.preset ||
+      field.name === "ranges") {
     scheduleRender();
   }
 }

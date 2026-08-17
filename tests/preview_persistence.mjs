@@ -541,7 +541,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // same form: what the family is called once it is built.
     name: { value: "" },
     ranges: { value: "" },
-    fallbacks: { type: "checkbox", checked: false },
+    // The wrapper is real markup: the label sits beside this box rather than
+    // around it, so what gets marked when the page needs it is the span the
+    // two share.
+    fallbacks: { type: "checkbox", checked: false,
+                 parentElement: makeElement() },
     fallback1: makeSelect(), fallback2: makeSelect(),
     // The output folder saves itself when it loses focus, so it listens.
     out: { value: "", on: {},
@@ -574,6 +578,19 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const buildButton = (id, label = "") => ({
     states: [],
     textContent: label,
+    // A button can be marked as the move the page is waiting on, the way a
+    // tick can, so it carries the same classes any element does.
+    classes: new Set(),
+    get classList() {
+      const owner = this;
+      return {
+        add: (name) => owner.classes.add(name),
+        remove: (name) => owner.classes.delete(name),
+        contains: (name) => owner.classes.has(name),
+        toggle: (name, on) => (on ? owner.classes.add(name)
+                                  : owner.classes.delete(name)),
+      };
+    },
     _disabled: false,
     get disabled() { return this._disabled; },
     set disabled(next) { this._disabled = next; this.states.push(next); },
@@ -3164,8 +3181,32 @@ for (const deferred of [
   check("a page with holes in it says so", note.hidden === false);
   check("counting them", note.textContent.startsWith("7 characters have"),
         note.textContent);
-  check("and saying what to do about it",
-        note.textContent.includes("press Fetch"), note.textContent);
+  check("and saying the move that is actually left",
+        note.textContent.includes("turn on bundled fallback faces"),
+        note.textContent);
+  // The bundled set is not the only answer, and on a family whose script no
+  // Noto face covers it is not the answer at all.
+  check("and that naming a family is the other way",
+        note.textContent.includes("fallback 1"), note.textContent);
+}
+
+// 60a. The advice follows the state rather than reciting every move: with the
+//      box on and the faces here, turning it on is not something anybody can
+//      do, and telling them to would send them looking for a tick that is
+//      already ticked.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 4 });
+  const box = env.exportForm.elements.fallbacks;
+  box.checked = true;
+  env.exportForm.on.input({target: box});
+  await settle();
+  const note = env.sandbox.document.getElementById("undrawn");
+  check("nothing about turning on a box already on",
+        !note.textContent.includes("turn on"), note.textContent);
+  check("and the one answer left is named",
+        note.textContent.includes("needs a family that has them in fallback 1"),
+        note.textContent);
 }
 
 // 60b. The other reason a page is blank, and the one with an answer: the
@@ -4674,6 +4715,113 @@ for (const deferred of [
   check("and the canvas shows the newest page",
         env.device.canvas.painted === second,
         JSON.stringify(env.device.canvas.painted));
+}
+
+// 78. Coverage decides what the page draws, so a tick has to redraw it. It
+//     used to redraw only while the bundled fallback set was on, back when
+//     coverage did nothing but choose which of those faces to load. That left
+//     the one action a blank page had just asked for doing nothing at all:
+//     the note says tick Arabic, you tick Arabic, and the page does not move.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  env.exportForm.elements.fallbacks.checked = false;
+  const box = env.presetList.querySelectorAll().find(one => one.value === "reading");
+  const before = env.fetches.bodies.length;
+  box.checked = false;
+  env.exportForm.on.input({target: box});
+  await settle();
+  check("a coverage tick redraws with the bundled faces off",
+        env.fetches.bodies.length > before,
+        `${before} -> ${env.fetches.bodies.length}`);
+  check("and the redraw carries the coverage it was ticked to",
+        env.fetches.bodies.at(-1).intervals !== undefined,
+        JSON.stringify(env.fetches.bodies.at(-1).intervals));
+}
+
+// 79. A raw range is coverage too, and the page is held to it the same way.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  const before = env.fetches.bodies.length;
+  env.exportForm.elements.ranges.value = "(0x0600-0x06FF)";
+  env.exportForm.on.input({target: env.exportForm.elements.ranges});
+  await settle();
+  check("typing a range redraws", env.fetches.bodies.length > before,
+        `${before} -> ${env.fetches.bodies.length}`);
+  check("and the range reaches the server",
+        env.fetches.bodies.at(-1).ranges === "(0x0600-0x06FF)",
+        JSON.stringify(env.fetches.bodies.at(-1).ranges));
+}
+
+// 80. The other tick the page can be waiting on, marked the same way. A page
+//     with holes in it names two moves in its note; the box for the one that
+//     is still off says which without being read for.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 7 });
+  const box = env.exportForm.elements.fallbacks;
+  check("the bundled faces box is marked while it is off and needed",
+        box.parentElement.classes.has("needed") === true,
+        [...box.parentElement.classes].join());
+}
+
+// 81. And not while it is already on: the faces are being asked for, so the
+//     answer is Fetch and marking the box would point at the wrong move.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 7 });
+  const box = env.exportForm.elements.fallbacks;
+  // Through the box, as a press does, so the redraw it causes is the one that
+  // decides the mark rather than the mark being set by hand.
+  box.checked = true;
+  env.exportForm.on.input({target: box});
+  await settle();
+  check("and not marked once it is on",
+        box.parentElement.classes.has("needed") === false,
+        [...box.parentElement.classes].join());
+}
+
+// 82. Nothing waiting, nothing marked, which is every page that draws.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { renderOk: true });
+  check("no tick is marked on a page that draws",
+        env.exportForm.elements.fallbacks.parentElement.classes.has("needed")
+        === false);
+}
+
+// 83. The last link in the chain. The box is on, so the faces are being asked
+//     for, and Fetch shows itself exactly when they are not here yet: that is
+//     the move left to make, so that is what is marked.
+{
+  const env = await loaded(fakeStorage(), { ...DEFAULTS, fallbacks: "" },
+                           { renderOk: true, undrawn: 7 });
+  const button = env.sandbox.document.getElementById("fetch");
+  const box = env.exportForm.elements.fallbacks;
+  check("with the faces absent the offer is showing", button.hidden === false);
+  box.checked = true;
+  env.exportForm.on.input({target: box});
+  await settle();
+  check("the box is no longer the move once it is on",
+        box.parentElement.classes.has("needed") === false,
+        [...box.parentElement.classes].join());
+  check("and Fetch is", button.classes.has("needed") === true,
+        [...button.classes].join());
+}
+
+// 84. Faces present and the box on, and the page still has holes: the family
+//     and its fallbacks between them have no glyph, and no control here
+//     changes that. Marking one would send somebody to press it for nothing.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 7 });
+  const button = env.sandbox.document.getElementById("fetch");
+  const box = env.exportForm.elements.fallbacks;
+  box.checked = true;
+  env.exportForm.on.input({target: box});
+  await settle();
+  check("nothing is marked when there is nothing left to press",
+        box.parentElement.classes.has("needed") === false
+        && button.classes.has("needed") === false,
+        `${[...box.parentElement.classes]} / ${[...button.classes]}`);
 }
 
 process.exit(failures ? 1 : 0);

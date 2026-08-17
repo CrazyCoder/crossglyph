@@ -518,6 +518,14 @@
                   aria-expanded="false" aria-controls="text-settings"><svg
         class="twist" viewBox="0 0 16 16" aria-hidden="true"><path
         d="M6 3.2 11.2 8 6 12.8"/></svg>Text</button></h2>
+      <!-- The same mark the note under the box carries, shown on the heading
+           while the fold is closed over it. A page can come out blank because
+           of a tick in the export panel, and the sentence saying which tick
+           lives in here: folded away, it is a page that failed for no stated
+           reason. Nothing sets this; it reads the note's own state through the
+           fold, the way the Page section's dot reads its rows. -->
+      <span id="text-warn" aria-hidden="true"
+            title="Something on this page could not be drawn">!</span>
       <div class="fold-quick">
         <!-- Which specimen is in the box. Custom comes first and holds whatever
              you type, so choosing a language never costs you your own text and

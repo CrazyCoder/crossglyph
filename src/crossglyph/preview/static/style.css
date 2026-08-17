@@ -607,12 +607,42 @@
   /* A key you press, set as one: the same treatment the untuned button gives
      its own, so the two read as the same kind of instruction. */
   .hint kbd { font: inherit; font-weight: 600; color: var(--text); }
-  /* A hint that is about this page rather than about the markup, so it reads
-     at full contrast with a rule beside it. Nothing louder than that: the page
-     did draw, and what is missing from it is a fixable setting and not a
-     fault. */
-  .hint.warn { color: var(--text); border-left: 2px solid var(--line);
-               padding-left: .55rem; }
+  /* A hint about this page rather than about the markup, and the thing that
+     explains a sheet which came out blank: the preview is held to what the
+     coverage would build, so a tick in the wrong place empties it, and a note
+     that whispers is one nobody reads before pressing Build.
+
+     Loud by weight, a mark and a ground, never by colour. The palette carries
+     no chroma on purpose (see the top of this file), and a warning tint beside
+     a greyscale specimen would bias the one judgement this page exists to
+     support.
+
+     Drawn from --text rather than --l3, which is black in both schemes: a
+     black rule on the dark panel is a rule nobody can see. */
+  .hint.warn { color: var(--text); font-weight: 500;
+               display: flex; gap: .5rem; align-items: flex-start;
+               border-left: 3px solid var(--text); background: var(--hover);
+               padding: .45rem .6rem; border-radius: 0 4px 4px 0; }
+  /* The mark, in the interface's own type rather than the specimen's, so a
+     face being judged never has to draw the complaint about itself. Shared
+     with the one on the folded heading, since a reader should not have to
+     learn two alarms for one fault. */
+  .hint.warn::before, #text-warn {
+    place-items: center; width: 1.05rem; height: 1.05rem;
+    border-radius: 50%; background: var(--text); color: var(--panel);
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+  .hint.warn::before { content: "!"; flex: none; display: grid;
+                       margin-top: .05rem; }
+  /* Folded, and the note it hides has something to say. The same reading the
+     Page dot does: nothing sets it, it is the note's own state seen through
+     the fold. Without it a blank sheet has no stated reason anywhere on
+     screen, which is the state this whole warning exists to prevent. */
+  #text-warn { display: none; }
+  :root:not([data-folds~="text"])
+    .section:has(+ #text-settings .hint.warn:not([hidden])) #text-warn {
+    display: grid;
+  }
 
   #status { margin-top: .7rem; color: var(--muted); font-size: 11.5px; }
 
@@ -953,15 +983,30 @@
      the state is true, there is just nothing to decide about it while the tick
      that carries it is on. */
   .presets label.implied { color: var(--muted); }
-  /* A preset the text on the page needs and this coverage has not got. The
-     page is blank where those characters are, and this is the tick that fills
-     them in, so it is marked where the tick is rather than only in the note
-     under the box. Weight and a rule beside it: colour alone would say nothing
-     on a panel somebody is reading in greyscale. */
-  .presets label.needed { font-weight: 600;
-                          box-shadow: inset 2px 0 0 0 var(--l3);
-                          padding-left: .3rem; margin-left: -.3rem;
-                          border-radius: 2px; }
+  /* A tick the page is waiting on: a coverage preset carrying characters this
+     build would drop, or the bundled faces that would draw ones the family has
+     not got. Marked where the tick is rather than only in the note under the
+     text, so the answer is where it gets applied. Weight and a rule beside it:
+     colour alone would say nothing on a panel read in greyscale, and this one
+     is read on a page that has just gone blank.
+
+     The rule goes on whatever holds the tick, so it lands to the left of the
+     tick in both places: a coverage box sits inside its label, the bundled one
+     sits beside its label in a row of its own, and marking the label in both
+     would draw the rule between the tick and its words in the second.
+
+     From --text and not --l3, which is black in both schemes and so is a rule
+     nobody can see on the dark panel. */
+  .presets label.needed,
+  .row.check .box.needed { box-shadow: inset 2px 0 0 0 var(--text);
+                           padding-left: .3rem; margin-left: -.3rem;
+                           border-radius: 2px; }
+  .presets label.needed,
+  .row.check .box.needed > .name { font-weight: 600; }
+  /* The last move in the same chain, when the box is on and the faces are not
+     here yet. A ring rather than a rule down one side: this one is a button,
+     and an edge marking on a control you press reads as a broken border. */
+  #fetch.needed { box-shadow: 0 0 0 2px var(--text); font-weight: 600; }
   .presets label { display: flex; align-items: center; gap: .35rem;
                    font-size: 12px; cursor: pointer; }
   .presets input { width: .95rem; height: .95rem; accent-color: var(--l2);

@@ -1,6 +1,6 @@
 import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
-import {exportForm, exportSettings, presetBoxes} from "./export.js";
+import {exportForm, exportSettings, fetchButton, presetBoxes} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
@@ -99,16 +99,39 @@ export let undrawnCount = 0;
 // not about the folder.
 export function showUndrawn(count) {
   undrawnCount = count;
+  // Whichever move is the one left to make, marked the way a coverage tick is.
+  // The box while it is off; once it is on, the faces still have to be here,
+  // and Fetch shows itself exactly when they are not. With it on and the faces
+  // present there is nothing to mark: the family and its fallbacks between them
+  // genuinely have no glyph, and no control on this panel changes that.
+  const box = exportForm.elements.fallbacks;
+  const wanting = count > 0;
+  if (box && box.parentElement) {
+    box.parentElement.classList.toggle("needed", wanting && !box.checked);
+  }
+  if (fetchButton) {
+    fetchButton.classList.toggle(
+      "needed", wanting && Boolean(box && box.checked) && !fetchButton.hidden);
+  }
   undrawnNote.hidden = !count;
   if (!count) return;
-  // Both moves, because either can be the one missing: the faces have to be
-  // here, and the box has to be on for the page and the build to use them.
-  // Pressing Fetch does both when it is the faces that are missing.
+  // The move that is actually left, which is the one being marked above. The
+  // bundled set is two conditions and either can be the missing one: the faces
+  // have to be here, and the box has to be on for the page and the build to
+  // use them. Naming a family in fallback 1 answers all three, and is the only
+  // answer left once the bundled faces are here and have no glyph either, so
+  // it is said every time rather than only at the end.
+  const named = "or name a family that has them in fallback 1";
+  const move = !(box && box.checked)
+    ? `Under Export, turn on bundled fallback faces, ${named}.`
+    : fetchButton && !fetchButton.hidden
+    ? `Press Fetch under Export to bring the bundled faces down, ${named}.`
+    : `The bundled faces are on and have none either, so this needs a family `
+      + `that has them in fallback 1.`;
   undrawnNote.textContent =
     `${count} character${count === 1 ? " has" : "s have"} no glyph in this `
     + `family or its fallback faces, so the page is blank where `
-    + `${count === 1 ? "it is" : "they are"}. Under Export, turn on bundled `
-    + `fallback faces, and press Fetch beside it if they are not here yet.`;
+    + `${count === 1 ? "it is" : "they are"}. ${move}`;
 }
 
 export const uncoveredNote = document.getElementById("uncovered");
