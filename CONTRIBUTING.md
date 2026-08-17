@@ -51,7 +51,16 @@ they run:
 | `CROSSGLYPH_TEST_OTF` | an OTF with a CFF outline, ligatures and a `pnum` feature |
 
 A firmware checkout beside this one supplies NotoSans, which a few metrics
-tests read directly.
+tests read directly, and NotoSansArabic, which the per-glyph size cap test
+reads for the one glyph large enough to reach it. The same checkout carries
+`lib/MiniBidi/minibidi.c`, which one test parses to check our Arabic form table
+against the firmware that reads it. Those three skip without it and say so.
+
+The Arabic tests otherwise need no font at all: `fontsmith.joining_font`
+synthesizes a face that joins through GSUB and carries none of the shaped
+codepoints, which is the shape of font the synthesis exists for. That is
+deliberate, so the path cannot pass by skipping on a machine with no Arabic
+face.
 
 Name one before believing a green run. A third of the suite is behind these,
 and the synthesized faces differ from a real one in ways tests can rest on

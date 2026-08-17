@@ -231,7 +231,7 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
 
 #: What a pan-CJK face is for. Han and the two kana blocks, hangul and its
 #: jamo, the CJK punctuation those are written with, and the compatibility and
-#: fullwidth blocks a book picks up from its source. Nothing in the twelve
+#: fullwidth blocks a book picks up from its source. Nothing in the thirteen
 #: faces above has a glyph in any of them, so text that needs one of these
 #: draws as blank space until a CJK face is fetched.
 CJK_RANGES = (

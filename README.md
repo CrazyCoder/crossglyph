@@ -31,7 +31,7 @@ the point size.
   pick: left alone, Merriweather would ship its Light as your Regular
 - four sizes of a four-style family, 795 glyphs each with kerning, built in
   about a second, one process per size
-- twelve Noto faces on request, so a missing arrow or Greek letter is not a
+- thirteen Noto faces on request, so a missing arrow or Greek letter is not a
   hole in the page
 - nothing installed system wide, since the launcher fetches uv, Python and the
   dependencies into a cache directory you can delete

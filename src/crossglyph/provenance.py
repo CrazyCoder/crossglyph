@@ -121,10 +121,20 @@ def _synthesized(variant: Variant) -> dict:
 
     Counted per style, since a family whose bold joins and whose regular does
     not is a family with something wrong in it.
+
+    A face this cannot read contributes nothing rather than raising. This runs
+    after the fonts are already built and written, so the build has read every
+    face it needed; a report is not allowed to be the step that fails one.
     """
     config: Config = variant.config
-    forms = sum(len(cpfont.arabic.presentation_forms(config.styles[style]))
-                for style in STYLES if style in config.styles)
+    forms = 0
+    for style in STYLES:
+        if style not in config.styles:
+            continue
+        try:
+            forms += len(cpfont.arabic.presentation_forms(config.styles[style]))
+        except Exception:                   # noqa: BLE001 -- see above
+            continue
     return {"arabic_forms": forms} if forms else {}
 
 
