@@ -1193,6 +1193,30 @@ def test_device_numeric_controls_use_the_shared_stepper():
     assert 'id="device-calibrate"' not in html
 
 
+def test_only_the_tone_knobs_carry_a_reset_arrow():
+    """Scale is a dropdown already showing every value it has, and the custom
+    scale is a measurement taken against a physical ruler: a one-click reset
+    with nothing to undo it is not the way to lose that. The four that remain
+    are the ones whose default is a number you would otherwise have to
+    remember and retype.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    carried = set(re.findall(r'data-device-reset="([^"]+)"', html))
+    assert carried == {"device-paper", "device-ink", "device-warm",
+                       "device-tint"}, carried
+    # Hidden until the value differs, which is the page's job to decide.
+    for control in sorted(carried):
+        arrow = re.search(
+            rf'<button[^>]*data-device-reset="{control}"[^>]*>', html, re.S)
+        assert arrow is not None, control
+        assert "hidden" in arrow.group(), control
+        assert 'class="revert"' in arrow.group(), control
+
+
 def test_the_copy_button_says_what_shift_does():
     """One button for two things, so the one it is not doing has to be findable.
     The page settles that the same way Build does when it says Rebuild: the

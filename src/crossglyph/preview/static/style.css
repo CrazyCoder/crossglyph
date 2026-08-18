@@ -780,11 +780,18 @@
     display: grid; gap: .25rem;
     border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;
   }
+  /* Four columns, the last of them the arrow's, the way .row.num is laid out.
+     The column stays whether or not the arrow is in it, so a value returning
+     to its default does not shift the row it is in. */
   .device-number {
     display: grid;
-    grid-template-columns: 4.8rem minmax(4rem, 1fr) 7.6rem;
+    grid-template-columns: 4.8rem minmax(4rem, 1fr) 7.6rem 1.5rem;
     align-items: center; gap: .35rem .45rem;
   }
+  /* The custom-scale row has no arrow: it is a measurement taken against a
+     physical ruler, and one click with nothing to undo it is not the way to
+     lose that. Its column is left empty rather than spanned, so every stepper
+     in the panel starts and ends in the same place. */
   .device-number .unit {
     color: var(--muted); font-size: 10px; letter-spacing: 0;
   }

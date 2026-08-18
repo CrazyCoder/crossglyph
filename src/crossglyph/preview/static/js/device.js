@@ -476,10 +476,51 @@ export function showRenderedPage(bitmap) {
   layoutDevice();
 }
 
+// What the markup declares a control to be, which is what both the panel's own
+// reset and the per-knob arrows put back. One answer for three kinds of
+// control, because two copies of this would be two chances to disagree about
+// what "default" means.
+function declaredValue(control) {
+  if (control.type === "checkbox") return control.defaultChecked;
+  if (control.tagName === "SELECT") {
+    const declared = [...control.options].find(item => item.defaultSelected);
+    return (declared || control.options[0]).value;
+  }
+  return control.defaultValue;
+}
+
+function putDeclared(control) {
+  if (control.type === "checkbox") control.checked = declaredValue(control);
+  else control.value = declaredValue(control);
+}
+
+function resetsFor(field) {
+  return document.querySelectorAll(`[data-device-reset="${field.id}"]`);
+}
+
+// The knobs that carry one. Not scale, which is a dropdown already showing
+// every value it has, and not the custom scale, which is a measurement taken
+// against a physical ruler: a one-click reset with nothing to undo it is not
+// the way to lose that.
+const RESETTABLE = [paper, ink, warm, tint];
+
+// An arrow is offered only while its knob differs from what the markup
+// declares, so the column is empty on a panel nobody has touched.
+function refreshDeviceResets() {
+  for (const field of RESETTABLE) {
+    const declared = declaredValue(field);
+    for (const arrow of resetsFor(field)) {
+      arrow.hidden = Number(field.value) === Number(declared);
+      arrow.title = `Reset to ${declared}`;
+    }
+  }
+}
+
 function syncNumericControls() {
   for (const field of [paper, ink, warm, tint, calibrationRange]) {
     showSlider(field);
   }
+  refreshDeviceResets();
   calibration.hidden = scale.value !== "custom";
   ruler.style.width = `${100 * CSS_PIXELS_PER_MM *
     Number(calibrationRange.value) / 100}px`;
@@ -504,6 +545,14 @@ function wireNumber(field, slider, changed) {
   pairSlider(field, slider, set);
   for (const button of document.querySelectorAll(`[data-for="${field.id}"]`)) {
     wireStepper(button, field, Number(button.dataset.dir), set);
+  }
+  // A reset rather than the bypass the tuning knobs carry. Those compare your
+  // value with what a .conf says and are worth flicking between; these have no
+  // config behind them, only the value the markup declares, so there is no
+  // second value to hold on to. Through `set`, so the slider, the store and the
+  // repaint all happen the way they do for any other edit.
+  for (const arrow of resetsFor(field)) {
+    arrow.addEventListener("click", () => set(field, Number(field.defaultValue)));
   }
   field.addEventListener("input", () => {
     const value = Number(field.value);
@@ -552,14 +601,7 @@ function resetDevice(scheduleRender) {
     option.defaultSelected)?.value || model.options[0].value;
   const changedDevice = model.value !== declaredDevice;
   for (const control of document.querySelectorAll("[data-device-setting]")) {
-    if (control.type === "checkbox") {
-      control.checked = control.defaultChecked;
-    } else if (control.tagName === "SELECT") {
-      const option = [...control.options].find(item => item.defaultSelected);
-      control.value = (option || control.options[0]).value;
-    } else {
-      control.value = control.defaultValue;
-    }
+    putDeclared(control);
   }
   fixedColor = false;
   color.value = themeColor();
@@ -592,6 +634,7 @@ export function wireDevice(scheduleRender) {
   });
   const toneChanged = () => {
     saveDevice();
+    refreshDeviceResets();
     paintDevicePage();
   };
   // The cast reaches the frame as well as the page, and the frame is not

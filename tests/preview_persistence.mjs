@@ -725,6 +725,15 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       attrs: {},
       setAttribute(key, value) { this.attrs[key] = value; },
     }]));
+  // The per-knob reset arrow each tone row carries. Not every device control
+  // has one: scale is a dropdown and the custom scale is a ruler measurement.
+  const deviceResets = Object.fromEntries(
+    [devicePaper, deviceInk, deviceWarm, deviceTint].map(field => [
+      field.id,
+      {hidden: true, title: "", on: {},
+       addEventListener(kind, fn) { this.on[kind] = fn; },
+       press() { this.on.click(); }},
+    ]));
   const deviceStepList = [devicePaper, deviceInk, deviceCalibration,
                           deviceWarm, deviceTint]
     .flatMap(field => [-1, 1].map(direction => ({
@@ -754,9 +763,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   });
   const deviceFrameImage = makeElement();
   const deviceReset = button("reset-device");
+  // Everything carrying data-device-setting in the markup, which is what the
+  // panel's own reset sweeps. A control missing from here is one the reset
+  // silently skips in this harness while working on the page.
   const deviceSettings = [
     deviceModel, deviceColor, deviceFrame, deviceScale,
-    devicePaper, deviceInk, deviceCalibration,
+    devicePaper, deviceInk, deviceCalibration, deviceWarm, deviceTint,
   ];
   const stubs = {
     save: saveButton,
@@ -919,9 +931,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         }
         if (selector === "[data-device-setting]") return deviceSettings;
         const deviceFor = selector.match(/^\[data-for="([^"]+)"\]$/)?.[1];
-        return deviceFor
-          ? deviceStepList.filter(button => button.dataset.for === deviceFor)
-          : [];
+        if (deviceFor) {
+          return deviceStepList.filter(button => button.dataset.for === deviceFor);
+        }
+        const resets = selector.match(/^\[data-device-reset="([^"]+)"\]$/)?.[1];
+        return resets ? [deviceResets[resets]].filter(Boolean) : [];
       },
       addEventListener(kind, fn) {
         if (kind === "keydown") keys.push(fn);
@@ -1239,7 +1253,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              warm: deviceWarm, tint: deviceTint,
              warmSlider: deviceWarmSlider, tintSlider: deviceTintSlider,
              tintFuncs,
-             copy: deviceCopy, copyIcons,
+             copy: deviceCopy, copyIcons, resets: deviceResets,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -4945,6 +4959,75 @@ for (const deferred of [
         back.device.warmSlider.value === "12" &&
         back.device.tintSlider.value === "0",
         `${back.device.warm.value}/${back.device.tint.value}`);
+}
+
+// Per-knob reset. A plain one, unlike the tuning column's arrow: there is no
+// config behind these, only the value the markup declares, so there is no
+// second value worth holding on to.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("a panel on its defaults offers no arrows",
+        Object.values(env.device.resets).every(arrow => arrow.hidden),
+        JSON.stringify(Object.fromEntries(
+          Object.entries(env.device.resets).map(([k, v]) => [k, v.hidden]))));
+
+  env.device.paper.value = "100";
+  env.device.edit(env.device.paper);
+  await settle();
+  check("a knob off its default offers one, and says what it goes back to",
+        env.device.resets["device-paper"].hidden === false &&
+        env.device.resets["device-paper"].title === "Reset to 90" &&
+        env.device.resets["device-ink"].hidden === true,
+        env.device.resets["device-paper"].title);
+
+  env.device.resets["device-paper"].press();
+  await settle();
+  check("pressing it puts the declared value back",
+        env.device.paper.value === "90" &&
+        env.device.paperSlider.value === "90" &&
+        env.device.resets["device-paper"].hidden === true,
+        env.device.paper.value);
+  check("and that is a change, so the store has it",
+        JSON.parse(storage.data["crossglyph.device"]).paper === "90",
+        storage.data["crossglyph.device"]);
+
+  // The cast knobs ship at values a reset has to land on exactly, 2.5 among
+  // them: a reset that snapped to whole numbers would leave tint offering an
+  // arrow it could never clear.
+  env.device.tint.value = "-4";
+  env.device.edit(env.device.tint);
+  await settle();
+  check("a fractional default is offered and reached",
+        env.device.resets["device-tint"].title === "Reset to 2.5",
+        env.device.resets["device-tint"].title);
+  env.device.resets["device-tint"].press();
+  await settle();
+  check("and the arrow goes once it is back on it",
+        env.device.tint.value === "2.5" &&
+        env.device.resets["device-tint"].hidden === true,
+        env.device.tint.value);
+
+  // A value restored from the store is still a value off the default, so the
+  // arrow has to be there on the next load rather than only after an edit.
+  env.device.warm.value = "-6";
+  env.device.edit(env.device.warm);
+  await settle();
+  const back = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("a loaded panel offers arrows for what the store carries",
+        back.device.warm.value === "-6" &&
+        back.device.resets["device-warm"].hidden === false &&
+        back.device.resets["device-paper"].hidden === true,
+        `${back.device.warm.value} ${back.device.resets["device-warm"].hidden}`);
+
+  back.device.reset();
+  await settle();
+  check("the panel's own reset clears every arrow with it",
+        Object.values(back.device.resets).every(arrow => arrow.hidden),
+        JSON.stringify(Object.fromEntries(
+          Object.entries(back.device.resets).map(([k, v]) => [k, v.hidden]))));
 }
 
 // Every device is rendered twice, and which frame is on screen follows the
