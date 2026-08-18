@@ -312,22 +312,15 @@ async function decoded(url) {
   return image;
 }
 
-// What sits behind the body, and in the corners the screen is rounded off with.
-//
-// Not transparency, which is what a canvas starts as and what an asset exported
-// from a drawing tool would carry. This is a picture of what is on screen, and
-// it is pasted into places that flatten an alpha channel to white -- where a
-// white device against white loses the edge these frames were re-rendered to
-// give it. The surround it already has is the page's, so the picture takes it
-// and follows the theme with it. The README screenshots are padded to the same
-// grey for the same reason.
-function stageColour() {
-  return getComputedStyle(root).getPropertyValue("--stage").trim() || "#e6e6e6";
-}
-
 // What the preview is showing, at the panel's own resolution: the body around
 // the page when the frame is on, the page alone when it is off. The frame
 // toggle is the whole of the choice, which is what it already means on screen.
+//
+// Nothing is painted behind it. The frames are rendered against transparency
+// and the bare screen is clipped to its own corners, so what comes out is the
+// device cut out of its surround and drops onto whatever it is put on. The
+// place it is pasted into decides what shows through, which is the point: a
+// background chosen here would be a rectangle to crop off everywhere else.
 //
 // Exported so it can be measured in a browser. Neither suite can: the JS one
 // runs against a stub DOM with no canvas, and pytest never opens a page, so a
@@ -339,8 +332,6 @@ export async function deviceImage() {
   sheet.width = framed ? device.frame.width : device.native.width;
   sheet.height = framed ? device.frame.height : device.native.height;
   const context = sheet.getContext("2d");
-  context.fillStyle = stageColour();
-  context.fillRect(0, 0, sheet.width, sheet.height);
   if (!framed) {
     // Rounded off the way the screen is shown, rather than a bare rectangle.
     context.beginPath();

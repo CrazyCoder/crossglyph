@@ -307,10 +307,13 @@ way it is built at the panel's resolution, so the type is exactly the pixels the
 device would draw, whatever scale the page is set to. The X4 gives 612 by 996
 framed and 480 by 800 bare, the X3 671 by 1011 and 528 by 792.
 
-The background is the page's own surround rather than transparency, so it is
-`#e6e6e6` in the light theme and `#141414` in the dark one. Transparency would
-be flattened to white by most of the places an image gets pasted, and a white
-body against white loses the edge it is drawn with.
+Nothing is painted behind it. The body is cut out of its surround, the bare
+screen is rounded off at its own corners, and everything outside is transparent,
+so the image drops onto whatever you put it on rather than carrying a rectangle
+to crop off. Somewhere that flattens transparency, as a document or a chat
+message may, fills that in with its own background instead. Even a white body on
+white still reads, since the edge is in the render rather than in a surround
+behind it.
 
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that
