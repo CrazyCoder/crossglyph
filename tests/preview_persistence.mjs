@@ -730,7 +730,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const deviceResets = Object.fromEntries(
     [devicePaper, deviceInk, deviceWarm, deviceTint].map(field => [
       field.id,
-      {hidden: true, title: "", on: {},
+      {hidden: true, title: "", on: {}, dataset: {deviceReset: field.id},
        addEventListener(kind, fn) { this.on[kind] = fn; },
        press() { this.on.click(); }},
     ]));
@@ -933,6 +933,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         const deviceFor = selector.match(/^\[data-for="([^"]+)"\]$/)?.[1];
         if (deviceFor) {
           return deviceStepList.filter(button => button.dataset.for === deviceFor);
+        }
+        // Both spellings the page uses: one row's arrow while it is being
+        // wired, and every arrow at once when their visibility is refreshed.
+        if (selector === "[data-device-reset]") {
+          return Object.values(deviceResets);
         }
         const resets = selector.match(/^\[data-device-reset="([^"]+)"\]$/)?.[1];
         return resets ? [deviceResets[resets]].filter(Boolean) : [];

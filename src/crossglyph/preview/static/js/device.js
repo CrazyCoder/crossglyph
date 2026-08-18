@@ -498,21 +498,22 @@ function resetsFor(field) {
   return document.querySelectorAll(`[data-device-reset="${field.id}"]`);
 }
 
-// The knobs that carry one. Not scale, which is a dropdown already showing
-// every value it has, and not the custom scale, which is a measurement taken
-// against a physical ruler: a one-click reset with nothing to undo it is not
-// the way to lose that.
-const RESETTABLE = [paper, ink, warm, tint];
-
-// An arrow is offered only while its knob differs from what the markup
-// declares, so the column is empty on a panel nobody has touched.
+// Which knobs carry an arrow is the markup's to say, and it says it by putting
+// one there: scale has none, being a dropdown that already shows every value it
+// has, and neither has the custom scale, which is a ruler measurement worth
+// more than one click. Asking the page rather than keeping a list beside it is
+// what stops an arrow being added to a row and never lit, since the wiring in
+// wireNumber already finds them this way.
+//
+// One is offered only while its knob differs from what the markup declares, so
+// the column is empty on a panel nobody has touched.
 function refreshDeviceResets() {
-  for (const field of RESETTABLE) {
+  for (const arrow of document.querySelectorAll("[data-device-reset]")) {
+    const field = document.getElementById(arrow.dataset.deviceReset);
+    if (!field) continue;
     const declared = declaredValue(field);
-    for (const arrow of resetsFor(field)) {
-      arrow.hidden = Number(field.value) === Number(declared);
-      arrow.title = `Reset to ${declared}`;
-    }
+    arrow.hidden = Number(field.value) === Number(declared);
+    arrow.title = `Reset to ${declared}`;
   }
 }
 
@@ -552,7 +553,8 @@ function wireNumber(field, slider, changed) {
   // second value to hold on to. Through `set`, so the slider, the store and the
   // repaint all happen the way they do for any other edit.
   for (const arrow of resetsFor(field)) {
-    arrow.addEventListener("click", () => set(field, Number(field.defaultValue)));
+    arrow.addEventListener(
+      "click", () => set(field, Number(declaredValue(field))));
   }
   field.addEventListener("input", () => {
     const value = Number(field.value);
@@ -597,9 +599,7 @@ export function loadDevice() {
 }
 
 function resetDevice(scheduleRender) {
-  const declaredDevice = [...model.options].find(option =>
-    option.defaultSelected)?.value || model.options[0].value;
-  const changedDevice = model.value !== declaredDevice;
+  const changedDevice = model.value !== declaredValue(model);
   for (const control of document.querySelectorAll("[data-device-setting]")) {
     putDeclared(control);
   }
