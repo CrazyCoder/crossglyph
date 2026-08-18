@@ -108,6 +108,240 @@ def test_status_says_a_preview_is_wedged_rather_than_gone(tmp_path, capsys,
     assert "not answering" in capsys.readouterr().out
 
 
+# --- naming a preview by address ------------------------------------------
+
+
+def test_a_port_on_its_own_keeps_the_running_previews_host():
+    """`stop --port 8001` on an install serving 0.0.0.0 means that install's
+    address, not a different one."""
+    assert daemon.resolve(a_state(host="0.0.0.0"), None, 8001) == \
+        ("0.0.0.0", 8001)
+    assert daemon.resolve(None, None, None) == \
+        (daemon.DEFAULT_HOST, daemon.DEFAULT_PORT)
+
+
+def answering(monkeypatch, ports: set, **extra):
+    """Make `probe` answer as a preview on these ports and nowhere else."""
+    def probe(host, port, **_kwargs):
+        return {"version": "0.1.2", "pid": 99, **extra} if port in ports \
+            else None
+
+    monkeypatch.setattr(daemon, "probe", probe)
+
+
+def test_stop_can_name_a_preview_this_install_did_not_start(tmp_path, capsys,
+                                                            monkeypatch):
+    """A foreground `crossglyph preview`, or a second instance on another
+    port, leaves no state file. Without an address there is nothing to name it
+    by, and the only way left to stop it is finding its process by hand.
+    """
+    running = {8123}
+    answering(monkeypatch, running)
+
+    def shutdown(where, **_kwargs):
+        running.clear()
+        return {"stopping": True}
+
+    monkeypatch.setattr(daemon, "ask", shutdown)
+    daemon.save(tmp_path, a_state(port=8000, pid=4321))
+
+    assert daemon.stop(tmp_path, port=8123) == 0
+
+    assert "stopped the preview on http://127.0.0.1:8123." in \
+        capsys.readouterr().out
+    # The tracked preview is untouched. Forgetting it because something else
+    # was stopped would leave no command able to name it again.
+    assert daemon.load(tmp_path).port == 8000
+
+
+def test_status_says_when_what_it_found_is_not_the_tracked_one(tmp_path,
+                                                               capsys,
+                                                               monkeypatch):
+    answering(monkeypatch, {8123}, workspace="/w")
+
+    assert daemon.status(tmp_path, port=8123) == 0
+
+    said = capsys.readouterr().out
+    assert "preview on http://127.0.0.1:8123" in said
+    assert "pid 99, crossglyph 0.1.2" in said
+    assert "fonts /w" in said
+    assert "not the preview this install is tracking" in said
+    # No uptime: the start time is kept in the state file and that preview
+    # wrote none. And no log line, which would name a different process's.
+    assert "up " not in said
+    assert daemon.LOG_NAME not in said
+
+
+def test_an_address_with_nothing_on_it_says_which_address(tmp_path, capsys):
+    port = free_port()
+    assert daemon.status(tmp_path, port=port) == 1
+    assert daemon.stop(tmp_path, port=port) == 0
+    said = capsys.readouterr().out
+    assert said.count(f"no preview is running on http://127.0.0.1:{port}.") == 2
+
+
+def test_stop_leaves_alone_something_that_is_not_a_preview(tmp_path, capsys,
+                                                           monkeypatch):
+    """The same refusal a start makes. A pid is not even known here, and a
+    port being busy is no licence to kill what is holding it."""
+    killed = []
+    monkeypatch.setattr(daemon, "terminate", killed.append)
+    held = socket.socket()
+    held.bind(("127.0.0.1", 0))
+    # Room for more than one: the probe that goes first leaves its connection
+    # in the queue, and a backlog of 1 would refuse the check that follows.
+    held.listen(8)
+    port = held.getsockname()[1]
+    try:
+        assert daemon.stop(tmp_path, port=port) == 1
+    finally:
+        held.close()
+    assert killed == []
+    assert "not CrossGlyph is listening" in capsys.readouterr().err
+
+
+def test_asking_about_another_address_does_not_sweep_the_tracked_state(
+        tmp_path, monkeypatch):
+    """The sweep is for a state whose process is gone. A question about 8123
+    is no evidence at all about the process on 8000."""
+    monkeypatch.setattr(daemon, "alive", lambda pid: False)
+    answering(monkeypatch, set())
+    daemon.save(tmp_path, a_state(port=8000))
+
+    assert daemon.status(tmp_path, port=8123) == 1
+
+    assert daemon.load(tmp_path) is not None
+
+
+def test_naming_the_tracked_address_is_still_the_tracked_preview(tmp_path,
+                                                                 monkeypatch):
+    """`stop --port 8000` where 8000 is the one that was started forgets it,
+    the way a bare stop does. Anything else would leave a state file naming a
+    preview that has gone."""
+    running = {8000}
+    answering(monkeypatch, running)
+    monkeypatch.setattr(daemon, "ask",
+                        lambda where, **k: (running.clear(), {"ok": True})[1])
+    daemon.save(tmp_path, a_state(port=8000))
+
+    assert daemon.stop(tmp_path, port=8000) == 0
+
+    assert daemon.load(tmp_path) is None
+
+
+def test_a_pid_of_zero_is_never_signalled(monkeypatch):
+    """0 stands in for a preview that reported no pid of its own, and on POSIX
+    it is a signal to the caller's whole process group."""
+    monkeypatch.setattr(daemon.os, "kill",
+                        lambda *a: pytest.fail("signalled the process group"))
+    daemon.terminate(0)
+
+
+# --- what --help says -----------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ("start", "stop", "status", "restart"))
+def test_every_background_command_documents_its_address(name, capsys):
+    with pytest.raises(SystemExit) as leaving:
+        daemon.parse(["--help"], name)
+    assert leaving.value.code == 0
+    # Rewrapped: argparse breaks help text at whatever width it is given.
+    said = " ".join(capsys.readouterr().out.split())
+    assert "--host ADDRESS" in said and "--port PORT" in said
+    assert daemon.ABOUT[name] in said
+    for default in daemon.ADDRESS_DEFAULT[name]:
+        assert f"(default: {default})" in said, default
+
+
+@pytest.mark.parametrize("name", ("stop", "status"))
+def test_stop_and_status_refuse_what_they_do_not_take(name, capsys):
+    """They launch nothing, so a preview option here is a misspelling rather
+    than something to pass on."""
+    with pytest.raises(SystemExit) as leaving:
+        daemon.parse(["--family", "notosans"], name)
+    assert leaving.value.code == 2
+    assert "--family" in capsys.readouterr().err
+
+
+# --- a foreground preview on a port that is already held -------------------
+
+
+def test_a_held_port_is_answered_before_anything_is_claimed(tmp_path,
+                                                            monkeypatch):
+    """`crossglyph start` then a bare `crossglyph` is the way into this, and
+    uvicorn's own answer is a line of errno printed after "preview on ..." has
+    already gone out for a preview that never started."""
+    from crossglyph.preview import server
+
+    daemon.save(tmp_path, a_state(port=8000))
+    monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
+    monkeypatch.setattr(daemon, "probe",
+                        lambda host, port, **k: {"version": "0.1.2"})
+
+    said = server._busy_address(tmp_path, "127.0.0.1", 8000)
+
+    assert said is not None
+    assert "already running on http://127.0.0.1:8000" in said
+    # The tracked one, so a bare stop is what stops it.
+    assert "`crossglyph stop`" in said
+    # And a free port to put a second one on, found rather than guessed.
+    assert "`crossglyph preview --port 8001`" in said
+
+
+def test_a_preview_on_a_port_this_install_did_not_start_is_named_by_port(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8001)
+    monkeypatch.setattr(daemon, "probe",
+                        lambda host, port, **k: {"version": "0.1.2"})
+
+    said = server_busy(tmp_path, 8001)
+
+    assert "`crossglyph stop --port 8001`" in said
+
+
+def test_something_else_on_the_port_is_said_to_be_something_else(tmp_path,
+                                                                 monkeypatch):
+    monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
+    monkeypatch.setattr(daemon, "probe", lambda host, port, **k: None)
+
+    said = server_busy(tmp_path, 8000)
+
+    assert "not CrossGlyph is listening" in said
+    assert "crossglyph stop" not in said
+
+
+def test_a_free_port_is_not_answered_at_all(tmp_path, monkeypatch):
+    monkeypatch.setattr(daemon, "taken", lambda host, port: False)
+    assert server_busy(tmp_path, 8000) is None
+
+
+def server_busy(root, port: int):
+    from crossglyph.preview import server
+
+    return server._busy_address(root, "127.0.0.1", port)
+
+
+def test_the_suggested_port_is_one_nothing_holds(tmp_path, monkeypatch):
+    """Suggesting the next number would send you into the next held port on a
+    machine running several of these."""
+    monkeypatch.setattr(daemon, "taken",
+                        lambda host, port: port in (8000, 8001, 8002))
+    monkeypatch.setattr(daemon, "probe",
+                        lambda host, port, **k: {"version": "0.1.2"})
+
+    assert "--port 8003`" in server_busy(tmp_path, 8000)
+
+
+def test_the_foreground_preview_says_what_its_port_defaults_to(capsys):
+    from crossglyph.preview import server
+
+    with pytest.raises(SystemExit):
+        server.main(["--help"])
+    said = " ".join(capsys.readouterr().out.split())
+    assert "--port PORT port to serve on (default: 8000)" in said
+    assert "$CROSSGLYPH_HOST" in said
+
+
 # --- addresses ------------------------------------------------------------
 
 

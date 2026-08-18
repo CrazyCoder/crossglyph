@@ -2317,7 +2317,22 @@ def test_the_automatic_pick_is_not_written_back(variable_source):
 # --- starting with no arguments -------------------------------------------
 
 
+@pytest.fixture
+def free_address(monkeypatch):
+    """Nothing listening on the address these tests pretend to serve on.
+
+    They stub uvicorn, so none of them binds anything, but main() asks whether
+    the address is free before it claims it. On a machine with a preview of
+    its own running, port 8000 is not, and the refusal is the whole point of
+    the ask.
+    """
+    from crossglyph import daemon
+
+    monkeypatch.setattr(daemon, "taken", lambda host, port: False)
+
+
 def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
+                                                               free_address,
                                                                monkeypatch):
     """A tester who unpacked the zip runs the launcher and nothing else, so
     the page has to arrive on whatever is in the workspace."""
@@ -2345,6 +2360,7 @@ def test_the_preview_opens_on_a_family_when_nothing_says_which(two_families,
 
 
 def test_ctrl_c_stops_the_preview_without_a_traceback(two_families,
+                                                       free_address,
                                                        monkeypatch):
     """Uvicorn re-raises its captured SIGINT after shutting down cleanly."""
     from crossglyph.preview import server
@@ -2360,12 +2376,35 @@ def test_ctrl_c_stops_the_preview_without_a_traceback(two_families,
     assert server.main(["--no-open"]) == 0
 
 
+def test_a_held_address_is_answered_before_anything_is_claimed(two_families,
+                                                                monkeypatch,
+                                                                capsys):
+    """`crossglyph start` and then a bare `crossglyph` is the way into this.
+    Left to uvicorn it is a line of errno with the word bind in it, printed
+    after this command has already said "preview on ..." for a preview that
+    never started."""
+    from crossglyph import daemon
+    from crossglyph.preview import server
+
+    monkeypatch.setattr(daemon, "taken", lambda host, port: True)
+    monkeypatch.setattr(daemon, "probe",
+                        lambda host, port, **k: {"version": "0.1.2"})
+    monkeypatch.setattr("uvicorn.Server",
+                        lambda config: pytest.fail("built a server anyway"))
+
+    assert server.main(["--no-open"]) == 1
+
+    said = capsys.readouterr()
+    assert "already running on" in said.err
+    assert "preview on" not in said.out
+
+
 @pytest.mark.parametrize(
     ("arguments", "wanted"),
     [(["--no-open"], "0.0.0.0"),
      (["--no-open", "--host", "192.0.2.1"], "192.0.2.1")])
 def test_the_preview_host_uses_the_environment_unless_flagged(
-        two_families, monkeypatch, arguments, wanted):
+        two_families, free_address, monkeypatch, arguments, wanted):
     """An image can set one safe container default without changing the local
     default or stopping an explicit address from winning."""
     from crossglyph.preview import server

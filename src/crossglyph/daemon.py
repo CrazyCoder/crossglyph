@@ -57,6 +57,25 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 
 
+#: What --host and --port fall back to, per command, for its own --help.
+ADDRESS_DEFAULT = {
+    "start": (DEFAULT_HOST, str(DEFAULT_PORT)),
+    "restart": ("the address of the preview it replaces",
+                "the port of the preview it replaces"),
+    "stop": ("the one this install started",) * 2,
+    "status": ("the one this install started",) * 2,
+}
+
+#: One line each, for the same.
+ABOUT = {
+    "start": "Run the preview in the background and open a browser on it.",
+    "stop": "Stop a background preview.",
+    "status": "Say which preview is running, and what it is on.",
+    "restart": "Stop the preview and start it again, on whichever version is "
+               "current by then.",
+}
+
+
 @dataclasses.dataclass
 class State:
     """What a background start left behind, so the other commands can find it."""
@@ -351,26 +370,99 @@ def since(started: float) -> str:
     return f"{seconds}s"
 
 
-def look(root: pathlib.Path) -> tuple[State | None, dict | None]:
-    """What was started, and what it has to say for itself.
+@dataclasses.dataclass
+class Found:
+    """The preview a command is to act on.
 
-    Three answers, and the third is the one worth having: no state at all,
-    a state whose server answers, and a state whose server does not while
-    its process is still there. That last one is a wedged preview, and
-    calling it "not running" would leave something holding the port that no
-    command of ours would ever stop.
-
-    A state whose process is gone is swept here, so a server that was killed
-    never confuses the next command.
+    Either the one the state file names or one named by address. The
+    difference matters in one place: only a tracked preview has a state file
+    to forget when it stops.
     """
-    state = load(root)
-    if state is None:
-        return None, None
-    body = probe(state.host, state.port)
-    if body is None and not alive(state.pid):
+    host: str
+    port: int
+    #: The process serving it: the state file's for a tracked preview, and the
+    #: server's own report for one found by address, which is the only pid
+    #: anything here could have for that one.
+    pid: int
+    #: What it says about itself, or None for a tracked preview that has
+    #: stopped answering. One found by address is never that: an address which
+    #: does not answer is not a preview anything here can name.
+    body: dict | None
+    #: The state file's record, when this is the preview it names.
+    state: State | None
+
+    @property
+    def where(self) -> str:
+        return url(self.host, self.port)
+
+
+def resolve(state: State | None, host: str | None,
+            port: int | None) -> tuple[str, int]:
+    """The address a command was pointed at, filling in what it did not name.
+
+    A port on its own keeps the running preview's host, so `stop --port 8001`
+    means what it looks like on an install serving 0.0.0.0.
+    """
+    return (host if host is not None else state.host if state else DEFAULT_HOST,
+            port if port is not None else state.port if state else DEFAULT_PORT)
+
+
+def find(root: pathlib.Path, state: State | None, host: str | None,
+         port: int | None) -> Found | None:
+    """The preview to act on, or None when nothing there answers as one.
+
+    With no address that is the one the state file names, and there are three
+    answers rather than two: no state at all, a state whose server answers,
+    and a state whose server does not while its process is still there. That
+    last one is a wedged preview, and calling it "not running" would leave
+    something holding the port that no command of ours would ever stop. A
+    state whose process is gone is swept here instead, so a server that was
+    killed never confuses the next command.
+
+    With an address it is whatever answers there. A foreground `crossglyph
+    preview`, or a second instance on another port, is a preview these
+    commands should be able to name, and neither leaves a state file to be
+    found in.
+    """
+    where = resolve(state, host, port)
+    if state is not None and (state.host, state.port) == where:
+        body = probe(*where)
+        if body is None and not alive(state.pid):
+            clear(root)
+            return None
+        return Found(*where, state.pid, body, state)
+    if host is None and port is None:
+        return None
+    body = probe(*where)
+    return None if body is None else Found(*where, body.get("pid") or 0,
+                                           body, None)
+
+
+def look(root: pathlib.Path) -> tuple[State | None, dict | None]:
+    """The tracked preview and what it has to say, for a start to check."""
+    found = find(root, load(root), None, None)
+    return (None, None) if found is None else (found.state, found.body)
+
+
+def forget(root: pathlib.Path, found: Found) -> None:
+    """Drop the state file, when what was stopped is what it names."""
+    if found.state is not None:
         clear(root)
-        return None, None
-    return state, body
+
+
+def missing(where: tuple[str, int], named: bool) -> tuple[str, bool]:
+    """What to say about an address holding no preview of ours, and whether
+    that is a complaint.
+
+    Something else listening there is one: a command aimed at a port somebody
+    else's server holds did not do what it was asked, and saying "no preview
+    is running" would read as though there were nothing to explain.
+    """
+    if named and taken(*where):
+        return (f"something that is not CrossGlyph is listening on "
+                f"{url(*where)}.", True)
+    return (f"no preview is running{f' on {url(*where)}' if named else ''}.",
+            False)
 
 
 def announce(said: str, where: str, pid: int, running: str,
@@ -454,78 +546,109 @@ def terminate(pid: int) -> None:
     asked politely first and waited: the window is between a server going
     unresponsive and this command running, and it is the same window every
     tool with a pid file lives with.
+
+    A preview found by address reports its own pid, and 0 is what stands in
+    for one that reported none. That is not a process: on POSIX it is the
+    caller's whole process group, so it is refused here rather than at every
+    call site.
     """
+    if pid <= 0:
+        return
     try:
         os.kill(pid, signal.SIGTERM)
     except OSError:
         pass
 
 
-def stop(root: pathlib.Path) -> int:
-    """Stop the background preview, gracefully if it will have it.
+def stop(root: pathlib.Path, host: str | None = None,
+         port: int | None = None) -> int:
+    """Stop a background preview, gracefully if it will have it.
 
     The endpoint rather than a signal, because Windows has neither: a
     detached child has no console for a Ctrl+Break to arrive through, and
     everything else there is a kill. Asking works the same way on all three
     platforms, and the kill is what answers a server that has stopped
     listening.
+
+    An address names which preview, for the ones this install did not start
+    and has no state file for. Only a tracked preview is forgotten here:
+    stopping something else must leave the running one nameable.
     """
-    state, body = look(root)
-    if state is None:
-        print("no preview is running.")
-        return 0
-    where = url(state.host, state.port)
-    if body is None:
+    state = load(root)
+    where = resolve(state, host, port)
+    found = find(root, state, host, port)
+    if found is None:
+        said, wrong = missing(where, host is not None or port is not None)
+        print(said, file=sys.stderr if wrong else sys.stdout)
+        return 1 if wrong else 0
+    if found.body is None:
         # Alive but not answering, which is the one case a stop must not walk
         # away from: nothing else would ever free that port.
-        terminate(state.pid)
-        clear(root)
-        print(f"the preview on {where} was not answering. Killed pid "
-              f"{state.pid}.")
+        terminate(found.pid)
+        forget(root, found)
+        print(f"the preview on {found.where} was not answering. Killed pid "
+              f"{found.pid}.")
         return 0
 
-    asked = ask(f"{where}/shutdown", method="POST", timeout=5.0) is not None
+    asked = ask(f"{found.where}/shutdown", method="POST",
+                timeout=5.0) is not None
     deadline = time.monotonic() + STOP_TIMEOUT
     while time.monotonic() < deadline:
-        if probe(state.host, state.port, timeout=1.0) is None:
-            clear(root)
-            print(f"stopped the preview on {where}.")
+        if probe(found.host, found.port, timeout=1.0) is None:
+            forget(root, found)
+            print(f"stopped the preview on {found.where}.")
             return 0
         time.sleep(POLL)
 
-    terminate(state.pid)
+    terminate(found.pid)
     time.sleep(1.0)
-    if probe(state.host, state.port, timeout=1.0) is not None:
+    if probe(found.host, found.port, timeout=1.0) is not None:
         # The state stays: something is still serving on that port, and
         # forgetting it here would leave no command able to name it again.
-        print(f"the preview on {where} did not stop. Its pid is {state.pid}.",
-              file=sys.stderr)
+        print(f"the preview on {found.where} did not stop. Its pid is "
+              f"{found.pid}.", file=sys.stderr)
         return 1
-    clear(root)
+    forget(root, found)
     reason = "did not stop when asked" if asked else "would not take the ask"
-    print(f"stopped the preview on {where}, which {reason}.")
+    print(f"stopped the preview on {found.where}, which {reason}.")
     return 0
 
 
-def status(root: pathlib.Path) -> int:
-    """Say what is running. Exit 0 when something is, 1 when nothing is."""
-    state, body = look(root)
-    if state is None:
-        print("no preview is running.")
+def status(root: pathlib.Path, host: str | None = None,
+           port: int | None = None) -> int:
+    """Say what is running. Exit 0 when something is, 1 when nothing is.
+
+    An address asks about that preview instead of the tracked one, which is
+    the only way to see a foreground `crossglyph preview` or a second
+    instance: neither writes a state file to be read here.
+    """
+    state = load(root)
+    where = resolve(state, host, port)
+    found = find(root, state, host, port)
+    if found is None:
+        print(missing(where, host is not None or port is not None)[0])
         return 1
-    if body is None:
-        print(f"a preview on {url(state.host, state.port)} (pid {state.pid}) "
-              f"is not answering. `crossglyph stop` will kill it.")
+    if found.body is None:
+        print(f"a preview on {found.where} (pid {found.pid}) is not "
+              f"answering. `crossglyph stop` will kill it.")
         print(f"  log {root / LOG_NAME}")
         return 1
-    print(f"preview on {url(state.host, state.port)}")
-    print(f"  pid {state.pid}, crossglyph {body['version']}, "
-          f"up {since(state.started)}")
-    if body.get("workspace"):
-        print(f"  fonts {body['workspace']}")
-    if body.get("pending"):
-        print(f"  {body['pending']} is installed; a restart would run it")
-    print(f"  log {root / LOG_NAME}")
+    print(f"preview on {found.where}")
+    # No uptime for one found by address: the state file is where a start time
+    # is kept, and that preview left none.
+    up = f", up {since(found.state.started)}" if found.state else ""
+    print(f"  pid {found.pid}, crossglyph {found.body['version']}{up}")
+    if found.body.get("workspace"):
+        print(f"  fonts {found.body['workspace']}")
+    if found.body.get("pending"):
+        print(f"  {found.body['pending']} is installed; a restart would run it")
+    if found.state is None:
+        print("  not the preview this install is tracking, so a bare stop or "
+              "restart leaves it alone")
+    else:
+        # The log belongs to the tracked start. Naming it under another
+        # preview would send a reader to a file about a different process.
+        print(f"  log {root / LOG_NAME}")
     return 0
 
 
@@ -559,20 +682,31 @@ def settle(opts: argparse.Namespace, state: State | None) -> None:
 
 
 def parse(argv: list[str], name: str) -> argparse.Namespace:
-    """The options a background command takes, which are the preview's.
+    """The options a background command takes.
 
-    Everything it does not name itself is passed through, so `--family`,
-    `--font` and the rest mean what they mean in the foreground. The address
-    has no default here: unset is what lets a restart tell "leave it as it
-    was" apart from "put it on 8000".
+    A launch takes the preview's as well: everything `start` and `restart` do
+    not name themselves is passed through, so `--family`, `--font` and the
+    rest mean what they mean in the foreground. `stop` and `status` launch
+    nothing, so they take an address and refuse anything else rather than
+    swallow a misspelling.
+
+    The address has no default here: unset is what lets a restart tell "leave
+    it as it was" apart from "put it on 8000".
     """
+    launching = name in ("start", "restart")
     parser = argparse.ArgumentParser(
-        prog=f"crossglyph {name}",
-        description="Run the preview in the background.")
-    parser.add_argument("--host", default=None,
-                        help=f"default: {DEFAULT_HOST}")
-    parser.add_argument("--port", type=int, default=None,
-                        help=f"default: {DEFAULT_PORT}")
+        prog=f"crossglyph {name}", description=ABOUT[name],
+        epilog=("Any other option goes to the preview, so --family, --font, "
+                "--fonts and --size mean what they mean in `crossglyph "
+                "preview`." if launching else None))
+    doing = "to serve on" if launching else "of the preview to act on"
+    where, which = ADDRESS_DEFAULT[name]
+    parser.add_argument("--host", default=None, metavar="ADDRESS",
+                        help=f"address {doing} (default: {where})")
+    parser.add_argument("--port", type=int, default=None, metavar="PORT",
+                        help=f"port {doing} (default: {which})")
+    if not launching:
+        return parser.parse_args(argv)
     parser.add_argument("--no-open", dest="open_browser",
                         action="store_false",
                         help="start it without opening a browser")
@@ -589,12 +723,10 @@ def main(name: str, argv: list[str]) -> int:
               "Run `crossglyph preview` in the foreground, and use Docker or "
               "Compose to start and stop the container.", file=sys.stderr)
         return 2
-    if name in ("stop", "status"):
-        if argv:
-            print(f"usage: crossglyph {name}", file=sys.stderr)
-            return 2
-        return stop(root) if name == "stop" else status(root)
     opts = parse(argv, name)
+    if name in ("stop", "status"):
+        act = stop if name == "stop" else status
+        return act(root, opts.host, opts.port)
     if name == "start":
         settle(opts, None)
         return start(root, opts)

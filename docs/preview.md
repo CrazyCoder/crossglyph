@@ -46,13 +46,22 @@ one that came with the tool. Name it and it builds, and pressing **Save** on it
 writes a `literata.conf` naming `dir`, after which it is a family like any
 other and builds with the rest.
 
-The server runs until it is killed, and it reads the Python once at startup, so
-a change to the source needs a restart. On Windows, free the port first:
+The server runs until it is stopped, and it reads the Python once at startup, so
+a change to the source needs a restart. Ctrl+C ends one in the window holding
+it, and `crossglyph stop --port 8000` ends one on any address, foreground or
+background and whether or not this install started it.
 
-```powershell
-Get-NetTCPConnection -LocalPort 8000 -State Listen |
-  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+Starting a second preview on a port that is already held says what is there and
+what to do about it, rather than failing at the bind:
+
 ```
+a preview is already running on http://127.0.0.1:8000. Open that one, or stop
+it with `crossglyph stop`.
+Serve one beside it with `crossglyph preview --port 8001`.
+```
+
+The port it offers is one nothing is listening on, so it is a command to run
+rather than a number to check first.
 
 ## In the background
 
@@ -66,12 +75,34 @@ one:
 ./crossglyph.sh status                # what is running, and which version
 ./crossglyph.sh restart               # same address, same family
 ./crossglyph.sh stop
+./crossglyph.sh stop --port 8123      # that one, whoever started it
 ```
 
 `start` takes every option `preview` takes, so `--family`, `--font`, `--host`
 and `--port` mean the same things. It waits for the page to answer before it
 says anything, so a start that failed says so here rather than opening a
 browser on nothing, and the reason is in `preview.log` beside the launcher.
+
+`stop` and `status` take `--host` and `--port` too, and there they name which
+preview to act on rather than where to serve. Without one they act on the
+preview this install started, which is the only one it keeps a note of. With
+one they act on whatever answers at that address, so a foreground
+`crossglyph preview`, or a second instance on another port, can be asked about
+and stopped like any other. A port on its own keeps the running preview's host.
+
+`status` on a preview that is not the tracked one says so, since a bare `stop`
+or `restart` will not touch it, and it has no start time or log to report:
+
+```
+preview on http://127.0.0.1:8123
+  pid 41290, crossglyph X.Y.Z
+  fonts /home/you/crossglyph/fonts
+  not the preview this install is tracking, so a bare stop or restart leaves
+  it alone
+```
+
+Naming a port nothing is serving says which port, and one held by something
+that is not CrossGlyph is left alone rather than killed.
 
 `status` asks the server rather than guessing from a process list, so what it
 reports is what is actually serving:

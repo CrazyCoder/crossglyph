@@ -87,8 +87,9 @@ To build every family in the workspace, with no page in between:
 To keep the preview running without a terminal window holding it open, there
 is `start`, `status`, `restart` and `stop`. `start` opens a browser once the
 page answers, `restart` comes back on the same address and picks up an update
-if one has been installed, and [docs/preview.md](docs/preview.md) has the
-rest.
+if one has been installed, and `stop --port 8123` names a preview on another
+address rather than the one this install started.
+[docs/preview.md](docs/preview.md) has the rest.
 
 Windows on ARM is the one platform without ready-made wheels: `freetype-py`
 publishes none, so uv tries to compile it and needs a build toolchain.

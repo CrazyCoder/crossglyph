@@ -11,7 +11,7 @@ USAGE = """usage: crossglyph [command] [options]
 
   preview            tune a font against the device's own renderer (default)
   start              the same, in the background, and open a browser on it
-  stop               stop the background preview
+  stop               stop a background preview
   status             say whether one is running, and which version
   restart            stop and start again, on whatever version is current
   build              build .cpfont families from the workspace
