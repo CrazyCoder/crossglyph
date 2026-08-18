@@ -49,22 +49,21 @@ function syncPreviewColumns() {
 // the panel's exact proportions that still contains that hole, centred on it,
 // and it is what the page is drawn into. Two reasons. The page overlaps the
 // hole's anti-aliased rim instead of stopping at it, which is what keeps a dark
-// line from appearing down each side. And 1:1 scales by native.width divided by
-// aperture.width and applies that one factor to both axes, so an aperture of
-// any other shape lands the page on fractional device pixels: the glass is
-// 0.60304 against the panel's 0.6, which put 800 source rows into 796. The
-// overhang tucks under the frame, which draws above the page.
-// Each device is rendered twice, and the two are not interchangeable.
+// line from appearing down each side. And every scale applies one factor to
+// both axes, so an aperture of any other shape lands the page on fractional
+// device pixels: the glass is 0.60304 against the panel's 0.6, which put 800
+// source rows into 796. The overhang tucks under the frame, which draws above.
 //
-// `pixels` has an aperture the size of the panel itself, so 1:1 mode -- which
-// scales by native.width / aperture.width -- scales it by one and the frame
-// lands on whole device pixels at any pixel ratio. `scaled` is what every other
-// mode draws: fit caps the frame at 480 CSS px, which at a 3x pixel ratio wants
-// 1440 device pixels and would upscale the smaller frame by more than two.
+// Each device is rendered twice and the two are not interchangeable. In
+// `pixels` the aperture is the panel itself, so the factor 1:1 works out --
+// native.width / aperture.width -- comes to one and the frame draws at its own
+// pixels whatever the device pixel ratio. `scaled` is for every other mode: fit
+// caps the frame at 480 CSS px, which at a 3x ratio wants 1440 device pixels
+// and would upscale the smaller frame by more than two.
 //
-// Both are rendered rather than resampled, so the smaller one keeps its edges
-// and its buttons: measured at the size 1:1 shows, its chin contrast is within
-// a few levels of what downsampling the tall one gives.
+// Both are rendered rather than resampled from each other, so the smaller one
+// keeps its edges and its buttons: measured at the size 1:1 shows it, its chin
+// contrast is within a few levels of downsampling the tall one.
 export const DEVICES = {
   x4: {
     native: {width: 480, height: 800},
@@ -105,6 +104,10 @@ const CSS_PIXELS_PER_MM = 96 / 25.4;
 const LEVELS = [0, 96, 200, 255];
 const LEVEL_RATIOS = [0, .329, .665, 1];
 
+// What each render calls its file. The tall one keeps the plain name, being the
+// one every mode but 1:1 draws.
+const SUFFIX = {scaled: "", pixels: "-1to1"};
+
 // Which of the two renders this scale wants. Read live rather than stored, so
 // changing the scale swaps the frame, its geometry and its file together and
 // they cannot disagree about which one is on screen.
@@ -112,18 +115,19 @@ function variant() {
   return scale.value === "pixels" ? "pixels" : "scaled";
 }
 
-function profile() {
+// One device's geometry, with the panel size the two renders share. Takes the
+// variant so the copy can ask for `pixels` while the page is showing the other.
+function profile(which = variant()) {
   const device = DEVICES[model.value] || DEVICES.x4;
-  return {native: device.native, ...device[variant()]};
+  return {native: device.native, ...device[which]};
 }
 
 function dpr() {
   return Number(globalThis.devicePixelRatio) || 1;
 }
 
-function frameUrl() {
-  const suffix = variant() === "pixels" ? "-1to1" : "";
-  return `device/${model.value}-${color.value}${suffix}.png`;
+function frameUrl(which = variant()) {
+  return `device/${model.value}-${color.value}${SUFFIX[which]}.png`;
 }
 
 let fixedColor = false;
@@ -238,6 +242,13 @@ function cast() {
   return castFor(numberOf(warm), numberOf(tint));
 }
 
+// How far the knobs sit from what the frames were rendered with, per channel.
+// All three are zero at the shipped position, and that is the case both callers
+// turn on: no filter over the image, and no pass over its pixels.
+function castDelta() {
+  return cast().map((offset, channel) => offset - BAKED[channel]);
+}
+
 function rgb(level) {
   return cast().map(offset =>
     Math.max(0, Math.min(255, Math.round(level + offset))));
@@ -253,13 +264,12 @@ function rgb(level) {
 // exactly, so a few specular highlights keep a trace of it. The renderer's own
 // guard holds those under 2% of the body.
 function syncFrameTint() {
-  const offsets = cast();
-  const changed = offsets.some((offset, channel) => offset !== BAKED[channel]);
+  const delta = castDelta();
+  const changed = delta.some(Boolean);
   frame.style.filter = changed ? "url(#frame-tint)" : "";
   if (!changed) return;
   for (const [channel, func] of tintFuncs.entries()) {
-    func.setAttribute("intercept",
-                      String((offsets[channel] - BAKED[channel]) / 255));
+    func.setAttribute("intercept", String(delta[channel] / 255));
   }
 }
 
@@ -268,28 +278,21 @@ function syncFrameTint() {
 // frame's aperture is the panel's own size, so the page goes in at its own
 // pixels and nothing on the way out is resampled -- where compositing into the
 // tall frame would stretch 480 columns of type across 873.
-function pixelProfile() {
-  const device = DEVICES[model.value] || DEVICES.x4;
-  return {native: device.native, ...device.pixels};
-}
-
-function pixelFrameUrl() {
-  return `device/${model.value}-${color.value}-1to1.png`;
-}
 
 // The frame's cast is a filter over the image, and drawImage does not carry CSS
 // filters, so the copy applies the same difference in pixels. Only where there
-// is something to see: the transparent surround has no colour to shift.
-function tintedFrame(image, width, height) {
+// is something to see: the transparent surround has no colour to shift. Sized
+// from the image rather than from the record, so a frame that ever disagreed
+// with its record would land wrong rather than be silently stretched to fit.
+function tintedFrame(image) {
   const sheet = document.createElement("canvas");
-  sheet.width = width;
-  sheet.height = height;
-  const context = sheet.getContext("2d", {willReadFrequently: true});
-  context.drawImage(image, 0, 0, width, height);
-  const offsets = cast();
-  if (offsets.every((offset, channel) => offset === BAKED[channel])) return sheet;
-  const delta = offsets.map((offset, channel) => offset - BAKED[channel]);
-  const pixels = context.getImageData(0, 0, width, height);
+  sheet.width = image.naturalWidth;
+  sheet.height = image.naturalHeight;
+  const context = sheet.getContext("2d");
+  context.drawImage(image, 0, 0);
+  const delta = castDelta();
+  if (!delta.some(Boolean)) return sheet;
+  const pixels = context.getImageData(0, 0, sheet.width, sheet.height);
   const data = pixels.data;
   for (let at = 0; at < data.length; at += 4) {
     if (!data[at + 3]) continue;
@@ -325,10 +328,14 @@ function stageColour() {
 // What the preview is showing, at the panel's own resolution: the body around
 // the page when the frame is on, the page alone when it is off. The frame
 // toggle is the whole of the choice, which is what it already means on screen.
+//
+// Exported so it can be measured in a browser. Neither suite can: the JS one
+// runs against a stub DOM with no canvas, and pytest never opens a page, so a
+// composite that came out wrong would pass both.
 export async function deviceImage() {
-  const device = pixelProfile();
-  const sheet = document.createElement("canvas");
+  const device = profile("pixels");
   const framed = frameShown.checked;
+  const sheet = document.createElement("canvas");
   sheet.width = framed ? device.frame.width : device.native.width;
   sheet.height = framed ? device.frame.height : device.native.height;
   const context = sheet.getContext("2d");
@@ -344,15 +351,13 @@ export async function deviceImage() {
   }
   context.drawImage(canvas, device.aperture.x, device.aperture.y,
                     device.aperture.width, device.aperture.height);
-  context.drawImage(
-    tintedFrame(await decoded(pixelFrameUrl()), sheet.width, sheet.height), 0, 0);
+  context.drawImage(tintedFrame(await decoded(frameUrl("pixels"))), 0, 0);
   return sheet;
 }
 
 async function deviceBlob() {
   const sheet = await deviceImage();
-  const blob = await new Promise(
-    resolve => sheet.toBlob(resolve, "image/png"));
+  const blob = await new Promise(resolve => sheet.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("the preview could not be encoded");
   return blob;
 }
@@ -362,31 +367,52 @@ function imageName() {
          + `${frameShown.checked ? `-${color.value}` : "-page"}.png`;
 }
 
-function said(button, text) {
-  button.classList.add("done");
-  const was = button.title;
-  button.title = text;
-  setTimeout(() => {
-    button.classList.remove("done");
-    button.title = was;
+// What the press will do, which depends on a key rather than on any state of
+// its own. The copy wording is the markup's, so the two cannot drift.
+const COPY_TITLE = copyButton.title;
+const DOWNLOAD_TITLE = "Download the preview as an image. Let go of Shift to copy.";
+let shiftHeld = false;
+let restoreTitle = null;
+
+function showCopyState() {
+  copyButton.querySelector(".as-copy").hidden = shiftHeld;
+  copyButton.querySelector(".as-download").hidden = !shiftHeld;
+  copyButton.title = shiftHeld ? DOWNLOAD_TITLE : COPY_TITLE;
+}
+
+// A clipboard write leaves nothing on screen, so the button says what happened
+// and then goes back to saying what it does. It goes back by re-running the
+// state above rather than by restoring whatever the title was: a second press
+// inside the delay would otherwise capture "copied" as the thing to return to,
+// and the button would keep saying it for good.
+function said(text, ok) {
+  clearTimeout(restoreTitle);
+  copyButton.classList.toggle("done", ok);
+  copyButton.title = text;
+  restoreTitle = setTimeout(() => {
+    copyButton.classList.remove("done");
+    showCopyState();
   }, 1200);
 }
 
 // The ClipboardItem takes the promise rather than an awaited blob: Safari wants
 // it built in the same turn as the press, and the encode is asynchronous.
-function copyDeviceImage(button) {
+function copyDeviceImage() {
   navigator.clipboard.write([new ClipboardItem({"image/png": deviceBlob()})])
-    .then(() => said(button, "copied"))
-    .catch(error => { button.title = String(error && error.message || error); });
+    .then(() => said("copied", true))
+    .catch(error => said(String(error && error.message || error), false));
 }
 
-async function downloadDeviceImage(button) {
+async function downloadDeviceImage() {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(await deviceBlob());
+  const url = URL.createObjectURL(await deviceBlob());
+  link.href = url;
   link.download = imageName();
   link.click();
-  URL.revokeObjectURL(link.href);
-  said(button, "saved");
+  // Not straight after the click: the download reads the blob through this URL,
+  // and revoking it in the same turn is a race the save can lose.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  said("saved", true);
 }
 
 //: The decoded page the canvas draws, replaced whole by each render. A bitmap
@@ -568,23 +594,17 @@ export function wireDevice(scheduleRender) {
   });
   reset.addEventListener("click", () => resetDevice(scheduleRender));
   copyButton.addEventListener("click", (event) => {
-    if (event.shiftKey) downloadDeviceImage(copyButton);
-    else copyDeviceImage(copyButton);
+    if (event.shiftKey) downloadDeviceImage();
+    else copyDeviceImage();
   });
   // Say what the press will do for as long as the key is held, the same way
   // Build says Rebuild.
-  const showCopyState = (held) => {
-    copyButton.querySelector(".as-copy").hidden = held;
-    copyButton.querySelector(".as-download").hidden = !held;
-    copyButton.title = held
-      ? "Download the preview as an image. Let go of Shift to copy."
-      : "Copy the preview as an image. Hold Shift to download.";
-  };
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Shift") showCopyState(true);
-  });
-  document.addEventListener("keyup", (event) => {
-    if (event.key === "Shift") showCopyState(false);
-  });
+  for (const [kind, held] of [["keydown", true], ["keyup", false]]) {
+    document.addEventListener(kind, (event) => {
+      if (event.key !== "Shift") return;
+      shiftHeld = held;
+      showCopyState();
+    });
+  }
   globalThis.addEventListener?.("resize", layoutDevice);
 }
