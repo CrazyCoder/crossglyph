@@ -807,9 +807,12 @@
      move the line while you were reading it. */
   .device-ruler-clip { overflow: hidden; padding-top: .25rem; }
   #device-calibration .device-number { margin-top: .4rem; }
+  /* Left aligned, not centred: the left tick is what a physical ruler is laid
+     against, so it has to stay where it is while the value moves. Centring
+     would slide it inwards until the line outgrew the panel and then stop,
+     which is a moving reference through exactly the range being calibrated. */
   #device-ruler {
-    position: relative; margin: 0 auto;
-    height: 1.1rem; border-top: 1px solid var(--text);
+    position: relative; height: 1.1rem; border-top: 1px solid var(--text);
   }
   #device-ruler::before, #device-ruler::after {
     content: ""; position: absolute; top: -.25rem; height: .5rem;

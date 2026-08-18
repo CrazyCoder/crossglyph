@@ -1716,42 +1716,6 @@ def _restart_rest(opts, source: pathlib.Path,
     return rest
 
 
-def _free_port(host: str, port: int, tries: int = 20) -> int | None:
-    """The first port above this one that nothing is listening on."""
-    for offset in range(1, tries + 1):
-        if port + offset > 65535:
-            break
-        if not daemon.taken(host, port + offset):
-            return port + offset
-    return None
-
-
-def _busy_address(root: pathlib.Path, host: str, port: int) -> str | None:
-    """Why this address cannot be served on, and what to do about it.
-
-    Asked before anything is claimed. uvicorn's own answer to a held port is a
-    line of errno with the word "bind" in it, and it arrives after this command
-    has already printed "preview on ..." for a preview that never started.
-    Asking first also means the answer can name what is there: which is nearly
-    always another CrossGlyph, and most often this install's own background
-    one.
-    """
-    if not daemon.taken(host, port):
-        return None
-    where = daemon.url(host, port)
-    spare = _free_port(host, port)
-    instead = (f"Serve one beside it with `crossglyph preview --port {spare}`."
-               if spare else "Pass --port to serve on another address.")
-    if daemon.probe(host, port) is None:
-        return (f"something that is not CrossGlyph is listening on {where}.\n"
-                f"{instead}")
-    state = daemon.load(root)
-    tracked = state is not None and (state.host, state.port) == (host, port)
-    stop = "crossglyph stop" if tracked else f"crossglyph stop --port {port}"
-    return (f"a preview is already running on {where}. Open that one, or stop "
-            f"it with `{stop}`.\n{instead}")
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="crossglyph preview",
@@ -1859,9 +1823,9 @@ def main(argv=None) -> int:
     import uvicorn
 
     root = install.root()
-    busy = _busy_address(root, opts.host, opts.port)
-    if busy is not None:
-        print(busy, file=sys.stderr)
+    held = daemon.busy(root, opts.host, opts.port, "preview")
+    if held is not None:
+        print(held, file=sys.stderr)
         return 1
     # On a thread, so a slow or absent network and a large directory removal
     # delay nothing anybody is waiting on. The page reads whatever the check

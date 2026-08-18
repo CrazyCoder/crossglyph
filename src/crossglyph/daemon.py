@@ -132,6 +132,16 @@ def url(host: str, port: int) -> str:
     return f"http://[{shown}]:{port}" if ":" in shown else f"http://{shown}:{port}"
 
 
+def same_address(one: tuple[str, int], two: tuple[str, int]) -> bool:
+    """Whether two addresses reach the same server.
+
+    Through `browsable`, so 0.0.0.0 and 127.0.0.1 are one target: a preview
+    started on every interface is the preview answering on the loopback, and
+    stopping it by the address it answers on has to forget the state naming it.
+    """
+    return (browsable(one[0]), one[1]) == (browsable(two[0]), two[1])
+
+
 #: Every request here is to this machine, and a proxy has no business in it.
 #: urlopen would otherwise read http_proxy from the environment and send a
 #: shutdown for 127.0.0.1 to whatever a company network put there, which
@@ -425,7 +435,7 @@ def find(root: pathlib.Path, state: State | None, host: str | None,
     found in.
     """
     where = resolve(state, host, port)
-    if state is not None and (state.host, state.port) == where:
+    if state is not None and same_address((state.host, state.port), where):
         body = probe(*where)
         if body is None and not alive(state.pid):
             clear(root)
@@ -450,6 +460,12 @@ def forget(root: pathlib.Path, found: Found) -> None:
         clear(root)
 
 
+def stranger(where: tuple[str, int]) -> str:
+    """A port held by a server that is not one of ours. Said the same way by
+    everything that finds one, since it is the same fact each time."""
+    return f"something that is not CrossGlyph is listening on {url(*where)}."
+
+
 def missing(where: tuple[str, int], named: bool) -> tuple[str, bool]:
     """What to say about an address holding no preview of ours, and whether
     that is a complaint.
@@ -459,10 +475,48 @@ def missing(where: tuple[str, int], named: bool) -> tuple[str, bool]:
     is running" would read as though there were nothing to explain.
     """
     if named and taken(*where):
-        return (f"something that is not CrossGlyph is listening on "
-                f"{url(*where)}.", True)
+        return stranger(where), True
     return (f"no preview is running{f' on {url(*where)}' if named else ''}.",
             False)
+
+
+def spare_port(host: str, port: int, tries: int = 20) -> int | None:
+    """The first port above this one that nothing is listening on."""
+    for offset in range(1, tries + 1):
+        if port + offset > 65535:
+            break
+        if not taken(host, port + offset):
+            return port + offset
+    return None
+
+
+def busy(root: pathlib.Path, host: str, port: int,
+         command: str) -> str | None:
+    """Why this address cannot be served on, and what to do about it, or None.
+
+    Asked before anything is claimed. Left to uvicorn it is a line of errno
+    with the word bind in it, arriving after the foreground preview has
+    already printed "preview on ..." for a preview that never started. Asking
+    first also lets the answer name what is there, which is nearly always
+    another CrossGlyph and most often this install's own: calling that
+    "something that is not CrossGlyph" sends a reader looking for a stranger's
+    server.
+    """
+    if not taken(host, port):
+        return None
+    where = (host, port)
+    spare = spare_port(host, port)
+    instead = (f"Serve one beside it with `crossglyph {command} --port "
+               f"{spare}`." if spare else
+               "Pass --port to serve on another port.")
+    if probe(host, port) is None:
+        return f"{stranger(where)}\n{instead}"
+    state = load(root)
+    tracked = state is not None and same_address((state.host, state.port),
+                                                 where)
+    ending = "crossglyph stop" if tracked else f"crossglyph stop --port {port}"
+    return (f"a preview is already running on {url(*where)}. Open that one, "
+            f"or stop it with `{ending}`.\n{instead}")
 
 
 def announce(said: str, where: str, pid: int, running: str,
@@ -497,9 +551,9 @@ def start(root: pathlib.Path, opts: argparse.Namespace) -> int:
         # rather than an error: say where it is and open it.
         return announce("preview already on", running, state.pid,
                         body["version"], opts.open_browser)
-    if taken(opts.host, opts.port):
-        print(f"something that is not CrossGlyph is listening on port "
-              f"{opts.port}.", file=sys.stderr)
+    held = busy(root, opts.host, opts.port, "start")
+    if held is not None:
+        print(held, file=sys.stderr)
         return 1
 
     where = url(opts.host, opts.port)

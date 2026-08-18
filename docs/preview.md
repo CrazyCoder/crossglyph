@@ -144,9 +144,11 @@ Between the two, `status` says so as well:
 ```
 
 Starting one that is already running is not an error: it says where it is and
-opens the browser, which is what you asked for. It refuses only when something
-that is not CrossGlyph holds the port, or when a preview is running on a
-different address than the one you named.
+opens the browser, which is what you asked for. It refuses when the port is
+held by anything else, and says which of the two it is, since a preview this
+install did not start and a stranger's server are answered differently. It also
+refuses while a preview it tracks is on an address other than the one you
+named.
 
 Stopping goes through the server rather than a signal, because Windows has
 neither a SIGTERM nor a console for a detached process to receive Ctrl+Break

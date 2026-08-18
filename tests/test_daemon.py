@@ -271,14 +271,11 @@ def test_a_held_port_is_answered_before_anything_is_claimed(tmp_path,
     """`crossglyph start` then a bare `crossglyph` is the way into this, and
     uvicorn's own answer is a line of errno printed after "preview on ..." has
     already gone out for a preview that never started."""
-    from crossglyph.preview import server
-
     daemon.save(tmp_path, a_state(port=8000))
     monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
-    monkeypatch.setattr(daemon, "probe",
-                        lambda host, port, **k: {"version": "0.1.2"})
+    answering(monkeypatch, {8000})
 
-    said = server._busy_address(tmp_path, "127.0.0.1", 8000)
+    said = daemon.busy(tmp_path, "127.0.0.1", 8000, "preview")
 
     assert said is not None
     assert "already running on http://127.0.0.1:8000" in said
@@ -291,12 +288,21 @@ def test_a_held_port_is_answered_before_anything_is_claimed(tmp_path,
 def test_a_preview_on_a_port_this_install_did_not_start_is_named_by_port(
         tmp_path, monkeypatch):
     monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8001)
-    monkeypatch.setattr(daemon, "probe",
-                        lambda host, port, **k: {"version": "0.1.2"})
+    answering(monkeypatch, {8001})
 
-    said = server_busy(tmp_path, 8001)
+    assert "`crossglyph stop --port 8001`" in \
+        daemon.busy(tmp_path, "127.0.0.1", 8001, "preview")
 
-    assert "`crossglyph stop --port 8001`" in said
+
+def test_the_command_that_could_not_serve_is_the_one_offered(tmp_path,
+                                                             monkeypatch):
+    """`start` says start and `preview` says preview: the suggestion is a line
+    to run, and the other one backgrounds itself or does not."""
+    monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
+    answering(monkeypatch, {8000})
+
+    assert "`crossglyph start --port 8001`" in \
+        daemon.busy(tmp_path, "127.0.0.1", 8000, "start")
 
 
 def test_something_else_on_the_port_is_said_to_be_something_else(tmp_path,
@@ -304,7 +310,7 @@ def test_something_else_on_the_port_is_said_to_be_something_else(tmp_path,
     monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
     monkeypatch.setattr(daemon, "probe", lambda host, port, **k: None)
 
-    said = server_busy(tmp_path, 8000)
+    said = daemon.busy(tmp_path, "127.0.0.1", 8000, "preview")
 
     assert "not CrossGlyph is listening" in said
     assert "crossglyph stop" not in said
@@ -312,13 +318,7 @@ def test_something_else_on_the_port_is_said_to_be_something_else(tmp_path,
 
 def test_a_free_port_is_not_answered_at_all(tmp_path, monkeypatch):
     monkeypatch.setattr(daemon, "taken", lambda host, port: False)
-    assert server_busy(tmp_path, 8000) is None
-
-
-def server_busy(root, port: int):
-    from crossglyph.preview import server
-
-    return server._busy_address(root, "127.0.0.1", port)
+    assert daemon.busy(tmp_path, "127.0.0.1", 8000, "preview") is None
 
 
 def test_the_suggested_port_is_one_nothing_holds(tmp_path, monkeypatch):
@@ -326,10 +326,45 @@ def test_the_suggested_port_is_one_nothing_holds(tmp_path, monkeypatch):
     machine running several of these."""
     monkeypatch.setattr(daemon, "taken",
                         lambda host, port: port in (8000, 8001, 8002))
-    monkeypatch.setattr(daemon, "probe",
-                        lambda host, port, **k: {"version": "0.1.2"})
+    answering(monkeypatch, {8000, 8001, 8002})
 
-    assert "--port 8003`" in server_busy(tmp_path, 8000)
+    assert "--port 8003`" in daemon.busy(tmp_path, "127.0.0.1", 8000,
+                                         "preview")
+
+
+def test_a_start_onto_an_untracked_preview_does_not_call_it_a_stranger(
+        tmp_path, capsys, monkeypatch):
+    """It is another CrossGlyph, and saying otherwise sends you looking for
+    somebody else's server on a port your own tool is holding."""
+    monkeypatch.setattr(daemon, "taken", lambda host, port: port == 8000)
+    answering(monkeypatch, {8000})
+    opts = daemon.parse(["--port", "8000", "--no-open"], "start")
+    daemon.settle(opts, None)
+
+    assert daemon.start(tmp_path, opts) == 1
+
+    said = capsys.readouterr().err
+    assert "a preview is already running on http://127.0.0.1:8000" in said
+    assert "`crossglyph stop --port 8000`" in said
+    assert "not CrossGlyph" not in said
+
+
+def test_the_address_a_preview_answers_on_is_the_one_it_was_started_on(
+        tmp_path, monkeypatch):
+    """A start on 0.0.0.0 is the preview answering on the loopback, so
+    stopping it by the address it answers on forgets the state naming it."""
+    assert daemon.same_address(("0.0.0.0", 8000), ("127.0.0.1", 8000))
+    assert not daemon.same_address(("192.0.2.1", 8000), ("127.0.0.1", 8000))
+
+    running = {8000}
+    answering(monkeypatch, running)
+    monkeypatch.setattr(daemon, "ask",
+                        lambda where, **k: (running.clear(), {"ok": True})[1])
+    daemon.save(tmp_path, a_state(host="0.0.0.0", port=8000))
+
+    assert daemon.stop(tmp_path, host="127.0.0.1", port=8000) == 0
+
+    assert daemon.load(tmp_path) is None
 
 
 def test_the_foreground_preview_says_what_its_port_defaults_to(capsys):
