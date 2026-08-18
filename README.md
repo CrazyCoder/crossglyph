@@ -27,6 +27,10 @@ the point size.
 - eight page controls, so the page you judge is set up like the device you are
   judging for: margin, alignment, line spacing, hyphenation and the language
   its patterns come from, paragraph spacing, anti-aliasing and night mode
+- the page inside the reader itself, rendered from XTEINK's own models, at one
+  screen pixel to one of your monitor's with neither the page nor the body
+  resampled, shaded to the cast measured off a real device and adjustable from
+  there, and copied out as an image in one press
 - variable fonts build at the weight their designer named, or at any weight you
   pick: left alone, Merriweather would ship its Light as your Regular
 - four sizes of a four-style family, 795 glyphs each with kerning, built in

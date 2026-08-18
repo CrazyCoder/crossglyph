@@ -243,7 +243,10 @@ rounded corners.
 **Scale** has four meanings:
 
 - **1:1 pixels** maps one reader pixel to one physical monitor pixel, accounting
-  for the browser's device pixel ratio. It does not resample the screen.
+  for the browser's device pixel ratio. Nothing is resampled, the body included:
+  each device ships a second render of its frame whose screen opening is the
+  panel's own size, and this scale draws that one at its own pixels. The other
+  scales take the taller render, which has the resolution they ask for.
 - **Device size** uses the reader body's documented dimensions at 100%.
 - **Fit** scales the selected body or bare screen into the available window.
 - **Custom** applies 50% to 150% of the documented device size. It shows a
@@ -293,6 +296,11 @@ viewing setting, and the copy below is the one thing that takes them with it.
 The button beside the frame toggle copies the preview to the clipboard as a
 PNG. Hold Shift and it downloads instead, and the icon changes while the key is
 held so the press says which it will do.
+
+Copying is a browser feature that only works on a secure page, which means
+`localhost` or https. A preview reached over plain http at some other address,
+as `--host 0.0.0.0` serves, says so when you press it and leaves you the Shift
+half, which has no such condition.
 
 What you get follows the frame toggle: the reader body around the page when the
 frame is shown, the page alone at the panel's own size when it is not. Either
