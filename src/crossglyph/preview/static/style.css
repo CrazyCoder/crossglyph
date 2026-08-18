@@ -771,6 +771,9 @@
     color: var(--muted); font-size: 10px; letter-spacing: 0;
   }
   .device-number .stepper { min-width: 0; }
+  /* Filter definitions only. Out of flow so a zero-sized inline SVG cannot
+     leave a line box at the foot of the page. */
+  #tint-filter { position: absolute; width: 0; height: 0; }
   #device-calibration {
     display: grid; grid-template-columns: minmax(0, 1fr);
     border-top: 1px solid var(--rule); margin-top: .35rem;

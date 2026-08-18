@@ -692,6 +692,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     name: "device-calibration-range", type: "number", value: "100",
     min: "50", max: "150", step: ".5",
   }));
+  const deviceWarm = deviceControl(makeControl({
+    name: "device-warm", type: "number", value: "3",
+    min: "-12", max: "12", step: ".5",
+  }));
+  const deviceTint = deviceControl(makeControl({
+    name: "device-tint", type: "number", value: "2.5",
+    min: "-8", max: "8", step: ".5",
+  }));
   const deviceSlider = (id, field) => ({
     id, dataset: {sliderFor: field.id}, value: field.value,
     min: field.min, max: field.max, step: field.step,
@@ -702,7 +710,17 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const deviceInkSlider = deviceSlider("device-ink-slider", deviceInk);
   const deviceCalibrationSlider =
     deviceSlider("device-calibration-slider", deviceCalibration);
-  const deviceStepList = [devicePaper, deviceInk, deviceCalibration]
+  const deviceWarmSlider = deviceSlider("device-warm-slider", deviceWarm);
+  const deviceTintSlider = deviceSlider("device-tint-slider", deviceTint);
+  // The three channel transfer functions of the frame's tint filter. Only
+  // their attributes matter: the page reads nothing back off them.
+  const tintFuncs = Object.fromEntries(["r", "g", "b"].map(channel =>
+    [`frame-tint-${channel}`, {
+      attrs: {},
+      setAttribute(key, value) { this.attrs[key] = value; },
+    }]));
+  const deviceStepList = [devicePaper, deviceInk, deviceCalibration,
+                          deviceWarm, deviceTint]
     .flatMap(field => [-1, 1].map(direction => ({
       dataset: {for: field.id, dir: String(direction)},
       on: {},
@@ -817,6 +835,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-calibration": {hidden: true},
     "device-calibration-range": deviceCalibration,
     "device-calibration-slider": deviceCalibrationSlider,
+    "device-warm": deviceWarm,
+    "device-warm-slider": deviceWarmSlider,
+    "device-tint": deviceTint,
+    "device-tint-slider": deviceTintSlider,
+    ...tintFuncs,
     "device-ruler": makeElement(),
     "reset-device": deviceReset,
     knobs: form,
@@ -1206,6 +1229,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              canvas: deviceCanvas, frameImage: deviceFrameImage,
              paperSlider: devicePaperSlider, inkSlider: deviceInkSlider,
              calibrationSlider: deviceCalibrationSlider,
+             warm: deviceWarm, tint: deviceTint,
+             warmSlider: deviceWarmSlider, tintSlider: deviceTintSlider,
+             tintFuncs,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -4831,11 +4857,14 @@ for (const deferred of [
         env.device.scale.value === "pixels" &&
         env.device.calibrationBox.hidden &&
         env.device.paper.value === "90" && env.device.ink.value === "90" &&
-        env.device.calibration.value === "100");
+        env.device.calibration.value === "100" &&
+        env.device.warm.value === "3" && env.device.tint.value === "2.5");
   check("reset keeps numeric fields and sliders together",
         env.device.paperSlider.value === "90" &&
         env.device.inkSlider.value === "90" &&
-        env.device.calibrationSlider.value === "100");
+        env.device.calibrationSlider.value === "100" &&
+        env.device.warmSlider.value === "3" &&
+        env.device.tintSlider.value === "2.5");
   // The endpoints carry the tint measured off the device: red above blue with
   // green highest, a warm greenish white rather than the cool one this used to
   // assert. fb2xt's frame renderer applies the same constant to the frames.
@@ -4845,6 +4874,69 @@ for (const deferred of [
         env.device.canvas.pixels.join());
   check("reset device preview removes its saved state",
         !("crossglyph.device" in storage.data));
+}
+
+// The warm and tint knobs. They span the cast's chromatic plane and nothing
+// else, so the pair they ship at has to land on the constant the frames were
+// rendered with, and zero on both has to be a true neutral.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  // Shipped is the calibrated frame itself: no filter over the image at all,
+  // which is the only way the default stays the pixels the render produced.
+  check("the shipped cast leaves the frame image unfiltered",
+        env.device.frameImage.style.filter === "",
+        String(env.device.frameImage.style.filter));
+
+  env.device.warm.value = "0";
+  env.device.edit(env.device.warm);
+  env.device.tint.value = "0";
+  env.device.edit(env.device.tint);
+  await settle();
+  // 90 percent paper is level 230, and neutral makes that #e6e6e6 exactly --
+  // the interface's own --stage grey, which is the point of being able to
+  // reach zero. Ink 90 is level 26.
+  check("zero on both knobs paints a neutral grey page",
+        env.device.canvas.pixels.slice(0, 3).join() === "26,26,26" &&
+        env.device.canvas.pixels.slice(-4, -1).join() === "230,230,230",
+        env.device.canvas.pixels.join());
+  check("and hands the frame the difference from what it was baked with",
+        env.device.frameImage.style.filter === "url(#frame-tint)" &&
+        // -(2/3, 5/3, -7/3) over 255: red down a little, green more, blue up.
+        Math.abs(Number(env.device.tintFuncs["frame-tint-r"].attrs.intercept) +
+                 2 / 3 / 255) < 1e-12 &&
+        Math.abs(Number(env.device.tintFuncs["frame-tint-g"].attrs.intercept) +
+                 5 / 3 / 255) < 1e-12 &&
+        Math.abs(Number(env.device.tintFuncs["frame-tint-b"].attrs.intercept) -
+                 7 / 3 / 255) < 1e-12,
+        JSON.stringify([env.device.frameImage.style.filter,
+                        env.device.tintFuncs["frame-tint-r"].attrs,
+                        env.device.tintFuncs["frame-tint-g"].attrs,
+                        env.device.tintFuncs["frame-tint-b"].attrs]));
+
+  // Warm is the red-blue separation and moves nothing else: green sits where
+  // tint alone puts it, whatever warm is doing.
+  env.device.warm.value = "12";
+  env.device.edit(env.device.warm);
+  await settle();
+  const paper = env.device.canvas.pixels.slice(-4, -1);
+  check("warm parts red from blue and leaves green where it was",
+        paper[0] === 236 && paper[1] === 230 && paper[2] === 224,
+        paper.join());
+
+  check("the knobs are saved with the rest of the device panel",
+        JSON.parse(storage.data["crossglyph.device"]).warm === "12" &&
+        JSON.parse(storage.data["crossglyph.device"]).tint === "0",
+        storage.data["crossglyph.device"]);
+
+  const back = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("and come back on the next load",
+        back.device.warm.value === "12" && back.device.tint.value === "0" &&
+        back.device.warmSlider.value === "12" &&
+        back.device.tintSlider.value === "0",
+        `${back.device.warm.value}/${back.device.tint.value}`);
 }
 
 // The decoded bitmaps are the only page state the pipeline holds, so their

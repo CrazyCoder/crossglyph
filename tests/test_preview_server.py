@@ -1165,6 +1165,8 @@ def test_device_numeric_controls_use_the_shared_stepper():
         "device-paper": ("50", "100"),
         "device-ink": ("50", "100"),
         "device-calibration-range": ("50", "150"),
+        "device-warm": ("-12", "12"),
+        "device-tint": ("-8", "8"),
     }
     for control, (minimum, maximum) in controls.items():
         assert f'data-slider-for="{control}"' in html
@@ -1178,6 +1180,42 @@ def test_device_numeric_controls_use_the_shared_stepper():
 
     assert '<option value="custom">custom</option>' in html
     assert 'id="device-calibrate"' not in html
+
+
+def test_the_device_panel_reads_top_to_bottom():
+    """Custom scale belongs under the dropdown that turns it on, not below the
+    two tone rows that have nothing to do with it. Warm and tint come after
+    paper and ink, in a block of their own so the rule between them is the one
+    .device-tones already draws.
+    """
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    order = [html.index(mark) for mark in (
+        'id="device-scale"', 'id="device-calibration"',
+        'id="device-paper"', 'id="device-ink"',
+        'id="device-warm"', 'id="device-tint"')]
+    assert order == sorted(order), order
+    assert html.count('<div class="device-tones">') == 2
+
+
+def test_the_frame_tint_filter_is_declared_in_display_levels():
+    """The knobs hand the frame an offset in levels, so the filter has to work
+    in the space those levels are in. A filter interpolates in linear light
+    unless it is told otherwise, which would bend every offset by the transfer
+    curve and turn a two-level shift into something else entirely.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    filt = re.search(r'<filter id="frame-tint".*?</filter>', html, re.S)
+    assert filt is not None
+    assert 'color-interpolation-filters="sRGB"' in filt.group()
+    for channel in "rgb":
+        assert f'id="frame-tint-{channel}"' in filt.group(), channel
+        assert filt.group().count('type="linear"') == 3
 
 
 def test_a_checkbox_knob_is_marked_rather_than_given_an_arrow():

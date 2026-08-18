@@ -14,6 +14,12 @@ const paper = document.getElementById("device-paper");
 const paperSlider = document.getElementById("device-paper-slider");
 const ink = document.getElementById("device-ink");
 const inkSlider = document.getElementById("device-ink-slider");
+const warm = document.getElementById("device-warm");
+const warmSlider = document.getElementById("device-warm-slider");
+const tint = document.getElementById("device-tint");
+const tintSlider = document.getElementById("device-tint-slider");
+const tintFuncs = ["r", "g", "b"].map(
+  channel => document.getElementById(`frame-tint-${channel}`));
 const calibration = document.getElementById("device-calibration");
 const calibrationRange = document.getElementById("device-calibration-range");
 const calibrationSlider = document.getElementById("device-calibration-slider");
@@ -145,6 +151,7 @@ export function layoutDevice() {
   frame.style.width = `${device.frame.width * factor}px`;
   frame.style.height = `${device.frame.height * factor}px`;
   surface.style.transform = "";
+  syncFrameTint();
   alignPixelGrid();
   syncPreviewColumns();
 }
@@ -164,10 +171,59 @@ function tone(value, low, high) {
 // patch balanced against paper at its own height: the body reads a cast of
 // (+0.7, +1.8, -2.4) and its e-ink panel (+1.0, +1.3, -2.4). Body and paper are
 // the same hue, so one transform serves both, and the rendered device frames
-// carry this same constant.
+// carry this same constant baked in.
+//
+// The two knobs are that cast's chromatic plane and nothing else: warm is how
+// far red sits above blue, tint how far green sits above their mean. What they
+// cannot express is a change in level, which is the point -- paper and ink own
+// that, and an offset carrying a lightness term would let these fight them.
+// Each channel triple sums to zero for the same reason.
+//
+// Nor is two a loss of reach: an offset triple has three degrees of freedom and
+// one of them is lightness, so this covers every hue those three can reach. The
+// shipped pair reproduces the measured (+1, +2, -2) exactly at every level from
+// 0 to 255 once rounded, which is what keeps zero on both a true neutral grey
+// and the default the calibrated one.
+const WARM_CAST = 3, TINT_CAST = 2.5;
+
+function castFor(warmth, greenness) {
+  return [warmth / 2 - greenness / 3, greenness * 2 / 3,
+          -warmth / 2 - greenness / 3];
+}
+
+// What fb2xt's frame renderer baked into every frame PNG. Computed from the
+// constants above rather than written out again, so syncFrameTint can compare
+// against it exactly: same expression and same inputs give the same doubles,
+// and the shipped position is the one case that must come out as no filter.
+const BAKED = castFor(WARM_CAST, TINT_CAST);
+
+function cast() {
+  return castFor(numberOf(warm), numberOf(tint));
+}
+
 function rgb(level) {
-  return [Math.min(255, level + 1), Math.min(255, level + 2),
-          Math.max(0, level - 2)];
+  return cast().map(offset =>
+    Math.max(0, Math.min(255, Math.round(level + offset))));
+}
+
+// The frames already carry BAKED, so only the difference is applied, and at the
+// shipped values there is none: no filter at all, and the image draws as the
+// exact pixels the render was calibrated to. A black body is tinted along with
+// a white one. At level 13 it is barely visible, but skipping it would be a
+// branch that buys nothing.
+//
+// Pixels that clipped at 255 when the cast was baked cannot be walked back
+// exactly, so a few specular highlights keep a trace of it. The renderer's own
+// guard holds those under 2% of the body.
+function syncFrameTint() {
+  const offsets = cast();
+  const changed = offsets.some((offset, channel) => offset !== BAKED[channel]);
+  frame.style.filter = changed ? "url(#frame-tint)" : "";
+  if (!changed) return;
+  for (const [channel, func] of tintFuncs.entries()) {
+    func.setAttribute("intercept",
+                      String((offsets[channel] - BAKED[channel]) / 255));
+  }
 }
 
 //: The decoded page the canvas draws, replaced whole by each render. A bitmap
@@ -215,7 +271,9 @@ export function showRenderedPage(bitmap) {
 }
 
 function syncNumericControls() {
-  for (const field of [paper, ink, calibrationRange]) showSlider(field);
+  for (const field of [paper, ink, warm, tint, calibrationRange]) {
+    showSlider(field);
+  }
   calibration.hidden = scale.value !== "custom";
   ruler.style.width = `${100 * CSS_PIXELS_PER_MM *
     Number(calibrationRange.value) / 100}px`;
@@ -225,6 +283,7 @@ function values() {
   const state = {
     device: model.value, frame: frameShown.checked, scale: scale.value,
     paper: paper.value, ink: ink.value, calibration: calibrationRange.value,
+    warm: warm.value, tint: tint.value,
   };
   if (fixedColor) state.color = color.value;
   return state;
@@ -269,7 +328,8 @@ export function loadDevice() {
       if (validOption(scale, saved.scale)) scale.value = saved.scale;
       if (typeof saved.frame === "boolean") frameShown.checked = saved.frame;
       for (const [control, value] of [[paper, saved.paper], [ink, saved.ink],
-                                      [calibrationRange, saved.calibration]]) {
+                                      [calibrationRange, saved.calibration],
+                                      [warm, saved.warm], [tint, saved.tint]]) {
         const number = Number(value);
         if (Number.isFinite(number) && number >= Number(control.min) &&
             number <= Number(control.max)) control.value = String(number);
@@ -328,8 +388,16 @@ export function wireDevice(scheduleRender) {
     saveDevice();
     paintDevicePage();
   };
+  // The cast reaches the frame as well as the page, and the frame is not
+  // repainted -- it is one image with a filter over it.
+  const castChanged = () => {
+    toneChanged();
+    syncFrameTint();
+  };
   wireNumber(paper, paperSlider, toneChanged);
   wireNumber(ink, inkSlider, toneChanged);
+  wireNumber(warm, warmSlider, castChanged);
+  wireNumber(tint, tintSlider, castChanged);
   wireNumber(calibrationRange, calibrationSlider, () => {
     syncNumericControls();
     saveDevice();

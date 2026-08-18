@@ -240,10 +240,6 @@ white. That choice is remembered independently from the page appearance. The
 reader icon removes the body while keeping the selected screen proportions and
 rounded corners.
 
-**Paper** and **Ink** remap the panel's four levels without rebuilding the
-font. Both run from 50% to 100% in the direction their labels imply: more paper
-is lighter, and more ink is darker. Both default to 90%.
-
 **Scale** has four meanings:
 
 - **1:1 pixels** maps one reader pixel to one physical monitor pixel, accounting
@@ -255,9 +251,33 @@ is lighter, and more ink is darker. Both default to 90%.
   knobs. Hold a physical ruler against the line and adjust until they match.
   Repeat this after moving the window to a monitor with a different scale.
 
+**Paper** and **Ink** remap the panel's four levels without rebuilding the
+font. Both run from 50% to 100% in the direction their labels imply: more paper
+is lighter, and more ink is darker. Both default to 90%.
+
+**Warm** and **Tint** shade those levels to match the display you are reading
+on. The device is not neutral: photographed on white paper in shade, its body
+and panel both read a faint warm green, and the preview ships carrying it.
+Whether that constant is right for your monitor and your room is not something
+this end can know, so it is a pair of knobs rather than a fact.
+
+Warm is how far red sits above blue, tint how far green sits above the mean of
+the two, both in display levels. Neither can change the level itself, which is
+why there are two and not three: that third degree of freedom is lightness, and
+paper and ink already own it. They ship at 3 and 2.5, which is the measured
+cast to the level. Zero on both is a true neutral grey, and at 90% paper that
+is `#e6e6e6`, the same grey the interface around it is built from.
+
+The frame follows the page, since the body and the paper it surrounds are the
+same hue and have to stay it. That shows on a white body and barely registers
+on a black one, whose level is 13, but it is the same shift either way.
+
 These choices and the tone values are remembered in this browser. **Reset
-device preview** restores the X4 frame, 1:1 pixels and 90% tones. It does not
-change the font or its saved config.
+device preview** restores the X4 frame, 1:1 pixels, 90% tones and the measured
+cast. It does not change the font or its saved config.
+
+The knobs are for looking. Neither the exported PNG nor anything written to a
+`.conf` carries them.
 
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that

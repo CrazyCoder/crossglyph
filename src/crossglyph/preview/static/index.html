@@ -403,7 +403,11 @@
           and does not resample the page. Device size uses the reader body's
           documented dimensions. Custom shows a 100 mm ruler and applies its
           percentage to that size. Fit is for narrow windows. Paper and ink
-          remap the four display levels without rerendering the font.</span></span>
+          remap the four display levels without rerendering the font. Warm and
+          tint shade the result to match your own display: warm is how far red
+          sits above blue, tint how far green sits above their mean, and zero
+          on both is a neutral grey. They ship at the cast measured off the
+          device, and they carry the frame of a white body with them.</span></span>
       </h2>
       <div class="fold-quick">
         <label class="fold-field" for="device-model"><span>device</span>
@@ -446,6 +450,32 @@
           </select>
         </div>
       </div>
+      <div id="device-calibration" hidden>
+        <div class="device-ruler-scroll">
+          <div id="device-ruler" title="Adjust until this line measures 100 mm">
+            <span>100 mm</span>
+          </div>
+        </div>
+        <div class="device-number">
+          <label class="name" for="device-calibration-range">scale <span class="unit">%</span></label>
+          <input id="device-calibration-slider" type="range"
+                 data-slider-for="device-calibration-range"
+                 min="50" max="150" step=".5" value="100"
+                 tabindex="-1" aria-hidden="true">
+          <span class="stepper">
+            <button type="button" class="step mono"
+                    data-for="device-calibration-range" data-dir="-1"
+                    aria-label="decrease custom scale">−</button>
+            <input class="mono" id="device-calibration-range" type="number"
+                   min="50" max="150" step=".5" value="100"
+                   inputmode="decimal" data-device-setting
+                   aria-label="custom device scale percent">
+            <button type="button" class="step mono"
+                    data-for="device-calibration-range" data-dir="1"
+                    aria-label="increase custom scale">+</button>
+          </span>
+        </div>
+      </div>
       <div class="device-tones">
         <div class="device-number">
           <label class="name" for="device-paper">paper <span class="unit">%</span></label>
@@ -478,29 +508,37 @@
           </span>
         </div>
       </div>
-      <div id="device-calibration" hidden>
-        <div class="device-ruler-scroll">
-          <div id="device-ruler" title="Adjust until this line measures 100 mm">
-            <span>100 mm</span>
-          </div>
+      <div class="device-tones">
+        <div class="device-number">
+          <label class="name" for="device-warm">warm</label>
+          <input id="device-warm-slider" type="range"
+                 data-slider-for="device-warm" min="-12" max="12" step=".5"
+                 value="3" tabindex="-1" aria-hidden="true">
+          <span class="stepper">
+            <button type="button" class="step mono" data-for="device-warm"
+                    data-dir="-1" aria-label="decrease warm">−</button>
+            <input class="mono" id="device-warm" type="number"
+                   min="-12" max="12" step=".5" value="3" inputmode="decimal"
+                   data-device-setting
+                   aria-label="warm, red above blue in display levels">
+            <button type="button" class="step mono" data-for="device-warm"
+                    data-dir="1" aria-label="increase warm">+</button>
+          </span>
         </div>
         <div class="device-number">
-          <label class="name" for="device-calibration-range">scale <span class="unit">%</span></label>
-          <input id="device-calibration-slider" type="range"
-                 data-slider-for="device-calibration-range"
-                 min="50" max="150" step=".5" value="100"
-                 tabindex="-1" aria-hidden="true">
+          <label class="name" for="device-tint">tint</label>
+          <input id="device-tint-slider" type="range"
+                 data-slider-for="device-tint" min="-8" max="8" step=".5"
+                 value="2.5" tabindex="-1" aria-hidden="true">
           <span class="stepper">
-            <button type="button" class="step mono"
-                    data-for="device-calibration-range" data-dir="-1"
-                    aria-label="decrease custom scale">−</button>
-            <input class="mono" id="device-calibration-range" type="number"
-                   min="50" max="150" step=".5" value="100"
-                   inputmode="decimal" data-device-setting
-                   aria-label="custom device scale percent">
-            <button type="button" class="step mono"
-                    data-for="device-calibration-range" data-dir="1"
-                    aria-label="increase custom scale">+</button>
+            <button type="button" class="step mono" data-for="device-tint"
+                    data-dir="-1" aria-label="decrease tint">−</button>
+            <input class="mono" id="device-tint" type="number"
+                   min="-8" max="8" step=".5" value="2.5" inputmode="decimal"
+                   data-device-setting
+                   aria-label="tint, green above red and blue in display levels">
+            <button type="button" class="step mono" data-for="device-tint"
+                    data-dir="1" aria-label="increase tint">+</button>
           </span>
         </div>
       </div>
@@ -910,5 +948,21 @@
   </div>
 </div>
 </div><!-- #exportcol: the card above and the foot above that -->
+
+<!-- The frame PNGs carry the measured cast baked in, so the warm and tint knobs
+     apply what they ask for minus what is already there. At the shipped values
+     that difference is zero and device.js takes the filter off the image
+     entirely, which is what keeps the default the exact pixels the render was
+     calibrated to. sRGB because a filter interpolates in linear light by
+     default and these offsets are in display levels. -->
+<svg id="tint-filter" width="0" height="0" aria-hidden="true" focusable="false">
+  <filter id="frame-tint" color-interpolation-filters="sRGB">
+    <feComponentTransfer>
+      <feFuncR id="frame-tint-r" type="linear" slope="1" intercept="0"/>
+      <feFuncG id="frame-tint-g" type="linear" slope="1" intercept="0"/>
+      <feFuncB id="frame-tint-b" type="linear" slope="1" intercept="0"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
 
 <script type="module" src="js/app.js"></script>
