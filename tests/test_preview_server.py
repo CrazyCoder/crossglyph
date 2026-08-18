@@ -1193,12 +1193,28 @@ def test_device_numeric_controls_use_the_shared_stepper():
     assert 'id="device-calibrate"' not in html
 
 
-def test_only_the_tone_knobs_carry_a_reset_arrow():
-    """Scale is a dropdown already showing every value it has, and the custom
-    scale is a measurement taken against a physical ruler: a one-click reset
-    with nothing to undo it is not the way to lose that. The four that remain
-    are the ones whose default is a number you would otherwise have to
-    remember and retype.
+def test_the_ruler_is_cut_off_rather_than_scrolled():
+    """The line is measured from its left tick outwards, so the far end is not
+    somewhere you go looking. A scrollbar would take a row of the panel and move
+    the line while it was being read against a physical ruler.
+
+    Two files have to agree on the class for the clipping to happen at all, and
+    renaming it in one of them would silently bring the scrollbar back.
+    """
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    css = (server.STATIC / "style.css").read_text(encoding="utf-8")
+    assert 'class="device-ruler-clip"' in html
+    rule = css[css.index(".device-ruler-clip {"):]
+    rule = rule[:rule.index("}")]
+    assert "overflow: hidden" in rule, rule
+
+
+def test_every_numeric_device_knob_carries_a_reset_arrow():
+    """Each of these has a default that is a number you would otherwise have to
+    remember and retype. Scale is the one control without an arrow: it is a
+    dropdown already showing every value it has.
     """
     import re
 
@@ -1207,7 +1223,7 @@ def test_only_the_tone_knobs_carry_a_reset_arrow():
     html = (server.STATIC / "index.html").read_text(encoding="utf-8")
     carried = set(re.findall(r'data-device-reset="([^"]+)"', html))
     assert carried == {"device-paper", "device-ink", "device-warm",
-                       "device-tint"}, carried
+                       "device-tint", "device-calibration-range"}, carried
     # Hidden until the value differs, which is the page's job to decide.
     for control in sorted(carried):
         arrow = re.search(

@@ -781,11 +781,9 @@
     border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;
   }
   /* Four columns, the last of them the reset arrow's, the way .row.num is laid
-     out. The column stays whether or not an arrow is in it, so a value
-     returning to its default does not shift the row it is in -- and the
-     custom-scale row, which carries no arrow at all, leaves it empty rather
-     than spanning it, so every stepper in the panel starts and ends in the
-     same place. */
+     out. The column stays whether or not an arrow is showing in it, so a value
+     returning to its default does not shift the row it is in, and every
+     stepper in the panel starts and ends in the same place. */
   .device-number {
     display: grid;
     grid-template-columns: 4.8rem minmax(4rem, 1fr) 7.6rem 1.5rem;
@@ -803,7 +801,11 @@
     border-top: 1px solid var(--rule); margin-top: .35rem;
     padding-top: .55rem;
   }
-  .device-ruler-scroll { overflow-x: auto; padding-top: .25rem; }
+  /* Cut off rather than scrolled. The ruler is held a physical one against, so
+     it is measured from its left tick outwards and the far end is not somewhere
+     you go looking: a scrollbar under it would only take a row of the panel and
+     move the line while you were reading it. */
+  .device-ruler-clip { overflow: hidden; padding-top: .25rem; }
   #device-calibration .device-number { margin-top: .4rem; }
   #device-ruler {
     position: relative; margin: 0 auto;

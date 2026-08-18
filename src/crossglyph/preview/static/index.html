@@ -468,7 +468,7 @@
         </div>
       </div>
       <div id="device-calibration" hidden>
-        <div class="device-ruler-scroll">
+        <div class="device-ruler-clip">
           <div id="device-ruler" title="Adjust until this line measures 100 mm">
             <span>100 mm</span>
           </div>
@@ -491,6 +491,9 @@
                     data-for="device-calibration-range" data-dir="1"
                     aria-label="increase custom scale">+</button>
           </span>
+          <button type="button" class="revert"
+                  data-device-reset="device-calibration-range"
+                  aria-label="reset custom scale" hidden>&#8634;</button>
         </div>
       </div>
       <div class="device-tones">

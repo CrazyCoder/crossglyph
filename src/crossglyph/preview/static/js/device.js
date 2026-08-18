@@ -499,11 +499,10 @@ function resetsFor(field) {
 }
 
 // Which knobs carry an arrow is the markup's to say, and it says it by putting
-// one there: scale has none, being a dropdown that already shows every value it
-// has, and neither has the custom scale, which is a ruler measurement worth
-// more than one click. Asking the page rather than keeping a list beside it is
-// what stops an arrow being added to a row and never lit, since the wiring in
-// wireNumber already finds them this way.
+// one there: every number does, and scale does not, being a dropdown that
+// already shows every value it has. Asking the page rather than keeping a list
+// beside it is what stops an arrow being added to a row and never lit, since
+// the wiring in wireNumber already finds them this way.
 //
 // One is offered only while its knob differs from what the markup declares, so
 // the column is empty on a panel nobody has touched.

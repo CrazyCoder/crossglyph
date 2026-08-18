@@ -275,14 +275,13 @@ The frame follows the page, since the body and the paper it surrounds are the
 same hue and have to stay it. That shows on a white body and barely registers
 on a black one, whose level is 13, but it is the same shift either way.
 
-Paper, ink, warm and tint each grow a small arrow while they sit away from what
-they ship at, and pressing it puts that one knob back. It is a plain reset,
-unlike the arrow in the tuning column, which sets your value aside so you can
-flick between the two: there is no config behind these, only the value the page
-declares, so there is no second value to hold on to. Scale has none, being a
-dropdown that already shows every value it has, and neither has the custom
-scale, which is a measurement taken against a physical ruler and worth more
-than one click.
+Paper, ink, warm, tint and the custom scale each grow a small arrow while they
+sit away from what they ship at, and pressing it puts that one knob back, the
+ruler with it. It is a plain reset, unlike the arrow in the tuning column, which
+sets your value aside so you can flick between the two: there is no config
+behind these, only the value the page declares, so there is no second value to
+hold on to. Scale is the one control without an arrow, being a dropdown that
+already shows every value it has.
 
 These choices and the tone values are remembered in this browser. **Reset
 device preview** restores all of them at once: the X4 frame, 1:1 pixels, 90%

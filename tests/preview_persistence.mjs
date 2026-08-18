@@ -725,10 +725,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       attrs: {},
       setAttribute(key, value) { this.attrs[key] = value; },
     }]));
-  // The per-knob reset arrow each tone row carries. Not every device control
-  // has one: scale is a dropdown and the custom scale is a ruler measurement.
+  // The per-knob reset arrow each numeric row carries. Scale is the one
+  // without: a dropdown showing every value it has needs no way back.
   const deviceResets = Object.fromEntries(
-    [devicePaper, deviceInk, deviceWarm, deviceTint].map(field => [
+    [devicePaper, deviceInk, deviceWarm, deviceTint,
+     deviceCalibration].map(field => [
       field.id,
       {hidden: true, title: "", on: {}, dataset: {deviceReset: field.id},
        addEventListener(kind, fn) { this.on[kind] = fn; },
@@ -5013,6 +5014,29 @@ for (const deferred of [
         env.device.tint.value === "2.5" &&
         env.device.resets["device-tint"].hidden === true,
         env.device.tint.value);
+
+  // The custom scale is a ruler measurement, so its arrow has the ruler to put
+  // back as well as the field.
+  env.device.scale.value = "custom";
+  env.device.change(env.device.scale);
+  env.device.calibration.value = "120";
+  env.device.edit(env.device.calibration);
+  await settle();
+  check("the custom scale offers one too",
+        env.device.resets["device-calibration-range"].hidden === false &&
+        env.device.resets["device-calibration-range"].title === "Reset to 100",
+        env.device.resets["device-calibration-range"].title);
+  env.device.resets["device-calibration-range"].press();
+  await settle();
+  check("pressing it takes the ruler back with the field",
+        env.device.calibration.value === "100" &&
+        env.device.calibrationSlider.value === "100" &&
+        Math.abs(parseFloat(env.device.ruler.style.width) - 100 * 96 / 25.4)
+          < .001 &&
+        env.device.resets["device-calibration-range"].hidden === true,
+        `${env.device.calibration.value} ${env.device.ruler.style.width}`);
+  env.device.scale.value = "pixels";
+  env.device.change(env.device.scale);
 
   // A value restored from the store is still a value off the default, so the
   // arrow has to be there on the next load rather than only after an edit.
