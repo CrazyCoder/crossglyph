@@ -395,12 +395,29 @@ function said(text, ok) {
   }, 1200);
 }
 
+function failed(error) {
+  said(String((error && error.message) || error), false);
+}
+
+// The clipboard is a secure-context API, and this preview is documented as
+// serving to a network on --host 0.0.0.0, where a plain http page has neither
+// navigator.clipboard nor ClipboardItem. Saying so beats a press that throws
+// and looks like nothing happened -- and the other half of the button still
+// works there, since an object URL needs no such thing.
+function canCopy() {
+  return typeof ClipboardItem === "function"
+         && typeof navigator.clipboard?.write === "function";
+}
+
 // The ClipboardItem takes the promise rather than an awaited blob: Safari wants
 // it built in the same turn as the press, and the encode is asynchronous.
-function copyDeviceImage() {
-  navigator.clipboard.write([new ClipboardItem({"image/png": deviceBlob()})])
-    .then(() => said("copied", true))
-    .catch(error => said(String(error && error.message || error), false));
+async function copyDeviceImage() {
+  if (!canCopy()) {
+    throw new Error("copying needs https or localhost, so hold Shift to save");
+  }
+  await navigator.clipboard.write(
+    [new ClipboardItem({"image/png": deviceBlob()})]);
+  said("copied", true);
 }
 
 async function downloadDeviceImage() {
@@ -593,9 +610,12 @@ export function wireDevice(scheduleRender) {
     layoutDevice();
   });
   reset.addEventListener("click", () => resetDevice(scheduleRender));
+  // Called inside the press rather than after an await, so the gesture is still
+  // the browser's reason for allowing a clipboard write. Both are async, so a
+  // throw either side of the first await arrives here as a rejection and the
+  // button says it, instead of going nowhere.
   copyButton.addEventListener("click", (event) => {
-    if (event.shiftKey) downloadDeviceImage();
-    else copyDeviceImage();
+    (event.shiftKey ? downloadDeviceImage() : copyDeviceImage()).catch(failed);
   });
   // Say what the press will do for as long as the key is held, the same way
   // Build says Rebuild.
