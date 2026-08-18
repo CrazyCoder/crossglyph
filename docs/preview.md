@@ -55,8 +55,7 @@ Starting a second preview on a port that is already held says what is there and
 what to do about it, rather than failing at the bind:
 
 ```
-a preview is already running on http://127.0.0.1:8000. Open that one, or stop
-it with `crossglyph stop`.
+a preview is already running on http://127.0.0.1:8000. Open that one, or stop it with `crossglyph stop`.
 Serve one beside it with `crossglyph preview --port 8001`.
 ```
 
@@ -82,27 +81,6 @@ one:
 and `--port` mean the same things. It waits for the page to answer before it
 says anything, so a start that failed says so here rather than opening a
 browser on nothing, and the reason is in `preview.log` beside the launcher.
-
-`stop` and `status` take `--host` and `--port` too, and there they name which
-preview to act on rather than where to serve. Without one they act on the
-preview this install started, which is the only one it keeps a note of. With
-one they act on whatever answers at that address, so a foreground
-`crossglyph preview`, or a second instance on another port, can be asked about
-and stopped like any other. A port on its own keeps the running preview's host.
-
-`status` on a preview that is not the tracked one says so, since a bare `stop`
-or `restart` will not touch it, and it has no start time or log to report:
-
-```
-preview on http://127.0.0.1:8123
-  pid 41290, crossglyph X.Y.Z
-  fonts /home/you/crossglyph/fonts
-  not the preview this install is tracking, so a bare stop or restart leaves
-  it alone
-```
-
-Naming a port nothing is serving says which port, and one held by something
-that is not CrossGlyph is left alone rather than killed.
 
 `status` asks the server rather than guessing from a process list, so what it
 reports is what is actually serving:
@@ -130,6 +108,27 @@ a preview on http://127.0.0.1:8000 (pid 41288) is not answering.
 
 `preview.log` is written unbuffered, so it can be read while the server is
 still up rather than filling in at the moment it exits.
+
+`stop` and `status` take `--host` and `--port` too, and there they name which
+preview to act on rather than where to serve. Without one they act on the
+preview this install started, which is the only one it keeps a note of. With
+one they act on whatever answers at that address, so a foreground
+`crossglyph preview`, or a second instance on another port, can be asked about
+and stopped like any other. A port on its own keeps the running preview's host.
+
+When what answers is not the tracked preview, the report says so, since a bare
+`stop` or `restart` will not touch it, and it has no start time or log of its
+own to report:
+
+```
+preview on http://127.0.0.1:8123
+  pid 41290, crossglyph X.Y.Z
+  fonts /home/you/crossglyph/fonts
+  not the preview this install is tracking, so a bare stop or restart leaves it alone
+```
+
+Naming a port nothing is serving says which port, and one held by something
+that is not CrossGlyph is left alone rather than killed.
 
 `restart` takes what it is not told from the start it replaces: bare, it comes
 back on the same address showing the same family, and `restart --port 9000`

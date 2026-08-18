@@ -434,17 +434,17 @@ def find(root: pathlib.Path, state: State | None, host: str | None,
     commands should be able to name, and neither leaves a state file to be
     found in.
     """
-    where = resolve(state, host, port)
-    if state is not None and same_address((state.host, state.port), where):
-        body = probe(*where)
+    address = resolve(state, host, port)
+    if state is not None and same_address((state.host, state.port), address):
+        body = probe(*address)
         if body is None and not alive(state.pid):
             clear(root)
             return None
-        return Found(*where, state.pid, body, state)
+        return Found(*address, state.pid, body, state)
     if host is None and port is None:
         return None
-    body = probe(*where)
-    return None if body is None else Found(*where, body.get("pid") or 0,
+    body = probe(*address)
+    return None if body is None else Found(*address, body.get("pid") or 0,
                                            body, None)
 
 
@@ -460,13 +460,13 @@ def forget(root: pathlib.Path, found: Found) -> None:
         clear(root)
 
 
-def stranger(where: tuple[str, int]) -> str:
+def stranger(address: tuple[str, int]) -> str:
     """A port held by a server that is not one of ours. Said the same way by
     everything that finds one, since it is the same fact each time."""
-    return f"something that is not CrossGlyph is listening on {url(*where)}."
+    return f"something that is not CrossGlyph is listening on {url(*address)}."
 
 
-def missing(where: tuple[str, int], named: bool) -> tuple[str, bool]:
+def missing(address: tuple[str, int], named: bool) -> tuple[str, bool]:
     """What to say about an address holding no preview of ours, and whether
     that is a complaint.
 
@@ -474,9 +474,9 @@ def missing(where: tuple[str, int], named: bool) -> tuple[str, bool]:
     else's server holds did not do what it was asked, and saying "no preview
     is running" would read as though there were nothing to explain.
     """
-    if named and taken(*where):
-        return stranger(where), True
-    return (f"no preview is running{f' on {url(*where)}' if named else ''}.",
+    if named and taken(*address):
+        return stranger(address), True
+    return (f"no preview is running{f' on {url(*address)}' if named else ''}.",
             False)
 
 
@@ -504,18 +504,18 @@ def busy(root: pathlib.Path, host: str, port: int,
     """
     if not taken(host, port):
         return None
-    where = (host, port)
+    address = (host, port)
     spare = spare_port(host, port)
     instead = (f"Serve one beside it with `crossglyph {command} --port "
                f"{spare}`." if spare else
                "Pass --port to serve on another port.")
     if probe(host, port) is None:
-        return f"{stranger(where)}\n{instead}"
+        return f"{stranger(address)}\n{instead}"
     state = load(root)
     tracked = state is not None and same_address((state.host, state.port),
-                                                 where)
+                                                 address)
     ending = "crossglyph stop" if tracked else f"crossglyph stop --port {port}"
-    return (f"a preview is already running on {url(*where)}. Open that one, "
+    return (f"a preview is already running on {url(*address)}. Open that one, "
             f"or stop it with `{ending}`.\n{instead}")
 
 
@@ -629,10 +629,10 @@ def stop(root: pathlib.Path, host: str | None = None,
     stopping something else must leave the running one nameable.
     """
     state = load(root)
-    where = resolve(state, host, port)
     found = find(root, state, host, port)
     if found is None:
-        said, wrong = missing(where, host is not None or port is not None)
+        said, wrong = missing(resolve(state, host, port),
+                              host is not None or port is not None)
         print(said, file=sys.stderr if wrong else sys.stdout)
         return 1 if wrong else 0
     if found.body is None:
@@ -677,10 +677,10 @@ def status(root: pathlib.Path, host: str | None = None,
     instance: neither writes a state file to be read here.
     """
     state = load(root)
-    where = resolve(state, host, port)
     found = find(root, state, host, port)
     if found is None:
-        print(missing(where, host is not None or port is not None)[0])
+        print(missing(resolve(state, host, port),
+                      host is not None or port is not None)[0])
         return 1
     if found.body is None:
         print(f"a preview on {found.where} (pid {found.pid}) is not "
@@ -754,11 +754,11 @@ def parse(argv: list[str], name: str) -> argparse.Namespace:
                 "--fonts and --size mean what they mean in `crossglyph "
                 "preview`." if launching else None))
     doing = "to serve on" if launching else "of the preview to act on"
-    where, which = ADDRESS_DEFAULT[name]
+    for_host, for_port = ADDRESS_DEFAULT[name]
     parser.add_argument("--host", default=None, metavar="ADDRESS",
-                        help=f"address {doing} (default: {where})")
+                        help=f"address {doing} (default: {for_host})")
     parser.add_argument("--port", type=int, default=None, metavar="PORT",
-                        help=f"port {doing} (default: {which})")
+                        help=f"port {doing} (default: {for_port})")
     if not launching:
         return parser.parse_args(argv)
     parser.add_argument("--no-open", dest="open_browser",

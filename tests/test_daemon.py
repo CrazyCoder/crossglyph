@@ -10,7 +10,7 @@ import urllib.request
 
 import pytest
 
-from crossglyph import daemon, render
+from crossglyph import cli, daemon, render
 
 needs_wasm = pytest.mark.skipif(
     not render.WASM_PATH.is_file(),
@@ -240,7 +240,7 @@ def test_a_pid_of_zero_is_never_signalled(monkeypatch):
 # --- what --help says -----------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ("start", "stop", "status", "restart"))
+@pytest.mark.parametrize("name", cli.SERVICE)
 def test_every_background_command_documents_its_address(name, capsys):
     with pytest.raises(SystemExit) as leaving:
         daemon.parse(["--help"], name)
@@ -330,6 +330,24 @@ def test_the_suggested_port_is_one_nothing_holds(tmp_path, monkeypatch):
 
     assert "--port 8003`" in daemon.busy(tmp_path, "127.0.0.1", 8000,
                                          "preview")
+
+
+def test_a_machine_with_no_free_port_still_says_what_to_do(tmp_path,
+                                                           monkeypatch):
+    """The offer is dropped rather than the whole answer: what is on the port
+    is still worth knowing when there is nowhere to put a second one."""
+    monkeypatch.setattr(daemon, "taken", lambda host, port: True)
+    monkeypatch.setattr(daemon, "probe", lambda host, port, **k: None)
+
+    said = daemon.busy(tmp_path, "127.0.0.1", 8000, "preview")
+
+    assert "not CrossGlyph is listening" in said
+    assert "Pass --port" in said
+
+
+def test_the_last_port_has_nothing_above_it():
+    """The search walks upwards, so 65535 is where it runs out."""
+    assert daemon.spare_port("127.0.0.1", 65535) is None
 
 
 def test_a_start_onto_an_untracked_preview_does_not_call_it_a_stranger(
