@@ -746,6 +746,24 @@
     fill: none; stroke: currentColor; stroke-width: 1.25;
     stroke-linecap: round; stroke-linejoin: round;
   }
+  .device-copy {
+    width: 1.55rem; height: 1.55rem; flex: none;
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--muted); background: var(--field);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  .device-copy:hover { color: var(--text); background: var(--hover); }
+  .device-copy:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+  /* A clipboard write leaves nothing to see, so the button says it did. */
+  .device-copy.done { color: var(--panel); background: var(--knob);
+                      border-color: var(--knob); }
+  .device-copy svg {
+    width: 14px; height: 14px; pointer-events: none;
+    fill: none; stroke: currentColor; stroke-width: 1.25;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
   .device-controls { padding: .15rem 0 .4rem; }
   .device-options {
     display: grid; grid-template-columns: auto minmax(5.5rem, 1fr);

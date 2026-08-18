@@ -25,6 +25,7 @@ const calibrationRange = document.getElementById("device-calibration-range");
 const calibrationSlider = document.getElementById("device-calibration-slider");
 const ruler = document.getElementById("device-ruler");
 const reset = document.getElementById("reset-device");
+const copyButton = document.getElementById("device-copy");
 
 const root = document.documentElement;
 
@@ -53,20 +54,47 @@ function syncPreviewColumns() {
 // any other shape lands the page on fractional device pixels: the glass is
 // 0.60304 against the panel's 0.6, which put 800 source rows into 796. The
 // overhang tucks under the frame, which draws above the page.
+// Each device is rendered twice, and the two are not interchangeable.
+//
+// `pixels` has an aperture the size of the panel itself, so 1:1 mode -- which
+// scales by native.width / aperture.width -- scales it by one and the frame
+// lands on whole device pixels at any pixel ratio. `scaled` is what every other
+// mode draws: fit caps the frame at 480 CSS px, which at a 3x pixel ratio wants
+// 1440 device pixels and would upscale the smaller frame by more than two.
+//
+// Both are rendered rather than resampled, so the smaller one keeps its edges
+// and its buttons: measured at the size 1:1 shows, its chin contrast is within
+// a few levels of what downsampling the tall one gives.
 export const DEVICES = {
   x4: {
     native: {width: 480, height: 800},
-    frame: {width: 1118, height: 1820},
-    aperture: {x: 117, y: 100, width: 873, height: 1455, radius: 16},
-    body: {x: 8, y: 8, width: 1091, height: 1804,
-           widthMm: 69.15, heightMm: 114.31},
+    scaled: {
+      frame: {width: 1118, height: 1820},
+      aperture: {x: 117, y: 100, width: 873, height: 1455, radius: 16},
+      body: {x: 8, y: 8, width: 1091, height: 1804,
+             widthMm: 69.15, heightMm: 114.31},
+    },
+    pixels: {
+      frame: {width: 612, height: 996},
+      aperture: {x: 63, y: 53, width: 480, height: 800, radius: 9},
+      body: {x: 4, y: 4, width: 598, height: 988,
+             widthMm: 69.15, heightMm: 114.31},
+    },
   },
   x3: {
     native: {width: 528, height: 792},
-    frame: {width: 1209, height: 1820},
-    aperture: {x: 130, y: 122, width: 948, height: 1422, radius: 16},
-    body: {x: 19, y: 19, width: 1171, height: 1793,
-           widthMm: 63.74, heightMm: 97.59},
+    scaled: {
+      frame: {width: 1209, height: 1820},
+      aperture: {x: 130, y: 122, width: 948, height: 1422, radius: 16},
+      body: {x: 19, y: 19, width: 1171, height: 1793,
+             widthMm: 63.74, heightMm: 97.59},
+    },
+    pixels: {
+      frame: {width: 671, height: 1011},
+      aperture: {x: 72, y: 67, width: 528, height: 792, radius: 9},
+      body: {x: 10, y: 10, width: 651, height: 997,
+             widthMm: 63.74, heightMm: 97.59},
+    },
   },
 };
 
@@ -77,8 +105,16 @@ const CSS_PIXELS_PER_MM = 96 / 25.4;
 const LEVELS = [0, 96, 200, 255];
 const LEVEL_RATIOS = [0, .329, .665, 1];
 
+// Which of the two renders this scale wants. Read live rather than stored, so
+// changing the scale swaps the frame, its geometry and its file together and
+// they cannot disagree about which one is on screen.
+function variant() {
+  return scale.value === "pixels" ? "pixels" : "scaled";
+}
+
 function profile() {
-  return DEVICES[model.value] || DEVICES.x4;
+  const device = DEVICES[model.value] || DEVICES.x4;
+  return {native: device.native, ...device[variant()]};
 }
 
 function dpr() {
@@ -86,7 +122,8 @@ function dpr() {
 }
 
 function frameUrl() {
-  return `device/${model.value}-${color.value}.png`;
+  const suffix = variant() === "pixels" ? "-1to1" : "";
+  return `device/${model.value}-${color.value}${suffix}.png`;
 }
 
 let fixedColor = false;
@@ -224,6 +261,132 @@ function syncFrameTint() {
     func.setAttribute("intercept",
                       String((offsets[channel] - BAKED[channel]) / 255));
   }
+}
+
+// --- the preview as a file ------------------------------------------------
+// Always built from the 1:1 render, whatever scale the page is showing. That
+// frame's aperture is the panel's own size, so the page goes in at its own
+// pixels and nothing on the way out is resampled -- where compositing into the
+// tall frame would stretch 480 columns of type across 873.
+function pixelProfile() {
+  const device = DEVICES[model.value] || DEVICES.x4;
+  return {native: device.native, ...device.pixels};
+}
+
+function pixelFrameUrl() {
+  return `device/${model.value}-${color.value}-1to1.png`;
+}
+
+// The frame's cast is a filter over the image, and drawImage does not carry CSS
+// filters, so the copy applies the same difference in pixels. Only where there
+// is something to see: the transparent surround has no colour to shift.
+function tintedFrame(image, width, height) {
+  const sheet = document.createElement("canvas");
+  sheet.width = width;
+  sheet.height = height;
+  const context = sheet.getContext("2d", {willReadFrequently: true});
+  context.drawImage(image, 0, 0, width, height);
+  const offsets = cast();
+  if (offsets.every((offset, channel) => offset === BAKED[channel])) return sheet;
+  const delta = offsets.map((offset, channel) => offset - BAKED[channel]);
+  const pixels = context.getImageData(0, 0, width, height);
+  const data = pixels.data;
+  for (let at = 0; at < data.length; at += 4) {
+    if (!data[at + 3]) continue;
+    for (let channel = 0; channel < 3; ++channel) {
+      data[at + channel] = Math.max(0, Math.min(255,
+        Math.round(data[at + channel] + delta[channel])));
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  return sheet;
+}
+
+async function decoded(url) {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
+// What sits behind the body, and in the corners the screen is rounded off with.
+//
+// Not transparency, which is what a canvas starts as and what an asset exported
+// from a drawing tool would carry. This is a picture of what is on screen, and
+// it is pasted into places that flatten an alpha channel to white -- where a
+// white device against white loses the edge these frames were re-rendered to
+// give it. The surround it already has is the page's, so the picture takes it
+// and follows the theme with it. The README screenshots are padded to the same
+// grey for the same reason.
+function stageColour() {
+  return getComputedStyle(root).getPropertyValue("--stage").trim() || "#e6e6e6";
+}
+
+// What the preview is showing, at the panel's own resolution: the body around
+// the page when the frame is on, the page alone when it is off. The frame
+// toggle is the whole of the choice, which is what it already means on screen.
+export async function deviceImage() {
+  const device = pixelProfile();
+  const sheet = document.createElement("canvas");
+  const framed = frameShown.checked;
+  sheet.width = framed ? device.frame.width : device.native.width;
+  sheet.height = framed ? device.frame.height : device.native.height;
+  const context = sheet.getContext("2d");
+  context.fillStyle = stageColour();
+  context.fillRect(0, 0, sheet.width, sheet.height);
+  if (!framed) {
+    // Rounded off the way the screen is shown, rather than a bare rectangle.
+    context.beginPath();
+    context.roundRect(0, 0, sheet.width, sheet.height, device.aperture.radius);
+    context.clip();
+    context.drawImage(canvas, 0, 0);
+    return sheet;
+  }
+  context.drawImage(canvas, device.aperture.x, device.aperture.y,
+                    device.aperture.width, device.aperture.height);
+  context.drawImage(
+    tintedFrame(await decoded(pixelFrameUrl()), sheet.width, sheet.height), 0, 0);
+  return sheet;
+}
+
+async function deviceBlob() {
+  const sheet = await deviceImage();
+  const blob = await new Promise(
+    resolve => sheet.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("the preview could not be encoded");
+  return blob;
+}
+
+function imageName() {
+  return `crossglyph-${model.value}`
+         + `${frameShown.checked ? `-${color.value}` : "-page"}.png`;
+}
+
+function said(button, text) {
+  button.classList.add("done");
+  const was = button.title;
+  button.title = text;
+  setTimeout(() => {
+    button.classList.remove("done");
+    button.title = was;
+  }, 1200);
+}
+
+// The ClipboardItem takes the promise rather than an awaited blob: Safari wants
+// it built in the same turn as the press, and the encode is asynchronous.
+function copyDeviceImage(button) {
+  navigator.clipboard.write([new ClipboardItem({"image/png": deviceBlob()})])
+    .then(() => said(button, "copied"))
+    .catch(error => { button.title = String(error && error.message || error); });
+}
+
+async function downloadDeviceImage(button) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(await deviceBlob());
+  link.download = imageName();
+  link.click();
+  URL.revokeObjectURL(link.href);
+  said(button, "saved");
 }
 
 //: The decoded page the canvas draws, replaced whole by each render. A bitmap
@@ -404,5 +567,24 @@ export function wireDevice(scheduleRender) {
     layoutDevice();
   });
   reset.addEventListener("click", () => resetDevice(scheduleRender));
+  copyButton.addEventListener("click", (event) => {
+    if (event.shiftKey) downloadDeviceImage(copyButton);
+    else copyDeviceImage(copyButton);
+  });
+  // Say what the press will do for as long as the key is held, the same way
+  // Build says Rebuild.
+  const showCopyState = (held) => {
+    copyButton.querySelector(".as-copy").hidden = held;
+    copyButton.querySelector(".as-download").hidden = !held;
+    copyButton.title = held
+      ? "Download the preview as an image. Let go of Shift to copy."
+      : "Copy the preview as an image. Hold Shift to download.";
+  };
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Shift") showCopyState(true);
+  });
+  document.addEventListener("keyup", (event) => {
+    if (event.key === "Shift") showCopyState(false);
+  });
   globalThis.addEventListener?.("resize", layoutDevice);
 }

@@ -276,8 +276,25 @@ These choices and the tone values are remembered in this browser. **Reset
 device preview** restores the X4 frame, 1:1 pixels, 90% tones and the measured
 cast. It does not change the font or its saved config.
 
-The knobs are for looking. Neither the exported PNG nor anything written to a
-`.conf` carries them.
+Nothing written to a `.conf` carries them, and neither does a build. They are a
+viewing setting, and the copy below is the one thing that takes them with it.
+
+### Copying the preview
+
+The button beside the frame toggle copies the preview to the clipboard as a
+PNG. Hold Shift and it downloads instead, and the icon changes while the key is
+held so the press says which it will do.
+
+What you get follows the frame toggle: the reader body around the page when the
+frame is shown, the page alone at the panel's own size when it is not. Either
+way it is built at the panel's resolution, so the type is exactly the pixels the
+device would draw, whatever scale the page is set to. The X4 gives 612 by 996
+framed and 480 by 800 bare, the X3 671 by 1011 and 528 by 792.
+
+The background is the page's own surround rather than transparency, so it is
+`#e6e6e6` in the light theme and `#141414` in the dark one. Transparency would
+be flattened to white by most of the places an image gets pasted, and a white
+body against white loses the edge it is drawn with.
 
 To see what your tuning is doing, take it away: `untuned` at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since that

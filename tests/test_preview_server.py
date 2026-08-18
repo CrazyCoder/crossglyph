@@ -505,21 +505,27 @@ def test_the_page_and_its_modules_are_never_cached(client):
 
 
 @pytest.mark.parametrize(
-    ("device", "size", "hole", "margin"),
+    ("device", "suffix", "size", "hole", "margin"),
     [
-        ("x4", (1118, 1820), (118, 105, 989, 1551), 8),
-        ("x3", (1209, 1820), (132, 123, 1077, 1544), 8),
+        ("x4", "", (1118, 1820), (118, 105, 989, 1551), 8),
+        ("x3", "", (1209, 1820), (132, 123, 1077, 1544), 8),
+        # The 1:1 pair, whose aperture is the panel's own size so that scale
+        # draws them untouched. Rendered rather than resampled, so they get
+        # every check the tall ones get: an edge that was resized would fail
+        # the bezel test below rather than pass it softly.
+        ("x4", "-1to1", (612, 996), (64, 57, 542, 849), 4),
+        ("x3", "-1to1", (671, 1011), (73, 68, 598, 858), 4),
     ],
 )
 def test_device_frames_carry_normalized_geometry(
-        client, device, size, hole, margin):
+        client, device, suffix, size, hole, margin):
     """The frames are rendered from the official models by fb2xt, which emits
     the geometry from the same run that produced the pixels. What matters here
     is that the shipped file still agrees with what the preview was told."""
     from PIL import Image, ImageStat
 
     for color in ("black", "white"):
-        response = client.get(f"/device/{device}-{color}.png")
+        response = client.get(f"/device/{device}-{color}{suffix}.png")
         assert response.status_code == 200
         frame = Image.open(io.BytesIO(response.content)).convert("RGBA")
         assert frame.size == size
@@ -551,7 +557,12 @@ def test_device_frames_carry_normalized_geometry(
         assert opaque[2] == pytest.approx(size[0] - margin, abs=2)
         assert opaque[3] == pytest.approx(size[1] - margin, abs=2)
 
-        body = frame.crop((size[0] // 4, 25, size[0] * 3 // 4, 100))
+        # A band across the top bezel, as a share of the frame rather than a
+        # count of pixels: the same 25 to 100 that sits in flat bezel on an
+        # 1820-tall frame reaches the curved top edge on a 996-tall one, and
+        # reads several levels dark for it.
+        band = (round(size[1] * 25 / 1820), round(size[1] * 100 / 1820))
+        body = frame.crop((size[0] // 4, band[0], size[0] * 3 // 4, band[1]))
         red, green, blue = ImageStat.Stat(body.convert("RGB")).mean
         tone = (red + green + blue) / 3
         expected = (10, 22) if color == "black" else (210, 230)
@@ -1180,6 +1191,31 @@ def test_device_numeric_controls_use_the_shared_stepper():
 
     assert '<option value="custom">custom</option>' in html
     assert 'id="device-calibrate"' not in html
+
+
+def test_the_copy_button_says_what_shift_does():
+    """One button for two things, so the one it is not doing has to be findable.
+    The page settles that the same way Build does when it says Rebuild: the
+    press names both, and the icon changes while the key is held.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    button = re.search(r'<button[^>]*id="device-copy".*?</button>', html, re.S)
+    assert button is not None
+    title = re.search(r'title="([^"]+)"', button.group())
+    assert title is not None
+    assert "Shift" in title.group(1), title.group(1)
+    # Both icons, and the download one starts hidden.
+    assert 'class="as-copy"' in button.group()
+    assert 'class="as-download"' in button.group()
+    assert re.search(r'class="as-download"[^>]*hidden', button.group())
+    # Beside the frame toggle, in the row that is open when the fold is shut.
+    preview = html.index('id="device-preview"')
+    settings = html.index('<div id="device-settings">', preview)
+    assert 'id="device-copy"' in html[preview:settings]
 
 
 def test_the_device_panel_reads_top_to_bottom():

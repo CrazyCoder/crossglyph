@@ -710,6 +710,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const deviceInkSlider = deviceSlider("device-ink-slider", deviceInk);
   const deviceCalibrationSlider =
     deviceSlider("device-calibration-slider", deviceCalibration);
+  // The copy button and the two icons it swaps between while Shift is held.
+  const copyIcons = {".as-copy": {hidden: false},
+                     ".as-download": {hidden: true}};
+  const deviceCopy = Object.assign(makeElement(), {
+    querySelector(selector) { return copyIcons[selector]; },
+  });
   const deviceWarmSlider = deviceSlider("device-warm-slider", deviceWarm);
   const deviceTintSlider = deviceSlider("device-tint-slider", deviceTint);
   // The three channel transfer functions of the frame's tint filter. Only
@@ -835,6 +841,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-calibration": {hidden: true},
     "device-calibration-range": deviceCalibration,
     "device-calibration-slider": deviceCalibrationSlider,
+    "device-copy": deviceCopy,
     "device-warm": deviceWarm,
     "device-warm-slider": deviceWarmSlider,
     "device-tint": deviceTint,
@@ -1232,6 +1239,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              warm: deviceWarm, tint: deviceTint,
              warmSlider: deviceWarmSlider, tintSlider: deviceTintSlider,
              tintFuncs,
+             copy: deviceCopy, copyIcons,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -4937,6 +4945,68 @@ for (const deferred of [
         back.device.warmSlider.value === "12" &&
         back.device.tintSlider.value === "0",
         `${back.device.warm.value}/${back.device.tint.value}`);
+}
+
+// Every device is rendered twice, and which frame is on screen follows the
+// scale. 1:1 takes the one whose aperture is the panel itself, so the frame
+// draws at its own pixels; every other scale takes the tall one, which has the
+// resolution fit asks for at a high pixel ratio.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  await settle();
+  check("1:1 takes the frame rendered at the panel's own size",
+        env.device.scale.value === "pixels" &&
+        env.device.frameImage.src === "device/x4-white-1to1.png",
+        `${env.device.scale.value} ${env.device.frameImage.src}`);
+  // 612 is that frame's own width: the factor is native over aperture over the
+  // pixel ratio, and an aperture already at native makes that one.
+  check("and lays it out from that frame's geometry, unscaled",
+        env.device.surface.style.width === "612px" &&
+        env.device.surface.style.height === "996px",
+        `${env.device.surface.style.width} ${env.device.surface.style.height}`);
+
+  env.device.scale.value = "fit";
+  env.device.change(env.device.scale);
+  await settle();
+  check("every other scale takes the tall frame",
+        env.device.frameImage.src === "device/x4-white.png",
+        env.device.frameImage.src);
+
+  env.device.scale.value = "pixels";
+  env.device.change(env.device.scale);
+  env.device.model.value = "x3";
+  env.device.change(env.device.model);
+  await settle();
+  check("and the pair is per device",
+        env.device.frameImage.src === "device/x3-white-1to1.png" &&
+        env.device.surface.style.width === "671px",
+        `${env.device.frameImage.src} ${env.device.surface.style.width}`);
+}
+
+// Shift turns the copy button into a download, and says so while it is held --
+// the same bargain Build makes when it says Rebuild.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  await settle();
+  // The title it starts with is the markup's, which test_preview_server.py
+  // asserts; what this covers is the pair of icons and the swap below.
+  check("the button copies by default",
+        env.device.copyIcons[".as-copy"].hidden === false &&
+        env.device.copyIcons[".as-download"].hidden === true,
+        JSON.stringify(env.device.copyIcons));
+
+  for (const listener of env.keys) listener({key: "Shift"});
+  check("holding shift shows it will download instead",
+        env.device.copyIcons[".as-copy"].hidden === true &&
+        env.device.copyIcons[".as-download"].hidden === false &&
+        /Download/.test(env.device.copy.title),
+        env.device.copy.title);
+
+  for (const listener of env.keyups) listener({key: "Shift"});
+  check("and letting go puts it back",
+        env.device.copyIcons[".as-copy"].hidden === false &&
+        env.device.copyIcons[".as-download"].hidden === true,
+        env.device.copy.title);
 }
 
 // The decoded bitmaps are the only page state the pipeline holds, so their

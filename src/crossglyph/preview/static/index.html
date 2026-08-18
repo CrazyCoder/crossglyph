@@ -433,6 +433,23 @@
             <path d="M7 14.7h4"/>
           </svg>
         </label>
+        <!-- One button, not two. Shift is what this page already means by a
+             second thing on the same press, and the icon changes while it is
+             held for the same reason Build says Rebuild: a modifier nobody can
+             see is a feature nobody finds. -->
+        <button type="button" id="device-copy" class="device-copy"
+                title="Copy the preview as an image. Hold Shift to download."
+                aria-label="copy the preview as an image">
+          <svg class="as-copy" viewBox="0 0 18 18" aria-hidden="true">
+            <rect x="6.6" y="2.6" width="8.8" height="10.8" rx="1.4"/>
+            <path d="M11.4 15.4H4a1.4 1.4 0 0 1-1.4-1.4V5.2"/>
+          </svg>
+          <svg class="as-download" viewBox="0 0 18 18" aria-hidden="true" hidden>
+            <path d="M9 2.6v8.2"/>
+            <path d="M5.8 7.8 9 11l3.2-3.2"/>
+            <path d="M3.2 14.6h11.6"/>
+          </svg>
+        </button>
       </div>
       <button type="button" class="clear" id="reset-device"
               title="Reset device preview"
