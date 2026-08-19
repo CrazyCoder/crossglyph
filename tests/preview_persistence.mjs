@@ -2070,11 +2070,17 @@ for (const { name, text } of sources) {
   check("and there is nothing to save while it does",
         env.save.disabled === true);
 
-  // Switching family is the other question: the value the arrow is holding is
-  // work, and it is not on screen to be missed.
+  // Switching family asks the same question the button does, and gets the same
+  // answer: the panel says what the config says, so there is nothing here to
+  // defend. The value the arrow is holding is one press from being back and
+  // was never going to survive a reload either, so counting it would leave a
+  // dark Save button and a warning about unsaved changes contradicting each
+  // other over one knob.
   env.family.choose("Sample");
-  check("but switching family still asks", env.prompts.length === 1,
-        JSON.stringify(env.prompts));
+  check("and switching family does not ask either",
+        env.prompts.length === 0, JSON.stringify(env.prompts));
+  check("the family switched", env.family.value === "Sample",
+        env.family.value);
 }
 
 // 26. Switching family loads that family's own settings.

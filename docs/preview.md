@@ -377,6 +377,12 @@ instead, which answers "what does this font change". Leave a knob on stock and
 it differs from the config again, so the arrow points back the other way. The
 tooltip names which of the two it is holding.
 
+What the arrow set aside lives no longer than the panel does: it is one press
+from being back on screen, and a reload or a switch of font drops it without
+asking. So switching font asks only about what the panel is showing, which is
+the question the Save button answers. While the arrow is on you are looking at
+what the config says, and both of them are quiet.
+
 Numeric axes of a variable font, such as `wdth`, use the same arrow. The
 family's config is the first comparison, the default declared by the font is
 the stock comparison, and **Untuned** shows that stock value. Weight pickers

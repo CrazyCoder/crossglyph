@@ -5,7 +5,7 @@ import {numericRow, showSlider} from "./knobs.js";
 import {attempt} from "./remember.js";
 import {renderNow, scheduleRender} from "./render.js";
 import {KNOB_KEYS, baseState, putKnob, refreshReverts, rememberSaved, showRevertState, stashed} from "./reverts.js";
-import {savedNote, showSaveState, unsavedWork} from "./save.js";
+import {knobsDiffer, savedNote, showSaveState} from "./save.js";
 
 // --- variable fonts -------------------------------------------------------
 // A variable font is several faces in one file, so which face a slot is drawn
@@ -293,7 +293,7 @@ export function refreshFamilies(d) {
   const before = familyEntries.get(chosen);
   // Against the entry the controls were loaded from. Once the new list lands,
   // an edit made on disk would otherwise look like unsaved work in the panel.
-  const hadUnsavedWork = unsavedWork();
+  const hadUnsavedWork = knobsDiffer();
   listFamilies(d);
   if (!familyEntries.has(chosen)) {
     // Its files have gone, so there is nothing left to draw it with and the
@@ -339,9 +339,12 @@ export function refreshFamilies(d) {
 //: while its own imports may still be evaluating.
 export function onFamilyChange() {
   // Unsaved knobs would be dropped by the load below, and they are the only
-  // thing on this page with nowhere else to live -- including a value a
-  // comparison has set aside, which is not on screen to be missed.
-  if (unsavedWork() && !confirm(
+  // thing on this page with nowhere else to live. The panel is what decides:
+  // a value a comparison has set aside is not counted, being one press from
+  // back on screen and nothing a reload would have kept either -- so a dark
+  // Save button and a silent switch mean the same thing, which is what makes
+  // either of them worth reading.
+  if (knobsDiffer() && !confirm(
         (shownFamily || "This font") + " has unsaved knob changes, and "
         + "switching discards them.")) {
     familyPicker.value = shownFamily;

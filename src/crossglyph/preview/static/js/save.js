@@ -65,13 +65,6 @@ export function knobsDiffer() {
   return exportDiffers() || tuningDiffers();
 }
 
-// The other question, which the family switch asks: is there work here that
-// switching would throw away? A value set aside by a comparison is exactly
-// that -- invisible on the page, and gone the moment another family loads.
-export function unsavedWork() {
-  return knobsDiffer() || stashed.size > 0;
-}
-
 // Which tab has something to say. Never about the panel on screen, the same
 // rule the build's mark keeps: what you are looking at says it for itself, the
 // knobs with a lit Save and the export panel with a press that saves before it
