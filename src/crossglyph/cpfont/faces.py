@@ -24,11 +24,11 @@ def open_face(path):
     from the buffer for the life of the face and freetype-py keeps a reference
     to it, so closing the handle here changes nothing.
 
-    An ASCII path still goes to FreeType by name, because a memory face costs
-    a full read up front and holds the file resident. The bundled CJK fallback
-    is 15.7 MB, and a render opens the fallback chain to ask which codepoints
-    it supplies; paying that on every keystroke is the cost this branch
-    avoids.
+    An ASCII path still goes to FreeType by name. A memory face costs a full
+    read up front and holds the whole file resident for as long as it is open,
+    where FreeType's own stream reads the tables it is asked for. The bundled
+    CJK fallback is 15.7 MB, so the difference is worth keeping for the
+    installs that never needed the detour.
     """
     import freetype
 

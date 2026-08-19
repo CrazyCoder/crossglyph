@@ -12,7 +12,8 @@ def test_a_face_opens_from_a_path_freetype_cannot_encode(tmp_path):
     """freetype-py sends FT_New_Face the path as UTF-8 and FreeType opens it
     with the C library's `fopen`, which on Windows reads bytes in the ANSI
     code page. The two disagree over every character above ASCII, so the face
-    fails with "cannot open resource" over a file Python reads happily."""
+    fails with "cannot open resource" over a file Python reads without
+    trouble."""
     from fontsmith import box_font
 
     from crossglyph.cpfont.faces import open_face
@@ -37,9 +38,9 @@ def test_an_ascii_path_opens_too(tmp_path):
 def test_nothing_else_opens_a_face_by_path():
     """The converter is a fork merged by hand, and upstream's own line is
     `freetype.Face(fontfile)`. A refresh that took it back would restore the
-    bug without failing anything that reads a font, since every suite runs
-    under an ASCII path unless it builds one of its own. The two tests above
-    cover the helper; this covers everyone who has to reach it.
+    bug without failing anything that reads a font, since every other test
+    runs under whatever path the checkout sits at, and that is an ASCII one
+    on both CI runners.
     """
     offenders = {
         path.relative_to(ROOT).as_posix()

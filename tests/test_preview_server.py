@@ -3277,9 +3277,9 @@ def test_a_workspace_under_a_non_ascii_path_still_draws(tmp_path, monkeypatch):
     """The install sits under the user's own name, and plenty of those carry
     a character above ASCII. FreeType opens a path through the C library's
     `fopen`, which on Windows reads it in the ANSI code page while freetype-py
-    hands it UTF-8, so every face in such a folder failed to open and the
-    first render came back "cannot open resource" over a page nobody could
-    fix from the panel."""
+    hands it UTF-8, so no face in such a folder opens by name. Reached from
+    here it is the whole panel: the first render answers "cannot open
+    resource", and no knob on the page changes that."""
     from fastapi.testclient import TestClient
     from fontsmith import box_font
 
