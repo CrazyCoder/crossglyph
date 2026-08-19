@@ -303,6 +303,39 @@ def test_a_variable_fonts_axes_are_not_part_of_its_family_name(tmp_path):
     }
 
 
+GOOGLE_SANS = ["GoogleSans-VariableFont_GRAD,opsz,wght.ttf",
+               "GoogleSans-Italic-VariableFont_GRAD,opsz,wght.ttf"]
+
+
+def test_the_website_download_spells_the_axis_list_a_second_way(tmp_path):
+    """The zip from fonts.google.com names the same thing -VariableFont_<axes>.
+    The italic is the harder half: its -Italic is in the middle of the stem, so
+    the two files share no prefix any style rule can pair them by."""
+    _touch(tmp_path, *GOOGLE_SANS)
+    families = fontconf.discover_families(tmp_path)
+    assert sorted(families) == ["GoogleSans"]
+    assert {k: v.name for k, v in families["GoogleSans"].items()} == {
+        "regular": "GoogleSans-VariableFont_GRAD,opsz,wght.ttf",
+        "italic": "GoogleSans-Italic-VariableFont_GRAD,opsz,wght.ttf",
+    }
+
+
+def test_one_axis_and_a_renamed_file_lose_the_suffix_too(tmp_path):
+    """A single-axis download, and the same file with the list taken off by
+    hand."""
+    assert fontconf.font_stem(tmp_path / "Lora-VariableFont_wght.ttf") == "Lora"
+    assert fontconf.font_stem(tmp_path / "Lora-VariableFont.ttf") == "Lora"
+
+
+def test_a_family_that_merely_ends_in_that_word_keeps_its_name(tmp_path):
+    """What marks the suffix as generated is the shape of what follows it.
+    Four characters is an axis tag; a word is somebody's family name."""
+    assert fontconf.font_stem(tmp_path / "Foundry-VariableFont_Display.ttf") \
+        == "Foundry-VariableFont_Display"
+    assert fontconf.font_stem(tmp_path / "MyVariableFont-Regular.ttf") \
+        == "MyVariableFont-Regular"
+
+
 def _variable(directory, name="Probe[wght].ttf", **kwargs):
     import fontsmith
     return fontsmith.variable_box_font(directory / name, [0x41, 0x42], **kwargs)

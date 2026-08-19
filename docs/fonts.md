@@ -516,6 +516,15 @@ strip as a family called `Merriweatheropszwdthwght`, and the italic, whose
 suffix is no longer at the end of the stem, becomes a second one-face family
 instead of that family's italic.
 
+The zip from the Google Fonts website writes the same list a second way, as
+`GoogleSans-VariableFont_GRAD,opsz,wght.ttf` with the italic as
+`GoogleSans-Italic-VariableFont_GRAD,opsz,wght.ttf`. That one comes off too.
+Both spellings give one family with four slots, and neither needs a config.
+
+What marks the suffix as generated is the shape of what follows the word: an
+axis tag is four characters, so `Foundry-VariableFont_Display.ttf` keeps its
+whole name and is a family in its own right.
+
 ### The italic follows the roman's weight
 
 The website drops every extra weight italic such as `MediumItalic`, which is

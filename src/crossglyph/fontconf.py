@@ -128,6 +128,20 @@ def sanitize_name(name: str) -> str:
 # one-face family rather than that family's italic.
 _AXES_RE = re.compile(r"\[[^\[\]]*\]$")
 
+# The zip the Google Fonts website hands you spells the same list a second way:
+# GoogleSans-VariableFont_GRAD,opsz,wght.ttf, and the italic as
+# GoogleSans-Italic-VariableFont_GRAD,opsz,wght.ttf. It comes off for the
+# reasons above, and the italic here is worse: its -Italic sits in the middle
+# of the stem, so the two files share no prefix that any style rule can pair.
+#
+# An axis tag is four characters by the OpenType specification, and the tags
+# are what makes this a suffix somebody generated rather than a family called
+# Something-VariableFont. The list is optional because a hand-renamed file
+# drops it, and the count is a range because a private tag is not policed.
+_DOWNLOAD_AXES_RE = re.compile(
+    r"[-_ ]variablefont(?:_[A-Za-z0-9]{2,4}(?:,[A-Za-z0-9]{2,4})*)?$",
+    re.IGNORECASE)
+
 
 # Every word a style suffix can be spelled with, for recognising a tail that is
 # nothing but style. Wider than STYLE_PATTERNS on purpose: this is only used to
@@ -155,7 +169,7 @@ def font_stem(path: pathlib.Path) -> str:
 
     Without a variable font's axis list, and without a foundry's series number.
     """
-    stem = _AXES_RE.sub("", path.stem)
+    stem = _DOWNLOAD_AXES_RE.sub("", _AXES_RE.sub("", path.stem))
     return re.sub(r"[-_ ]+$", "", _SERIES_RE.sub("", stem))
 
 
