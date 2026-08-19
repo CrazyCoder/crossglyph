@@ -18,29 +18,28 @@ starts absent: `all.conf.example` beside it is a commented list of every key
 it can hold, to copy when you want one. The preview writes `all.conf` too,
 when you save a family it covers without naming.
 
-It holds settings shared by every family in the workspace: a `<family>.conf`
+It holds settings shared by every family in the workspace. A `<family>.conf`
 inherits from it and states only what it does differently, and a family with no
-config at all is built from it. The workspace ships one with every line
-commented out, so it sets nothing until you edit it. Delete it and nothing
-changes.
+config at all is built from it alone. Delete it and nothing changes.
 
 Discovery does not depend on it either. Drop four files in the workspace and
 they build on the next run, taking their name from the filenames.
 
 Subfolders are walked, so a family that arrives as a folder can stay one. The
-folder is organization and nothing else: a face is known by its filename
+folder is organization and nothing else. A face is known by its filename
 wherever it sits, so `serif/Charis-Bold.ttf` is Charis' bold exactly as
-`Charis-Bold.ttf` at the root would be, and a folder of `Regular.ttf` and
-`Bold.ttf` builds families called Regular and Bold rather than one named after
-the folder. Rename the files, not the folder.
+`Charis-Bold.ttf` at the root would be. A folder holding `Regular.ttf` and
+`Bold.ttf` builds two families called Regular and Bold, and neither takes the
+folder's name. Rename the files. The folder name is never read.
 
-Four folders are left alone: `conf` holds configs, `cpfonts` holds builds,
-`fallbacks` holds the Noto faces that fill holes in other families rather than
-being families themselves, and anything beginning with a dot is somebody
-else's.
+Four folders are left alone. `conf` holds configs, `cpfonts` holds builds, and
+`fallbacks` holds the Noto faces that fill holes in other families without
+being families themselves. Anything beginning with a dot belongs to something
+else.
 
-It cannot set `name`, `family`, or the explicit style and fallback file keys.
-Those name one specific family or file, so they are rejected there.
+`all.conf` cannot set `name`, `family`, or the explicit style and fallback file
+keys. Each of those names one specific family or file, so they are rejected
+there.
 
 `--list` says where each family's settings came from:
 
@@ -125,33 +124,33 @@ list, since a size list of any length is yours to write.
 
 ### Fractional point sizes
 
-`sizes` takes fractions such as `13.5`, and they are real rasterizations rather
-than a rounding of the nearest whole size. At 150 DPI a point is 2.08 px/em, so
-consecutive whole sizes are about 10% apart at reading sizes: 13 pt sets
-`advanceY` 31 and 13.5 pt sets 32, a step you cannot otherwise reach.
+`sizes` takes fractions such as `13.5`, and each one is a real rasterization at
+that size. At 150 DPI a point is 2.08 px/em, so consecutive whole sizes are
+about 10% apart at reading sizes: 13 pt sets `advanceY` 31 and 13.5 pt sets 32,
+a step you cannot otherwise reach.
 
-The filename carries the rounded label, not the size. The device parses the
-size out of the filename with `strtol` into a `uint8_t`
+The filename carries the rounded label and never the size itself. The device
+parses the size out of the filename with `strtol` into a `uint8_t`
 (`SdCardFontRegistry.cpp:85`), so a fractional size could not be named there.
-Nothing reads a point size out of the file itself, so `sizes = 13.5` writes
+Nothing reads a point size out of the file, so `sizes = 13.5` writes
 `Family_14.cpfont`, and the device offers "14" while rendering 13.5 pt glyphs.
 Rounding is half up. `--list` and the line each size prints as it is built both
-name the label when it differs from the size, so the file a build is about to
-write, or has just written, is never left to be worked out:
+name the label when it differs from the size, so you can see which file a build
+is about to write, or has just written:
 
 ```
   -> Family: 13.5 (ships as 14) 16
   Family 13.5 (ships as 14) (0.4 MB, 354 glyphs, 3s)
 ```
 
-Two sizes that round to the same label are refused rather than silently
-overwriting each other, so `sizes = 13.5 14` is an error.
+Two sizes that round to the same label would overwrite each other, so they are
+refused: `sizes = 13.5 14` is an error.
 
-The separator here is a comma or a space, so a decimal comma is two sizes:
-`sizes = 13,25` builds 13 pt and 25 pt, and nothing can tell it apart from
-somebody asking for exactly that. Write the fraction with a dot. The website's
-size boxes hold one size each and do read a comma as a decimal point, since
-there the two cannot be confused.
+The separator here is a comma or a space, which makes a decimal comma two
+sizes. `sizes = 13,25` builds 13 pt and 25 pt, and nothing can tell that apart
+from a request for exactly those two. Write the fraction with a dot. The
+website's size boxes hold one size each and do read a comma as a decimal point,
+because there the two cannot be confused.
 
 ## Coverage
 
@@ -181,20 +180,20 @@ Arabic is written joined up, like cursive, so a letter takes a different shape
 depending on where it sits in a word: one at the start, another in the middle,
 another at the end, another standing alone. A reader has to pick the right one.
 
-CrossPoint picks it and then looks that shape up by a codepoint of its own,
-because it has no room on the device for the rule engine a font's own joining
-rules need. Fonts split into two camps on this. Older ones store every shape
-under its own codepoint, which is what the device expects. Newer ones, and most
-good Arabic faces today, store one shape plus the rules, and the device finds
-nothing where it looks. Scheherazade New and ReadexPro are in the second camp,
-and until this was handled they drew a page of blanks, or of replacement boxes
-wherever the build had one of those to draw instead.
+CrossPoint picks it and then looks that shape up by a separate codepoint,
+because the device has no room for the rule engine a font's own joining rules
+need. Fonts split into two camps on this. Older ones store every shape under
+its own codepoint, and that is what the device expects. Newer ones, including
+most good Arabic faces today, store one shape plus the rules, so the device
+finds nothing where it looks. Scheherazade New and ReadexPro are in the second
+camp, and they drew a page of blanks, or of replacement boxes wherever the
+build had one to draw.
 
 So the rules are run here instead, once, while the font is built, and each
-resulting shape is stored where the device will ask for it. This is automatic:
-there is no setting, and it works with any Arabic face. Where a face spells a
+resulting shape is stored where the device will ask for it. This is automatic.
+There is no setting, and it works with any Arabic face. Some faces spell a
 letter as a base plus a separate mark, which is how the alef with hamza and the
-alef with madda are usually drawn, the pieces are combined into one picture
+alef with madda are usually drawn; those pieces are combined into one picture
 first.
 
 The one thing to do yourself is put `arabic` in `intervals`, exactly as you
@@ -223,8 +222,8 @@ the `.cpfont` format has room for. One glyph in practice reaches it: the
 bismillah at U+FDFD, an entire phrase drawn as one ornament rather than a
 letter. In Noto Sans Arabic it is 244 pixels wide at 12 pt and passes the
 limit at about 12.6, so every ordinary reading size above 12 pt drops it. The
-build says so, naming the codepoint and the size it measured, and carries on:
-a glyph the device could not store draws nothing there either way, and one
+build says so, naming the codepoint and the size it measured, and carries on.
+A glyph the device could not store draws nothing there either way, and one
 ornament is not worth failing a family over.
 
 The honorific ligatures beside it, U+FDFA and U+FDFB, are nowhere near the
@@ -276,21 +275,20 @@ typographic default reads wrong at your size:
 space_width_2006 = 0.25    # widen the dialogue dash space from 1/6 em
 ```
 
-Only the widths are settable, not which codepoints are in the table. U+00A0 and
-U+202F are rewritten into a plain space before layout, so the device never asks
-a font for them, and a codepoint outside the table is rejected rather than
-silently ignored.
+The widths are settable and the set of codepoints in the table is fixed. U+00A0
+and U+202F are rewritten into a plain space before layout, so the device never
+asks a font for them, and a codepoint outside the table is rejected out loud.
 
-The face itself is generated, and it is an input to a build rather than
-anything to put on a card: it lives in the temporary directory, named for a
-digest of the widths in it, and a build makes it if it is not already there.
-So a width edited here produces a different file rather than finding the old
-one and using it, and nothing lands in the folder you copy across.
+The face itself is generated, and it is an input to a build and never something
+to put on a card. It lives in the temporary directory, named for a digest of
+the widths in it, and a build makes it if it is not already there. A width
+edited here therefore produces a different file, and nothing lands in the
+folder you copy across.
 
 ## Tuning how glyphs look
 
 The device stores two bits per pixel, four levels, so every glyph passes
-through a quantizer, and that is where a face gains or loses its character.
+through a quantizer. A face gains or loses its character there.
 FreeType renders 8-bit coverage at 150 DPI, so 13 pt is 27.08 px/em. `gamma`
 curves that coverage, it is truncated to 4 bits, then `thresholds` cuts it into
 the four levels the device stores.
@@ -319,8 +317,8 @@ non-zero level solid black (`GfxRenderer.cpp:449`), so only the first threshold
 has any effect and lowering it fattens the text.
 
 Measured at 13 pt over a mixed Cyrillic and Latin sample of 5838 inked pixels.
-Mean coverage does not move, because thresholds redistribute what FreeType
-already produced rather than changing it:
+Mean coverage does not move: thresholds redistribute what FreeType already
+produced, and change none of it:
 
 | thresholds | mean coverage | level 0 | 1 | 2 | 3 (black) |
 |---|---|---|---|---|---|
@@ -331,44 +329,44 @@ already produced rather than changing it:
 earlier, on the outline and on how FreeType fits it to the pixel grid, so they
 change the coverage the quantizer then sees. Three of them are worth a note.
 
-`weight` uses `FT_Outline_Embolden`, which fattens the outline without moving
-the advance width. Text gets heavier at unchanged spacing, which is right at
-reading sizes but is not a substitute for a real bold face.
+`weight` uses `FT_Outline_Embolden`, which fattens the outline and leaves the
+advance width alone. Text gets heavier at unchanged spacing. That is right at
+reading sizes, and it is no substitute for a real bold face.
 
 `stem_darkening` is narrower than its name suggests, and where it applies
 depends on `hinting` as much as on the font. FreeType has the code in two
-engines, and each puts a condition of its own on top of the setting: the Adobe
-CF2 interpreter, which draws CFF and Type 1 faces, darkens a scaled load, and
-the auto-hinter darkens at a light target. So a CFF or OTF face moves under any
-hinting but `auto`, and a TrueType face, having no CF2 path, moves only at
-`hinting = light`, which is the one setting that hands it to the auto-hinter.
-Under `auto` neither format moves: it targets normal hinting, and the
-auto-hinter reloads the glyph unscaled, which fails both conditions at once.
+engines, and each adds a condition on top of the setting. The Adobe CF2
+interpreter, which draws CFF and Type 1 faces, darkens a scaled load. The
+auto-hinter darkens at a light target. So a CFF or OTF face moves under any
+hinting but `auto`, while a TrueType face has no CF2 path and moves only at
+`hinting = light`, the one setting that hands it to the auto-hinter. Under
+`auto` neither format moves: it targets normal hinting, and the auto-hinter
+reloads the glyph unscaled, failing both conditions at once.
 
 The two are not the same size either. Through CF2 the effect is slight, well
 under a percent of the set pixels; through the light auto-hinter it is
-substantial. Measured over 132 faces on FreeType 2.13, and the preview greys
-the switch when the pair you have chosen is one of the cases that cannot move.
-It leaves the rest alone rather than promising anything, because a CFF face
-whose stems fall where the darkening curve rounds to nothing is unmoved as
-well, and nothing short of rasterizing both ways would know.
+substantial. That was measured over 132 faces on FreeType 2.13. The preview
+greys the switch when the pair you have chosen is one of the cases that cannot
+move, and leaves the rest live without promising anything: a CFF face whose
+stems fall where the darkening curve rounds to nothing is unmoved as well, and
+nothing short of rasterizing both ways would know.
 
 `grayscale_hinting` chooses which of FreeType's two TrueType bytecode
 interpreters runs a font's own hinting. The default is version 40, which
-FreeType calls roughly equivalent to DirectWrite ClearType and which hints
-vertically only, since on a subpixel display snapping a stem sideways costs
-more than it buys. Version 35 fits both axes, and FreeType documents it as
-supporting grayscale and black and white rasterizing only, which is exactly
-what this device has. A stem then lands on a pixel instead of straddling two
-and being drawn twice in grey. Measured over 303 hinted faces it leaves 3.8%
-fewer midtone pixels, and a third fewer on a face like DejaVu.
+FreeType calls roughly equivalent to DirectWrite ClearType. It hints vertically
+only, because on a subpixel display snapping a stem sideways costs more than it
+buys. Version 35 fits both axes, and FreeType documents it as supporting
+grayscale and black and white rasterizing only. That is all this device does.
+A stem then lands on a pixel instead of straddling two and being drawn twice in
+grey. Measured over 303 hinted faces it leaves 3.8% fewer midtone pixels, and a
+third fewer on a face like DejaVu.
 
-It is narrow in the same way `stem_darkening` is, and for a different reason:
-it reaches a face only while that face's own bytecode is what draws it. A CFF
-family has none, a TrueType family with no glyph instructions goes to the
-auto-hinter anyway, and so does any family under `light`, `auto` or `none`. So
-it is a `hinting = normal` control, on a TrueType face, and the preview greys
-the row everywhere else.
+It is narrow in the same way `stem_darkening` is, for a different reason: it
+reaches a face only while that face's own bytecode draws it. A CFF family has
+none. A TrueType family with no glyph instructions goes to the auto-hinter
+anyway, and so does any family under `light`, `auto` or `none`. So this is a
+`hinting = normal` control on a TrueType face, and the preview greys the row
+everywhere else.
 
 `mono` changes what a pixel is decided by. Normally the converter takes
 FreeType's coverage and cuts it at the three thresholds, and the reader with
@@ -398,8 +396,8 @@ before choosing.
 
 ## Line spacing
 
-Line pitch is stored in the font, not decided on the device. `getLineHeight()`
-is `advanceY` from the `.cpfont` times a compression factor
+Line pitch is stored in the font, and the device does not decide it.
+`getLineHeight()` is `advanceY` from the `.cpfont` times a compression factor
 (`GfxRenderer.cpp:2005`), and for SD card fonts that factor is 0.95, 1.00 or
 1.10 for Tight, Normal and Wide, hardcoded to one family's table for every font
 (`CrossPointSettings.cpp:268`). So Tight buys 5%, calibrated for a font you are
@@ -424,10 +422,10 @@ The em relative form is the one that makes families comparable. Set it once in
 That is also CSS's unitless `line-height` semantics.
 
 Only the pitch moves. `ascender` and `descender` are left alone, because they
-place the baseline inside the line and are what underline, strikethrough, ruby
-and superscript offsets are measured from (`TextBlock.cpp:185-219`). Set the
-pitch below what those two span and consecutive lines can collide. The build
-says so and carries on, since tight leading is sometimes exactly the point:
+place the baseline inside the line, and underline, strikethrough, ruby and
+superscript offsets are all measured from them (`TextBlock.cpp:185-219`). Set
+the pitch below what those two span and consecutive lines can collide. The
+build says so and carries on, because tight leading is sometimes the point:
 
 ```
 warning: line_height 8px is under the 29px this font's ascender and
@@ -523,25 +521,24 @@ instead of that family's italic.
 The website drops every extra weight italic such as `MediumItalic`, which is
 right when one would fight a plain `Italic` for the slot, and wrong when the
 family's roman is itself an extra weight. A family whose roman is
-`Name-Medium` pairs with `Name-MediumItalic` rather than with the lighter
-`Name Italic`. A family whose roman is `Name-Regular` is unaffected.
+`Name-Medium` pairs with `Name-MediumItalic`, and leaves the lighter
+`Name Italic` alone. A family whose roman is `Name-Regular` is unaffected.
 
 ### A foundry's series number is not part of the family
 
 Linotype numbers the styles: 65 Medium, 66 Medium Italic, 75 Bold, 76 Bold
 Italic, where the first digit is the weight and the second says upright or
-italic. The number sits in the stem, so without dropping it each file strips
-to a family of its own and the four never meet. Only a whole number between
-the family and a tail of nothing but style words goes, which keeps the rule
-off a name where the number is the family: `Roboto_Condensed_300` has no style
-tail, so it stays its own family.
+italic. The number sits in the stem, so a file that keeps it strips to a
+family nothing else shares, and the four never meet. Only a whole number
+between the family and a tail of nothing but style words is dropped. That keeps
+the rule off a name where the number is the family: `Roboto_Condensed_300` has
+no style tail, so it stays a family in its own right.
 
 ### Terse suffixes
 
 A terse suffix has no separator: `b` or `bd` bold, `i` or `it` italic,
-`bi`, `bdi` or `bdit` bold italic, and `z` bold italic, which is what
-Microsoft's own core fonts ship (`georgiaz.ttf`, `verdanaz.ttf`,
-`CALIBRIZ.TTF`). A bare trailing letter is read as a style only when a file
+`bi`, `bdi` or `bdit` bold italic, and `z` bold italic, the one Microsoft's
+own core fonts ship (`georgiaz.ttf`, `verdanaz.ttf`, `CALIBRIZ.TTF`). A bare trailing letter is read as a style only when a file
 named for the plain family sits beside it. Otherwise `Bodoni.ttf` would be the
 italic of a family called `Bodon`. A spelled out suffix always outranks a terse
 one.
@@ -562,16 +559,16 @@ them ships four:
 | italic | `Merriweather-Italic[opsz,wdth,wght].ttf` | `wght 400` |
 | bold italic | `Merriweather-Italic[opsz,wdth,wght].ttf` | `wght 700` |
 
-A slot is built at the instance the font names, not at the file's default. That
-distinction is the whole point: Merriweather's default instance is `wght 300`,
-its Light, so a build that takes the file as it comes ships a Light face and
-calls it Regular. Rasterizing "Handgloves" at 13 pt gives 836 dark pixels from
+A slot is built at the instance the font names, and never at the file's
+default. That distinction decides what ships. Merriweather's default instance
+is `wght 300`, its Light, so a build that takes the file as it comes ships a
+Light face and calls it Regular. Rasterizing "Handgloves" at 13 pt gives 836 dark pixels from
 the default, 1043 at the named Regular and 1337 at Bold.
 
 A font that names no instance for a slot falls back to the CSS weights, 400 and
 700, clamped to what its axis offers. A `wght` axis stopping at 500 builds its
 bold there. A font whose axis has no room above its default has no bold in it
-at all, and the slot is left empty rather than filled with the same glyphs
+at all, and the slot is left empty instead of filled with the same glyphs
 twice. A file for the slot always wins, because a drawn bold beats an
 interpolated one.
 
@@ -609,9 +606,9 @@ rsync, and all three hand back a fresh mtime for unchanged bytes.
 
 A size disappears from the config and its `.cpfont` goes with it. A whole
 family disappears, because you dropped `sizes_mod` or renamed it, and its
-directory is removed too. Any build does this, not only a build of everything:
-what the output folder should hold is what the workspace produces, which does
-not depend on which family you happened to ask for.
+directory is removed too. Any build does this, including a build of one
+family. The output folder should hold what the workspace produces, and that
+does not depend on which family you happened to ask for.
 
 Two things are never removed. A directory with no stamp of ours was not built
 here, so anything you put in the output folder by hand is safe. And a family
@@ -649,27 +646,30 @@ to somebody who liked how it looked, and what travels with it is four
 }
 ```
 
-Every setting, not only the ones a config set. Defaults move between versions,
-so a record of the departures alone would reproduce a different font later and
-neither copy could say which one shipped.
+Every setting, including the ones no config set. Defaults move between
+versions, so a record of the departures alone would reproduce a different font
+later, and neither copy could say which one shipped.
 
-Some of it is there for a reader rather than for a rebuild. `sha256` is what
-says whether the face you have is the face this was made from, where a version
-string is a claim and a filename is a label. `licence_url` and `designer` are
-the first two questions a font someone handed you raises. `glyphs` answers
-what is in it without opening anything. `instance` is which face of a variable
-file a slot was drawn at, without which a reproduction of a Merriweather build
-comes back visibly lighter and nothing says why, with `instance_name` beside
-it, because "Medium" is what somebody searching for that face would type and
-`wght 500` is what they would have to translate first. The `subfamily` cannot
-stand in for it: on a variable file that describes the default instance, which
-is Thin for Bitter and not what anybody built. And `point_size` appears for
-a fractional size, because the filename cannot hold one: the device parses the
-label with `strtol`, so a family built at 13.5 ships as `_14`.
+Some of it serves a reader instead of a rebuild. `sha256` settles whether the
+face you have is the face this was made from, where a version string is a claim
+and a filename is a label. `licence_url` and `designer` answer the first two
+questions a font somebody handed you raises. `glyphs` says what is in it
+without opening anything.
+
+`instance` records which face of a variable file a slot was drawn at. Without
+it a reproduction of a Merriweather build comes back visibly lighter and
+nothing explains why. `instance_name` sits beside it, because "Medium" is what
+you would search for and `wght 500` is what you would have to translate it into
+first. The `subfamily` cannot stand in: on a variable file it describes the
+default instance, which is Thin for Bitter and not the face that was built.
+
+`point_size` appears for a fractional size, because the filename cannot hold
+one. The device parses the label with `strtol`, so a family built at 13.5 ships
+as `_14`.
 
 A `synthesized` block appears above `fallbacks` when a face needed repairing,
-and says how much: `"synthesized": {"arabic_forms": 125}` is a build of
-Scheherazade New, which stores joining rules rather than joined shapes.
+and says how much. `"synthesized": {"arabic_forms": 125}` is a build of
+Scheherazade New, which stores joining rules in place of joined shapes.
 `arabic_forms` counts the shapes the build resolved by running a face's own
 shaping instead of reading its character map, across every face it drew from,
 the fallbacks included. A face that already carries those shapes contributes
