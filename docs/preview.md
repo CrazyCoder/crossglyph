@@ -451,6 +451,12 @@ you ship are sizes you were able to look at first. A comma is a decimal point
 in one of those boxes, since each holds a single size; in **more sizes**, which
 is a list, it still separates one from the next, and so does a space.
 
+Press a box's title and the knob goes to what that box holds, which is how a
+shipped size gets looked at rather than typed out again. It shows the size the
+box will hold rather than the characters in it, so a box still being typed into
+shows as it will land, and an empty one shows nothing. The knob is a view
+setting, so nothing about the config moves with the press.
+
 A fractional size is rasterized at the size you asked for and shipped under the
 whole number it rounds to, half up. The device parses the size out of the
 filename into a single byte and cannot hold a fraction there, so 13.25 builds

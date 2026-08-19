@@ -705,15 +705,31 @@
             knob steps in, and rounds anything between them.
           </span>
         </span></span>
+      <!-- Each title is a button rather than a label: pressing it moves the
+           size knob to what its box holds, which is the distance between "14
+           is in the list" and "14 is what 14 looks like". The box keeps its
+           name in aria-label, since the title is now an action and not one. -->
       <div class="sizes">
-        <label><span>Small</span>
-          <input class="mono" id="size1" name="size1" type="text" inputmode="decimal"></label>
-        <label><span>Medium</span>
-          <input class="mono" id="size2" name="size2" type="text" inputmode="decimal"></label>
-        <label><span>Large</span>
-          <input class="mono" id="size3" name="size3" type="text" inputmode="decimal"></label>
-        <label><span>Extra Large</span>
-          <input class="mono" id="size4" name="size4" type="text" inputmode="decimal"></label>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="size1"
+                  title="Show the page at this size">Small</button>
+          <input class="mono" id="size1" name="size1" type="text"
+                 inputmode="decimal" aria-label="Small"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="size2"
+                  title="Show the page at this size">Medium</button>
+          <input class="mono" id="size2" name="size2" type="text"
+                 inputmode="decimal" aria-label="Medium"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="size3"
+                  title="Show the page at this size">Large</button>
+          <input class="mono" id="size3" name="size3" type="text"
+                 inputmode="decimal" aria-label="Large"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="size4"
+                  title="Show the page at this size">Extra Large</button>
+          <input class="mono" id="size4" name="size4" type="text"
+                 inputmode="decimal" aria-label="Extra Large"></div>
       </div>
       <!-- What a fractional size will be called on the card, which the boxes
            above cannot say for themselves: the filename carries the whole
@@ -757,14 +773,26 @@
     <div class="stacked">
       <span class="name">sizes <span class="unit">pt</span></span>
       <div class="sizes">
-        <label><span>Small</span>
-          <input class="mono" id="mod1" name="mod1" type="text" inputmode="decimal"></label>
-        <label><span>Medium</span>
-          <input class="mono" id="mod2" name="mod2" type="text" inputmode="decimal"></label>
-        <label><span>Large</span>
-          <input class="mono" id="mod3" name="mod3" type="text" inputmode="decimal"></label>
-        <label><span>Extra Large</span>
-          <input class="mono" id="mod4" name="mod4" type="text" inputmode="decimal"></label>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="mod1"
+                  title="Show the page at this size">Small</button>
+          <input class="mono" id="mod1" name="mod1" type="text"
+                 inputmode="decimal" aria-label="Small"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="mod2"
+                  title="Show the page at this size">Medium</button>
+          <input class="mono" id="mod2" name="mod2" type="text"
+                 inputmode="decimal" aria-label="Medium"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="mod3"
+                  title="Show the page at this size">Large</button>
+          <input class="mono" id="mod3" name="mod3" type="text"
+                 inputmode="decimal" aria-label="Large"></div>
+        <div class="size-box">
+          <button type="button" class="size-title" data-preview-size="mod4"
+                  title="Show the page at this size">Extra Large</button>
+          <input class="mono" id="mod4" name="mod4" type="text"
+                 inputmode="decimal" aria-label="Extra Large"></div>
       </div>
       <div class="hint" id="mod-ships-as" hidden></div>
     </div>

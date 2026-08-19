@@ -3,7 +3,7 @@ import {familyPicker} from "./family.js";
 import {loadDevice, syncDeviceColor, wireDevice} from "./device.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
-        wireBuildButtons} from "./export.js";
+        wireBuildButtons, wireSizeTitles} from "./export.js";
 import {syncSliders, wireKnobs} from "./knobs.js";
 import {declareLanguage, loadPage, loadSize, preferredLanguage} from "./remember.js";
 import {renderNow, scheduleRender, wireRender} from "./render.js";
@@ -31,6 +31,7 @@ systemDark.addEventListener("change", syncDeviceColor);
 wireResets();
 wireUntuned();
 wireBuildButtons();
+wireSizeTitles();
 // A mark is about the panel you are not on, so switching panels changes which
 // of the two is owed one even though nothing was edited. tabs.js sets the
 // attribute this reads, and both listeners are on the same press, so the

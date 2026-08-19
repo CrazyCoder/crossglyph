@@ -564,9 +564,23 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     field.dataset = field.dataset || {};
     field.name = field.name || name;
   }
+  // The title above each size box. A press rather than a label: it moves the
+  // size knob to what its box holds.
+  const sizeTitles = ["size1", "size2", "size3", "size4",
+                      "mod1", "mod2", "mod3", "mod4"].map(name => ({
+    dataset: { previewSize: name },
+    on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+  }));
   const exportForm = {
     hidden: false, elements: exportFields, on: {},
     addEventListener(kind, fn) { this.on[kind] = fn; },
+    querySelectorAll: (selector) =>
+      selector === "[data-preview-size]" ? sizeTitles : [],
+    //: Pressing a box's title, which shows the page at the size it holds.
+    preview(name) {
+      sizeTitles.find(title => title.dataset.previewSize === name).on.click();
+    },
     // What the page listens for: a change to any control in here offers a save.
     edit(field) { this.on.input({ target: exportFields[field] }); },
     // And leaving one, which is when a size box snaps to the quarter point.
@@ -2479,6 +2493,50 @@ for (const { name, text } of sources) {
   check("and a family whose sizes are whole clears it",
         note.hidden === true && modNote.hidden === true,
         `${note.textContent} | ${modNote.textContent}`);
+}
+
+// 30b5. A size box says what will ship and the knob on the left says what you
+//       are looking at, which used to mean typing each shipped size into the
+//       knob by hand to judge it. A box's title moves the knob to what the box
+//       holds. The knob is a view setting, so nothing about the config moves
+//       with it.
+{
+  const env = await loaded(fakeStorage());
+  check("the family opens with its own sizes in the boxes",
+        env.exportForm.elements.size1.value === "12", env.exportForm.elements.size1.value);
+  check("and the knob at the size the page is drawn at",
+        env.byName.size.value === "13", env.byName.size.value);
+
+  env.exportForm.preview("size1");
+  await settle();
+  check("pressing a box's title shows the page at that size",
+        env.byName.size.value === "12", env.byName.size.value);
+  check("and draws it", env.fetches.bodies.at(-1).size === 12,
+        JSON.stringify(env.fetches.bodies.at(-1).size));
+  check("without touching what the config says",
+        env.save.disabled === true && env.fetches.saves.length === 0,
+        `${env.save.disabled}/${env.fetches.saves.length}`);
+
+  // What the box would hold once it snapped, since the press can come before
+  // the box has been left. Anything outside the knob's range comes back into
+  // it the same way.
+  env.exportForm.elements.size2.value = "13.3";
+  env.exportForm.edit("size2");
+  env.exportForm.preview("size2");
+  check("a size still being typed is shown as the box will hold it",
+        env.byName.size.value === "13.25", env.byName.size.value);
+
+  env.exportForm.elements.mod1.value = "9";
+  env.exportForm.edit("mod1");
+  env.exportForm.preview("mod1");
+  check("the second family's boxes do it too",
+        env.byName.size.value === "9", env.byName.size.value);
+
+  // The second family starts with no sizes at all, so most of its boxes are
+  // empty -- and an empty box has no size to show.
+  env.exportForm.preview("mod4");
+  check("and an empty box leaves the knob where it was",
+        env.byName.size.value === "9", env.byName.size.value);
 }
 
 // 30c. The second family: the same faces at other sizes, listed beside this one

@@ -926,8 +926,14 @@
      along a line of digits. */
   .sizes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
            gap: .4rem; padding: .35rem 0 .15rem; }
-  .sizes label { display: flex; flex-direction: column; gap: .15rem;
-                 font-size: 11px; color: var(--muted); cursor: pointer; }
+  .sizes .size-box { display: flex; flex-direction: column; gap: .15rem; }
+  /* Set as the label it stands in for, since what it says about the box under
+     it has not changed. It underlines on hover because it is also a press, and
+     a title that does something has to look unlike the ones that do not. */
+  .sizes .size-title { font: inherit; font-size: 11px; color: var(--muted);
+                       background: none; border: 0; padding: 0; text-align: left;
+                       cursor: pointer; }
+  .sizes .size-title:hover { color: var(--text); text-decoration: underline; }
   #export .sizes input[type=text] { text-align: center; }
 
   /* Its label above rather than beside it: twenty-one checkboxes in three

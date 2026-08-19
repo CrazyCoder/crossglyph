@@ -1,5 +1,6 @@
 import {form} from "./dom.js";
 import {familyEntries, familyPicker} from "./family.js";
+import {setField} from "./knobs.js";
 import {scheduleRender, undrawnCount} from "./render.js";
 import {progressBar, spellBytes} from "./progress.js";
 import {knobsDiffer, saveButton, saveKnobs, savedNote,
@@ -558,6 +559,32 @@ export function sizeLeft(field) {
 }
 
 exportForm.addEventListener("change", (event) => sizeLeft(event.target));
+
+// --- looking at a size ----------------------------------------------------
+// The boxes say what will ship and the knob on the left says what you are
+// looking at, and the two are easy to set apart and tedious to keep together:
+// judging four shipped sizes meant typing each of them into the knob by hand.
+// A box's title moves the knob to what that box holds, which is the whole
+// distance between a size being in the list and having been looked at.
+//
+// The knob is a view setting, so this writes nothing into the config and
+// leaves the Save button where it was.
+function previewSize(name) {
+  const size = Number(snapSize(exportForm.elements[name].value));
+  // An empty box, or one still being typed into, has no size to show yet.
+  if (!(size > 0)) return;
+  setField(form.elements.size, size);
+}
+
+//: Wired by the entry point rather than on import: the press reaches across to
+//: the knob form, and a module body runs while its imports may still be on
+//: their way up.
+export function wireSizeTitles() {
+  for (const title of exportForm.querySelectorAll("[data-preview-size]")) {
+    title.addEventListener(
+      "click", () => previewSize(title.dataset.previewSize));
+  }
+}
 
 // The faces are not vendored: they are large, unmodified and OFL, so they are
 // fetched once into the font source folder. The offer only appears when they
