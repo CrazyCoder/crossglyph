@@ -199,6 +199,22 @@ def test_one_bit_rendering_reaches_the_render(client):
 GREEK = 0x3B1
 
 
+def _forget_the_last_folder():
+    """Every cache a render fills, so the next folder is read fresh.
+
+    The build caches are keyed on paths the suite reuses across tests, so a
+    stale entry would answer for the previous folder. The fingerprint goes
+    with them: it is a module global, so the folder the last test built is
+    what this one would be compared against.
+    """
+    from crossglyph.preview import server
+
+    server.forget_families()
+    server._workspace = None
+    server.build_font_cached.cache_clear()
+    server.resolved_fallbacks.cache_clear()
+
+
 @pytest.fixture
 def two_families(tmp_path, monkeypatch):
     """A source folder of exactly two families, built for this test.
@@ -219,19 +235,10 @@ def two_families(tmp_path, monkeypatch):
              family="Filler")
     (_conf(tmp_path) / "all.conf").write_text("fallbacks = no\n", encoding="utf-8")
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
-    # The build caches are keyed on paths this fixture reuses across tests, so
-    # a stale entry would answer for the previous folder. The fingerprint goes
-    # with them: it is a module global, so the folder the last test built is
-    # what this one would be compared against.
-    server.forget_families()
-    server._workspace = None
-    server.build_font_cached.cache_clear()
-    server.resolved_fallbacks.cache_clear()
+    _forget_the_last_folder()
     server.set_font_source(tmp_path / "Probe-Regular.ttf", family="Probe")
     yield "Filler"
-    server.forget_families()
-    server.build_font_cached.cache_clear()
-    server.resolved_fallbacks.cache_clear()
+    _forget_the_last_folder()
     server.set_font_source(SRC)
 
 
@@ -3263,3 +3270,35 @@ def test_fallbacks_without_a_coverage_still_render(tmp_path):
     answer = client.post("/render", json={"text": "abc", "size": 16,
                                           "fallbacks": True})
     assert answer.status_code in (200, 503), answer.text
+
+
+@needs_core
+def test_a_workspace_under_a_non_ascii_path_still_draws(tmp_path, monkeypatch):
+    """The install sits under the user's own name, and plenty of those carry
+    a character above ASCII. FreeType opens a path through the C library's
+    `fopen`, which on Windows reads it in the ANSI code page while freetype-py
+    hands it UTF-8, so every face in such a folder failed to open and the
+    first render came back "cannot open resource" over a page nobody could
+    fix from the panel."""
+    from fastapi.testclient import TestClient
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    workspace = tmp_path / "Сергей"
+    workspace.mkdir()
+    box_font(workspace / "Probe-Regular.ttf", [*range(0x20, 0x7F)],
+             family="Probe")
+    (_conf(workspace) / "all.conf").write_text("fallbacks = no\n",
+                                               encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", workspace)
+    _forget_the_last_folder()
+    server.set_font_source(workspace / "Probe-Regular.ttf", family="Probe")
+    try:
+        answer = TestClient(server.app).post(
+            "/render", json={"size": 13, "family": "Probe", "text": "Hello"})
+        assert answer.status_code == 200, answer.text
+    finally:
+        _forget_the_last_folder()
+        server.set_font_source(SRC)

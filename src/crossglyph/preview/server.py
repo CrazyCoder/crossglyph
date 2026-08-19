@@ -55,6 +55,7 @@ from ..cpfont.convert import (
     figure_glyph_overrides,
     gsub_ligature_sequences,
 )
+from ..cpfont.faces import open_face
 from ..cpfont.tuning import LineHeight, Tuning
 from ..fontconf import Config, FontConfigError
 from ..render import RenderCoreMissing, image, stamp
@@ -420,7 +421,7 @@ def face_outlines(path: pathlib.Path) -> str:
 def _face_outlines(path: str, mtime: int, size: int) -> str:
     del mtime, size                 # in the key, not the body
     try:
-        return freetype.Face(path).get_format().decode().casefold()
+        return open_face(path).get_format().decode().casefold()
     except (OSError, freetype.FT_Exception):
         return ""
 
@@ -454,7 +455,7 @@ def face_hinting(path: pathlib.Path) -> tuple[bool, bool]:
 def _face_hinting(path: str, mtime: int, size: int) -> tuple[bool, bool]:
     del mtime, size                 # in the key, not the body
     try:
-        tricky = freetype.Face(path).is_tricky
+        tricky = open_face(path).is_tricky
     except (OSError, freetype.FT_Exception):
         return (True, True)
     try:

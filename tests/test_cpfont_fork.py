@@ -34,10 +34,16 @@ CITATIONS = ["generate_cpfont_multistyle", "rasterize_font_style",
              "HEADER_SIZE", "STYLE_TOC_FORMAT"]
 
 
+#: The two files UPSTREAM names, and the only ones a refresh overwrites. The
+#: rest of the cpfont package is ours, so it is held to our rules like
+#: everything else.
+FORKED = {"convert.py", "version.py"}
+
+
 def _our_sources():
-    """Our own files, which is everywhere but the fork itself."""
+    """Our own files, which is everywhere but the two forked ones."""
     for path in sorted((ROOT / "src/crossglyph").rglob("*.py")):
-        if path.parts[-2] != "cpfont":  # the fork citing itself is upstream's
+        if path.parts[-2] != "cpfont" or path.name not in FORKED:
             yield path
     yield from sorted((ROOT / "tests").glob("*.py"))
 

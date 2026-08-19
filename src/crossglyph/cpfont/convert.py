@@ -35,6 +35,7 @@ import dataclasses
 from collections import namedtuple
 
 from .arabic import implied_coverage, presentation_forms
+from .faces import open_face
 from .tuning import Tuning
 from .version import CPFONT_VERSION
 
@@ -1012,7 +1013,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     style_names = {0: "regular", 1: "bold", 2: "italic", 3: "bolditalic"}
     style_label = style_names.get(style_id, str(style_id))
 
-    face = freetype.Face(fontfile)
+    # FORK: open_face rather than freetype.Face, for a path above ASCII.
+    face = open_face(fontfile)
     # FORK: before the size, because the coordinates change the outlines the
     # size is then applied to. Only the named axes move; the rest keep the
     # font's own defaults.
@@ -1029,7 +1031,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     face.set_char_size(fixed, fixed, 150, 150)
     fallback_faces = []
     for fallback_fontfile in (fallback_fontfiles or []):
-        fallback_face = freetype.Face(fallback_fontfile)
+        fallback_face = open_face(fallback_fontfile)     # FORK: as above
         fallback_face.set_char_size(fixed, fixed, 150, 150)
         fallback_faces.append(fallback_face)
     source_faces = [face] + fallback_faces

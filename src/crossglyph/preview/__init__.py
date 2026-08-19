@@ -17,11 +17,11 @@ import tempfile
 import typing
 from collections.abc import Mapping
 
-import freetype
 from PIL import Image
 
 from .. import cpfont, render
 from ..cpfont import convert
+from ..cpfont.faces import open_face
 from ..cpfont.tuning import Tuning
 from ..render import image
 from . import markup
@@ -191,7 +191,7 @@ def missing_codepoints(sources: Mapping[int, pathlib.Path | str],
     faces = []
     for source in sources.values():
         try:
-            faces.append(freetype.Face(str(source)))
+            faces.append(open_face(source))
         except Exception:                   # noqa: BLE001 -- the rasterizer
             return ()                       # will report it properly
     return tuple(code for start, end in coverage
@@ -366,7 +366,7 @@ def fallback_split(sources: Mapping[int, pathlib.Path | str],
         if not missing:
             break
         try:
-            face = freetype.Face(str(face_path))
+            face = open_face(face_path)
         except Exception:                   # noqa: BLE001 -- not this layer's
             keep.append(face_path)          # to report; the rasterizer says it
             continue
