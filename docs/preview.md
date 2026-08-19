@@ -194,6 +194,18 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
+Every numeric knob is a slider for covering distance and a field with a `-` and
+a `+` for landing on a value. Hold shift on either stepper and the press is a
+coarse one: it moves by what that knob calls a big move and lands on the
+multiples of it, so from 13.25 the size knob reaches 14 and then 15 rather than
+15.75. Each knob declares its own, in the unit it counts in, since that is the
+thing no arithmetic over its range would know: a whole point of size, half a
+point of gamma, a pixel of letter spacing, five pixels of margin, five percent
+of a device setting. A numeric axis of a variable font has no such declaration
+to make, being built from whatever the font carries, so it derives a round
+number sized off its range: sixteen coarse presses from one end to the other,
+whatever the axis is. Holding a stepper repeats it either way.
+
 `off` at the bottom of that list is a third state rather than a second way to
 untick the box, and the difference shows on any text with a compound in it:
 

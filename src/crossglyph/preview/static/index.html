@@ -59,7 +59,7 @@
     <input type="range" data-slider-for="size" min="6" max="40" step="0.25" value="13" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="size" data-dir="-1" aria-label="decrease size">−</button>
-      <input class="mono" id="size" name="size" type="number" min="6" max="40"
+      <input class="mono" id="size" data-coarse="1" name="size" type="number" min="6" max="40"
              value="13" step="0.25" inputmode="decimal" data-group="root">
       <button type="button" class="step mono" data-for="size" data-dir="1" aria-label="increase size">+</button>
     </span>
@@ -92,7 +92,7 @@
     <input type="range" data-slider-for="gamma" min="0.3" max="4" step="0.05" value="1" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="gamma" data-dir="-1" aria-label="decrease gamma">−</button>
-      <input class="mono" id="gamma" name="gamma" type="number" min="0.3" max="4"
+      <input class="mono" id="gamma" data-coarse="0.5" name="gamma" type="number" min="0.3" max="4"
              value="1" step="0.05" inputmode="decimal">
       <button type="button" class="step mono" data-for="gamma" data-dir="1" aria-label="increase gamma">+</button>
     </span>
@@ -105,7 +105,7 @@
     <input type="range" data-slider-for="weight" min="-1" max="1" step="0.05" value="0" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="weight" data-dir="-1" aria-label="decrease weight">−</button>
-      <input class="mono" id="weight" name="weight" type="number" min="-1" max="1"
+      <input class="mono" id="weight" data-coarse="0.25" name="weight" type="number" min="-1" max="1"
              value="0" step="0.05" inputmode="decimal">
       <button type="button" class="step mono" data-for="weight" data-dir="1" aria-label="increase weight">+</button>
     </span>
@@ -121,7 +121,7 @@
     <input type="range" data-slider-for="line_height" min="0.8" max="2.2" step="0.05" value="1.15" tabindex="-1" aria-hidden="true" disabled>
     <span class="stepper">
       <button type="button" class="step mono" data-for="line_height" data-dir="-1" aria-label="decrease line height">−</button>
-      <input class="mono" id="line_height" name="line_height" type="number"
+      <input class="mono" id="line_height" data-coarse="0.25" name="line_height" type="number"
              min="0.8" max="2.2" value="1.15" step="0.05" inputmode="decimal" disabled>
       <button type="button" class="step mono" data-for="line_height" data-dir="1" aria-label="increase line height">+</button>
     </span>
@@ -138,7 +138,7 @@
     <input type="range" data-slider-for="letter_spacing" min="-2" max="4" step="0.1" value="0" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="letter_spacing" data-dir="-1" aria-label="decrease letter spacing">−</button>
-      <input class="mono" id="letter_spacing" name="letter_spacing" type="number"
+      <input class="mono" id="letter_spacing" data-coarse="1" name="letter_spacing" type="number"
              min="-2" max="4" value="0" step="0.1" inputmode="decimal">
       <button type="button" class="step mono" data-for="letter_spacing" data-dir="1" aria-label="increase letter spacing">+</button>
     </span>
@@ -151,7 +151,7 @@
     <input type="range" data-slider-for="word_spacing" min="-2" max="8" step="0.1" value="0" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="word_spacing" data-dir="-1" aria-label="decrease word spacing">−</button>
-      <input class="mono" id="word_spacing" name="word_spacing" type="number"
+      <input class="mono" id="word_spacing" data-coarse="1" name="word_spacing" type="number"
              min="-2" max="8" value="0" step="0.1" inputmode="decimal">
       <button type="button" class="step mono" data-for="word_spacing" data-dir="1" aria-label="increase word spacing">+</button>
     </span>
@@ -164,7 +164,7 @@
     <input type="range" data-slider-for="kerning" min="0" max="2" step="0.05" value="1" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="kerning" data-dir="-1" aria-label="decrease kerning">−</button>
-      <input class="mono" id="kerning" name="kerning" type="number" min="0" max="2"
+      <input class="mono" id="kerning" data-coarse="0.25" name="kerning" type="number" min="0" max="2"
              value="1" step="0.05" inputmode="decimal">
       <button type="button" class="step mono" data-for="kerning" data-dir="1" aria-label="increase kerning">+</button>
     </span>
@@ -177,7 +177,7 @@
     <input type="range" data-slider-for="slant" min="0" max="0.4" step="0.01" value="0" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="slant" data-dir="-1" aria-label="decrease slant">−</button>
-      <input class="mono" id="slant" name="slant" type="number" min="0" max="0.4"
+      <input class="mono" id="slant" data-coarse="0.05" name="slant" type="number" min="0" max="0.4"
              value="0" step="0.01" inputmode="decimal">
       <button type="button" class="step mono" data-for="slant" data-dir="1" aria-label="increase slant">+</button>
     </span>
@@ -285,7 +285,7 @@
     <input type="range" data-slider-for="margin" min="5" max="40" step="1" value="5" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="margin" data-dir="-1" aria-label="decrease margin">−</button>
-      <input class="mono" id="margin" name="margin" type="number" min="5" max="40"
+      <input class="mono" id="margin" data-coarse="5" name="margin" type="number" min="5" max="40"
              value="5" step="1" inputmode="numeric" data-group="page">
       <button type="button" class="step mono" data-for="margin" data-dir="1" aria-label="increase margin">+</button>
     </span>
@@ -483,7 +483,7 @@
             <button type="button" class="step mono"
                     data-for="device-calibration-range" data-dir="-1"
                     aria-label="decrease custom scale">−</button>
-            <input class="mono" id="device-calibration-range" type="number"
+            <input class="mono" id="device-calibration-range" data-coarse="5" type="number"
                    min="50" max="150" step=".5" value="100"
                    inputmode="decimal" data-device-setting
                    aria-label="custom device scale percent">
@@ -505,7 +505,7 @@
           <span class="stepper">
             <button type="button" class="step mono" data-for="device-paper"
                     data-dir="-1" aria-label="decrease paper">−</button>
-            <input class="mono" id="device-paper" type="number"
+            <input class="mono" id="device-paper" data-coarse="5" type="number"
                    min="50" max="100" step="1" value="90" inputmode="numeric"
                    data-device-setting>
             <button type="button" class="step mono" data-for="device-paper"
@@ -523,7 +523,7 @@
           <span class="stepper">
             <button type="button" class="step mono" data-for="device-ink"
                     data-dir="-1" aria-label="decrease ink">−</button>
-            <input class="mono" id="device-ink" type="number"
+            <input class="mono" id="device-ink" data-coarse="5" type="number"
                    min="50" max="100" step="1" value="90" inputmode="numeric"
                    data-device-setting>
             <button type="button" class="step mono" data-for="device-ink"
@@ -543,7 +543,7 @@
           <span class="stepper">
             <button type="button" class="step mono" data-for="device-warm"
                     data-dir="-1" aria-label="decrease warm">−</button>
-            <input class="mono" id="device-warm" type="number"
+            <input class="mono" id="device-warm" data-coarse="2" type="number"
                    min="-12" max="12" step=".5" value="3" inputmode="decimal"
                    data-device-setting
                    aria-label="warm, red above blue in display levels">
@@ -562,7 +562,7 @@
           <span class="stepper">
             <button type="button" class="step mono" data-for="device-tint"
                     data-dir="-1" aria-label="decrease tint">−</button>
-            <input class="mono" id="device-tint" type="number"
+            <input class="mono" id="device-tint" data-coarse="2" type="number"
                    min="-8" max="8" step=".5" value="2.5" inputmode="decimal"
                    data-device-setting
                    aria-label="tint, green above red and blue in display levels">

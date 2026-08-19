@@ -59,9 +59,47 @@ export function showSlider(field) {
   slider.style.setProperty("--fill", `${Math.round(fraction * 100)}%`);
 }
 
+// The 1-2-5 number at or above what was asked for, which is what a scale
+// somebody reads values off is made of: 50 rather than 47.
+export function roundStep(wanted) {
+  if (!(wanted > 0)) return 0;
+  const decade = 10 ** Math.floor(Math.log10(wanted));
+  return [1, 2, 5].map(unit => unit * decade).find(one => one >= wanted)
+         ?? 10 * decade;
+}
+
+// How far a shifted press moves. It follows the unit rather than the range --
+// a point, a pixel, a quarter of an em -- and no arithmetic over min, max and
+// step knows what a knob is counting in: size covers 34 points in quarters and
+// wants 1 of them, a wght axis covers 800 in ones and wants 50. So a declared
+// knob names its own, in `data-coarse` beside the step it is the coarse
+// version of.
+//
+// A row built for a font's own axis has no markup to say it in, so it gets a
+// round number sized off the range: sixteen presses across the axis, whatever
+// the axis is.
+function coarseStep(field) {
+  const declared = Number(field.dataset.coarse);
+  if (declared > 0) return declared;
+  const step = Number(field.step) || 1;
+  return Math.max(step, roundStep((Number(field.max) - Number(field.min)) / 16));
+}
+
 export function stepBy(field, direction, coarse, set = setField) {
-  const step = (Number(field.step) || 1) * (coarse ? 10 : 1);
-  set(field, Number(field.value) + step * direction);
+  if (!coarse) {
+    set(field, Number(field.value) + (Number(field.step) || 1) * direction);
+    return;
+  }
+  // Onto the multiples of the coarse step rather than carrying the fraction
+  // along: from 13.25 the size knob goes to 14 and then 15, which is the whole
+  // reason a coarse press is worth having on a quarter-point knob. The epsilon
+  // is for a value already sitting on the grid, where 0.15 / 0.05 comes out a
+  // hair under 3 and the press would otherwise be spent going nowhere.
+  const step = coarseStep(field);
+  const at = Number(field.value) / step;
+  const to = direction > 0 ? Math.floor(at + 1e-6) + 1
+                           : Math.ceil(at - 1e-6) - 1;
+  set(field, to * step);
 }
 
 // A held stepper repeats, which is what keeps a field as quick to sweep as the
@@ -117,8 +155,8 @@ export function pairSlider(field, slider, set = setField) {
 // The markup declares the knobs that are always there; this is for the ones
 // that depend on the font, which is the axes a variable family brings. Going
 // through the same wiring is the point of it: a built row snaps to its step,
-// clamps to its range, keeps its slider and field in step, takes shift for ten
-// at a time, and asks for a page the one coalesced way -- none of which it
+// clamps to its range, keeps its slider and field in step, takes shift for a
+// coarse press, and asks for a page the one coalesced way -- none of which it
 // gets by being assembled by hand somewhere else.
 export function numericRow({label, min, max, step, value, title = "", id = ""}) {
   const row = document.createElement("div");

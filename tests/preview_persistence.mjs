@@ -148,8 +148,12 @@ for (const { name, text } of sources) {
 // buttons restore from, so the stub has to carry them the way a real control
 // does: the value the markup declared, fixed at construction.
 function makeControl({ name, type = "text", value = "", checked = false, group,
-                      options, min = "", max = "", step = "1" }) {
+                      options, min = "", max = "", step = "1", coarse }) {
   const el = { name, type, value, checked, dataset: {}, options, min, max, step };
+  // What a shifted press moves this knob by, which the markup declares beside
+  // the step. A stub without it would take the derived one a font's own axis
+  // gets, and the two answer differently on every knob here.
+  if (coarse) el.dataset.coarse = coarse;
   el.defaultValue = value;
   el.defaultChecked = checked;
   // A checkbox carries "on" whether or not the markup gives it a value, while
@@ -398,15 +402,15 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       options: [{ value: "x4" }, { value: "x3" }],
     }),
     makeControl({ name: "size", type: "number", value: "13", group: "root",
-                  min: "6", max: "40", step: "0.25" }),
+                  min: "6", max: "40", step: "0.25", coarse: "1" }),
     makeControl({ name: "gamma", type: "number", value: "1",
-                  min: "0.3", max: "4", step: "0.05" }),
+                  min: "0.3", max: "4", step: "0.05", coarse: "0.5" }),
     // A second font knob, so "the save carries the whole panel rather than
     // only what changed" is a claim this can actually tell apart.
     makeControl({ name: "weight", type: "number", value: "0",
-                  min: "-1", max: "1", step: "0.05" }),
+                  min: "-1", max: "1", step: "0.05", coarse: "0.25" }),
     makeControl({ name: "margin", type: "number", value: "5", group: "page",
-                  min: "5", max: "40", step: "1" }),
+                  min: "5", max: "40", step: "1", coarse: "5" }),
     makeControl({
       name: "alignment", value: "justify", group: "page",
       options: [{ value: "justify" }, { value: "left" }, { value: "center" }],
@@ -453,7 +457,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     makeControl({ name: "antialiased", type: "checkbox", checked: true, group: "page" }),
     makeControl({ name: "inverted", type: "checkbox", checked: false, group: "page" }),
     makeControl({ name: "line_height", type: "number", value: "1.15",
-                  min: "0.8", max: "2.2", step: "0.05" }),
+                  min: "0.8", max: "2.2", step: "0.05", coarse: "0.25" }),
     makeControl({ name: "text", value: "", group: "root" }),
     // The two variable-font weight pickers. They start empty: their options
     // come from whichever family is showing, and a static one has none.
@@ -478,12 +482,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   }));
   // The steppers, so the +/- path can be driven -- it reaches setField without
   // ever firing an input event, which is its own class of bug.
-  const stepList = ["gamma", "margin"].flatMap(name => [-1, 1].map(dir => ({
-    dataset: { for: name, dir: String(dir) },
-    on: {},
-    addEventListener(kind, fn) { this.on[kind] = fn; },
-    press() { this.on.pointerdown({ shiftKey: false }); },
-  })));
+  const stepList = ["size", "gamma", "margin"].flatMap(
+    name => [-1, 1].map(dir => ({
+      dataset: { for: name, dir: String(dir) },
+      on: {},
+      addEventListener(kind, fn) { this.on[kind] = fn; },
+      press(shiftKey = false) { this.on.pointerdown({ shiftKey }); },
+    })));
   // One arrow per knob, shown only when that knob is off its default.
   // A checkbox on each side of the font/page line, because a checkbox's state
   // is `checked` alone and everything else about it is a trap.
@@ -684,21 +689,23 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   }));
   const devicePaper = deviceControl(makeControl({
     name: "device-paper", type: "number", value: "90", min: "50", max: "100",
+    coarse: "5",
   }));
   const deviceInk = deviceControl(makeControl({
     name: "device-ink", type: "number", value: "90", min: "50", max: "100",
+    coarse: "5",
   }));
   const deviceCalibration = deviceControl(makeControl({
     name: "device-calibration-range", type: "number", value: "100",
-    min: "50", max: "150", step: ".5",
+    min: "50", max: "150", step: ".5", coarse: "5",
   }));
   const deviceWarm = deviceControl(makeControl({
     name: "device-warm", type: "number", value: "3",
-    min: "-12", max: "12", step: ".5",
+    min: "-12", max: "12", step: ".5", coarse: "2",
   }));
   const deviceTint = deviceControl(makeControl({
     name: "device-tint", type: "number", value: "2.5",
-    min: "-8", max: "8", step: ".5",
+    min: "-8", max: "8", step: ".5", coarse: "2",
   }));
   const deviceSlider = (id, field) => ({
     id, dataset: {sliderFor: field.id}, value: field.value,
@@ -1651,6 +1658,58 @@ for (const { name, text } of sources) {
   arrow.click();
   check("and puts back what was actually dialled in",
         env.byName.gamma.value === "1.25", env.byName.gamma.value);
+}
+
+// 12a. Shift is a coarse press, and it lands on the multiples of what the knob
+//      declares as a big move rather than carrying the fraction along. These
+//      values are read off the panel and written into a .conf, so where a press
+//      lands matters as much as how far it went: from 13.25 the size knob is
+//      wanted at 14 and 15, not at 15.75 and 18.25.
+{
+  const env = await run(fakeStorage());
+  const press = (name, direction, shiftKey) => env.stepList.find(
+    one => one.dataset.for === name &&
+           Number(one.dataset.dir) === direction).press(shiftKey);
+
+  env.byName.size.value = "13.25";
+  env.listeners.input({ target: env.byName.size });
+  press("size", 1, true);
+  check("a coarse press lands on the whole point below the next one",
+        env.byName.size.value === "14", env.byName.size.value);
+  press("size", 1, true);
+  check("and keeps to them from there",
+        env.byName.size.value === "15", env.byName.size.value);
+  press("size", -1, false);
+  check("while a bare press is still the step the knob steps in",
+        env.byName.size.value === "14.75", env.byName.size.value);
+  press("size", -1, true);
+  check("and a coarse press back rounds the other way",
+        env.byName.size.value === "14", env.byName.size.value);
+  check("the slider follows a coarse press like any other",
+        env.sliderList.find(one => one.dataset.sliderFor === "size")
+          .value === "14");
+
+  // Each knob declares its own, in the unit it counts in: half a point of
+  // gamma, five pixels of margin. Ten times the step would be neither.
+  press("gamma", 1, true);
+  check("gamma takes the half it declares",
+        env.byName.gamma.value === "1.5", env.byName.gamma.value);
+  press("margin", 1, true);
+  check("and margin the five it declares",
+        env.byName.margin.value === "10", env.byName.margin.value);
+}
+
+// 12b. The round number the derived coarse press is made of, asked directly:
+//      one wdth axis exercises a single case of it, and what the rule has to
+//      hold is that every answer is a number somebody would have picked.
+{
+  const env = await run(fakeStorage());
+  const round = env.modules.get("knobs.js").roundStep;
+  const answers = [1.5625, 50, 8.5, 0.625, 3.125, 1, 200].map(round).join();
+  check("every derived press is a 1-2-5 number at or above what was asked",
+        answers === "2,50,10,1,5,1,200", answers);
+  check("and a range that says nothing has none to derive",
+        round(0) === 0 && round(NaN) === 0);
 }
 
 // 13. Typing a value moves its slider. Only setField did that, so a typed
@@ -2701,6 +2760,25 @@ for (const { name, text } of sources) {
   check("and two presses are still one page",
         env.fetches.render === stepped + 1,
         `${stepped} -> ${env.fetches.render}`);
+}
+
+// 40b2. An axis row is built from the font and has no markup to declare a
+//       coarse press in, so it derives one: a round number sized off the range,
+//       sixteen presses across whatever the axis turns out to be. wdth spans 25
+//       in ones, which makes it two.
+{
+  const env = await loaded(fakeStorage());
+  env.family.choose("Vari");
+  await settle();
+  const row = env.sandbox.document.getElementById("axis-rows").children[0];
+  const [minus, field, plus] = row.children[2].children;
+
+  plus.on.pointerdown({ shiftKey: true });
+  check("a coarse press on a built row takes the derived step",
+        field.value === "102", field.value);
+  minus.on.pointerdown({ shiftKey: false });
+  check("and a bare one still takes the axis step",
+        field.value === "101", field.value);
 }
 
 // 40c. Reset font knobs leaves the axis controls where they are. They are not
@@ -4860,7 +4938,7 @@ for (const deferred of [
         env.device.paper.value === "50" &&
         env.device.paperSlider.value === "50");
   env.device.step(env.device.calibration, 1, true);
-  check("the custom stepper takes a coarse half-percent step",
+  check("the custom stepper takes the five percent it declares",
         env.device.calibration.value === "115" &&
         env.device.calibrationSlider.value === "115",
         env.device.calibration.value);
