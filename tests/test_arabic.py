@@ -17,6 +17,16 @@ SHAPE_NODE = re.compile(
     r"/\*\s*([0-9A-F]{3})\s*\*/\s*\{\s*(S[LRDUC])\s*,\s*(0x[0-9A-Fa-f]+)\s*\}")
 
 
+def dark_pixels(page, below=250):
+    """How much ink a rendered page carries, which is what says it drew.
+
+    Through the histogram, which counts the same thing in one pass and is not
+    on its way out. `getdata` is deprecated and goes in Pillow 14, and its
+    replacement arrived too late for the `pillow>=10` this package asks for.
+    """
+    return sum(page.convert("L").histogram()[:below])
+
+
 def test_the_table_covers_the_letters_minibidi_shapes():
     letters = {base for base, _ in arabic.PRESENTATION_FORMS}
     assert letters
@@ -265,7 +275,7 @@ def _ink(face_path, codepoint, size=16.0):
     font_bytes = build_font({REGULAR: face_path}, size,
                             coverage=((0x0020, 0x0020), (codepoint, codepoint)))
     page = image.render_png(font_bytes, chr(codepoint))
-    return sum(1 for value in page.convert("L").getdata() if value < 250)
+    return dark_pixels(page)
 
 
 def test_a_synthesized_form_rasterizes_to_ink(tmp_path):
@@ -298,7 +308,7 @@ def _page_ink(face, coverage, text, fallbacks=(), size=16.0):
     font = build_font({REGULAR: face}, size, coverage=coverage,
                       fallbacks=tuple(str(p) for p in fallbacks))
     page = image.render_png(font, text)
-    return sum(1 for v in page.convert("L").getdata() if v < 250)
+    return dark_pixels(page)
 
 
 #: One joined word the fixture can draw, and the coverage its letters need.
@@ -400,7 +410,7 @@ def test_a_glyph_inside_the_cap_is_still_drawn():
     font = build_font({REGULAR: face}, 32.0,
                       coverage=((0x0020, 0x0020), (0xFDFA, 0xFDFA)))
     page = image.render_png(font, "ﷺ")
-    assert sum(1 for v in page.convert("L").getdata() if v < 250) > 0
+    assert dark_pixels(page) > 0
 
 
 def test_the_arabic_preset_reaches_the_honorific_ligatures():
