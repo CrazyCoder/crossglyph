@@ -5,9 +5,9 @@ Tune a font for an Xteink reader running
 the page redraw as you move each control. A change lands in 10 to 300 ms,
 depending on your hardware and how much of the font is being built.
 
-Most fonts need tuning to read well at two bits per pixel. Until now every
-guess cost a card swap or an emulator run, so almost nobody went past changing
-the point size.
+Most fonts need tuning to read well at two bits per pixel. Without a preview
+every guess costs a card swap or an emulator run, which is why most people stop
+at the point size.
 
 <p align="center">
   <a href="docs/images/tune.png"><img src="docs/images/tune.png" width="32%"
@@ -18,8 +18,8 @@ the point size.
      alt="The Export panel with sizes, coverage, fallbacks and build controls"></a>
 </p>
 
-- the firmware's own renderer, its C++ compiled to WebAssembly, so the page is
-  what the device draws rather than an impression of it
+- the firmware's own renderer, its C++ compiled to WebAssembly, so the page
+  shows what the device draws and not an impression of it
 - fourteen rasterizing controls: gamma, the three grey thresholds, weight,
   slant, hinting mode, grayscale hinting, mono rasterizing, stem darkening,
   line height, letter and word spacing, kerning strength, ligatures,
@@ -43,9 +43,9 @@ the point size.
 - nothing installed system wide, since the launcher fetches uv, Python and the
   dependencies into a cache directory you can delete
 
-CrossGlyph turns TTF and OTF files into `.cpfont`, which is what the device
-reads: glyph bitmaps at two bits per pixel, one file per point size, kerning
-and ligature tables baked in. The device has no rasterizer, so every size is a
+CrossGlyph turns TTF and OTF files into `.cpfont`, the format the device
+reads: glyph bitmaps at two bits per pixel, one file per point size, with
+kerning and ligature tables baked in. The device has no rasterizer, so every size is a
 separate build.
 
 ## Quick start
@@ -61,8 +61,7 @@ first family it finds.
 
 What you unpack holds the launcher, your `fonts` folder, and a `versions`
 folder with the code in it. The launcher runs whichever version `current`
-names, which is how a later release can be added beside this one rather than
-written over it.
+names, so a later release is added beside this one and never written over it.
 
 CrossGlyph looks for a newer release about once a day and says so when there
 is one. `crossglyph update`, or the button in the preview, installs it beside
@@ -88,7 +87,7 @@ To keep the preview running without a terminal window holding it open, there
 is `start`, `status`, `restart` and `stop`. `start` opens a browser once the
 page answers, `restart` comes back on the same address and picks up an update
 if one has been installed, and `stop --port 8123` names a preview on another
-address rather than the one this install started.
+address instead of the one this install started.
 [docs/preview.md](docs/preview.md) has the rest.
 
 Windows on ARM is the one platform without ready-made wheels: `freetype-py`
@@ -136,9 +135,9 @@ land in `cpfonts` unless `out` in `all.conf` says otherwise.
 
 A family needs no config at all. Drop four files in, name them the way their
 foundry did, and they build on the next run. `all.conf` holds settings shared
-by every family. It is yours and starts absent; copy `all.conf.example`
-beside it to start from a commented list of every key.
-Write a `<family>.conf` when one family needs settings of its own. See
+by every family. It is yours and starts absent; copy `all.conf.example` beside
+it to start from a commented list of every key. Write a `<family>.conf` when
+one family needs settings the others do not. See
 [docs/fonts.md](docs/fonts.md) for every key, and for what the tuning controls
 actually do.
 
@@ -158,8 +157,8 @@ that lacks an arrow leaves a gap where it should be. Thirteen Noto faces fill
 those holes, covering Hebrew, Arabic, Armenian, Georgian, Ethiopic, Cherokee,
 Tifinagh, Coptic, mathematics, symbols and emoji.
 
-They are OFL licensed and unmodified, so they are downloaded rather than
-shipped here:
+They are OFL licensed and unmodified, so they are downloaded on request and
+not shipped here:
 
 ```sh
 ./crossglyph.sh fetch-fallbacks
