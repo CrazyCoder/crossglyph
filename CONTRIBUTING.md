@@ -169,6 +169,12 @@ anything, so a tag cannot publish what the suite has not passed. That is a
 `workflow_call` rather than a `needs:` on the job over there, because `needs`
 only names jobs inside one workflow.
 
+One push does not get it. A release pushes `master` and then its tag seconds
+apart, and the tag names the commit `master` already points at, so the suite
+would cover the same tree twice. Both jobs skip a branch push whose head
+commit is a `chore(release):` subject. The tag's run is the gate, and it
+still runs everything.
+
 It drives the pinned uv through `tools/uv.cmd`, so each run verifies that
 checksum on both platforms and tests on the interpreter `.python-version`
 names. Two steps guard what the suite cannot say for itself: the wrappers keep

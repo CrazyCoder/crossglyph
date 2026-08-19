@@ -11,8 +11,29 @@ on:
   workflow_dispatch:
   workflow_call:
 
+# A release pushes master and then its tag, seconds apart, and the tag names
+# the commit master's head already is. Both pushes land here, so without the
+# condition below the suite covers one tree twice, six jobs to say what three
+# say. The tag's run is the one release.yml waits on before it publishes, so
+# the branch push is the half to drop, and only for the commit release.py
+# writes.
+#
+# By the ref, and not by cancelling a run in flight. A concurrency group would
+# have the two races to see which cancels which, and losing that race takes the
+# release job down with the suite it needs.
+#
+# The subject is spelled out in both jobs below. A job's `if` cannot read the
+# `env` context, so there is nowhere above them to put it once. It is written
+# by release.py in fb2xt, as `chore(release): {tag}`.
+
 jobs:
   test:
+    # A tag always runs it: refs/tags is where the gate lives. So does any
+    # branch push whose head is not a release commit, and every pull request
+    # and dispatch, where head_commit is absent and reads as empty.
+    if: >-
+      startsWith(github.ref, 'refs/tags/')
+      || !startsWith(github.event.head_commit.message, 'chore(release): ')
     strategy:
       # Both, always. One of them going red is the interesting case, and
       # stopping the other run is how that gets read as a fluke.
@@ -29,7 +50,7 @@ jobs:
             italic: C:/Windows/Fonts/ariali.ttf
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # git normalizes nothing in the wrappers, so a checkout carries whatever
       # was committed. What this catches is an editor that flattened one half
@@ -65,12 +86,16 @@ jobs:
         run: node --experimental-vm-modules tests/preview_persistence.mjs
 
   container:
+    # As above: the tag's run covers this commit, so the branch push skips it.
+    if: >-
+      startsWith(github.ref, 'refs/tags/')
+      || !startsWith(github.event.head_commit.message, 'chore(release): ')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the container image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
