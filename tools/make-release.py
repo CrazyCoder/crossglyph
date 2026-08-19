@@ -67,11 +67,11 @@ REQUIRED = [
     "crossglyph.sh", "crossglyph.cmd",
     "crossglyph-docker.sh", "crossglyph-docker.cmd",
     "compose.yaml", "compose.build.yaml", "update.conf",
-    "fonts/README.md", "fonts/conf/all.conf",
+    "fonts/README.md", "fonts/conf/all.conf.example",
     # The version copies are the shipped baselines that tell an untouched
     # root file from one the user edited.
     "{v}/compose.yaml", "{v}/compose.build.yaml",
-    "{v}/fonts/README.md", "{v}/fonts/conf/all.conf",
+    "{v}/fonts/README.md", "{v}/fonts/conf/all.conf.example",
     # Each launcher's version copy is what an update installs or stages beside
     # the live one.
     "{v}/crossglyph.cmd", "{v}/crossglyph.sh",

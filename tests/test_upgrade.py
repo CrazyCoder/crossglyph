@@ -63,10 +63,10 @@ def make_zip(version=NEW, *, template=TEMPLATE, escape=False,
                     info.external_attr = 0o100755 << 16
                 archive.writestr(info, launcher)
         archive.writestr(f"{PREFIX}/current", f"{version}\n")
-        archive.writestr(f"{PREFIX}/fonts/conf/all.conf", template)
+        archive.writestr(f"{PREFIX}/fonts/README.md", template)
         archive.writestr(f"{inside}/pyproject.toml", f'version = "{version}"\n')
         archive.writestr(f"{inside}/src/crossglyph/cli.py", "print()\n")
-        archive.writestr(f"{inside}/fonts/conf/all.conf", template)
+        archive.writestr(f"{inside}/fonts/README.md", template)
         archive.writestr(f"{PREFIX}/compose.yaml", compose(version))
         archive.writestr(f"{inside}/compose.yaml", compose(version))
         build = compose_build(f"./versions/{version}")
@@ -122,7 +122,7 @@ def served(monkeypatch):
 def release(tmp_path):
     """An unpacked release sitting on the old version."""
     (tmp_path / "versions" / OLD / "fonts" / "conf").mkdir(parents=True)
-    (tmp_path / "versions" / OLD / "fonts" / "conf" / "all.conf").write_bytes(
+    (tmp_path / "versions" / OLD / "fonts" / "README.md").write_bytes(
         TEMPLATE)
     # Bytes rather than text: what is staged is decided by a byte comparison,
     # and a fixture that wrote CRLF here would be testing the line endings.
@@ -134,7 +134,7 @@ def release(tmp_path):
     (tmp_path / "versions" / OLD / "compose.build.yaml").write_bytes(old_build)
     (tmp_path / "compose.build.yaml").write_bytes(old_build)
     (tmp_path / "fonts" / "conf").mkdir(parents=True)
-    (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(TEMPLATE)
+    (tmp_path / "fonts" / "README.md").write_bytes(TEMPLATE)
     layout.write_current(tmp_path, OLD)
     return tmp_path
 
@@ -427,27 +427,54 @@ def test_an_executable_member_lands_executable(tmp_path):
 def test_a_template_nobody_has_is_written(tmp_path):
     incoming = tmp_path / "incoming"
     (incoming / "fonts" / "conf").mkdir(parents=True)
-    (incoming / "fonts" / "conf" / "all.conf").write_bytes(b"new\n")
+    (incoming / "fonts" / "README.md").write_bytes(b"new\n")
     assert upgrade.seed_conffiles(tmp_path, incoming, None) == []
-    assert (tmp_path / "fonts" / "conf" / "all.conf").read_bytes() == b"new\n"
+    assert (tmp_path / "fonts" / "README.md").read_bytes() == b"new\n"
+
+
+def test_an_example_is_offered_to_a_workspace_without_the_real_file(tmp_path):
+    """all.conf.example is the copy to start from, so an install that has no
+    all.conf is exactly who it is for."""
+    incoming = tmp_path / "incoming"
+    (incoming / "fonts" / "conf").mkdir(parents=True)
+    (incoming / "fonts" / "conf" / "all.conf.example").write_bytes(b"# out =\n")
+    assert upgrade.seed_conffiles(tmp_path, incoming, None) == []
+    assert (tmp_path / "fonts" / "conf" / "all.conf.example").is_file()
+
+
+def test_an_example_is_not_pushed_at_somebody_who_wrote_the_real_file(tmp_path):
+    """Theirs already exists, so the template is documentation they do not
+    need. Seeding it anyway would put a file nobody asked for beside the one
+    they wrote, at every update, for as long as they keep the install."""
+    incoming = tmp_path / "incoming"
+    (incoming / "fonts" / "conf").mkdir(parents=True)
+    (incoming / "fonts" / "conf" / "all.conf.example").write_bytes(b"# out =\n")
+    (tmp_path / "fonts" / "conf").mkdir(parents=True)
+    (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(b"out = D:/mine\n")
+
+    assert upgrade.seed_conffiles(tmp_path, incoming, None) == []
+    assert not (tmp_path / "fonts" / "conf" / "all.conf.example").exists()
+    # And theirs is untouched, which is the whole point of not writing.
+    assert (tmp_path / "fonts" / "conf" / "all.conf").read_bytes() == \
+        b"out = D:/mine\n"
 
 
 def test_a_template_nobody_edited_is_replaced(release, served):
     """Identical to what this version shipped, so it is ours to update."""
-    shipped = release / "versions" / OLD / "fonts" / "conf" / "all.conf"
+    shipped = release / "versions" / OLD / "fonts" / "README.md"
     shipped.write_bytes(b"old\n")
-    (release / "fonts" / "conf" / "all.conf").write_bytes(b"old\n")
+    (release / "fonts" / "README.md").write_bytes(b"old\n")
     assert last(run(release))["kept"] == []
-    assert (release / "fonts" / "conf" / "all.conf").read_bytes() == TEMPLATE
+    assert (release / "fonts" / "README.md").read_bytes() == TEMPLATE
 
 
 def test_a_template_somebody_edited_is_kept(release, served):
-    (release / "fonts" / "conf" / "all.conf").write_bytes(b"out = D:/mine\n")
+    (release / "fonts" / "README.md").write_bytes(b"out = D:/mine\n")
     said = last(run(release))
-    assert said["kept"] == ["fonts/conf/all.conf"]
-    assert (release / "fonts" / "conf" / "all.conf").read_bytes() == \
+    assert said["kept"] == ["fonts/README.md"]
+    assert (release / "fonts" / "README.md").read_bytes() == \
         b"out = D:/mine\n"
-    assert (release / "fonts" / "conf" / "all.conf.new").read_bytes() == \
+    assert (release / "fonts" / "README.md.new").read_bytes() == \
         TEMPLATE
 
 
@@ -498,7 +525,7 @@ def source(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
     (tmp_path / "crossglyph.sh").write_text("#!/bin/sh\n", encoding="utf-8")
     (tmp_path / "fonts" / "conf").mkdir(parents=True)
-    (tmp_path / "fonts" / "conf" / "all.conf").write_bytes(TEMPLATE)
+    (tmp_path / "fonts" / "README.md").write_bytes(TEMPLATE)
     (tmp_path / "compose.yaml").write_bytes(SOURCE_COMPOSE)
     (tmp_path / "compose.build.yaml").write_bytes(SOURCE_COMPOSE_BUILD)
     return tmp_path

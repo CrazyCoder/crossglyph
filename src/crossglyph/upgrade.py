@@ -46,6 +46,11 @@ MANAGED = ("compose.build.yaml", "compose.yaml")
 #: Written beside a file the user has edited, rather than over it.
 SUFFIX = ".new"
 
+#: A file that is documentation of the one it is named after: `all.conf` is
+#: written by hand and by the preview, and `all.conf.example` is the copy to
+#: start from. Only an install without the real file is offered one.
+TEMPLATE = ".example"
+
 #: Launchers are staged when they already exist because a shell may be reading
 #: one while an update runs. A launcher introduced by a release is not open and
 #: can be installed directly; later replacements follow the staged path.
@@ -114,6 +119,20 @@ def extract(archive: pathlib.Path, into: pathlib.Path, wanted: str) -> None:
                          f"{wanted} to install")
 
 
+def _template_wanted(root: pathlib.Path, relative: pathlib.PurePath) -> bool:
+    """Whether a workspace template belongs in this install.
+
+    A template is documentation for somebody who has not written the file yet,
+    so a workspace that already has the real one is not owed a copy: seeding it
+    there puts a file nobody asked for beside the one they wrote, at every
+    update, for as long as they keep the install. Anything that is not a
+    template is wanted either way.
+    """
+    if relative.suffix != TEMPLATE:
+        return True
+    return not (root / WORKSPACE / relative.with_suffix("")).is_file()
+
+
 def _seed_conffile(live: pathlib.Path, arriving: pathlib.Path,
                    was: pathlib.Path | None) -> bool:
     """Apply one conffile. True means the live edit was kept."""
@@ -150,6 +169,8 @@ def seed_conffiles(root: pathlib.Path, incoming: pathlib.Path,
         if not path.is_file():
             continue
         relative = path.relative_to(source)
+        if not _template_wanted(root, relative):
+            continue
         live = root / WORKSPACE / relative
         was = shipped / WORKSPACE / relative if shipped else None
         if _seed_conffile(live, path, was):

@@ -67,7 +67,8 @@ def test_what_the_user_writes_stays_at_the_root():
         ("update.conf",)
 
 
-@pytest.mark.parametrize("path", ["fonts/README.md", "fonts/conf/all.conf"])
+@pytest.mark.parametrize("path",
+                         ["fonts/README.md", "fonts/conf/all.conf.example"])
 def test_a_workspace_file_lands_in_both_places(path):
     """The root copy is the user's to edit. The one inside the version is how
     it shipped, which is the only way an update can tell an edited file from
@@ -213,7 +214,10 @@ def test_the_archive_holds_both_halves_of_the_release(built, members):
                      "crossglyph.cmd", "crossglyph.sh"):
         assert launcher in members
         assert f"versions/{version}/{launcher}" in members
-    assert "fonts/conf/all.conf" in members
+    assert "fonts/conf/all.conf.example" in members
+    # The template ships; all.conf is the user's and is never in a release, so
+    # an update has nothing of theirs to write over.
+    assert "fonts/conf/all.conf" not in members
     assert f"versions/{version}/pyproject.toml" in members
     assert "compose.yaml" in members
     assert "compose.build.yaml" in members
@@ -241,8 +245,9 @@ def test_the_two_copies_of_a_template_are_the_same_bytes(built):
     them would make every install look edited."""
     version, name, path = built
     with zipfile.ZipFile(path) as archive:
-        assert archive.read(f"{name}/fonts/conf/all.conf") == \
-            archive.read(f"{name}/versions/{version}/fonts/conf/all.conf")
+        assert archive.read(f"{name}/fonts/conf/all.conf.example") == \
+            archive.read(
+                f"{name}/versions/{version}/fonts/conf/all.conf.example")
 
 
 def test_the_two_compose_files_are_identical_and_pinned(built):

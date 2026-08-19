@@ -136,7 +136,8 @@ land in `cpfonts` unless `out` in `all.conf` says otherwise.
 
 A family needs no config at all. Drop four files in, name them the way their
 foundry did, and they build on the next run. `all.conf` holds settings shared
-by every family and ships commented out, so it sets nothing until you edit it.
+by every family. It is yours and starts absent; copy `all.conf.example`
+beside it to start from a commented list of every key.
 Write a `<family>.conf` when one family needs settings of its own. See
 [docs/fonts.md](docs/fonts.md) for every key, and for what the tuning controls
 actually do.

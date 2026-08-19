@@ -13,7 +13,8 @@ reads the style off the end of each filename, so a family named the way its
 foundry named it needs no configuration.
 
 Settings live in `conf`, one `<family>.conf` per family, with shared values in
-`conf/all.conf`. That file ships commented out, so it sets nothing until you
-edit it. The preview writes both for you when you press Save.
+`conf/all.conf`. Both are yours and both start absent: copy
+`conf/all.conf.example` when you want the shared file, or press Save in the
+preview, which writes either for you.
 
 Built families land in `cpfonts`.

@@ -1,9 +1,13 @@
 # Settings shared by every family in this workspace.
 #
-# Nothing here is required. Each line below is commented out and carries the
-# value the tool already uses, so uncommenting one changes nothing until you
-# edit it. A <family>.conf beside this file overrides these for that family,
-# and states only what it does differently.
+# Copy this to all.conf to use it. This file is the template and is read by
+# nothing; all.conf is yours, and the preview writes it when you press Save.
+#
+# Nothing here is required, and a workspace with no all.conf at all works.
+# Each line below is commented out and carries the value the tool already
+# uses, so uncommenting one changes nothing until you edit it. A
+# <family>.conf beside all.conf overrides these for that family, and states
+# only what it does differently.
 #
 # This file cannot set name, family, or the explicit style and fallback file
 # keys: each of those names one specific family or file.

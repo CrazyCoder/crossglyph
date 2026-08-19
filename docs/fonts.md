@@ -13,7 +13,10 @@ optional, and the shortest useful config is empty.
 
 ## all.conf, the shared defaults
 
-A file named `all.conf` in `conf` is not a family, and is not required.
+A file named `all.conf` in `conf` is not a family, and is not required. It
+starts absent: `all.conf.example` beside it is a commented list of every key
+it can hold, to copy when you want one. The preview writes `all.conf` too,
+when you save a family it covers without naming.
 
 It holds settings shared by every family in the workspace: a `<family>.conf`
 inherits from it and states only what it does differently, and a family with no
