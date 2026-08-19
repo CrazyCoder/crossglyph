@@ -3308,7 +3308,7 @@ def test_a_workspace_under_a_non_ascii_path_still_draws(tmp_path, monkeypatch):
 
 
 def _fault_of(answer):
-    """The kind and the sentence, as the page reads them off a failed render."""
+    """The kind and the sentence, as the page reads them off a render."""
     return answer.headers.get("x-fault"), answer.json()["detail"]
 
 
@@ -3338,7 +3338,8 @@ def test_a_malformed_font_is_not_called_a_setting(tmp_path, monkeypatch):
         assert answer.status_code == 422
         assert kind == "font"
         assert "Probe-Regular.ttf" in why, why
-        assert "FT_Exception" not in why, "freetype-py's wrapper reached the page"
+        assert "FT_Exception" not in why, \
+            "freetype-py's wrapper reached the page"
     finally:
         _forget_the_last_folder()
         server.set_font_source(SRC)
@@ -3413,7 +3414,23 @@ def test_freetype_saying_nothing_about_the_file_is_told_which(tmp_path):
     assert "Probe-Regular.ttf" in single, single
     # Nothing resolved yet, so there is nothing to name and it says only what
     # FreeType said.
-    assert server._fault(freetype.FT_Exception(1), None)[1] ==         "cannot open resource"
+    assert server._fault(freetype.FT_Exception(1), None)[1] == (
+        "cannot open resource")
+
+
+def test_freetype_words_carrying_brackets_come_through_whole():
+    """The wrapper is one bracket off each end. str.strip() takes characters
+    and not an affix, so a message ending in a bracket of its own loses that
+    one too and comes out unbalanced."""
+    from crossglyph.preview import server
+
+    class Odd(Exception):
+        def __str__(self):
+            return "FT_Exception:  (invalid argument (size))"
+
+    assert server._freetype_said(Odd()) == "invalid argument (size)"
+    # Nothing shaped like the wrapper at all, so there is nothing to unwrap.
+    assert server._freetype_said(ValueError("plain")) == "plain"
 
 
 def test_a_reason_the_converter_exits_with_reaches_the_page():

@@ -97,7 +97,10 @@ const FAULTS = {
 // the page does not know the name of falls back to the status, which is what
 // an older server and every other endpoint give it.
 export function failureHeadline(status, fault) {
-  if (FAULTS[fault]) return FAULTS[fault];
+  // hasOwn, not a plain lookup: every object inherits `constructor` and
+  // `toString`, and a header naming one of those would put a function where
+  // the headline goes.
+  if (fault && Object.hasOwn(FAULTS, fault)) return FAULTS[fault];
   if (status === 503) return "The page cannot be drawn yet.";
   if (status === 422) return "That setting was refused.";
   return `The page could not be drawn (${status}).`;

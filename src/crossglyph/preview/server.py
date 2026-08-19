@@ -374,9 +374,15 @@ def _freetype_said(exc: BaseException) -> str:
     Its __str__ is `FT_Exception:  (cannot open resource)` -- the class name,
     two spaces, and the message in brackets. The class name means nothing to
     a reader and the brackets are not punctuation they can act on.
+
+    One bracket off each end and only a matched pair, so a message carrying
+    brackets of its own comes through whole. str.strip() takes characters
+    rather than an affix and would eat both of a trailing `(x))`.
     """
     inside = str(exc).partition(":")[2].strip()
-    return inside.strip("()").strip() or str(exc)
+    if inside.startswith("(") and inside.endswith(")"):
+        inside = inside[1:-1].strip()
+    return inside or str(exc)
 
 
 def _fault(exc: BaseException, faces: dict | None) -> tuple[str, str]:

@@ -3024,6 +3024,17 @@ for (const [fault, headline] of [
   check("and so does a fault name this page does not know",
         odd.pageError.parts.what.textContent === "That setting was refused.",
         odd.pageError.parts.what.textContent);
+  // Every object inherits these. Looked up without asking whose property it
+  // is, they answer with a function, and a function is what the headline
+  // would then be set to.
+  for (const inherited of ["constructor", "toString", "__proto__"]) {
+    const page = await loaded(fakeStorage(), undefined,
+                              {renderFails: {status: 422, fault: inherited,
+                                             body: "why"}});
+    check(`a fault named ${inherited} is not read off the prototype`,
+          page.pageError.parts.what.textContent === "That setting was refused.",
+          String(page.pageError.parts.what.textContent));
+  }
 }
 
 // 41b. A server that has stopped answers nothing at all. There is no status
