@@ -194,18 +194,6 @@ on the device it comes from the book's own metadata instead. A control that
 cannot apply is greyed rather than hidden, so hyphenating as Russian is not
 offered while hyphenation is off.
 
-Every numeric knob is a slider for covering distance and a field with a `-` and
-a `+` for landing on a value. Hold shift on either stepper and the press is a
-coarse one: it moves by what that knob calls a big move and lands on the
-multiples of it, so from 13.25 the size knob reaches 14 and then 15 rather than
-15.75. Each knob declares its own, in the unit it counts in, since that is the
-thing no arithmetic over its range would know: a whole point of size, half a
-point of gamma, a pixel of letter spacing, five pixels of margin, five percent
-of a device setting. A numeric axis of a variable font has no such declaration
-to make, being built from whatever the font carries, so it derives a round
-number sized off its range: sixteen coarse presses from one end to the other,
-whatever the axis is. Holding a stepper repeats it either way.
-
 `off` at the bottom of that list is a third state rather than a second way to
 untick the box, and the difference shows on any text with a compound in it:
 
@@ -224,6 +212,18 @@ language, it breaks at hyphens the text already carries and adds none of its
 own, which is exactly what the device does with a book whose language it does
 not recognise and is worth being able to look at. A language on top of that
 adds its patterns.
+
+Every numeric knob is a slider for covering distance and a field with a `-` and
+a `+` for landing on a value. Hold shift on either stepper and the press is a
+coarse one: it moves by what that knob calls a big move and lands on the
+multiples of it, so from 13.25 the size knob reaches 14 and then 15 rather than
+15.75. Each knob declares its own, in the unit it counts in, since that is the
+thing no arithmetic over its range would know: a whole point of size, half a
+point of gamma, a pixel of letter spacing, five pixels of margin, five percent
+of a device setting. A numeric axis of a variable font has no such declaration
+to make, being built from whatever the font carries, so it derives a round
+number sized off its range: sixteen coarse presses from one end to the other,
+whatever the axis is. Holding a stepper repeats it either way.
 
 The **Page** section folds, and starts folded. These are settings you match to
 the device you are judging against once and then leave, where everything above
@@ -378,8 +378,8 @@ it differs from the config again, so the arrow points back the other way. The
 tooltip names which of the two it is holding.
 
 What the arrow set aside lives no longer than the panel does: it is one press
-from being back on screen, and a reload or a switch of font drops it without
-asking. So switching font asks only about what the panel is showing, which is
+from being back on screen, and a reload, a switch of font, or the config
+changing on disk under the page all drop it without asking. So switching font asks only about what the panel is showing, which is
 the question the Save button answers. While the arrow is on you are looking at
 what the config says, and both of them are quiet.
 

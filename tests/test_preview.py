@@ -699,6 +699,37 @@ def test_the_stylesheet_has_no_stray_comment_or_brace():
     assert depth == 0, f"{depth} unclosed block(s)"
 
 
+def test_every_numeric_knob_declares_what_a_coarse_press_moves_it_by():
+    """Shift on a stepper moves by the knob's `data-coarse` and lands on the
+    multiples of it. A knob without one falls back to a number derived from its
+    range, which is right for an axis row built from a font and wrong for a
+    declared knob: the derived rule knows the range and not the unit, so it
+    hands the size knob 2 points where a point is what it counts in.
+
+    Nothing at runtime says so. The knob works, shift works, and the press is
+    simply the wrong size, which is exactly the kind of thing that gets noticed
+    a year later.
+    """
+    import re
+
+    from crossglyph.preview import server
+
+    page = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    knobs = re.findall(r'<input\b[^>]*type="number"[^>]*>', page, re.S)
+    assert len(knobs) >= 14, f"only {len(knobs)} numeric knobs found"
+    for knob in knobs:
+        named = re.search(r'id="([^"]+)"', knob)
+        name = named.group(1) if named else knob[:60]
+        assert "data-coarse=" in knob, f"{name} declares no data-coarse"
+        # A coarse press that is not a whole number of steps lands off the grid
+        # the field snaps back to, so the press would not go where it says.
+        coarse = float(re.search(r'data-coarse="([\d.]+)"', knob).group(1))
+        step = float(re.search(r'\sstep="([\d.]+)"', knob).group(1))
+        assert abs(round(coarse / step) - coarse / step) < 1e-9, (
+            f"{name}: a coarse press of {coarse} is not a whole number of "
+            f"its {step} steps")
+
+
 def test_the_size_boxes_take_what_the_size_knob_can_reach():
     """The export panel snaps its size boxes to the knob's step and range, and
     holds those three numbers of its own because the knob is markup and the
