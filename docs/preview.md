@@ -14,59 +14,58 @@
 ./crossglyph.sh preview --family notosans --png page.png  # one page, no server
 ```
 
-Every rendered PNG carries `CrossGlyph X.Y.Z` in gray at the bottom right.
-CrossGlyph adds the watermark after the device render, so it is not part of
-the simulated framebuffer.
+Every rendered PNG carries `CrossGlyph X.Y.Z` in gray at the bottom right. The
+watermark is added after the device render, so it is not part of the simulated
+framebuffer.
 
-`--fonts` is the same flag `build` takes and answers the same question: which
-folder holds the families. Unset, it is `$CROSSGLYPH_FONTS`, and unset again
-it is the `fonts` folder beside the launcher.
+`--fonts` is the same flag `build` takes, and it answers the same question:
+which folder holds the families. Unset, it falls back to `$CROSSGLYPH_FONTS`,
+and then to the `fonts` folder beside the launcher.
 
-`--family` takes a name from the workspace and resolves the four faces exactly
-as a build does: from the family's own `.conf` if it has one, from `all.conf`
-and the filenames if it does not, honouring any face pinned in either. A name
-that matches nothing lists the families that are there. `--bold`, `--italic`
-and `--bold-italic` work beside it and override that one face.
+`--family` takes a name from the workspace. It resolves the four faces the same
+way a build does: from the family's own `.conf` if it has one, otherwise from
+`all.conf` and the filenames, honouring any face pinned in either. A name that
+matches nothing lists the families that are there. `--bold`, `--italic` and
+`--bold-italic` work beside it and each overrides one face.
 
 The picker at the top left switches families without a restart. The family
 rides on each render request, and the build cache is keyed on the faces, so
-going back to one you were just looking at is free. Started on a bare `--font`,
-that file stays at the top of the list as a choice of its own, since it is no
-family and cannot become one.
+returning to a family you were just looking at costs nothing. If you started on
+a bare `--font`, that file stays at the top of the list as a separate choice.
+It belongs to no family and cannot become one.
 
 The picker always ends with Literata, which ships with the tool and is marked
-`(bundled)`. Its faces are read where they are installed and nothing is copied
-into the workspace. It is there so a first run has type to look at, and it
-stays afterwards as somewhere to flip to: a face you know is good, at the size
-and the knobs you are working at.
+`(bundled)`. Its faces are read where they are installed, and nothing is copied
+into your workspace. It gives a first run some type to look at, and it stays
+afterwards as somewhere to flip to: a face you know is good, at the size and
+the knobs you are working at.
 
 Being in the picker does not put it in your workspace. `crossglyph build` with
-no arguments, and **Build all**, build the families in your folder and not the
-one that came with the tool. Name it and it builds, and pressing **Save** on it
-writes a `literata.conf` naming `dir`, after which it is a family like any
-other and builds with the rest.
+no arguments, and **Build all**, build the families in your folder and leave
+the bundled one alone. Name it and it builds. Pressing **Save** on it writes a
+`literata.conf` naming `dir`, and from then on it is a family like any other
+and builds with the rest.
 
-The server runs until it is stopped, and it reads the Python once at startup, so
-a change to the source needs a restart. Ctrl+C ends one in the window holding
-it, and `crossglyph stop --port 8000` ends one on any address, foreground or
-background and whether or not this install started it.
+The server runs until you stop it. It reads the Python once at startup, so a
+change to the source needs a restart. Ctrl+C ends the one in the window holding
+it. `crossglyph stop --port 8000` ends one on any address, foreground or
+background, whether or not this install started it.
 
-Starting a second preview on a port that is already held says what is there and
-what to do about it, rather than failing at the bind:
+Starting a second preview on a port that is already held prints what is there
+and what to do about it:
 
 ```
 a preview is already running on http://127.0.0.1:8000. Open that one, or stop it with `crossglyph stop`.
 Serve one beside it with `crossglyph preview --port 8001`.
 ```
 
-The port it offers is one nothing is listening on, so it is a command to run
-rather than a number to check first.
+The port it offers is one nothing is listening on, so you can run that line as
+printed.
 
 ## In the background
 
-Tuning a font is a thing you come back to for days, and the terminal window
-that is holding the server open is doing nothing else. So it can run without
-one:
+Tuning a font is something you come back to over days, and the terminal window
+holding the server open does nothing else. So it can run without one:
 
 ```sh
 ./crossglyph.sh start                 # start it, and open a browser on it
@@ -79,11 +78,11 @@ one:
 
 `start` takes every option `preview` takes, so `--family`, `--font`, `--host`
 and `--port` mean the same things. It waits for the page to answer before it
-says anything, so a start that failed says so here rather than opening a
-browser on nothing, and the reason is in `preview.log` beside the launcher.
+prints anything. A start that failed says so at the prompt, and never opens a
+browser on nothing; the reason is in `preview.log` beside the launcher.
 
-`status` asks the server rather than guessing from a process list, so what it
-reports is what is actually serving:
+`status` asks the server itself, so it reports whatever is actually serving. A
+process list would only show what was launched:
 
 ```
 preview on http://127.0.0.1:8000
@@ -92,22 +91,22 @@ preview on http://127.0.0.1:8000
   log /home/you/crossglyph/preview.log
 ```
 
-The workspace and the pid come from the server rather than from what was
-typed. `--fonts` and `$CROSSGLYPH_FONTS` both move the workspace, and the
-process that serves is not always the one that was started: uv's venv python
-launches the real interpreter, so a pid remembered at the spawn would be a
-wrapper, and stopping it would leave the server holding the port.
+The workspace and the pid come from the server, not from the command line.
+Both `--fonts` and `$CROSSGLYPH_FONTS` move the workspace. The process that
+serves is also not always the one that was launched: uv's venv python starts
+the real interpreter, so a pid remembered at the spawn would be a wrapper, and
+stopping that would leave the server holding the port.
 
-A preview that has stopped answering while its process is still there is said
-as one, since that is the state a stop has to be able to end:
+A preview that has stopped answering while its process is still there is
+reported as exactly that. A stop has to be able to end that state:
 
 ```
 a preview on http://127.0.0.1:8000 (pid 41288) is not answering.
 `crossglyph stop` will kill it.
 ```
 
-`preview.log` is written unbuffered, so it can be read while the server is
-still up rather than filling in at the moment it exits.
+`preview.log` is written unbuffered, so you can read it while the server is
+still up. A buffered one would fill in at the moment it exits.
 
 `stop` and `status` take `--host` and `--port` too, and there they name which
 preview to act on rather than where to serve. Without one they act on the
