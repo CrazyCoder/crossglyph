@@ -430,21 +430,19 @@ def test_a_family_name_stands_in_for_its_face_paths():
 
 
 @needs
-def test_the_page_can_ask_for_another_family(client):
+def test_the_page_can_ask_for_another_family(client, two_families):
     """The picker's whole point: changing which font is set should not mean
     restarting the app, so the family rides on the request rather than being
-    process state."""
-    from crossglyph.preview import server
+    process state.
 
-    names = [entry["name"] for entry in server.families()]
-    if len(names) < 2:
-        pytest.skip("needs two families in the font source folder")
-
+    The fixture's two, not whatever the workspace happens to hold. A folder
+    with one family in it ran none of this and said nothing about it.
+    """
     pages = [client.post("/render", json={"size": 13, "family": name})
-             for name in names[:2]]
+             for name in ("Probe", "Filler")]
     assert all(page.status_code == 200 for page in pages)
     assert pages[0].content != pages[1].content, \
-        f"{names[0]} and {names[1]} drew the same page"
+        "Probe and Filler drew the same page"
 
 
 @needs
