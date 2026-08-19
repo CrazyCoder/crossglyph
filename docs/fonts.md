@@ -538,7 +538,7 @@ tail, so it stays its own family.
 
 ### Terse suffixes
 
-The old convention has no separator: `b` or `bd` bold, `i` or `it` italic,
+A terse suffix has no separator: `b` or `bd` bold, `i` or `it` italic,
 `bi`, `bdi` or `bdit` bold italic, and `z` bold italic, which is what
 Microsoft's own core fonts ship (`georgiaz.ttf`, `verdanaz.ttf`,
 `CALIBRIZ.TTF`). A bare trailing letter is read as a style only when a file

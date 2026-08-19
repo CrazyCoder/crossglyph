@@ -120,8 +120,8 @@ goes to `versions/.tmp-<version>.zip` and the unpack to
 and both of which are swept at the next launch.
 
 Installing a version whose directory is already there, which is what rolling
-forward after a rollback does, moves the old one to `versions/.old-<version>`
-rather than deleting it. That is not tidiness: the environment uv built inside
+forward after a rollback does, moves the directory already there to
+`versions/.old-<version>` instead of deleting it. That is not tidiness: the environment uv built inside
 it shares its files with every other environment on the drive, and while
 CrossGlyph is running those files cannot be deleted at all. The directory is
 another name the launcher will never start, and it goes at the next launch.
@@ -180,9 +180,9 @@ adds those two things and changes nothing else. The launcher already prefers
 the versioned layout, so the next run starts the new version, and the install
 updates normally from then on.
 
-The old source files at the root are left where they are, but the launcher no
-longer reads them. The shared `fonts` workspace and `compose.yaml` remain at the
-root because native and container launches both use them.
+The source files from the flat layout stay at the root, and the launcher does
+not read them. The shared `fonts` workspace and `compose.yaml` stay at the root
+too, because native and container launches both use them.
 
 The offer only appears when the published release is newer than the version in
 the tree. A snapshot taken from the default branch reports the version of the
