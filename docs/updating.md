@@ -31,28 +31,26 @@ note: X.Y.Z is available. Run crossglyph update to install it.
 
 The second sentence depends on how CrossGlyph was installed. A clone is told
 to pull, a container to take the new image, an unpacked release to run the
-command above. None of them is told anything while there is nothing to do: the
-comparison is the version this install reports against the published one, so a
-clone that is behind that release hears about it and one that is not is left
-alone.
+command above. None of them hears anything while there is nothing to do. The
+check compares the version this install reports against the published one, so
+a clone behind that release hears about it and one that is current stays quiet.
 
 A source download is the exception, and says what it is whatever the check
 found. Its version is whatever the last release set, so a tree taken from the
 default branch after that reports the release and compares as up to date while
-holding rather more than it did.
+holding a good deal more.
 
 In the preview, the island under the specimen answers the question: the new
 version when there is one, and **Up to date.** when there is not. When it last
-looked is a fact about that answer rather than the answer itself, so it sits
-on the line below with the rest of what this install is. Beside it is one
-button: **Check now**
-ordinarily, and **Update** in its place when there is a release this install
-can install. The name at the left of that line links the project, and the
-address comes from the same constant the updater fetches from, so the two
-cannot come to point at different places.
+looked is a fact about that answer and not the answer itself, so it sits on the
+line below with the rest of what this install is. Beside it is one button:
+**Check now** ordinarily, and **Update** in its place when there is a release
+this install can take. The name at the left of that line links the project, and
+the address comes from the same constant the updater fetches from, so the two
+cannot drift apart.
 
-Where that button can do the whole job, the line below says nothing about how
-to update: a command beside a button that runs it is only noise. The kinds the
+Where that button can do the whole job, the line below leaves out how to
+update. A command beside a button that runs it is only noise. The kinds the
 button cannot help still say what would, and so does a source download, whose
 answer is not the command but what pressing it would do to the install.
 
@@ -78,7 +76,7 @@ crossglyph update
 The **Update** button in a local preview downloads the release, installs it,
 restarts CrossGlyph on the same address and reloads the page after the new
 version answers. The port can disappear briefly between the two processes.
-The page waits through that gap rather than treating it as a failed update.
+The page waits through that gap and does not call it a failed update.
 Only one install request runs at a time. A second tab cannot start another
 download or another restart while the first one is working.
 
@@ -104,14 +102,14 @@ because a remote page is not allowed to stop the server, and an update run
 with `crossglyph update`. On the next launch, the native launcher runs the
 version named by `current`.
 
-Automatic handoff is a capability of the version that is running, not the one
-it has just downloaded. The first update from a release without that capability
-therefore asks you to close CrossGlyph and open it once. Later updates can
-restart in the page.
+Automatic handoff is a capability of the version that is running. The one it
+has just downloaded does not decide it. So the first update from a release
+without that capability asks you to close CrossGlyph and open it once. Later
+updates can restart in the page.
 
 The preview stops offering a release as soon as it is on disk. That fact comes
-from the disk rather than from the page that pressed the button, so a reload,
-a second browser and an update run from the command line while the preview is
+from the disk and not from the page that pressed the button, so a reload, a
+second browser and an update run from the command line while the preview is
 open are all told the same thing.
 
 An update interrupted anywhere leaves an install that still runs. The download
@@ -119,15 +117,16 @@ goes to `versions/.tmp-<version>.zip` and the unpack to
 `versions/.incoming-<version>`, neither of which the launcher will ever start,
 and both of which are swept at the next launch.
 
-Installing a version whose directory is already there, which is what rolling
-forward after a rollback does, moves the directory already there to
-`versions/.old-<version>` instead of deleting it. That is not tidiness: the environment uv built inside
-it shares its files with every other environment on the drive, and while
-CrossGlyph is running those files cannot be deleted at all. The directory is
-another name the launcher will never start, and it goes at the next launch.
+Rolling forward after a rollback installs a version whose directory is already
+there. That directory is moved to `versions/.old-<version>` and not deleted.
+Deleting it is not something the installer can rely on: the environment uv
+built inside it shares its files with every other environment on the drive, and
+while CrossGlyph is running those files cannot be removed at all. The moved
+directory is another name the launcher will never start, and it goes at the
+next launch.
 
 One thing stops it before it downloads anything: an install that does not own
-its own files, which is a clone, a container, or a folder nobody can write to.
+its files. That means a clone, a container, or a folder you cannot write to.
 The notice says what to do instead.
 
 ### The launchers
@@ -152,14 +151,20 @@ names.
 ### Your workspace
 
 An update never writes over a file you edited. For each file it ships into
-`fonts`, today `README.md` and `conf/all.conf`:
+`fonts`, today `README.md` and `conf/all.conf.example`:
 
 - if it is not there, it is written;
 - if it is exactly as it shipped, it is replaced, since you never touched it;
 - otherwise yours is kept, the new one is written beside it as
   `<name>.new`, and the update says so.
 
-Everything else in `fonts` is yours and is not looked at.
+A template is skipped entirely where you already have the file it is a
+template for. An install with a `conf/all.conf` is never offered
+`conf/all.conf.example`, so the copy you started from does not reappear beside
+your settings at every update.
+
+`conf/all.conf` itself is never shipped and never touched. Everything else in
+`fonts` is yours and is not looked at.
 
 ### Docker configuration
 
@@ -169,8 +174,8 @@ file. If you edited one, yours is kept and the new one is written as
 `<name>.new`.
 
 Each release's Compose files select that release's image and versioned local
-build context by default. Put deployment settings in `.env` rather than
-editing the Compose files when possible. CrossGlyph does not write `.env`.
+build context by default. Where you can, put deployment settings in `.env`
+and leave the Compose files alone. CrossGlyph does not write `.env`.
 
 ### A source download
 
@@ -207,11 +212,12 @@ That silence is the tool not raising the subject, and it is nothing more than
 that. Ask and you are answered: `crossglyph update --check` and **Check now**
 both name that release and say why nothing had mentioned it, the button
 appears beside it, and `crossglyph update` installs it. A rollback is a
-decision about being nagged, not one you have to undo to change your mind.
+decision about being nagged, and you can change your mind without undoing
+it.
 
 ## How many versions are kept
 
-The one in use and one more, which is what rolling back needs. Older ones are
+The one in use and one more, which is all a rollback needs. Older ones are
 removed at the next launch, on a background thread in the preview, so a large
 removal never delays the page. `keep_versions` in `update.conf` changes the
 count.
@@ -219,7 +225,7 @@ count.
 A version costs about 3 MB unpacked, and about 80 MB once it has been run and
 uv has built its environment. Nothing removes the version in use, the version
 `current` names, or the one this process is running from, and a directory that
-will not go is left for the next launch rather than failing anything.
+will not go is left for the next launch, and nothing fails.
 
 ## Settings
 
@@ -232,7 +238,8 @@ It ships fully commented, so having it changes nothing until you edit a line.
 | `interval_hours` | `24` | How long to wait between checks. |
 | `keep_versions` | `1` | Versions kept besides the one in use. Zero keeps none, and leaves nothing to roll back to. |
 
-A value that does not parse leaves the default rather than being guessed at.
+A value that does not parse leaves the default in place. Nothing is guessed
+at.
 
 ## Turning it off
 
@@ -245,8 +252,8 @@ so one is enough and a `yes` in the config does not overrule the others:
 - the `CI` environment variable, which is set for you on build machines.
 
 None of them touches `crossglyph update --check`, `crossglyph update` or the
-two buttons. Those are you asking, which is a different thing from the tool
-asking. Nothing installs itself either way.
+two buttons. Those are you asking, and the tool asking is a different
+thing. Nothing installs itself either way.
 
 ## What it writes
 
