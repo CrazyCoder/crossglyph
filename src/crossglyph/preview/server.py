@@ -356,6 +356,79 @@ def _axis_note(config: Config, style: str) -> str:
 #: with the reason in it rather than a traceback.
 CLIENT_ERRORS = (ValueError, TypeError, LookupError, FontConfigError)
 
+#: Which kind of failure a render hit, for the page to headline. One status
+#: cannot say this: a knob the converter would not take, a family whose files
+#: have moved and a font file nobody can read are all 422, and a single
+#: headline over the three of them names the wrong thing twice.
+#:
+#: A response header rather than a field in the body, following x-undrawn and
+#: x-coverage-fix below. The body of a failed request is FastAPI's
+#: {"detail": ...} and /save reads that same shape, so widening it here would
+#: reach a panel that has nothing to do with rendering.
+FAULT_HEADER = "x-fault"
+
+
+def _freetype_said(exc: BaseException) -> str:
+    """FreeType's own words, without freetype-py's wrapper around them.
+
+    Its __str__ is `FT_Exception:  (cannot open resource)` -- the class name,
+    two spaces, and the message in brackets. The class name means nothing to
+    a reader and the brackets are not punctuation they can act on.
+    """
+    inside = str(exc).partition(":")[2].strip()
+    return inside.strip("()").strip() or str(exc)
+
+
+def _fault(exc: BaseException, faces: dict | None) -> tuple[str, str]:
+    """Which kind of failure this render hit, and the sentence to show for it.
+
+    `faces` is the style-to-path mapping the render had resolved, or None when
+    it failed before there was one. It is where the file name in a font fault
+    comes from: FreeType says what went wrong and never which file it was
+    reading, so without this the reader is told "cannot open resource" about
+    nothing in particular.
+    """
+    detail = str(exc).strip()
+    if isinstance(exc, SystemExit):
+        # sys.exit("reason") carries one; sys.exit(1) does not, and str() of
+        # an int code is the digit, which would reach the panel as the whole
+        # message. Both exits this path can reach carry their reason.
+        reason = "" if isinstance(exc.code, int) else detail
+        return "converter", reason or ("the converter rejected this "
+                                       "combination; see the server log")
+    if isinstance(exc, freetype.FT_Exception):
+        return "font", _unreadable(faces, _freetype_said(exc))
+    # Already names the file it was reading, and says what to do about it.
+    if isinstance(exc, FontBuildError):
+        return "font", detail
+    if isinstance(exc, LookupError):
+        return "family", detail
+    if isinstance(exc, FontConfigError):
+        return "config", detail
+    return "setting", detail or f"{type(exc).__name__} from the converter"
+
+
+def _unreadable(faces: dict | None, said: str) -> str:
+    """A font fault with the files named, since FreeType's message is not.
+
+    Every face the build was given, and "one of" them where there is more
+    than one: a fallback in the chain is as likely to be the unreadable one
+    as the family's own face, and the error cannot say which. Sharing a
+    folder is the ordinary case, so that is named once after the files
+    instead of repeated down a column of paths.
+    """
+    paths = sorted({pathlib.Path(path) for path in (faces or {}).values()})
+    if not paths:
+        return said
+    folders = {path.parent for path in paths}
+    if len(folders) == 1:
+        what, where = ", ".join(p.name for p in paths), f" in {folders.pop()}"
+    else:
+        what, where = ", ".join(str(p) for p in paths), ""
+    if len(paths) > 1:
+        what = f"one of {what}"
+    return f"{said}. Reading {what}{where}."
+
 
 #: The knobs that only do something when the font has the feature behind them.
 #: Each answers with what the converter would actually apply, rather than with
@@ -784,6 +857,9 @@ def build_font_cached(sources: tuple, size: float, coverage: tuple,
 def render(request: RenderRequest) -> Response:
     if not _sources and not request.family:
         raise HTTPException(503, "no font source; start with --font")
+    # Named in a font fault below, and set before the try because the failure
+    # can land before there is anything to name.
+    sources: dict | None = None
     try:
         spec = PageSpec(**request.page.model_dump())
         spec.to_call_args()                      # validate before rasterizing
@@ -829,12 +905,8 @@ def render(request: RenderRequest) -> Response:
     # BaseException, so a bare `except ValueError` lets it past the handler and
     # out of the app entirely.
     except SystemExit as exc:
-        # sys.exit("reason") carries one; sys.exit(1) does not, and str() of it
-        # is "1", which would reach the panel as the whole error message.
-        reason = str(exc) if not isinstance(exc.code, int) else ""
-        raise HTTPException(
-            422, reason or "the converter rejected this combination; "
-                           "see the server log") from exc
+        kind, why = _fault(exc, sources)
+        raise HTTPException(422, why, {FAULT_HEADER: kind}) from exc
     # FontBuildError from cpfont, not fontbuild: two classes share the name,
     # and the one this path can raise is the converter's, from
     # rasterize_font_style on a malformed face. The fontbuild one comes
@@ -848,8 +920,8 @@ def render(request: RenderRequest) -> Response:
     # is the reader's problem to see rather than a 500.
     except (*CLIENT_ERRORS, FontBuildError,
             freetype.FT_Exception) as exc:
-        raise HTTPException(
-            422, str(exc) or f"{type(exc).__name__} from the converter") from exc
+        kind, why = _fault(exc, sources)
+        raise HTTPException(422, why, {FAULT_HEADER: kind}) from exc
     # A workspace condition, not bad input -- the same class as having no font
     # source, which is already a 503. As a 422 it shows up in the panel's
     # status line as though the knob had been rejected.

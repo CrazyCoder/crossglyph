@@ -1022,6 +1022,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         if (opts.renderFails) {
           return Promise.resolve({
             ok: false, status: opts.renderFails.status,
+            // A real Response carries these whether or not it succeeded, and
+            // the fault the page headlines by rides on one.
+            headers: {get: name =>
+              name === "x-fault" ? opts.renderFails.fault ?? null : null},
             text: () => Promise.resolve(opts.renderFails.body),
           });
         }
@@ -2977,13 +2981,49 @@ for (const { name, text } of sources) {
 //      thing to do something about.
 {
   const env = await loaded(fakeStorage(), undefined,
-                           {renderFails: {status: 422, body: "gamma: too large"}});
+                           {renderFails: {status: 422, fault: "setting",
+                                          body: "gamma: too large"}});
   check("a refused knob says so",
         env.pageError.parts.what.textContent === "That setting was refused.",
         env.pageError.parts.what.textContent);
   check("and a body that is not JSON is shown as it came",
         env.pageError.parts.why.textContent === "gamma: too large",
         env.pageError.parts.why.textContent);
+}
+
+// 41a-i. The status cannot say which of these it was: a knob the converter
+//        would not take, a family whose files have moved and a font file
+//        nobody can read all arrive as 422. The server names the fault and
+//        the page headlines it, so the reader is not sent looking at the
+//        panel for a fault no control on it causes.
+for (const [fault, headline] of [
+  ["font", "A font file could not be read."],
+  ["family", "That family is no longer in the font folder."],
+  ["config", "A font config file was refused."],
+  ["converter", "The converter would not build this font."],
+]) {
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 422, fault, body: "why"}});
+  check(`a ${fault} fault is headlined as one`,
+        env.pageError.parts.what.textContent === headline,
+        env.pageError.parts.what.textContent);
+}
+
+// 41a-ii. A server that names no fault, which is any other endpoint and any
+//         build older than this page. The status is all there is to go on and
+//         it still has to say something.
+{
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 422, body: "why"}});
+  check("an unnamed fault falls back to the status",
+        env.pageError.parts.what.textContent === "That setting was refused.",
+        env.pageError.parts.what.textContent);
+  const odd = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 422, fault: "newer",
+                                          body: "why"}});
+  check("and so does a fault name this page does not know",
+        odd.pageError.parts.what.textContent === "That setting was refused.",
+        odd.pageError.parts.what.textContent);
 }
 
 // 41b. A server that has stopped answers nothing at all. There is no status

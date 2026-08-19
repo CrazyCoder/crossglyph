@@ -136,10 +136,15 @@ def resolve_intervals(preset_str):
     for name in [name.strip().lower() for name in preset_str.split(",") if name.strip()]:
         unnamed_interval = parse_hex_range(name)
         if name not in INTERVAL_PRESETS and unnamed_interval is None:
-            print(f"Error: unknown interval preset '{name}'", file=sys.stderr)
-            print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
-            print("You can also specify unnamed hex ranges like (0x2100-0x214F)", file=sys.stderr)
-            sys.exit(1)
+            # FORK: carried by the exit rather than printed before it. A
+            # caller that traps SystemExit -- the preview does, since this is
+            # a script at heart and exits where a library would raise -- then
+            # has the reason to show instead of a bare exit code. Python
+            # prints it to stderr on the way out, so a command line reads
+            # what it always did.
+            sys.exit(f"unknown interval preset '{name}'. Available: "
+                     f"{', '.join(sorted(INTERVAL_PRESETS.keys()))}. "
+                     f"Unnamed hex ranges like (0x2100-0x214F) work too.")
         parsed_tokens.append((name, unnamed_interval))
 
     for name, unnamed_interval in parsed_tokens:
@@ -1527,11 +1532,10 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     for style_id in sorted(raster_data.keys()):
         sd = raster_data[style_id]
         if sd.advanceY > 255:
-            print(f"ERROR: advanceY ({sd.advanceY}) exceeds uint8 range for "
-                  f"style {style_id} size {size}. This likely means the font "
-                  f"size is too large for this format.",
-                  file=sys.stderr)
-            sys.exit(1)
+            # FORK: as above, the reason travels with the exit.
+            sys.exit(f"this font needs {sd.advanceY} pixels a line at size "
+                     f"{size}, and the .cpfont format holds 255. "
+                     f"Try a smaller size.")
         toc_data += struct.pack(STYLE_TOC_FORMAT,
                                 style_id,
                                 len(sd.intervals), len(sd.all_glyphs),

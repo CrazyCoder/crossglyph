@@ -334,3 +334,31 @@ def test_moving_a_coordinate_restales_the_size(tmp_path):
 
     moved = _variable_project(tmp_path, "bold = Probe[wght].ttf@wght=900\n")
     assert fontstamp.stale_sizes(moved, tmp_path / "out" / "Probe") == [12]
+
+
+def test_a_build_runs_under_a_non_ascii_path(tmp_path):
+    """The whole pipeline and not only a preview render. The converter hands
+    FreeType the face path here too, and FreeType opens it through the C
+    library's `fopen`, which on Windows reads bytes in the ANSI code page
+    while freetype-py sends UTF-8. Every size fails with "cannot open
+    resource" unless the face is read another way.
+
+    The output folder is under the same name, so the writer and the manifest
+    are covered by it as well.
+    """
+    from fontsmith import box_font
+
+    home = tmp_path / "Сергей"
+    source = home / "src"
+    source.mkdir(parents=True)
+    box_font(source / "Probe-Regular.ttf", range(0x20, 0x7F), family="Probe")
+    (source / "probe.conf").write_text(
+        "sizes = 12\nintervals = base\n", encoding="utf-8")
+
+    variant = fontconf.parse_config(source / "probe.conf").variants()[0]
+    report = fontbuild.build_variant(variant, home / "out")
+
+    assert report.built == [12]
+    blob = (home / "out" / "Probe" / "Probe_12.cpfont").read_bytes()
+    assert blob[:8] == b"CPFONT\x00\x00"
+    assert struct.unpack_from("<H", blob, 8)[0] == 4

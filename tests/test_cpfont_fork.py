@@ -119,3 +119,42 @@ def test_a_lazily_opened_font_yields_the_same_kerning(monkeypatch, tmp_path):
         str(path), codepoints, 27) == lazy_pairs
     assert convert.extract_ligatures_fonttools(str(path), codepoints) == \
         lazy_ligatures
+
+
+# --- reasons the converter exits with ---------------------------------------
+
+
+def test_a_size_the_format_cannot_hold_exits_with_its_reason(tmp_path):
+    """FORK: advanceY is a byte in the .cpfont TOC, and a large size on a
+    loose-hhea face runs past it. Upstream prints the reason and then exits
+    with a bare code, which is fine for a command line and leaves a caller
+    that traps SystemExit -- the preview does -- with nothing to show.
+
+    150 DPI, so the pixels a line run well past a byte long before the point
+    size looks unusual.
+    """
+    import pytest
+
+    from crossglyph import cpfont
+
+    path, codepoints = _kerned_face(tmp_path)
+    with pytest.raises(SystemExit) as leaving:
+        cpfont.generate_cpfont_multistyle(
+            {0: str(path)}, 200, [(0x41, 0x42)],
+            str(tmp_path / "out.cpfont"))
+    said = str(leaving.value)
+    assert "255" in said and "smaller" in said, said
+    assert said != "1", "the exit code reached the caller instead of a reason"
+
+
+def test_an_unknown_interval_preset_exits_with_the_list(tmp_path):
+    """FORK: the same, for the other exit a preview render can reach. What it
+    would have taken is the answer to the reader's next question."""
+    import pytest
+
+    from crossglyph import cpfont
+
+    with pytest.raises(SystemExit) as leaving:
+        cpfont.resolve_intervals("klingon")
+    said = str(leaving.value)
+    assert "klingon" in said and "cyrillic" in said, said

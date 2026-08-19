@@ -3302,3 +3302,140 @@ def test_a_workspace_under_a_non_ascii_path_still_draws(tmp_path, monkeypatch):
     finally:
         _forget_the_last_folder()
         server.set_font_source(SRC)
+
+
+# --- what a failed render says ----------------------------------------------
+
+
+def _fault_of(answer):
+    """The kind and the sentence, as the page reads them off a failed render."""
+    return answer.headers.get("x-fault"), answer.json()["detail"]
+
+
+@needs_core
+def test_a_malformed_font_is_not_called_a_setting(tmp_path, monkeypatch):
+    """A file in the folder that is not a font. fontTools reads the face
+    before the rasterizer does, so this arrives as the converter's own
+    FontBuildError, which already names the file and says what to try."""
+    from fastapi.testclient import TestClient
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    face = tmp_path / "Probe-Regular.ttf"
+    box_font(face, range(0x20, 0x7F), family="Probe")
+    (_conf(tmp_path) / "all.conf").write_text("fallbacks = no\n",
+                                              encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    _forget_the_last_folder()
+    server.set_font_source(face, family="Probe")
+    try:
+        face.write_bytes(b"not a font at all")
+        answer = TestClient(server.app).post(
+            "/render", json={"size": 13, "family": "Probe", "text": "Hi"})
+        kind, why = _fault_of(answer)
+        assert answer.status_code == 422
+        assert kind == "font"
+        assert "Probe-Regular.ttf" in why, why
+        assert "FT_Exception" not in why, "freetype-py's wrapper reached the page"
+    finally:
+        _forget_the_last_folder()
+        server.set_font_source(SRC)
+
+
+def test_a_family_that_is_gone_is_not_called_a_setting(tmp_path, monkeypatch):
+    """A remembered choice whose files have moved. Nothing on the panel was
+    refused, so the headline the page picks must not say a setting was.
+
+    Its own folder, because the answer to "no such family" depends on what
+    else is in the one being read: a config in there that cannot be resolved
+    is reported ahead of the name that was asked for, and rightly.
+    """
+    from fastapi.testclient import TestClient
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    _forget_the_last_folder()
+    try:
+        answer = TestClient(server.app).post(
+            "/render", json={"size": 13, "family": "Nonesuch"})
+        kind, why = _fault_of(answer)
+        assert answer.status_code == 422
+        assert kind == "family"
+        # Cased as the picker looks it up, and it lists what is there instead.
+        assert "nonesuch" in why.lower() and "Probe" in why, why
+    finally:
+        _forget_the_last_folder()
+        server.set_font_source(SRC)
+
+
+@needs
+def test_a_knob_the_converter_will_not_take_is_a_setting(client):
+    """The one case the old single headline was right about, kept."""
+    answer = client.post("/render",
+                         json={"size": 13, "page": {"alignment": "sideways"}})
+    assert answer.status_code == 422
+    assert _fault_of(answer)[0] == "setting"
+
+
+def test_freetype_saying_nothing_about_the_file_is_told_which(tmp_path):
+    """The other way a font fault arrives, and the reason _unreadable exists.
+    FreeType reports what went wrong and never which file it was reading, so
+    "cannot open resource" on its own is a sentence about nothing in
+    particular.
+
+    Reached when FreeType refuses a face fontTools could read, which the
+    malformed case above never is. A fallback in the chain is as likely to be
+    the one it refused as the family's own face, so every face the build was
+    given is named and none is claimed to be the culprit.
+    """
+    import freetype
+
+    from crossglyph.preview import server
+
+    folder = tmp_path / "Сергей"
+    faces = {0: folder / "Probe-Regular.ttf", 2: folder / "Probe-Italic.ttf"}
+    kind, why = server._fault(freetype.FT_Exception(1), faces)
+
+    assert kind == "font"
+    assert "FT_Exception" not in why, "freetype-py's wrapper reached the page"
+    assert why.startswith("cannot open resource."), why
+    assert "one of Probe-Italic.ttf, Probe-Regular.ttf" in why, why
+    assert str(folder) in why, why
+    # One face, and nothing is hedged: there is only one file it can be.
+    single = server._fault(freetype.FT_Exception(1), {0: faces[0]})[1]
+    assert "one of" not in single, single
+    assert "Probe-Regular.ttf" in single, single
+    # Nothing resolved yet, so there is nothing to name and it says only what
+    # FreeType said.
+    assert server._fault(freetype.FT_Exception(1), None)[1] ==         "cannot open resource"
+
+
+def test_a_reason_the_converter_exits_with_reaches_the_page():
+    """The converter exits where a library would raise, so its reason is the
+    exit's own argument. A bare exit code carries none, and the panel has to
+    say something for that too."""
+    from crossglyph.preview import server
+
+    assert server._fault(SystemExit("this font needs 261 pixels a line"),
+                         None) == ("converter",
+                                   "this font needs 261 pixels a line")
+    kind, why = server._fault(SystemExit(1), None)
+    assert kind == "converter"
+    assert why.startswith("the converter rejected"), why
+
+
+@needs
+def test_an_unknown_coverage_preset_says_which_one(client):
+    """The other exit on this path. Its list of what it would have taken is
+    the answer to the question the reader is about to ask."""
+    answer = client.post("/render", json={"size": 13, "intervals": "klingon"})
+    kind, why = _fault_of(answer)
+    assert answer.status_code == 422
+    assert kind == "converter"
+    assert "klingon" in why and "cyrillic" in why, why

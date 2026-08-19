@@ -80,9 +80,24 @@ export async function failureText(response) {
   } catch { return raw; }
 }
 
-// 503 is a state of the workspace, 422 a setting the converter would not take.
-// Both are things to do something about, so each says which it is.
-export function failureHeadline(status) {
+// What each kind of failed render is called, keyed by the x-fault the server
+// sends with it. The status alone cannot say: a knob the converter would not
+// take, a family whose files have moved and a font file nobody can read all
+// arrive as 422, and one headline over the three names the wrong thing twice.
+// The sentence under it is the server's, and says which file or which knob.
+const FAULTS = {
+  font: "A font file could not be read.",
+  family: "That family is no longer in the font folder.",
+  config: "A font config file was refused.",
+  converter: "The converter would not build this font.",
+  setting: "That setting was refused.",
+};
+
+// 503 is a state of the workspace, 422 something about this request. A fault
+// the page does not know the name of falls back to the status, which is what
+// an older server and every other endpoint give it.
+export function failureHeadline(status, fault) {
+  if (FAULTS[fault]) return FAULTS[fault];
   if (status === 503) return "The page cannot be drawn yet.";
   if (status === 422) return "That setting was refused.";
   return `The page could not be drawn (${status}).`;
@@ -193,7 +208,8 @@ export async function renderNow() {
   // shared blob URL or image: either would replace state the newer page owns.
   if (mine !== latest) return;
   if (!response.ok) {
-    showPageError(failureHeadline(response.status), payload);
+    showPageError(failureHeadline(response.status,
+                                  response.headers.get("x-fault")), payload);
     status.textContent = `${response.status}`;
     return;
   }

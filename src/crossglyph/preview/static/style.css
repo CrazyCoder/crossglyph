@@ -680,7 +680,12 @@
      last page stays faintly visible, which is the difference between "this is
      out of date" and "there has never been anything here". */
   #stage { position: relative; }
-  #page-error { position: absolute; inset: 0; display: grid;
+  /* Above the device frame. #device-surface is positioned but sets no
+     z-index, so it opens no stacking context of its own and the frame's
+     `z-index: 2` competes here rather than inside it. Without a number of its
+     own this panel loses to the frame, and the bezel covers the ends of every
+     line long enough to reach it. */
+  #page-error { position: absolute; inset: 0; z-index: 3; display: grid;
                 align-content: center; justify-items: start; gap: .85rem;
                 padding: 2.5rem; background: var(--panel); opacity: .97;
                 border: 1px solid var(--line); }
