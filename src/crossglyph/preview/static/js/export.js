@@ -399,10 +399,21 @@ export function showStep(step) {
     // Where they went is not in it: the note has one reserved line in the
     // foot, an output path is most of a panel wide, and the box three rows up
     // is already showing the folder this went to.
-    builtNote.textContent =
-      `${made} built${size}, ${kept} already current${had}`
-      + (failed ? `, ${failed} failed` : "")
-      + (gone ? `, removed ${step.removed.join(", ")}` : "");
+    //
+    // A count only while there is one to give. A run that built every size has
+    // nothing already current, and "0 already current" beside its own answer
+    // reads as a second and worse one -- the same rule a failure and a removal
+    // keep, each named only where there is one.
+    const parts = [
+      made && `${made} built${size}`,
+      kept && `${kept} already current${had}`,
+      failed && `${failed} failed`,
+      gone && `removed ${step.removed.join(", ")}`,
+    ].filter(Boolean);
+    // A run with no size in it at all leaves every count out, and the foot
+    // keeps a line for this note either way: an empty one reads as a build
+    // that never answered rather than one with nothing to do.
+    builtNote.textContent = parts.join(", ") || "nothing to build";
   }
 }
 

@@ -379,9 +379,10 @@ tooltip names which of the two it is holding.
 
 What the arrow set aside lives no longer than the panel does: it is one press
 from being back on screen, and a reload, a switch of font, or the config
-changing on disk under the page all drop it without asking. So switching font asks only about what the panel is showing, which is
-the question the Save button answers. While the arrow is on you are looking at
-what the config says, and both of them are quiet.
+changing on disk under the page all drop it without asking. So switching font
+asks only about what the panel is showing, which is the question the Save
+button answers. While the arrow is on you are looking at what the config says,
+and both of them are quiet.
 
 Numeric axes of a variable font, such as `wdth`, use the same arrow. The
 family's config is the first comparison, the default declared by the font is
@@ -512,9 +513,11 @@ it finishes says what was built, what was already current and anything that
 failed, with the bytes beside each count: a card has a fixed amount of room,
 and a build is when somebody wants to know what a family costs on it. The two
 numbers are separate because they answer different things, what this run
-wrote and what the sizes it left alone already take up. Where it all went is
-not in that line, since the foot keeps one line for it and an output path is
-most of a panel wide; the box three rows up is already showing the folder.
+wrote and what the sizes it left alone already take up. A count of nothing is
+left out rather than written as a zero, so a run that built every size says
+what it built and stops there. Where it all went is not in that line, since
+the foot keeps one line for it and an output path is most of a panel wide;
+the box three rows up is already showing the folder.
 
 A build also tidies the output folder against the workspace: a family you
 renamed, dropped, or took the second size list off leaves a whole directory

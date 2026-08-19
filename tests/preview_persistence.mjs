@@ -2233,7 +2233,7 @@ for (const { name, text } of sources) {
   // Not where: the note has one reserved line in the panel's foot, and the
   // output box three rows above it is already showing the folder.
   check("and says what it did and what it cost",
-        env.built.textContent === "2 built (2.4 MB), 0 already current",
+        env.built.textContent === "2 built (2.4 MB)",
         env.built.textContent);
   check("having counted its way there rather than sitting on 'building…'",
         env.progressCount.steps.includes("1 of 2") &&
@@ -3807,8 +3807,9 @@ for (const deferred of [
         `${boxes.default.checked} ${boxes.default.disabled}`);
 }
 
-// 75. Nothing was written, so there is no size to give. "0 built (0 B)" says
-//     the same thing twice and reads like a failure.
+// 75. Nothing was written, so there is neither a size to give nor a count.
+//     "0 built (0 B)" says the same thing twice and reads like a failure, and
+//     a zero beside the answer reads as a second and worse answer.
 {
   const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
     { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
@@ -3817,8 +3818,8 @@ for (const deferred of [
         failed: [], removed: [], error: null }] },
   ] });
   await env.builds.one();
-  check("a run that wrote nothing gives no size",
-        env.built.textContent === "0 built, 1 already current",
+  check("a run that wrote nothing says only what it found",
+        env.built.textContent === "1 already current",
         env.built.textContent);
 }
 
@@ -3834,8 +3835,40 @@ for (const deferred of [
   ] });
   await env.builds.one();
   check("a small build reads in kilobytes",
-        env.built.textContent.startsWith("1 built (41 kB),"),
+        env.built.textContent === "1 built (41 kB)",
         env.built.textContent);
+}
+
+// 76a. Both counts, which is the ordinary run: a size that moved and a size
+//      that did not. They are joined in the order the panel reads them.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\fonts\cpfonts", families: ["Alto"] },
+    { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 41000 },
+    { event: "done", out: "D:\fonts\cpfonts", bytes: 41000,
+      current_bytes: 52000, families: [
+      { name: "Alto", bytes: 41000, sizes: [12, 13], built: [12], skipped: [13],
+        failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a run that did some of each says both",
+        env.built.textContent === "1 built (41 kB), 1 already current (52 kB)",
+        env.built.textContent);
+}
+
+// 76b. And a run with nothing in it at all keeps a sentence. The note has one
+//      reserved line in the foot, and clearing it would read as a build that
+//      never answered rather than one with nothing to do.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 0, out: "D:\fonts\cpfonts", families: ["Alto"] },
+    { event: "done", out: "D:\fonts\cpfonts", bytes: 0, families: [
+      { name: "Alto", bytes: 0, sizes: [], built: [], skipped: [],
+        failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a run with nothing in it says so",
+        env.built.textContent === "nothing to build", env.built.textContent);
 }
 
 // 77. A checkbox nobody has touched is not a changed knob. Its `value` reads
