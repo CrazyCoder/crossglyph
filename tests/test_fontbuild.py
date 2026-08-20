@@ -1286,3 +1286,60 @@ def test_a_family_with_nothing_to_build_still_reports_its_coverage(tmp_path):
         "and the second run had nothing to do"
     assert [step for step in again if step["event"] == "coverage"] == \
         [step for step in first if step["event"] == "coverage"]
+
+
+def test_the_predicted_count_is_the_count_the_converter_writes(tmp_path):
+    """The panel names this number under the coverage boxes and the command
+    line refuses a build on it, so it has to be the one the converter reaches.
+
+    It was three short. A build supplies the fixed-width spaces from a face it
+    generates, and that face joins U+2000 to U+200A into one run and adds
+    another; the count read the file, which does not exist until some build
+    has made one, so a fresh workspace counted differently from a second run.
+    """
+    import freetype
+
+    from crossglyph.cpfont import convert
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf",
+             [0x20, 0x41] + list(range(0x2E00, 0x2E40, 2)), family="Probe")
+    # A width nobody has built before, so the face this family would use is
+    # named for a digest with no file behind it -- which is the state every
+    # fresh workspace is in.
+    (tmp_path / "probe.conf").write_text(
+        "intervals = symbols\nfallbacks = no\nspace_glyphs = yes\n"
+        "space_width_2006 = 0.1731\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    # The generated face is cached in the system temp folder, keyed by its
+    # widths, so it outlives tmp_path and this test's own earlier runs.
+    fontbuild.space_font_path(config.space_widths).unlink(missing_ok=True)
+    assert not fontbuild.space_font_path(config.space_widths).is_file(), \
+        "nothing has built one, which is the case that used to be wrong"
+
+    predicted = fontbuild.interval_counts(config)["regular"]
+
+    # And what the converter would write, given the chain a build hands it.
+    fontbuild.ensure_space_font(config.space_widths)
+    chain = fontbuild.fallback_chain(config)[fontbuild.STYLE_IDS["regular"]]
+    packed, _, _ = convert.resolve_style_coverage(
+        freetype.Face(str(config.styles["regular"])),
+        [freetype.Face(str(face)) for face in chain],
+        fontbuild.asked_intervals(config.coverage))
+    assert predicted == len(packed)
+
+
+def test_a_family_with_the_spaces_switched_off_is_counted_without_them(
+        tmp_path):
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    counts = {}
+    for setting in ("yes", "no"):
+        (tmp_path / "probe.conf").write_text(
+            f"intervals =\nfallbacks = no\nspace_glyphs = {setting}\n",
+            encoding="utf-8")
+        counts[setting] = fontbuild.interval_counts(
+            fontconf.parse_config(tmp_path / "probe.conf",
+                                  root=tmp_path))["regular"]
+    assert counts["yes"] > counts["no"], counts

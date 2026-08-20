@@ -665,13 +665,30 @@ def chain_codepoints(paths: typing.Iterable[str | pathlib.Path],
     since it opens every face in the chain with fontTools and the chain can
     hold a 15.7 MB CJK one.
     """
-    found = drawable_codepoints(paths)
+    # Once, because the chain is read twice below and a caller handing this a
+    # generator would find the second pass empty and the shaped forms gone.
+    faces = list(dict.fromkeys(str(path) for path in paths))
+    found = drawable_codepoints(faces)
     if not cpfont.arabic.wants_forms(asked):
         return found
-    for path in dict.fromkeys(str(path) for path in paths):
+    for path in faces:
         with contextlib.suppress(Exception):
             found |= set(cpfont.arabic.presentation_forms(path))
     return found
+
+
+#: Every fixed-width space a build supplies for itself, whatever the widths
+#: are set to: membership is not overridable, only the widths. Taken from the
+#: table and not from the generated face, which does not exist until a build
+#: has made one -- so reading the file would have the first build of a
+#: workspace counted differently from the second.
+SPACE_CODEPOINTS = frozenset(spacefont.DEFAULT_SPACE_WIDTHS)
+
+
+def space_codepoints(config: Config) -> frozenset[int]:
+    """The spaces this family's own build would draw, and none for one that
+    has them switched off."""
+    return SPACE_CODEPOINTS if config.space_glyphs else frozenset()
 
 
 def build_faces(config: Config) -> list[str]:
@@ -786,12 +803,14 @@ def interval_spans(config: Config) -> dict[str, list[tuple[int, int]]]:
     """The runs themselves, for a message that has to say where they are."""
     asked = asked_intervals(config.coverage)
     chain = fallback_chain(config)
+    spaces = space_codepoints(config)
     spans = {}
     for style in STYLES:
         if style not in config.styles:
             continue
         faces = [str(config.styles[style])] + list(chain[STYLE_IDS[style]])
-        spans[style] = interval_runs(asked, chain_codepoints(faces, asked))
+        spans[style] = interval_runs(
+            asked, chain_codepoints(faces, asked) | spaces)
     return spans
 
 

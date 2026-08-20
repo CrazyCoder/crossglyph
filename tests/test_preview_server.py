@@ -3683,21 +3683,26 @@ def test_the_render_says_how_many_intervals_a_build_would_carry(client, gappy):
         "family": gappy, "text": "A", "size": 12,
         "intervals": "", "ranges": "(0x2D30-0x2D6F)"})
     assert answer.status_code == 200, answer.text
-    # The 32 runs the range asks for, and the two the face has in `base`.
-    assert int(answer.headers["x-intervals"]) == 34
+    # The 32 runs the range asks for, the two the face has in `base`, and
+    # the two a build's own space face adds there: U+2000 to U+200A is one
+    # and U+205F is another. The build supplies those whatever the family
+    # covers, so a count without them is one the build then contradicts.
+    assert int(answer.headers["x-intervals"]) == 36
     assert int(answer.headers["x-interval-cap"]) == server.MAX_INTERVALS
 
 
 def test_a_coverage_that_fits_still_reports_its_count(client, gappy):
     """Reported and not judged, so where the line falls stays in one place.
 
-    Untick the range and the same face costs two: the fragmentation is what
-    the coverage asked for, and it goes when the asking does."""
+    Untick the range and the same face costs four: its own two runs in
+    `base`, and the two the fixed-width spaces make there. The
+    fragmentation is what the coverage asked for, and it goes when the
+    asking does."""
     answer = client.post("/render", json={
         "family": gappy, "text": "A", "size": 12,
         "intervals": "", "ranges": ""})
     assert answer.status_code == 200, answer.text
-    assert int(answer.headers["x-intervals"]) == 2
+    assert int(answer.headers["x-intervals"]) == 4
 
 
 def test_a_range_half_typed_leaves_the_count_alone(client, gappy):

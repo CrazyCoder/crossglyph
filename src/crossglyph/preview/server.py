@@ -810,7 +810,7 @@ def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
 
 
 @functools.lru_cache(maxsize=64)
-def _worst_intervals(coverage: str, faces: tuple) -> int:
+def _worst_intervals(coverage: str, faces: tuple, spaces: bool = True) -> int:
     """The most intervals any style of this family would carry, once built.
 
     CrossPoint refuses a style with more than MAX_INTERVALS of them and says
@@ -820,10 +820,16 @@ def _worst_intervals(coverage: str, faces: tuple) -> int:
 
     Kept, because a render runs on every keystroke in the sample text and the
     answer moves only when a box is ticked or a fallback picked.
+
+    `spaces` is the family's `space_glyphs`, which is a config key with no
+    control on the page. A build supplies the fixed-width spaces itself, and
+    they join two runs and add two more, so leaving them out had the panel
+    naming a number three short of the one the build then printed.
     """
     asked = fontbuild.asked_intervals(coverage)
+    supplied = fontbuild.SPACE_CODEPOINTS if spaces else frozenset()
     return max((len(fontbuild.interval_runs(
-                    asked, fontbuild.chain_codepoints(chain, asked)))
+                    asked, fontbuild.chain_codepoints(chain, asked) | supplied))
                 for _style, chain in faces), default=0)
 
 
@@ -886,7 +892,22 @@ def interval_load(request: RenderRequest) -> int:
     offered = fallbacks_for(request)
     return _worst_intervals(coverage, tuple(sorted(
         (style, (str(path), *offered.get(style, ())))
-        for style, path in styles.items())))
+        for style, path in styles.items())), _spaces_for(request.family))
+
+
+def _spaces_for(family: str) -> bool:
+    """Whether that family's build would supply the fixed-width spaces.
+
+    `space_glyphs` has no control on the page, so this is the one thing the
+    count needs that the panel cannot send. Yes for a family with no config of
+    its own, which is what the key defaults to.
+    """
+    if not family:
+        return True
+    try:
+        return family_config(family).space_glyphs
+    except (LookupError, OSError, FontConfigError):
+        return True
 
 
 def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
