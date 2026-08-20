@@ -272,22 +272,33 @@ def pinned_faces(path: pathlib.Path) -> dict[str, pathlib.Path]:
     return faces
 
 
-def named_faces(name: str, directory: pathlib.Path | None,
-                source: pathlib.Path | str | None = None
-                ) -> dict[str, pathlib.Path]:
-    """The four slots of a family named in a config, or an empty dict.
+def named_faces(name: str,
+                directory: pathlib.Path | None) -> dict[str, pathlib.Path]:
+    """The four slots of a family in the fallbacks folder, or an empty dict.
 
-    The fallbacks folder is asked first, so a bundled name means the same thing
-    in every workspace. Only then are your own families tried, which is what
-    lets a fallback be a family with a config of its own: its `dir`, its
-    explicit style keys, and filenames discovery would not have guessed.
+    Asked before the workspace, so a bundled name means the same thing
+    everywhere: a family the folder has is that family, whatever a config of
+    yours calls itself.
     """
-    if directory is not None:
-        faces = fontconf.discover_styles(directory, name)
-        if "regular" in faces:
-            return faces
+    if directory is None:
+        return {}
+    faces = fontconf.discover_styles(directory, name)
+    return faces if "regular" in faces else {}
+
+
+def workspace_faces(name: str,
+                    families: typing.Sequence[Config]
+                    ) -> dict[str, pathlib.Path]:
+    """The four slots of one of your own families, or an empty dict.
+
+    This is what lets a fallback be a family with a config of its own: its
+    `dir`, its explicit style keys, and filenames discovery would not have
+    guessed. `families` arrives already gathered, because gathering reads every
+    config in the folder and stats their faces -- a caller resolving three
+    names must not pay for that three times.
+    """
     wanted = name.casefold()
-    for config in offered(source)[0]:
+    for config in families:
         if wanted in (config.name.casefold(), config.family.casefold()):
             return dict(config.styles)
     return {}
@@ -345,6 +356,10 @@ def ordered_entries(config: Config, coverage: str | None = None
                                require_bundled_fallbacks(config.root))
     directory = fallback_dir(config.root)
     entries = []
+    # Gathered on the first name the fallbacks folder cannot answer, and not
+    # before: a list of bundled names only, which is the common one, never
+    # reads the workspace at all.
+    families: list[Config] | None = None
     for token in (part.strip() for part in written.split(",")):
         if not token:
             continue
@@ -352,12 +367,16 @@ def ordered_entries(config: Config, coverage: str | None = None
             entries += bundled_entries(coverage,
                                        require_bundled_fallbacks(config.root))
             continue
-        faces = named_faces(token, directory, config.root)
+        faces = named_faces(token, directory)
         if not faces:
-            where = f"{directory} nor " if directory else ""
+            if families is None:
+                families = offered(config.root)[0]
+            faces = workspace_faces(token, families)
+        if not faces:
+            where = f"{directory} or " if directory else ""
             raise FontConfigError(
-                f"fallback_order names {token!r}, which is neither a family "
-                f"in {where}the font folder.")
+                f"fallback_order names {token!r}, which is not a family in "
+                f"{where}the font folder.")
         entries.append(faces)
     return entries
 
@@ -799,10 +818,10 @@ def _fallback_faces(variant: Variant) -> dict[str, list[str]]:
     look up. That it was used at all is `space_glyphs` in the settings.
     """
     ours = space_font_path(variant.config.space_widths).name
-    return {style: [face for face in fallback_chain(variant.config)[style_id]
+    chain = fallback_chain(variant.config)
+    return {style: [face for face in chain[STYLE_IDS[style]]
                     if pathlib.Path(face).name != ours]
-            for style in STYLES if style in variant.config.styles
-            for style_id in [STYLE_IDS[style]]}
+            for style in STYLES if style in variant.config.styles}
 
 
 class Plan(typing.NamedTuple):

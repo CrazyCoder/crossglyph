@@ -3548,3 +3548,39 @@ def test_an_unknown_coverage_preset_says_which_one(client):
     assert answer.status_code == 422
     assert kind == "converter"
     assert "klingon" in why and "cyrillic" in why, why
+
+
+def test_a_picked_fallback_resolves_its_styles_as_the_build_does(tmp_path,
+                                                                 monkeypatch):
+    """The panel picks a family and the config keeps one file, so the build
+    finds the other three by name beside it. A config naming a bold of its own
+    is the case the two can disagree over, and the build is the answer."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    box_font(tmp_path / "Probe-Bold.ttf", [0x20, 0x41], family="Probe")
+    box_font(tmp_path / "Icons-Regular.ttf", [0x20, 0x2192], family="Icons")
+    box_font(tmp_path / "Dingbats.ttf", [0x20, 0x2192], family="Dingbats")
+    _conf(tmp_path).joinpath("icons.conf").write_text(
+        "regular = Icons-Regular.ttf\nbold = Dingbats.ttf\n", encoding="utf-8")
+    _conf(tmp_path).joinpath("probe.conf").write_text(
+        "fallback_regular = Icons-Regular.ttf\n", encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    _forget_the_last_folder()
+
+    probe = next(config for config in fontbuild.offered(tmp_path)[0]
+                 if config.name == "Probe")
+    offered = server.fallbacks_for(server.RenderRequest(
+        family="Probe", text="a", fallback1="Icons"))
+
+    # Without the space face, which the build appends and the page never
+    # offers: it draws the fixed width spaces and nothing else.
+    spaces = str(fontbuild.space_font_path(probe.space_widths))
+    built = [face
+             for face in fontbuild.fallback_chain(probe)[
+                 fontbuild.STYLE_IDS["bold"]]
+             if face != spaces]
+    assert list(offered[server.BOLD]) == built

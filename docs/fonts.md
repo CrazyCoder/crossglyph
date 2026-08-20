@@ -81,7 +81,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
 | `fallbacks` | `no` | append the thirteen bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
-| `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. See [Which face a fallback lends](#which-face-a-fallback-lends) |
+| `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. Inert while `fallbacks` is `no`, since there is no chain to order. See [Which face a fallback lends](#which-face-a-fallback-lends) |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
@@ -282,6 +282,9 @@ Three rules cover the key. The list is the chain. `bundled` stands for the
 fetched set. A face appears once, at its first position. Leave `bundled` out
 and the list is the whole chain. Write it that way to drop a family from the
 set, or to reorder the set itself.
+
+`fallbacks = yes` above it is not decoration. `fallbacks` is what turns the
+chain on, and with it off there is nothing for `fallback_order` to order.
 
 The two families you pick in the panel are always in front of all of it, so a
 config never has to account for them. Naming one of them in `fallback_order`

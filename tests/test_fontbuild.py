@@ -430,7 +430,7 @@ def test_a_named_family_is_found_in_the_fallbacks_folder(tmp_path):
     for name in ("NotoSans-Regular.ttf", "NotoSans-Bold.ttf"):
         (folder / name).write_bytes(b"")
 
-    faces = fontbuild.named_faces("NotoSans", folder, tmp_path)
+    faces = fontbuild.named_faces("NotoSans", folder)
 
     assert faces["regular"].name == "NotoSans-Regular.ttf"
     assert faces["bold"].name == "NotoSans-Bold.ttf"
@@ -444,7 +444,8 @@ def test_a_named_family_falls_through_to_the_workspace(tmp_path):
     (folder / fontbuild.ANCHOR_FACE).write_bytes(b"")
     (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"")
 
-    faces = fontbuild.named_faces("MyIcons", folder, tmp_path)
+    assert fontbuild.named_faces("MyIcons", folder) == {}
+    faces = fontbuild.workspace_faces("MyIcons", fontbuild.offered(tmp_path)[0])
 
     assert faces["regular"].name == "MyIcons-Regular.ttf"
 
@@ -456,10 +457,13 @@ def test_the_fallbacks_folder_wins_a_name_both_places_have(tmp_path):
     folder.mkdir()
     (folder / "NotoSans-Regular.ttf").write_bytes(b"")
     (tmp_path / "NotoSans-Regular.ttf").write_bytes(b"")
+    (tmp_path / "Alto-Medium.otf").write_bytes(b"")
 
-    faces = fontbuild.named_faces("NotoSans", folder, tmp_path)
+    entry, = fontbuild.ordered_entries(
+        _parsed(tmp_path / "alto.conf",
+                "fallbacks = yes\nfallback_order = NotoSans\n"))
 
-    assert faces["regular"].parent == folder
+    assert entry["regular"].parent == folder
 
 
 def test_a_name_nothing_has_resolves_to_nothing(tmp_path):
@@ -467,7 +471,9 @@ def test_a_name_nothing_has_resolves_to_nothing(tmp_path):
     folder.mkdir()
     (folder / fontbuild.ANCHOR_FACE).write_bytes(b"")
 
-    assert fontbuild.named_faces("Nowhere", folder, tmp_path) == {}
+    assert fontbuild.named_faces("Nowhere", folder) == {}
+    assert fontbuild.workspace_faces(
+        "Nowhere", fontbuild.offered(tmp_path)[0]) == {}
 
 
 def test_every_style_gets_a_chain_of_its_own(config, tmp_path):

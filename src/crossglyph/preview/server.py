@@ -764,7 +764,9 @@ def _tuning(items: tuple) -> Tuning:
     return Tuning(**fields)
 
 
-@functools.lru_cache(maxsize=8)
+# Keyed by family as well as coverage, since a family's `fallback_order` can
+# reorder the set, so a workspace of them needs more than a handful of entries.
+@functools.lru_cache(maxsize=32)
 def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
     """The families a build with this coverage would fill from, in its order.
 
@@ -819,12 +821,15 @@ def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
     for name in (request.fallback1, request.fallback2):
         if not name:
             continue
-        family_faces = sources_for(name)
-        if REGULAR not in family_faces:
+        regular = sources_for(name).get(REGULAR)
+        if regular is None:
             raise LookupError(f"the {name!r} family has no regular face to "
                               f"fall back to")
-        entries.append({STYLES[style]: path
-                        for style, path in family_faces.items()})
+        # Through pinned_faces, because a save keeps this pick as one filename
+        # and the build finds the other three beside it. A family whose config
+        # names a bold discovery would not have found is where the two answers
+        # part, and the build's is the one the page has to show.
+        entries.append(fontbuild.pinned_faces(regular))
     if request.fallbacks:
         # Not said and nothing ticked pick the same faces here: the coverage
         # only decides whether a CJK script was asked for, and neither answers
@@ -840,7 +845,9 @@ def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
             for style_id, style in enumerate(STYLES)}
 
 
-@functools.lru_cache(maxsize=32)
+# One entry per style rather than per render, so the depth is four times the
+# renders it holds.
+@functools.lru_cache(maxsize=128)
 def resolved_fallbacks(sources: tuple, coverage: tuple,
                        fallbacks: tuple) -> Drawable:
     """The faces worth opening and the codepoints none of them has.
