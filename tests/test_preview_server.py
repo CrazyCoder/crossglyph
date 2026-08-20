@@ -1947,7 +1947,8 @@ def test_building_writes_the_families_the_folder_declares(tmp_path, monkeypatch)
     # fixed amount of room, and a build is when somebody wants to know.
     written = made.stat().st_size
     assert steps[1] == {"event": "size", "family": family, "size": 12,
-                        "done": 1, "total": 1, "bytes": written}
+                        "done": 1, "total": 1, "bytes": written,
+                        "warnings": []}
     assert steps[-1]["out"] == str(tmp_path / fontbuild.OUTPUT_NAME)
     assert steps[-1]["bytes"] == written
     assert steps[-1]["families"] == [
