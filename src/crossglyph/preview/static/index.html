@@ -189,7 +189,31 @@
        the four grey levels sit. Darkened is what the built-in fonts use, and
        what a face that sets too light on the panel usually wants. -->
   <div class="row">
-    <label class="name" for="thresholds">thresholds</label>
+    <span class="name"><label for="thresholds">thresholds</label><span
+        class="explain">
+        <button type="button" class="info" aria-label="What thresholds do"
+                aria-describedby="thresholds-tip">?</button>
+        <span class="tip" id="thresholds-tip" role="tooltip">
+          Which of the device's four shades each pixel ends up: paper, light
+          grey, dark grey or black. FreeType draws a glyph in sixteen shades of
+          coverage, and these three cut points say where the boundaries fall.
+          Under the first is paper. At or over the third is solid black.
+          <br><br>
+          Lower cut points put more ink on the page.
+          <strong>darkened</strong> is what the device's own fonts use, and
+          <strong>darkest</strong> is a step past it.
+          <br><br>
+          The first number does the most work. With the reader's
+          <strong>anti-aliasing</strong> off it is the only one that does any:
+          the device paints every shade above it solid black, so the other two
+          have nothing left to decide.
+          <br><br>
+          If the page is simply too light, try <strong>gamma</strong> first.
+          That changes how much ink there is, where these only place what is
+          already drawn. A config can set its own three, and the row then
+          carries them as a fourth entry.
+        </span>
+      </span></span>
     <select id="thresholds" name="thresholds">
       <option value="4,8,12" selected>default (4, 8, 12)</option>
       <option value="3,6,10">darkened (3, 6, 10)</option>
