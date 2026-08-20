@@ -765,11 +765,15 @@ def _tuning(items: tuple) -> Tuning:
 
 
 @functools.lru_cache(maxsize=8)
-def _bundled_faces(source: str, intervals: str) -> tuple[tuple, ...]:
-    """The bundled Noto families a build with this coverage would fill from.
+def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
+    """The families a build with this coverage would fill from, in its order.
 
     One entry per family, each a style map as fontbuild.pinned_faces returns,
     flattened to pairs so an lru_cache key can hold it.
+
+    The family's own `fallback_order` decides the order where it sets one. It
+    is a config key with no control on the page, so a render that ignored it
+    would draw a chain the build does not use.
 
     Cached: this reads all.conf and stats a dozen files, and a render must not
     do that on every keystroke. Nothing here reads a font -- which of them is
@@ -787,8 +791,15 @@ def _bundled_faces(source: str, intervals: str) -> tuple[tuple, ...]:
         # a blank page teaches nothing. The panel already says they are not
         # here, and has the button, a few rows under the box that asked.
         return ()
-    return tuple(tuple(sorted(entry.items())) for entry in
-                 fontbuild.bundled_entries(intervals, directory))
+    entries = None
+    if family:
+        with contextlib.suppress(LookupError, FontConfigError):
+            config = family_config(family)
+            if config.fallback_order.strip():
+                entries = fontbuild.ordered_entries(config, intervals)
+    if entries is None:
+        entries = fontbuild.bundled_entries(intervals, directory)
+    return tuple(tuple(sorted(entry.items())) for entry in entries)
 
 
 def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
@@ -819,7 +830,7 @@ def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
         # wrongly to make.
         entries += [dict(entry) for entry in
                     _bundled_faces(str(fontbuild.SOURCE_DIR),
-                                   request.intervals or "")]
+                                   request.intervals or "", request.family)]
 
     return {style_id: tuple(fontbuild.chain_for(entries, style))
             for style_id, style in enumerate(STYLES)}

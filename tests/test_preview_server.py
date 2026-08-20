@@ -285,6 +285,33 @@ def test_a_bold_run_is_offered_the_bold_fallback(tmp_path, monkeypatch):
                for face in offered[server.REGULAR])
 
 
+def test_the_page_follows_the_order_the_config_sets(tmp_path, monkeypatch):
+    """`fallback_order` has no control on the page, so a render that ignored
+    it would draw a chain the build does not use."""
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        (faces / name).write_bytes(b"")
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    box_font(tmp_path / "MyIcons-Regular.ttf", [0x20, 0x2192],
+             family="MyIcons")
+    _conf(tmp_path).joinpath("probe.conf").write_text(
+        "fallbacks = yes\nfallback_order = MyIcons, bundled\n",
+        encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    _forget_the_last_folder()
+
+    offered = server.fallbacks_for(server.RenderRequest(
+        family="Probe", text="a", fallbacks=True, intervals="reading"))
+
+    assert offered[server.REGULAR][0].endswith("MyIcons-Regular.ttf")
+
+
 def test_a_family_with_no_face_for_a_style_lends_its_regular(tmp_path,
                                                              monkeypatch):
     """Noto publishes no italic for twelve of the thirteen, so this is the

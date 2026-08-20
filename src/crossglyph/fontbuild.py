@@ -321,7 +321,8 @@ def bundled_entries(intervals: str,
     return entries
 
 
-def ordered_entries(config: Config) -> list[dict[str, pathlib.Path]]:
+def ordered_entries(config: Config, coverage: str | None = None
+                    ) -> list[dict[str, pathlib.Path]]:
     """The chain behind the panel's two picks, resolved per style.
 
     `fallback_order` is the chain when it is set, and BUNDLED_TOKEN inside it
@@ -332,10 +333,15 @@ def ordered_entries(config: Config) -> list[dict[str, pathlib.Path]]:
     The bundled set is required only where it is actually asked for. A config
     listing families of its own, and never the token, builds in a workspace
     that has fetched nothing.
+
+    `coverage` overrides the config's own, for the preview: the panel's ticks
+    are what a render draws against, and they decide whether a CJK face joins
+    the set.
     """
+    coverage = config.coverage if coverage is None else coverage
     written = config.fallback_order.strip()
     if not written:
-        return bundled_entries(config.coverage,
+        return bundled_entries(coverage,
                                require_bundled_fallbacks(config.root))
     directory = fallback_dir(config.root)
     entries = []
@@ -343,7 +349,7 @@ def ordered_entries(config: Config) -> list[dict[str, pathlib.Path]]:
         if not token:
             continue
         if token.casefold() == BUNDLED_TOKEN:
-            entries += bundled_entries(config.coverage,
+            entries += bundled_entries(coverage,
                                        require_bundled_fallbacks(config.root))
             continue
         faces = named_faces(token, directory, config.root)
