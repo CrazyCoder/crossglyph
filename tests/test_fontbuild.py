@@ -1,4 +1,5 @@
 import pathlib
+import unicodedata
 
 import pytest
 
@@ -1006,16 +1007,16 @@ def test_a_token_the_family_covers_is_counted_as_drawn(tmp_path):
     _family(tmp_path, [0x20, 0x41, 0x3B1])
     (tmp_path / "probe.conf").write_text("intervals = greek\n", encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
-    counts = fontbuild.coverage_counts(config)
-    asked, drawable = counts["greek"]
-    assert asked > 1 and drawable == 1, "one Greek letter of the block"
+    counted = fontbuild.coverage_counts(config)["greek"]
+    assert counted.asked > 1 and counted.drawable == 1, \
+        "one Greek letter of the block"
 
 
 def test_a_token_no_face_covers_comes_out_at_zero(tmp_path):
     _family(tmp_path, [0x20, 0x41])
     (tmp_path / "probe.conf").write_text("intervals = thai\n", encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
-    assert fontbuild.coverage_counts(config)["thai"] == (128, 0)
+    assert fontbuild.coverage_counts(config)["thai"] == (128, 87, 0)
 
 
 def test_a_raw_range_is_counted_under_its_own_span(tmp_path):
@@ -1023,7 +1024,7 @@ def test_a_raw_range_is_counted_under_its_own_span(tmp_path):
     (tmp_path / "probe.conf").write_text("ranges = (0x2900-0x29FF)\n",
                                          encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
-    assert fontbuild.coverage_counts(config)["(0x2900-0x29ff)"] == (256, 1)
+    assert fontbuild.coverage_counts(config)["(0x2900-0x29ff)"] == (256, 256, 1)
 
 
 def test_base_is_not_reported_because_every_build_carries_it(tmp_path):
@@ -1043,7 +1044,7 @@ def test_a_fallback_face_counts_towards_the_family_it_fills_for(tmp_path):
         "intervals = thai\nfallback_regular = Filler-Regular.ttf\n",
         encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
-    assert fontbuild.coverage_counts(config)["thai"] == (128, 1)
+    assert fontbuild.coverage_counts(config)["thai"] == (128, 87, 1)
 
 
 # --- and what would answer it --------------------------------------------
@@ -1184,3 +1185,24 @@ def test_a_family_whose_sizes_all_failed_reports_no_coverage(tmp_path):
             tmp_path / "out"))
     assert [step for step in steps if step["event"] == "failed"]
     assert not [step for step in steps if step["event"] == "coverage"]
+
+
+def test_a_block_is_wider_than_the_characters_in_it(tmp_path):
+    """The Thai block spans 128 codepoints and Unicode assigns 87 of them, so
+    a face that draws every Thai character still reads 68% of the block.
+    Without the middle figure the record cannot tell that from a face that is
+    genuinely a third short."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    box_font(tmp_path / "Filler-Regular.ttf",
+             [0x20] + [code for code in range(0x0E00, 0x0E80)
+                       if unicodedata.category(chr(code)) != "Cn"],
+             family="Filler")
+    (tmp_path / "probe.conf").write_text(
+        "intervals = thai\nfallback_regular = Filler-Regular.ttf\n",
+        encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    counted = fontbuild.coverage_counts(config)["thai"]
+    assert counted.asked == 128, "the block"
+    assert counted.assigned == counted.drawable == 87, "and every character"

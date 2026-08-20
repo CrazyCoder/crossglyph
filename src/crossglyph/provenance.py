@@ -197,7 +197,7 @@ def _files(variant: Variant, directory: pathlib.Path,
 def describe(variant: Variant, directory: pathlib.Path,
              sizes: typing.Iterable[float],
              fallbacks: dict[str, list[str]] | None = None,
-             coverage: dict[str, tuple[int, int]] | None = None) -> dict:
+             coverage: dict[str, tuple[int, int, int]] | None = None) -> dict:
     """The provenance block for one built family.
 
     `fallbacks` are whole paths per style, and are recorded by filename: the
@@ -208,6 +208,10 @@ def describe(variant: Variant, directory: pathlib.Path,
     `coverage` is what each ticked token asked for against what the faces can
     supply. `_settings` records the tokens themselves, so that is the ask and
     this is what came of it.
+
+    Three figures and not two. A preset spans whole blocks and blocks have
+    holes in them, so the share worth judging is against the characters in the
+    block and not against its width.
     """
     config: Config = variant.config
     faces = list(dict.fromkeys(face for chain in (fallbacks or {}).values()
@@ -229,7 +233,9 @@ def describe(variant: Variant, directory: pathlib.Path,
         # What the faces between them could draw, which is a wider number than
         # what the converter packed. Reaching the packed one costs a second
         # pass over every glyph; the docs carry the difference.
-        "coverage": {token: {"asked": asked, "drawable": drawable}
-                     for token, (asked, drawable) in (coverage or {}).items()},
+        "coverage": {token: {"asked": asked, "assigned": assigned,
+                             "drawable": drawable}
+                     for token, (asked, assigned, drawable)
+                     in (coverage or {}).items()},
         "files": _files(variant, directory, sizes),
     }

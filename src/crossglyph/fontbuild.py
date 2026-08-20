@@ -15,6 +15,7 @@ from __future__ import annotations
 import concurrent.futures
 import contextlib
 import dataclasses
+import functools
 import io
 import os
 import pathlib
@@ -22,6 +23,7 @@ import struct
 import tempfile
 import time
 import typing
+import unicodedata
 
 from . import cpfont, fontconf, fontstamp, provenance, spacefont
 from .fontconf import (STYLES, Config, FontConfigError, Variant, parse_config,
@@ -589,18 +591,38 @@ def drawable_codepoints(paths: typing.Iterable[str | pathlib.Path]) -> set[int]:
     return found
 
 
-def token_codepoints(token: str) -> set[int]:
+@functools.lru_cache(maxsize=64)
+def token_codepoints(token: str) -> frozenset[int]:
     """What one coverage token asks for, or nothing for a token nobody knows.
+
+    Every codepoint of every span, including the ones Unicode has never
+    assigned: this is the block the reader ticked, and `assigned_codepoints`
+    is the part of it that could be drawn by anything.
 
     `base` is left out on purpose. Every build carries it whatever the coverage
     says, so counting it would report on a choice the reader never made.
     """
     token = token.strip().lower()
     if not token or token in cpfont.convert.BASE_INTERVAL_PRESETS:
-        return set()
+        return frozenset()
     span = cpfont.parse_hex_range(token)
     spans = [span] if span else cpfont.INTERVAL_PRESETS.get(token, [])
-    return {code for low, high in spans for code in range(low, high + 1)}
+    return frozenset(code for low, high in spans
+                     for code in range(low, high + 1))
+
+
+@functools.lru_cache(maxsize=64)
+def assigned_codepoints(token: str) -> frozenset[int]:
+    """The characters in that block, without the holes.
+
+    A preset is written as whole blocks and blocks are not full. The Thai
+    block spans 128 codepoints and Unicode assigns 87, so a face carrying
+    every Thai character draws 68% of what the tick asked for. Judged against
+    the block a complete face looks two thirds done; judged against this it
+    looks complete, which it is.
+    """
+    return frozenset(code for code in token_codepoints(token)
+                     if unicodedata.category(chr(code)) != "Cn")
 
 
 def build_faces(config: Config) -> list[str]:
@@ -611,9 +633,20 @@ def build_faces(config: Config) -> list[str]:
                for face in chain])
 
 
-def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
-    """Per coverage token, how many codepoints it asked for and how many the
-    build can draw.
+class Counted(typing.NamedTuple):
+    """One coverage token, measured three ways.
+
+    `asked` is the block the tick spans and `assigned` is the characters in
+    it. The two differ by as much as a third, so a ratio taken against the
+    wrong one calls a complete face incomplete.
+    """
+    asked: int
+    assigned: int
+    drawable: int
+
+
+def coverage_counts(config: Config) -> dict[str, Counted]:
+    """Per coverage token, what it asked for and what the build can draw.
 
     Against every face the build opens, primary and fallback together, with no
     regard for which style holds which. A codepoint the regular has and the
@@ -625,8 +658,9 @@ def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
     for token in config.coverage.split(","):
         wanted = token_codepoints(token)
         if wanted:
-            counts[token.strip().lower()] = (len(wanted),
-                                             len(wanted & drawable))
+            counts[token.strip().lower()] = Counted(
+                len(wanted), len(assigned_codepoints(token)),
+                len(wanted & drawable))
     return counts
 
 
@@ -675,11 +709,11 @@ def uncovered(variant: Variant) -> Uncovered | None:
 
 
 def uncovered_from(variant: Variant,
-                   counts: dict[str, tuple[int, int]]) -> Uncovered | None:
+                   counts: dict[str, Counted]) -> Uncovered | None:
     """The same answer from counts already taken, so nothing reads twice."""
     config: Config = variant.config
-    empty = tuple(token for token, (_asked, drawable) in counts.items()
-                  if not drawable)
+    empty = tuple(token for token, counted in counts.items()
+                  if not counted.drawable)
     if not empty:
         return None
 

@@ -728,9 +728,9 @@ to somebody who liked how it looked, and what travels with it is four
   },
   "fallbacks": {"regular": ["NotoSans-Regular.ttf", …],
                 "bold": ["NotoSans-Bold.ttf", …], …},
-  "coverage": {"reading": {"asked": 2887, "drawable": 2811},
-               "greek": {"asked": 400, "drawable": 368},
-               "thai": {"asked": 128, "drawable": 0}},
+  "coverage": {"reading": {"asked": 2887, "assigned": 2819, "drawable": 2819},
+               "greek": {"asked": 400, "assigned": 368, "drawable": 368},
+               "thai": {"asked": 128, "assigned": 87, "drawable": 0}},
   "files": {"12": {"file": "Bitter_12.cpfont", "bytes": 1162006,
                    "glyphs": 3095}}
 }
@@ -764,6 +764,12 @@ the whole family, and the record is what a reproduction reads.
 `coverage` holds what each ticked token asked for against what the faces
 between them could supply. `settings` records the tokens, so that is the ask
 and this is the answer. A zero here is the state the build warns about.
+
+Judge `drawable` against `assigned` and never against `asked`. A preset is
+written as whole blocks and blocks have holes: Thai spans 128 codepoints and
+Unicode assigns 87 of them, so a face carrying every Thai character reaches 68%
+of the block and 100% of the characters in it. Tifinagh caps at 74% the same
+way and Hebrew at 82%.
 
 `drawable` counts what the faces have. What the converter packed is a narrower
 number, decided per style, and reaching it would cost a second pass over every

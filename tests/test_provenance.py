@@ -259,4 +259,5 @@ def test_the_record_keeps_what_each_token_asked_for_and_got(tmp_path):
         [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)], out))
     record = json.loads((out / "Probe" / fontstamp.STAMP_NAME)
                         .read_text(encoding="utf-8"))
-    assert record["built"]["coverage"]["thai"] == {"asked": 128, "drawable": 0}
+    assert record["built"]["coverage"]["thai"] == {
+        "asked": 128, "assigned": 87, "drawable": 0}
