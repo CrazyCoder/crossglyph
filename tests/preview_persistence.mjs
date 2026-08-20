@@ -1032,14 +1032,17 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         if (opts.renderOk) {
           return Promise.resolve({
             ok: true, status: 200, blob: () => Promise.resolve({fresh: true}),
-            // How many characters the page could not draw, and how many of
-            // those the coverage would not have built. A real answer always
-            // carries all three; `undrawn`, `uncovered` and `coverageFix` in
-            // the options are how a test asks for a page with holes in it.
+            // How many characters the page could not draw, how many of those
+            // the coverage would not have built, and how many faces a fetch
+            // would still bring this page. A real answer always carries all
+            // four; `undrawn`, `uncovered`, `coverageFix` and `fallbacksLeft`
+            // in the options are how a test asks for a page with holes in it.
             headers: {
               get: (name) => (
                 name === "x-undrawn" ? String(opts.undrawn ?? 0)
                 : name === "x-uncovered" ? String(opts.uncovered ?? 0)
+                : name === "x-fallbacks-missing"
+                  ? String(opts.fallbacksLeft ?? 0)
                 : name === "x-coverage-fix" ? (opts.coverageFix ?? "")
                 : null),
             },
@@ -3617,6 +3620,28 @@ for (const deferred of [
   check("and the one answer left is named",
         note.textContent.includes("needs a family that has them in fallback 1"),
         note.textContent);
+}
+
+// 60a-ii. Unless a face this page needs is still to fetch, which the folder
+//         alone cannot say: the CJK one comes only when something asks for
+//         it, so pasting Japanese into a workspace holding every other face
+//         puts the button back and makes pressing it the move.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, undrawn: 4, fallbacksLeft: 1 });
+  const box = env.exportForm.elements.fallbacks;
+  box.checked = true;
+  env.exportForm.on.input({target: box});
+  await settle();
+  const note = env.sandbox.document.getElementById("undrawn");
+  check("a face this page still needs brings the button back",
+        env.sandbox.document.getElementById("fetch").hidden === false);
+  check("and the note counts it beside the folder",
+        env.sandbox.document.getElementById("have-fallbacks").textContent
+          === "from fonts\\fallbacks, 1 more to fetch",
+        env.sandbox.document.getElementById("have-fallbacks").textContent);
+  check("so pressing Fetch is the move, not finding a font yourself",
+        note.textContent.includes("Press Fetch"), note.textContent);
 }
 
 // 60b. The other reason a page is blank, and the one with an answer: the

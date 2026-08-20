@@ -999,9 +999,19 @@ def render(request: RenderRequest) -> Response:
     # no face on the list has it, or the coverage would not have built it.
     # The second names the presets that would carry it, so a blank page says
     # which box to tick rather than leaving it to be worked out.
+    # And what a fetch would still bring *this* page. The count the panel got
+    # at load speaks for the folder alone, which cannot answer for the CJK
+    # face: that one comes only when something asks for it, so a folder can
+    # hold every other face and be short of it. Without this the button hides
+    # itself on a Japanese page and the note goes on to advise a family of
+    # your own, with the face that would have drawn it a press away.
     return Response(buffer.getvalue(), media_type="image/png",
                     headers={"x-undrawn": str(len(undrawn)),
                              "x-uncovered": str(len(uncovered)),
+                             "x-fallbacks-missing": str(len(
+                                 fontbuild.missing_fallbacks(
+                                     fontbuild.SOURCE_DIR,
+                                     request.intervals or "", request.text))),
                              "x-coverage-fix":
                                  ",".join(presets_covering(uncovered))})
 

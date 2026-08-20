@@ -606,7 +606,14 @@ export const fetchButton = document.getElementById("fetch");
 export const fetchNote = document.getElementById("fetched");
 export const haveFallbacks = document.getElementById("have-fallbacks");
 
+//: Where the faces are, kept so a render can revise the count without
+//: knowing the path. The two arrive from different places: the folder comes
+//: with /defaults once, and what is left to fetch is a fact about the page
+//: being drawn and changes with it.
+let fallbacksWhere = "";
+
 export function showFallbackState(where, missing = 0) {
+  fallbacksWhere = where || "";
   fetchButton.hidden = Boolean(where) && !missing;
   // The last two segments: the whole path is most of a line and says
   // little the tail does not -- once they are fetched it is the font
@@ -621,6 +628,14 @@ export function showFallbackState(where, missing = 0) {
     haveFallbacks.textContent = `from ${tail}`;
   }
   haveFallbacks.title = where || "";
+}
+
+// What this page in particular would still fetch, off the render. The CJK
+// face is the one that moves: it is 15.7 MB and comes only when something
+// asks for it, so pasting Japanese into a workspace with every other face
+// puts the button back.
+export function showFallbacksLeft(missing) {
+  showFallbackState(fallbacksWhere, missing);
 }
 
 export function showFetchStep(step) {

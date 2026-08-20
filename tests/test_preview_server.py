@@ -3584,3 +3584,24 @@ def test_a_picked_fallback_resolves_its_styles_as_the_build_does(tmp_path,
                  fontbuild.STYLE_IDS["bold"]]
              if face != spaces]
     assert list(offered[server.BOLD]) == built
+
+
+def test_a_page_that_needs_the_cjk_face_is_told_it_is_still_to_fetch(
+        client, tmp_path, two_families):
+    """The CJK face comes only when something asks for it, so a folder holding
+    every other face is complete and short of it at once. The count at load
+    cannot see the page, and the page is what asks."""
+    from crossglyph import fontbuild
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.fetch_plan():
+        (faces / name).write_bytes(b"")
+
+    assert client.get("/defaults").json()["fallbacks_missing"] == 0
+    latin = client.post("/render", json={"text": "abc", "size": 16})
+    japanese = client.post("/render", json={"text": "こん", "size": 16})
+
+    assert latin.status_code == japanese.status_code == 200
+    assert latin.headers["x-fallbacks-missing"] == "0"
+    assert japanese.headers["x-fallbacks-missing"] == "1"

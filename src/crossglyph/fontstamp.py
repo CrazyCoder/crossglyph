@@ -70,8 +70,8 @@ def chain_digests(config) -> dict[int, list[str]]:
             path = pathlib.Path(face)
             if path != space and path not in hashed:
                 hashed[path] = source_digest(path)
-    return {style_id: [hashed[path] for face in faces
-                       for path in [pathlib.Path(face)] if path in hashed]
+    return {style_id: [hashed[path] for path in map(pathlib.Path, faces)
+                       if path in hashed]
             for style_id, faces in sorted(chain.items())}
 
 

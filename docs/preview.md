@@ -672,6 +672,12 @@ work out which coverage would have asked for it. One CJK face answers Japanese,
 Korean and both Chinese scripts. It is a slow download, so the same bar the
 build uses says how far it has got, and the button is out until it finishes.
 
+So does the offer. That face comes only when something asks for it, which
+means a workspace can hold every other face and still be short of it, and the
+folder on its own cannot tell you. The count is worked out again on each
+render, against the text and coverage in front of you. Paste Japanese into a
+fully fetched workspace and the button comes back with one face to bring.
+
 ## What this is not
 
 The preview draws one page of sample text. It is not the reader: no chapters,

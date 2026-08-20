@@ -1,6 +1,7 @@
 import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
-import {exportForm, exportSettings, fetchButton, presetBoxes} from "./export.js";
+import {exportForm, exportSettings, fetchButton, presetBoxes,
+        showFallbacksLeft} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
@@ -216,6 +217,9 @@ export async function renderNow() {
     status.textContent = `${response.status}`;
     return;
   }
+  // Before showUndrawn, which reads whether the button is showing to decide
+  // which move it advises.
+  showFallbacksLeft(Number(response.headers.get("x-fallbacks-missing")) || 0);
   showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
   showUncovered(Number(response.headers.get("x-uncovered")) || 0,
                 response.headers.get("x-coverage-fix"));
