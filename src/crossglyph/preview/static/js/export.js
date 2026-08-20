@@ -598,20 +598,28 @@ export function wireSizeTitles() {
 }
 
 // The faces are not vendored: they are large, unmodified and OFL, so they are
-// fetched once into the font source folder. The offer only appears when they
-// are not already somewhere -- a checkout beside the repo counts.
+// fetched once into the font source folder. The offer appears while any of
+// them is still to get -- a checkout beside the repo counts as having them,
+// and a folder filled by an older version can be short the faces this one
+// added.
 export const fetchButton = document.getElementById("fetch");
 export const fetchNote = document.getElementById("fetched");
 export const haveFallbacks = document.getElementById("have-fallbacks");
 
-export function showFallbackState(where) {
-  fetchButton.hidden = Boolean(where);
+export function showFallbackState(where, missing = 0) {
+  fetchButton.hidden = Boolean(where) && !missing;
   // The last two segments: the whole path is most of a line and says
   // little the tail does not -- once they are fetched it is the font
   // folder and "fallbacks", and before that the checkout's own. The
   // whole of it stays in the title.
   const tail = where ? where.split(/[\\/]/).slice(-2).join("\\") : "";
-  haveFallbacks.textContent = where ? `from ${tail}` : "not fetched yet";
+  if (!where) {
+    haveFallbacks.textContent = "not fetched yet";
+  } else if (missing) {
+    haveFallbacks.textContent = `from ${tail}, ${missing} more to fetch`;
+  } else {
+    haveFallbacks.textContent = `from ${tail}`;
+  }
   haveFallbacks.title = where || "";
 }
 

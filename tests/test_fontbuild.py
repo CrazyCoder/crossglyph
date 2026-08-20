@@ -602,6 +602,34 @@ def test_a_folder_fetched_before_the_styles_still_builds(tmp_path):
     assert not set(wanted) & set(fontbuild.NOTOSANS_STYLES)
 
 
+def test_nothing_fetched_means_the_whole_plan_is_missing(tmp_path):
+    assert fontbuild.missing_fallbacks(tmp_path) == fontbuild.fetch_plan()
+
+
+def test_a_folder_missing_the_new_faces_names_them(tmp_path):
+    """The set grows between versions, so a folder is not either fetched or
+    not. This is what puts the button back in front of somebody who fetched
+    before the styles were added."""
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.fetch_plan():
+        if name in fontbuild.NOTOSANS_STYLES:
+            continue
+        (faces / name).write_bytes(b"")
+
+    assert fontbuild.missing_fallbacks(tmp_path) == \
+        list(fontbuild.NOTOSANS_STYLES)
+
+
+def test_a_complete_folder_is_missing_nothing(tmp_path):
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.fetch_plan():
+        (faces / name).write_bytes(b"")
+
+    assert fontbuild.missing_fallbacks(tmp_path) == []
+
+
 def test_a_fetch_lands_the_licence_and_leaves_cjk_alone(tmp_path, monkeypatch):
     """15.7 MB of CJK is not something to hand someone building a Cyrillic
     family, and the OFL requires the licence to travel with the faces."""

@@ -83,7 +83,7 @@ fetch("/defaults").then(r => r.json()).then(d => {
   fillSamples(d.samples);
   restoreSample(navigator.languages);
   fillPresets(d.presets || [], d.base || []);
-  showFallbackState(d.fallbacks);
+  showFallbackState(d.fallbacks, d.fallbacks_missing);
   outField.value = d.out || "";
   outField.placeholder = d.out_resolved || "";
   document.getElementById("source-note").textContent =

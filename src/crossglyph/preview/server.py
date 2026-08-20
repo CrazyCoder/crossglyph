@@ -1248,6 +1248,10 @@ def defaults() -> JSONResponse:
             # Whether the bundled faces are anywhere, so the panel can offer to
             # fetch them rather than let a build fail on them.
             "fallbacks": str(fontbuild.fallback_dir() or ""),
+            # How many a fetch would still add. A folder can hold every face an
+            # older version wanted and lack what this one added, so presence is
+            # not the question the button asks.
+            "fallbacks_missing": len(fontbuild.missing_fallbacks()),
             "font": _sources[REGULAR].name if _sources else None,
             "faces": sorted(FACE_NAMES[style] for style in _sources),
             "families": families(),

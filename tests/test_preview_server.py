@@ -261,6 +261,26 @@ def test_the_family_list_is_read_from_the_folder_every_time(client,
     assert "Newcomer" in named()
 
 
+def test_the_page_is_told_how_many_faces_are_still_to_fetch(client, tmp_path,
+                                                            two_families):
+    """A folder fetched before the NotoSans styles were added has the faces an
+    older version wanted, so presence alone would hide the button and leave
+    nothing to press."""
+    from crossglyph import fontbuild
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.fetch_plan():
+        if name in fontbuild.NOTOSANS_STYLES:
+            continue
+        (faces / name).write_bytes(b"")
+
+    payload = client.get("/defaults").json()
+
+    assert payload["fallbacks"].endswith(fontbuild.FALLBACK_NAME)
+    assert payload["fallbacks_missing"] == len(fontbuild.NOTOSANS_STYLES)
+
+
 def test_the_folder_listing_is_not_something_a_browser_may_keep(client,
                                                                 two_families):
     """The page asks this again precisely because the answer changes. A copy

@@ -381,6 +381,21 @@ def fetch_plan(intervals: str = "", text: str = "") -> list[str]:
     return names
 
 
+def missing_fallbacks(source: pathlib.Path | str | None = None,
+                      intervals: str = "", text: str = "") -> list[str]:
+    """What a fetch would add to the folder as it stands.
+
+    The set grows between versions, so a folder is not either fetched or not.
+    A workspace can hold every face one release wanted and lack what the next
+    one added, and the page has to be able to offer those.
+    """
+    directory = fallback_dir(source)
+    if directory is None:
+        return fetch_plan(intervals, text)
+    return [name for name in fetch_plan(intervals, text)
+            if not (directory / name).is_file()]
+
+
 def fetch_steps(source: pathlib.Path | str | None = None, intervals: str = "",
                 text: str = "") -> typing.Iterator[dict]:
     """Fetch the bundled faces, saying how far it has got.
