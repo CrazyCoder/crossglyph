@@ -403,9 +403,8 @@ function coverageAdvice(remedy, bundled) {
     // a folder the build does not read, and the range comes out as empty as
     // it was.
     return bundled
-      ? "Press Fetch, above, then build again."
-      : "Press Fetch, above, turn on bundled fallback faces, then build "
-        + "again.";
+      ? "Press Fetch, then build again."
+      : "Press Fetch, turn on bundled fallback faces, then build again.";
   }
   // The faces are here and this build did not use them. Usually the box is
   // off and pressing it is the whole answer; with it on, the order in the

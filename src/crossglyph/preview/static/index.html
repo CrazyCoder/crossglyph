@@ -290,7 +290,7 @@
           FreeType fit the font whatever instructions it carries, and is worth
           trying on a face that looks muddy at small sizes.
           <br><br>
-          This row also decides what two of the switches below it can do.
+          This row also decides what two of the switches can do.
           <strong>grayscale hinting</strong> is a choice between two ways of
           running the font's own instructions, so it needs a mode where those
           run, which for almost every font means <strong>normal</strong>.
@@ -925,8 +925,8 @@
                   aria-describedby="sizes-tip">?</button>
           <span class="tip" id="sizes-tip" role="tooltip">
             The reader's Font Size setting lists every size the family carries,
-            one entry each. Not the size on the left, which is only what you
-            are tuning at. A box takes a fraction, in the quarter points that
+            one entry each. Not the <strong>size</strong> knob, which is only
+            what you are tuning at. A box takes a fraction, in the quarter points that
             knob steps in, and rounds anything between them.
           </span>
         </span></span>
@@ -988,7 +988,7 @@
                 aria-describedby="mod-tip">?</button>
         <span class="tip" id="mod-tip" role="tooltip">
           More sizes, built from the same faces. With the suffix empty they
-          join the family above, and the reader lists them among its sizes:
+          join this family, and the reader lists them among its sizes:
           nothing limits how many one family carries. Fill the suffix in and
           they build <strong id="mod-name">a second family</strong> instead,
           listed beside the first under that name, which is worth having when
@@ -1055,7 +1055,7 @@
             Extra Unicode ranges, for books that need them. More coverage means
             a larger file and a longer build.
             <br><br>
-            The page above draws what a build of these ticks would draw. Untick
+            The preview draws what a build of these ticks would draw. Untick
             a range the text uses and it goes blank there, the way the built
             font would, and the note under the text box says which tick would
             carry it.
@@ -1090,8 +1090,8 @@
             a glyph the family already has. Some uncommon codepoints may still
             be left out of the <code>.cpfont</code>.
             <br><br>
-            None of this decides the page on the left: a preview is built from
-            the text in the box, whatever is ticked here.
+            None of this decides what the preview draws: it is built from the
+            text in the box, whatever is ticked here.
           </span>
         </span>
       </span>
@@ -1139,7 +1139,7 @@
             on a wide coverage they are the difference between 300 glyphs and
             3,300.
             <br><br>
-            The page above shows them too, in the same order the build would:
+            The preview shows them too, in the same order the build would:
             paste a character this family has not got and you see which face it
             will actually come from. Nothing is opened while the family covers
             the text.
