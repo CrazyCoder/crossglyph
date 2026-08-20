@@ -678,6 +678,13 @@ folder on its own cannot tell you. The count is worked out again on each
 render, against the text and coverage in front of you. Paste Japanese into a
 fully fetched workspace and the button comes back with one face to bring.
 
+A face the folder does not have stops a build and not the page. The page is
+for tuning a family, and a sample of Russian has nothing to do with a Chinese
+face being absent, so it draws with the faces that are there and counts what
+they could not draw under the box. A build is the other way round: a `.cpfont`
+is read on a device months later, so a script the coverage asked for going
+quietly missing is worth refusing over, and the message names the fetch.
+
 ## What this is not
 
 The preview draws one page of sample text. It is not the reader: no chapters,

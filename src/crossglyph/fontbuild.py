@@ -227,7 +227,8 @@ def bundled_fallbacks(intervals: str) -> list[str]:
     return list(BUNDLED_FALLBACKS) + list(DEFAULT_CJK_FALLBACK)
 
 
-def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Path]:
+def wanted_fallbacks(intervals: str, directory: pathlib.Path,
+                     strict: bool = True) -> list[pathlib.Path]:
     """The bundled faces this coverage needs, in workflow order.
 
     A CJK face is 15.7 MB and only earns that when a CJK script was asked for.
@@ -238,6 +239,14 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
     OPTIONAL_FALLBACKS says which those are. A CJK face still counts as
     requested once a CJK script is in the coverage, which is what the flag
     below is for.
+
+    `strict` is what makes that an error, and only a build sets it. A .cpfont
+    is read on a device long after it is written, so a script quietly absent
+    from one is worth refusing over. The preview passes False: it draws a page
+    to tune a family by, and a face the coverage asked for has nothing to do
+    with the sample in front of you. Nothing is hidden by that -- what a face
+    would have drawn is counted under the box, and the offer to fetch it is a
+    few rows down.
     """
     asked_for_cjk = any(preset in intervals.lower() for preset in CJK_FALLBACKS)
     paths, missing = [], []
@@ -250,7 +259,7 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
             continue                    # not fetched, and not asked for
         else:
             missing.append(name)
-    if missing:
+    if missing and strict:
         raise FallbacksMissing(
             f"{directory} is missing {', '.join(missing)}. Fetch the set with "
             f"`crossglyph fetch-fallbacks`, or set 'fallbacks = no'.")
@@ -308,13 +317,13 @@ def workspace_faces(name: str,
 BUNDLED_TOKEN = "bundled"
 
 
-def bundled_entries(intervals: str,
-                    directory: pathlib.Path) -> list[dict[str, pathlib.Path]]:
+def bundled_entries(intervals: str, directory: pathlib.Path,
+                    strict: bool = True) -> list[dict[str, pathlib.Path]]:
     """The built-in set, one style map per family, in workflow order.
 
     Which files those are is still wanted_fallbacks' answer, so the rule about
-    a CJK face nobody asked for, and the error that names the fetch, are the
-    ones already there.
+    a CJK face nobody asked for, and `strict` deciding whether a face the
+    coverage asked for is an error, are the ones already there.
 
     One entry per family and not per file. BUNDLED_FALLBACKS lists the files a
     fetch downloads, NotoSans in four styles among them, and the first of a
@@ -323,7 +332,7 @@ def bundled_entries(intervals: str,
     bold one -- and every style's chain would then carry it.
     """
     entries, seen = [], set()
-    for path in wanted_fallbacks(intervals, directory):
+    for path in wanted_fallbacks(intervals, directory, strict):
         family = fontconf.family_of(fontconf.font_stem(path)).casefold()
         if family in seen:
             continue
@@ -332,8 +341,8 @@ def bundled_entries(intervals: str,
     return entries
 
 
-def ordered_entries(config: Config, coverage: str | None = None
-                    ) -> list[dict[str, pathlib.Path]]:
+def ordered_entries(config: Config, coverage: str | None = None,
+                    strict: bool = True) -> list[dict[str, pathlib.Path]]:
     """The chain behind the panel's two picks, resolved per style.
 
     `fallback_order` is the chain when it is set, and BUNDLED_TOKEN inside it
@@ -347,13 +356,17 @@ def ordered_entries(config: Config, coverage: str | None = None
 
     `coverage` overrides the config's own, for the preview: the panel's ticks
     are what a render draws against, and they decide whether a CJK face joins
-    the set.
+    the set. `strict` is wanted_fallbacks', and travels with it.
+
+    A name this cannot resolve is an error either way. The reader chose that
+    word and no fetch brings it, so the panel has to say so where a face the
+    fetch would bring is drawn around instead.
     """
     coverage = config.coverage if coverage is None else coverage
     written = config.fallback_order.strip()
     if not written:
         return bundled_entries(coverage,
-                               require_bundled_fallbacks(config.root))
+                               require_bundled_fallbacks(config.root), strict)
     directory = fallback_dir(config.root)
     entries = []
     # Gathered on the first name the fallbacks folder cannot answer, and not
@@ -364,8 +377,8 @@ def ordered_entries(config: Config, coverage: str | None = None
         if not token:
             continue
         if token.casefold() == BUNDLED_TOKEN:
-            entries += bundled_entries(coverage,
-                                       require_bundled_fallbacks(config.root))
+            entries += bundled_entries(
+                coverage, require_bundled_fallbacks(config.root), strict)
             continue
         faces = named_faces(token, directory)
         if not faces:

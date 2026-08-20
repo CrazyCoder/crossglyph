@@ -3605,3 +3605,25 @@ def test_a_page_that_needs_the_cjk_face_is_told_it_is_still_to_fetch(
     assert latin.status_code == japanese.status_code == 200
     assert latin.headers["x-fallbacks-missing"] == "0"
     assert japanese.headers["x-fallbacks-missing"] == "1"
+
+
+def test_a_face_the_folder_lacks_does_not_stop_the_page(client, tmp_path,
+                                                        two_families):
+    """Ticking a CJK range asks for two faces, and a folder can have one of
+    them. The page is for tuning what the family covers, and a Cyrillic sample
+    has nothing to do with the face that is missing."""
+    from crossglyph import fontbuild
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.fetch_plan():
+        (faces / name).write_bytes(b"")
+    (faces / "NotoSansCJKjp-Regular.otf").write_bytes(b"")
+
+    drawn = client.post("/render", json={"text": "Привет hello", "size": 16,
+                                         "fallbacks": True,
+                                         "intervals": "base,cyrillic,cjk-jp"})
+
+    assert drawn.status_code == 200, drawn.text
+    assert drawn.headers["x-fallbacks-missing"] == "1", \
+        "and the face it is short of is still offered"

@@ -802,9 +802,9 @@ def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
         with contextlib.suppress(LookupError):
             config = family_config(family)
             if config.fallback_order.strip():
-                entries = fontbuild.ordered_entries(config, intervals)
+                entries = fontbuild.ordered_entries(config, intervals, False)
     if entries is None:
-        entries = fontbuild.bundled_entries(intervals, directory)
+        entries = fontbuild.bundled_entries(intervals, directory, False)
     return tuple(tuple(sorted(entry.items())) for entry in entries)
 
 
@@ -981,10 +981,6 @@ def render(request: RenderRequest) -> Response:
     # status line as though the knob had been rejected.
     except RenderCoreMissing as exc:
         raise HTTPException(503, str(exc)) from exc
-    # Fallbacks ticked and not fetched. The same class again, and this is the
-    # one missing file the reader can fix without leaving the page.
-    except fontbuild.FallbacksMissing as exc:
-        raise HTTPException(503, _with_the_button(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(503, str(exc)) from exc
 
