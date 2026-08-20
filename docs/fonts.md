@@ -70,19 +70,46 @@ italic         = NotoSans-Italic.ttf
 bolditalic     = NotoSans-BoldItalic.ttf
 ```
 
+#### What the family is, and which files it is made of
+
 | key | default | meaning |
 |---|---|---|
 | `name` | the discovered family | family name on the device, and the filename prefix. Non-alphanumerics are stripped |
 | `family` | the config filename | the stem to match source files against, when it differs from the filename. `name` does not affect it |
 | `dir` | the workspace root | where to look for the font files |
+| `regular` `bold` `italic` `bolditalic` | auto-discovered | name a file explicitly, relative to `dir`. `file.ttf@wght=600` pins a [variable font's](#variable-fonts) coordinates |
+
+#### What gets built
+
+| key | default | meaning |
+|---|---|---|
 | `sizes` | `12 14 16 18` | point sizes to build. Fractions are allowed, see below |
 | `sizes_mod` | none | point sizes for a second family, `<name><mod_suffix>` |
 | `mod_suffix` | `Mod` | suffix for that second family |
+| `out` | `cpfonts` | in `all.conf` only: where builds go, resolved against the workspace |
+
+#### Which characters go in
+
+| key | default | meaning |
+|---|---|---|
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours. `intervals =` with nothing after it is the narrowest build there is, since `base` is carried whatever this says |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
+| `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
+| `space_width_XXXX` | per Unicode | override one fixed width space as a fraction of an em: `space_width_2006 = 0.25` |
+
+#### Where a missing character comes from
+
+| key | default | meaning |
+|---|---|---|
 | `fallbacks` | `no` | append the bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. A face you have not fetched is skipped, and the build says which, along with any preset that drew nothing. See [When a tick draws nothing](#when-a-tick-draws-nothing) |
 | `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. Inert while `fallbacks` is `no`, since there is no chain to order. See [Which face a fallback lends](#which-face-a-fallback-lends) |
-| `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
+| `fallback_regular` `fallback2_regular` | none | your own fallback families, ahead of the bundled ones |
+| `fallback_dir` | `fallbacks` | in `all.conf` only: a Noto set shared between workspaces |
+
+#### How a glyph is drawn
+
+| key | default | meaning |
+|---|---|---|
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
@@ -91,17 +118,17 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `grayscale_hinting` | `no` | run FreeType's interpreter version 35, which fits stems on both axes rather than hinting for a subpixel display. Only reaches a TrueType face carrying bytecode, under `hinting = normal`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `mono` | `no` | rasterize each glyph as one bit per pixel, with FreeType's dropout control, instead of thresholding coverage. The font then draws in two levels whatever the reader's anti-aliasing setting is. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `stem_darkening` | `no` | FreeType stem darkening. Narrow: a CFF or OTF face under any hinting but `auto`, and a TrueType face only under `hinting = light`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
+
+#### How the text is spaced
+
+| key | default | meaning |
+|---|---|---|
 | `line_height` | the font's own | line pitch. `1.15` is em relative, `0.9x` is a multiple of the font's own, `26px` is absolute. See [Line spacing](#line-spacing) |
 | `letter_spacing` | `0` | tracking in pixels, added to every glyph's advance. Stored at 1/16 px, and negatives tighten |
 | `word_spacing` | `0` | added to the space on top of `letter_spacing`, as CSS word-spacing is |
 | `kerning` | `yes` | GPOS kerning: `yes`, `no`, or a factor such as `0.5`. A face kerned for print often over-tightens at 12 or 13 px |
 | `ligatures` | `yes` | GSUB ligatures. `fi` and `fl` often blur into one blob at four grey levels |
 | `figures` | `default` | `proportional` applies the font's GSUB `pnum` feature, so a `1` stops being padded to the width of a `0`. See [Proportional figures](#proportional-figures) |
-| `space_width_XXXX` | per Unicode | override one fixed width space as a fraction of an em: `space_width_2006 = 0.25` |
-| `regular` `bold` `italic` `bolditalic` | auto-discovered | name a file explicitly, relative to `dir`. `file.ttf@wght=600` pins a [variable font's](#variable-fonts) coordinates |
-| `fallback_regular` `fallback2_regular` | none | your own fallback families, ahead of the bundled ones |
-| `out` | `cpfonts` | in `all.conf` only: where builds go, resolved against the workspace |
-| `fallback_dir` | `fallbacks` | in `all.conf` only: a Noto set shared between workspaces |
 
 The four explicit style keys are the exact equivalent of the four upload slots
 on the CrossPoint font website. Auto-discovery is a convenience on top of them.
@@ -358,6 +385,8 @@ FreeType renders 8-bit coverage at 150 DPI, so 13 pt is 27.08 px/em. `gamma`
 curves that coverage, it is truncated to 4 bits, then `thresholds` cuts it into
 the four levels the device stores.
 
+### Gamma
+
 A useful `gamma` runs about 0.3 to 4.0, the range crengine offers for the same
 curve. What it does is not uniform across that range. Up to about 2 it darkens.
 Past 3 it darkens barely at all and mostly converts grey edges into solid
@@ -375,6 +404,8 @@ So a high `gamma` keeps some antialiasing while pushing the page towards the
 hard edges of 1-bit rendering, and a low one lightens a face that sets too
 heavy at small sizes.
 
+### Thresholds
+
 Which of the three cut points matters depends on the reader's
 **Settings > Text > Anti-Aliasing** switch. With it on, all three are live and
 the page is drawn from two grey planes. With it off, `GfxRenderer` paints every
@@ -390,6 +421,8 @@ produced, and change none of it:
 | `4 8 12` (default) | 6.03 | 2950 | 608 | 414 | 1866 |
 | `3 6 10` (the built-in fonts') | 6.03 | 2866 | 234 | 689 | 2049 |
 
+### Weight, slant and the hinting knobs
+
 `weight`, `slant`, `hinting`, `grayscale_hinting` and `stem_darkening` act
 earlier, on the outline and on how FreeType fits it to the pixel grid, so they
 change the coverage the quantizer then sees. Three of them are worth a note.
@@ -397,6 +430,8 @@ change the coverage the quantizer then sees. Three of them are worth a note.
 `weight` uses `FT_Outline_Embolden`, which fattens the outline and leaves the
 advance width alone. Text gets heavier at unchanged spacing. That is right at
 reading sizes, and it is no substitute for a real bold face.
+
+### Stem darkening
 
 `stem_darkening` is narrower than its name suggests, and where it applies
 depends on `hinting` as much as on the font. FreeType has the code in two
@@ -416,6 +451,8 @@ move, and leaves the rest live without promising anything: a CFF face whose
 stems fall where the darkening curve rounds to nothing is unmoved as well, and
 nothing short of rasterizing both ways would know.
 
+### Grayscale hinting
+
 `grayscale_hinting` chooses which of FreeType's two TrueType bytecode
 interpreters runs a font's own hinting. The default is version 40, which
 FreeType calls roughly equivalent to DirectWrite ClearType. It hints vertically
@@ -432,6 +469,8 @@ none. A TrueType family with no glyph instructions goes to the auto-hinter
 anyway, and so does any family under `light`, `auto` or `none`. So this is a
 `hinting = normal` control on a TrueType face, and the preview greys the row
 everywhere else.
+
+### Mono rasterizing
 
 `mono` changes what a pixel is decided by. Normally the converter takes
 FreeType's coverage and cuts it at the three thresholds, and the reader with
@@ -873,6 +912,8 @@ as `_14`.
 where it has one. Which file a glyph was borrowed from is not one answer for
 the whole family, and the record is what a reproduction reads.
 
+### The coverage block
+
 `coverage` holds what each ticked token asked for against what the faces
 between them could supply. `settings` records the tokens, so that is the ask
 and this is the answer. A zero here is the state the build warns about.
@@ -886,6 +927,8 @@ way and Hebrew at 82%.
 `drawable` counts what the faces have. What the converter packed is a narrower
 number, decided per style, and reaching it would cost a second pass over every
 glyph. The `glyphs` count under `files` is the packed answer for one size.
+
+### Repaired faces
 
 A `synthesized` block appears above `fallbacks` when a face needed repairing,
 and says how much. `"synthesized": {"arabic_forms": 125}` is a build of
@@ -902,6 +945,8 @@ It is written when a build produces something, so a folder that is already
 current keeps the record of the run that made it. Nothing reads it back yet.
 It is written because the time to record how something was made is while you
 still know.
+
+## How long a build takes
 
 Sizes are rasterized in parallel, one process each. The default is a worker per
 core less one, so the machine stays usable while a build runs, and never more
