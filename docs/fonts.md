@@ -111,7 +111,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | key | default | meaning |
 |---|---|---|
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
-| `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. Any ascending triple within 1 to 15. `3 6 10` is the darker set the built-in fonts use, and the two are what the preview offers |
+| `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. Any ascending triple within 1 to 15. `3 6 10` is the set the built-in fonts use, and the preview offers it, `4 8 12` and `2 5 9` |
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
 | `slant` | `0` | shear as a tangent. `0.25` is about 14 degrees, for synthesizing an oblique a family lacks |
 | `hinting` | `normal` | `normal`, `light` (vertical only, softer), `none`, or `auto` (FreeType's auto-hinter, worth trying when a font looks muddy at small sizes) |
@@ -408,11 +408,17 @@ heavy at small sizes.
 
 **All three are yours to set, and the panel offers two of them by name.** Any
 ascending triple within 1 to 15 is accepted, so `5 9 13` is as valid as the
-default. The panel's **thresholds** row lists default (4, 8, 12) and darkened
-(3, 6, 10). Those are the two sets worth a name, and the built-in fonts use the
-second. Write your own triple in the `.conf` and the row grows a third entry
-for it, `custom (5, 9, 13)`, so loading a family never quietly rounds its
-tuning to one of the two.
+default. The panel's **thresholds** row lists three, each a step darker than the last:
+default (4, 8, 12), darkened (3, 6, 10) as the built-in fonts have it, and
+darkest (2, 5, 9). Write your own triple in the `.conf` and the row grows
+an entry for it, `custom (5, 9, 13)`, so loading a family never quietly rounds
+its tuning to one of the three.
+
+The first cut spreads the ink, and it is the only one that survives the reader
+turning anti-aliasing off. Measured over a mixed Cyrillic
+and Latin page at 13 pt, the three sets ink 3.62%, 3.93% and 4.22% of the
+screen. Going darker than that stops being legible before it stops being
+possible, which is why the list ends where it does.
 
 Which of the three cut points matters depends on the reader's
 **Settings > Text > Anti-Aliasing** switch. With it on, all three are live and

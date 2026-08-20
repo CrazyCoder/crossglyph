@@ -23,6 +23,20 @@ const JS = join(STATIC, "js");
 // into one scope would be simpler and would test the wrong thing: every name
 // resolves in one scope, so a module reading a name it never imported passes
 // here and throws on the first click over there.
+//: The page's own markup, for the handful of fixtures that would otherwise be
+//: a second copy of what it declares. A <select> whose options are typed out
+//: here goes on passing after somebody adds one over there, and the drift is
+//: silent -- which is the whole failure this suite exists to prevent.
+const INDEX = readFileSync(join(STATIC, "index.html"), "utf8");
+
+function optionsOf(id) {
+  const select = new RegExp(`<select[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</select>`)
+    .exec(INDEX);
+  if (!select) throw new Error(`no <select id="${id}"> in index.html`);
+  return [...select[1].matchAll(/<option[^>]*\bvalue="([^"]*)"/g)]
+    .map(([, value]) => ({ value }));
+}
+
 const ENTRY = "app.js";
 const files = new Map();
 function fileFor(name) {
@@ -239,7 +253,7 @@ const DEFAULTS = {
     { name: "Sample", faces: ["bold", "italic", "regular"],
       conf: "sample.conf", derived: false,
       tuning: { gamma: 1, weight: 0, hinting: "normal",
-                thresholds: [2, 5, 9], line_height: null },
+                thresholds: [5, 9, 13], line_height: null },
       outlines: "cff",
       features: { ligatures: true, figures: true },
       bytecode: false, tricky: false,
@@ -433,11 +447,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       options: [{ value: "normal" }, { value: "light" },
                 { value: "none" }, { value: "auto" }],
     }),
-    // Two presets in the markup; a config carrying its own triple has to be
-    // offered as a third rather than blanking the control.
+    // The presets the markup declares, read from it rather than repeated. A
+    // config carrying its own triple has to be offered past them rather than
+    // blanking the control.
     makeControl({
-      name: "thresholds", value: "4,8,12",
-      options: [{ value: "4,8,12" }, { value: "3,6,10" }],
+      name: "thresholds", value: "4,8,12", options: optionsOf("thresholds"),
     }),
     // Greyed by the hinting row above rather than by the font alone.
     makeControl({ name: "stem_darkening", type: "checkbox", checked: false }),
@@ -2678,16 +2692,21 @@ for (const { name, text } of sources) {
 
   env.family.choose("Sample");
   check("a config's own triple is offered rather than dropped",
-        env.byName.thresholds.value === "2,5,9", env.byName.thresholds.value);
-  check("as an option beside the two presets",
+        env.byName.thresholds.value === "5,9,13", env.byName.thresholds.value);
+  const shipped = optionsOf("thresholds").map(o => o.value);
+  // Ship this triple as a preset and the case above stops testing anything:
+  // the control would carry it already, and nothing would be added.
+  check("the fixture's triple is one the markup does not ship",
+        !shipped.includes("5,9,13"), shipped.join());
+  check("as an option after the ones the markup declares",
         env.byName.thresholds.options.map(o => o.value).join()
-          === "4,8,12,3,6,10,2,5,9",
+          === [...shipped, "5,9,13"].join(),
         env.byName.thresholds.options.map(o => o.value).join());
 
   env.family.choose("Alto");
   check("and the custom one goes when the family that had it does",
         env.byName.thresholds.options.map(o => o.value).join()
-          === "4,8,12,3,6,10",
+          === shipped.join(),
         env.byName.thresholds.options.map(o => o.value).join());
 }
 
