@@ -285,7 +285,7 @@ const DEFAULTS = {
   family: "Alto",
   // Where the bundled faces are, if anywhere: empty means the panel offers
   // to fetch them.
-  fallbacks: "D:\fonts\fallbacks",
+  fallbacks: "D:\\fonts\\fallbacks",
   source: "D:\\fonts",
   out: "",
   // The ranges are what the panel works containment out from, so the fixture
@@ -2682,6 +2682,19 @@ for (const { name, text } of sources) {
         bare.sandbox.document.getElementById("have-fallbacks").textContent
           === "not fetched yet",
         bare.sandbox.document.getElementById("have-fallbacks").textContent);
+
+  // The set grows between versions, so a folder is not either fetched or not.
+  // A workspace filled by an older version has the faces that version wanted
+  // and none of what this one added, and hiding the button on the strength of
+  // the folder being there leaves nothing to press.
+  const some = await loaded(fakeStorage(),
+                            { ...DEFAULTS, fallbacks_missing: 3 });
+  check("a folder short of a face is still offered the button",
+        some.sandbox.document.getElementById("fetch").hidden === false);
+  check("and the note says how many are left",
+        some.sandbox.document.getElementById("have-fallbacks").textContent
+          === "from fonts\\fallbacks, 3 more to fetch",
+        some.sandbox.document.getElementById("have-fallbacks").textContent);
 }
 
 // 40. Variable fonts. One file is several faces, so which face each slot is
