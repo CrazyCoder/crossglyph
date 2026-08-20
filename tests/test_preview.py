@@ -822,6 +822,11 @@ def test_a_flat_list_of_fallbacks_still_serves_every_style(tmp_path):
 NAMING_SECTION = "### The same settings in the preview"
 
 
+def _page_html():
+    return (pathlib.Path(__file__).resolve().parents[1] / "src" / "crossglyph"
+            / "preview" / "static" / "index.html").read_text(encoding="utf-8")
+
+
 def _panel_labels():
     """Every label on the panel, lowercased, without its unit annotation.
 
@@ -830,8 +835,7 @@ def _panel_labels():
     """
     import re
 
-    html = (pathlib.Path(__file__).resolve().parents[1] / "src" / "crossglyph"
-            / "preview" / "static" / "index.html").read_text(encoding="utf-8")
+    html = _page_html()
     found = set()
     for body in re.findall(r"<label\b[^>]*>(.*?)</label>", html, re.S):
         body = re.sub(r'<span class="unit">.*?</span>', "", body, flags=re.S)
@@ -893,11 +897,6 @@ def test_the_page_about_the_panel_uses_the_panel_words():
     assert not named, (
         f"docs/preview.md names these by their config spelling, and the panel "
         f"labels them differently: {', '.join(named)}")
-
-
-def _page_html():
-    return (pathlib.Path(__file__).resolve().parents[1] / "src" / "crossglyph"
-            / "preview" / "static" / "index.html").read_text(encoding="utf-8")
 
 
 def test_every_help_badge_describes_a_tip_that_is_there():

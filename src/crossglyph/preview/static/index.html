@@ -339,9 +339,9 @@
             auto-hinter instead. The row greys itself in those cases and says
             which one it is.
             <br><br>
-            One case it does not grey: with <strong>mono rasterizing</strong>
-            on, FreeType drops back to this older engine's behaviour of its
-            own accord, so the switch changes nothing either way.
+            <strong>mono rasterizing</strong> takes it too. FreeType hints the
+            way this engine does whenever the raster is monochrome, whichever
+            of the two is chosen, so the row greys there as well.
           </span>
         </span></span>
       <input id="grayscale_hinting" name="grayscale_hinting" type="checkbox">
@@ -373,10 +373,11 @@
             It belongs to the font and not to the page: one built this way
             draws in two levels whatever the reader's anti-aliasing is set to.
             <strong>gamma</strong> and <strong>thresholds</strong> have no
-            coverage left to work on while it is on, so both grey out. The
-            outline is fitted differently as well, so some advance widths land
-            on other whole pixels and the text sets to slightly different
-            lines.
+            coverage left to work on while it is on, so both grey out, and
+            <strong>grayscale hinting</strong> with them: FreeType hints as
+            that engine does for a monochrome raster anyway. The outline is
+            fitted differently as well, so some advance widths land on other
+            whole pixels and the text sets to slightly different lines.
           </span>
         </span></span>
       <input id="mono" name="mono" type="checkbox">
@@ -993,7 +994,7 @@
           listed beside the first under that name, which is worth having when
           two entries suit you better than one long list of sizes.
           <br><br>
-          Leave the sizes empty for neither.
+          Leave these sizes empty and the family builds its four boxes alone.
         </span>
       </span></h2>
       <span id="mod-dot" aria-hidden="true" hidden
