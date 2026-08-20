@@ -971,9 +971,12 @@
              inputmode="decimal">
     </div>
 
-    <!-- Most families are one family, so this folds and starts folded. The
-         dot says the fold is hiding sizes that are set, which is the one thing
-         somebody could otherwise lose track of behind it. -->
+    <!-- A second entry in the reader's font list, not a way past a size
+         limit: `sizes` above takes as many as you give it, and the reader
+         lists every size a family carries (ReaderFontSizes.cpp). Most people
+         want one entry, so this folds and starts folded. The dot says the
+         fold is hiding sizes that are set, which is the one thing somebody
+         could otherwise lose track of behind it. -->
     <div class="section">
       <h2><button type="button" id="mod-toggle" data-fold="mod"
                   aria-expanded="false" aria-controls="mod-settings"><svg
@@ -984,9 +987,11 @@
                 aria-describedby="mod-tip">?</button>
         <span class="tip" id="mod-tip" role="tooltip">
           Sizes here build <strong id="mod-name">a second family</strong> from
-          the same faces, listed beside this one on the device. It is the way
-          to give a font eight sizes without one long list. Leave them empty
-          for one family; the suffix is what its name ends with.
+          the same faces, listed beside this one on the device under a name of
+          its own. One family can carry as many sizes as you give it, so this
+          is for when two entries in the font list suit you better than one
+          entry with a long list of sizes under it. Leave these empty for a
+          single family; the suffix is what the second name ends with.
         </span>
       </span></h2>
       <span id="mod-dot" aria-hidden="true" hidden

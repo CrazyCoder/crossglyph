@@ -467,8 +467,13 @@ The export panel holds the settings that decide what a build writes: the family
 name, the point sizes, the coverage, and the fallback families. Press the **?**
 beside a label to read what that setting does.
 
-The **second family** section starts folded, since most families are just the
-one. A dot on its heading means this family has a second one set up.
+The four **sizes** boxes cover what most families ship. The **second family**
+section builds those same faces again under the same name plus a suffix, at
+another set of sizes, and the device lists that as a font of its own beside the
+first. It is not a way past a limit on sizes: one family carries as many as you
+give it. Use it when two entries in the font list suit you better than one
+entry with a long list of sizes under it. The section starts folded, and a dot
+on its heading means this family has one.
 
 On a window wide enough for three columns the panel gets one of its own beside
 the page. On a narrower window it shares a column with the font controls, and
@@ -500,6 +505,11 @@ through the page until 13.25 looks better than 13, then put 13.25 in a box.
 Anything between two steps rounds to the nearer one when you leave the box, and
 anything outside the range is pulled back in, so the sizes you ship are sizes
 you were able to look at first.
+
+A family may carry more than four sizes, and the boxes are not the limit: a
+config with a longer list of them opens a **more sizes** field beside the boxes
+holding the rest. The field appears only for a family that already has one, so
+a fifth size is added in the config rather than here.
 
 A comma is a decimal point in one of those boxes, since each holds a single
 size. In **more sizes**, which is a list, it separates one from the next, and so

@@ -182,8 +182,10 @@ family carries, one entry each. It is a point size that is stored and shown,
 not an abstract small, medium or large slot.
 
 `sizes_mod` builds a second family from the same faces at another set of sizes,
-so `NotoSans` at 12, 14, 16, 18 and `NotoSansMod` at 13, 15, 17, 19. It is a
-way to keep two lists apart.
+so `NotoSans` at 12, 14, 16, 18 and `NotoSansMod` at 13, 15, 17, 19. The reader
+lists it as a font of its own beside the first. Nothing limits how many sizes
+one family may carry, so this is for keeping two lists apart and not for
+getting past a cap.
 
 Two sizes are special. The built-in interface fonts render at 8, 10 and 12 pt,
 and CJK text in the interface is drawn by borrowing the selected family at the
