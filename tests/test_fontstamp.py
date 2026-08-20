@@ -30,6 +30,29 @@ def _cpfont(directory, variant, size):
     return path
 
 
+def _chained(tmp_path, text):
+    """A variant in a workspace that has the bundled faces and one family of
+    your own, so a chain can be reordered."""
+    from crossglyph import fontbuild
+
+    fonts = tmp_path / "src"
+    fonts.mkdir(exist_ok=True)
+    # All four, so the chain has a bold style to put a bold face in.
+    for name in ("Alto-Medium.otf", "Alto Bold.otf", "Alto Italic.otf",
+                 "Alto Bold Italic.otf"):
+        (fonts / name).write_bytes(b"font-" + name.encode())
+    (fonts / "MyIcons-Regular.ttf").write_bytes(b"icons")
+    faces = fonts / fontbuild.FALLBACK_NAME
+    faces.mkdir(exist_ok=True)
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        (faces / name).write_bytes(b"noto-" + name.encode())
+    for pair in fontbuild.CJK_FALLBACKS.values():
+        for name in pair:
+            (faces / name).write_bytes(b"cjk-" + name.encode())
+    (fonts / "alto.conf").write_text(text, encoding="utf-8")
+    return fontconf.parse_config(fonts / "alto.conf").variants()[0]
+
+
 # --- digest ---------------------------------------------------------------
 
 def test_digest_is_stable(variant):
@@ -100,6 +123,32 @@ def test_digest_tracks_the_cpfont_format_version(variant, monkeypatch):
     before = fontstamp.digest(variant, 12)
     monkeypatch.setattr(fontstamp.cpfont, "CPFONT_VERSION", 5)
     assert fontstamp.digest(variant, 12) != before
+
+
+def test_a_reordered_chain_is_a_different_font(tmp_path):
+    """Which face supplies a codepoint depends on the order, so a build under
+    a new order is not the build sitting in the folder."""
+    before = _chained(tmp_path, "fallbacks = yes\n")
+    was = fontstamp.digest(before, 13)
+
+    after = _chained(tmp_path, "fallbacks = yes\n"
+                               "fallback_order = MyIcons, bundled\n")
+
+    assert fontstamp.digest(after, 13) != was
+
+
+def test_a_bold_face_appearing_in_the_folder_rebuilds_the_style(tmp_path):
+    """The point of hashing the resolved chain and not the flag: the config
+    did not move, and the font it builds did."""
+    from crossglyph import fontbuild
+
+    variant = _chained(tmp_path, "fallbacks = yes\n")
+    was = fontstamp.digest(variant, 13)
+
+    (tmp_path / "src" / fontbuild.FALLBACK_NAME
+     / "NotoSans-Bold.ttf").write_bytes(b"bold")
+
+    assert fontstamp.digest(_chained(tmp_path, "fallbacks = yes\n"), 13) != was
 
 
 # --- staleness ------------------------------------------------------------

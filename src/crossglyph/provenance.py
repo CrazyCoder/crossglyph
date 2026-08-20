@@ -160,9 +160,17 @@ def _settings(variant: Variant) -> dict:
     if config.space_widths:
         settings["space_widths"] = {f"{cp:04X}": width for cp, width
                                     in sorted(config.space_widths.items())}
-    if config.user_fallbacks:
-        settings["user_fallbacks"] = {key: path.name for key, path
-                                      in sorted(config.user_fallbacks.items())}
+    # Which face lent a glyph to which style, in the order they were asked.
+    # fontbuild imports this module, so the import is here rather than at the
+    # top.
+    from . import fontbuild
+
+    chain = fontbuild.fallback_chain(config)
+    if chain:
+        settings["fallback_chain"] = {
+            style: [pathlib.Path(face).name
+                    for face in chain[fontbuild.STYLE_IDS[style]]]
+            for style in STYLES if fontbuild.STYLE_IDS[style] in chain}
     return settings
 
 

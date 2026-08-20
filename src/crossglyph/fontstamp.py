@@ -41,6 +41,22 @@ def source_digest(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
+def _chain_digests(config) -> dict[int, list[str]]:
+    """Every fallback face each style would open, hashed, in order.
+
+    The generated space font is left out. It is not on disk until a build
+    makes it, and its bytes differ run to run whatever its widths are, which
+    is why `space_glyphs` hashes the spec instead.
+    """
+    from . import fontbuild
+
+    space = fontbuild.space_font_path(config.space_widths)
+    return {style_id: [source_digest(path) for face in faces
+                       for path in [pathlib.Path(face)] if path != space]
+            for style_id, faces in sorted(
+                fontbuild.fallback_chain(config).items())}
+
+
 def digest(variant: Variant, size: float) -> str:
     """Everything that can change the bytes of one .cpfont, hashed."""
     config = variant.config
@@ -56,8 +72,13 @@ def digest(variant: Variant, size: float) -> str:
         # the bold slot's weight leaves every size looking current.
         "axes": {style: coords for style in STYLES if style in config.styles
                  for coords in [config.coords(style, size)] if coords},
-        "user_fallbacks": {k: source_digest(v)
-                           for k, v in sorted(config.user_fallbacks.items())},
+        # Per style, in order. Which face supplies a codepoint is the chain's
+        # answer, so a reorder, or a bold face newly dropped in the folder,
+        # is a different font at settings that did not move.
+        #
+        # fontbuild imports this module, so the import is here rather than at
+        # the top.
+        "chain": _chain_digests(config),
         "converter": [source_digest(path) for path in CONVERTER_SOURCES],
         # The generated file is not hashed: fontTools stamps head.created, so
         # its bytes differ run to run while the font does not.

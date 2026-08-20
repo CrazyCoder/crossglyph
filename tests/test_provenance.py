@@ -31,6 +31,31 @@ def built(tmp_path):
                       .read_text(encoding="utf-8"))
 
 
+def test_the_record_says_which_face_each_style_borrowed_from(tmp_path):
+    """What reproduces a font is what it was built with, and which face lent a
+    glyph to which style is part of that."""
+    from fontsmith import box_font
+
+    for style in ("Regular", "Bold"):
+        box_font(tmp_path / f"Probe-{style}.ttf", [0x20, 0x41],
+                 family="Probe", style=style)
+        box_font(tmp_path / f"Fill-{style}.ttf", [0x20, 0x2192],
+                 family="Fill", style=style)
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = base\nfallbacks = no\n"
+        "fallback_regular = Fill-Regular.ttf\n", encoding="utf-8")
+    out = tmp_path / "out"
+    list(fontbuild.build_families(
+        [fontconf.parse_config(tmp_path / "probe.conf")], out))
+    record = json.loads((out / "Probe" / fontstamp.STAMP_NAME)
+                        .read_text(encoding="utf-8"))
+
+    chain = record["built"]["settings"]["fallback_chain"]
+
+    assert chain["regular"][0] == "Fill-Regular.ttf"
+    assert chain["bold"][0] == "Fill-Bold.ttf"
+
+
 def test_the_rebuild_check_still_reads_its_own_half(built):
     """Provenance rides in the file the staleness check owns, so the half that
     decides a rebuild has to be untouched by it."""
