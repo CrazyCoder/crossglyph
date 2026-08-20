@@ -1020,7 +1020,11 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
         sizes=parse_sizes(values.get("sizes", ""), where) or DEFAULT_SIZES,
         sizes_mod=parse_sizes(values.get("sizes_mod", ""), where),
         mod_suffix=sanitize_name(values.get("mod_suffix", "Mod")),
-        intervals=values.get("intervals", DEFAULT_INTERVALS).strip() or DEFAULT_INTERVALS,
+        # `intervals =` with nothing after it is a choice, and the narrowest
+        # one: every build carries `base` whatever this says, so an empty list
+        # is a font of ASCII and its punctuation. Only an absent key takes the
+        # default.
+        intervals=values.get("intervals", DEFAULT_INTERVALS).strip(),
         ranges=values.get("ranges", "").strip(),
         fallback_order=values.get("fallback_order", "").strip(),
         fallbacks=_bool(values.get("fallbacks", "no"), "fallbacks", where),

@@ -78,7 +78,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `sizes` | `12 14 16 18` | point sizes to build. Fractions are allowed, see below |
 | `sizes_mod` | none | point sizes for a second family, `<name><mod_suffix>` |
 | `mod_suffix` | `Mod` | suffix for that second family |
-| `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
+| `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours. `intervals =` with nothing after it is the narrowest build there is, since `base` is carried whatever this says |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
 | `fallbacks` | `no` | append the bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. A face you have not fetched is skipped, and the build says which |
 | `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. Inert while `fallbacks` is `no`, since there is no chain to order. See [Which face a fallback lends](#which-face-a-fallback-lends) |

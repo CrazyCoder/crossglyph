@@ -807,3 +807,17 @@ def test_all_conf_may_carry_the_fallback_order():
     """It names families and not one specific file, so it is shareable. That is
     the useful place for it: one order for the workspace."""
     assert "fallback_order" in fontbuild.DEFAULTS_KEYS
+
+
+def test_an_empty_coverage_is_not_the_default_coverage(tmp_path):
+    """Unticking every preset is a choice, and the narrowest one. Only an
+    absent key means the default."""
+    (tmp_path / "Probe-Regular.ttf").write_bytes(b"")
+
+    absent = tmp_path / "absent.conf"
+    absent.write_text("family = Probe\n", encoding="utf-8")
+    empty = tmp_path / "empty.conf"
+    empty.write_text("family = Probe\nintervals =\n", encoding="utf-8")
+
+    assert fontconf.parse_config(absent).intervals == fontconf.DEFAULT_INTERVALS
+    assert fontconf.parse_config(empty).intervals == ""

@@ -3625,3 +3625,22 @@ def test_a_face_the_folder_lacks_does_not_stop_the_page(client, tmp_path,
     assert drawn.status_code == 200, drawn.text
     assert drawn.headers["x-fallbacks-missing"] == "1", \
         "and the face it is short of is still offered"
+
+
+def test_unticking_every_preset_survives_a_reload(scratch):
+    """The panel showed no coverage, so the panel has to show no coverage when
+    it comes back. Handing the family the default instead is both a save that
+    did not stick and a build several times the size of the one asked for."""
+    from fastapi.testclient import TestClient
+
+    from crossglyph.preview import server
+
+    saved = _save_export("Alto", intervals="")
+
+    assert saved.status_code == 200, saved.text
+    assert "intervals" in (_conf(scratch) / "alto.conf").read_text(
+        encoding="utf-8"), "an absent key is the default, so it has to be there"
+    settings = next(f["export"] for f in TestClient(server.app)
+                    .get("/defaults").json()["families"]
+                    if f["name"] == "Alto")
+    assert settings["intervals"] == ""

@@ -1139,7 +1139,10 @@ def export_changes(request_export: dict, config: Config,
     wanted["mod_suffix"] = (
         suffix if sizes_mod and suffix and suffix != inherited_suffix else None)
 
-    wanted["intervals"] = str(request_export.get("intervals", "")).strip() or None
+    # Written even when it is empty, where every other key here is dropped at
+    # that point. Nothing ticked is a coverage the panel can show and a build
+    # can make, and a key that is absent hands the family the default instead.
+    wanted["intervals"] = str(request_export.get("intervals", "")).strip()
     wanted["ranges"] = str(request_export.get("ranges", "")).strip() or None
     wanted["fallbacks"] = "yes" if request_export.get("fallbacks") else "no"
 
