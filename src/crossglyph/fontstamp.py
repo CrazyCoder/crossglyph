@@ -47,14 +47,24 @@ def _chain_digests(config) -> dict[int, list[str]]:
     The generated space font is left out. It is not on disk until a build
     makes it, and its bytes differ run to run whatever its widths are, which
     is why `space_glyphs` hashes the spec instead.
+
+    A workspace whose bundled faces are not fetched has no chain to hash and
+    no build to be stale against. An empty answer here lets the staleness
+    check finish, and the build then stops with the sentence naming the fetch,
+    which is the one place that failure reads as something to fix. The faces
+    arriving later change this from empty to a chain, so the rebuild still
+    happens.
     """
     from . import fontbuild
 
+    try:
+        chain = fontbuild.fallback_chain(config)
+    except fontbuild.FallbacksMissing:
+        return {}
     space = fontbuild.space_font_path(config.space_widths)
     return {style_id: [source_digest(path) for face in faces
                        for path in [pathlib.Path(face)] if path != space]
-            for style_id, faces in sorted(
-                fontbuild.fallback_chain(config).items())}
+            for style_id, faces in sorted(chain.items())}
 
 
 def digest(variant: Variant, size: float) -> str:

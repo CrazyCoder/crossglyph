@@ -60,6 +60,7 @@ mod_suffix     = Mod
 intervals      = reading
 ranges         = (0x2900-0x29FF),(0x2E00-0x2E7F)
 fallbacks      = no
+fallback_order = NotoSerif, bundled
 space_glyphs   = yes
 thresholds     = 4 8 12
 hinting        = normal
@@ -79,7 +80,8 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `mod_suffix` | `Mod` | suffix for that second family |
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
-| `fallbacks` | `no` | append the thirteen bundled Noto faces, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
+| `fallbacks` | `no` | append the thirteen bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. Fetch the faces before enabling it |
+| `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. See [Which face a fallback lends](#which-face-a-fallback-lends) |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
@@ -254,6 +256,37 @@ glyphs is being padded, and the byte size alone does not say so.
 `default` is also a much cheaper request than `reading` when fallbacks are on,
 because `reading` adds mathematics, arrows, box drawing, geometric shapes and
 dingbats.
+
+### Which face a fallback lends
+
+A fallback is a family and not a file. For each style, an entry lends its own
+face for that style where the folder has one, and its regular face otherwise.
+So a symbol borrowed into a bold run is drawn from the bold face when there is
+one to draw it from.
+
+The fetched set carries NotoSans in four styles and the other twelve families
+in one. Noto publishes a bold for eight of the thirteen and an italic for
+NotoSans alone, so the rest would be a megabyte each for a slot they cannot
+fill. Anything you add to the fallbacks folder yourself is picked up the same
+way: drop `NotoSerif-Bold.ttf` beside a `NotoSerif-Regular.ttf` that a config
+names, and the bold style starts using it.
+
+`fallback_order` names the families and the order they are asked in:
+
+```ini
+fallbacks      = yes
+fallback_order = NotoSerif, bundled
+```
+
+Three rules cover the key. The list is the chain. `bundled` stands for the
+fetched set. A face appears once, at its first position. Leave `bundled` out
+and the list is the whole chain. Write it that way to drop a family from the
+set, or to reorder the set itself.
+
+The two families you pick in the panel are always in front of all of it, so a
+config never has to account for them. Naming one of them in `fallback_order`
+as well changes nothing: it is already in the chain, and the second mention is
+a repeat.
 
 ## The fixed width spaces
 
@@ -715,7 +748,7 @@ that:
 | path | `lib/EpdFont/scripts/` | `scripts/font-builder/` | forked from the website's |
 | base coverage | none implicit | `base` always injected | as the website |
 | presets | `ascii`, `latin1`, `cjk`, `builtin`, `punctuation` | `default`, `arabic`, `thai`, `bengali`, `cjk-sc`, `cjk-tc`, `cjk-jp` | as the website |
-| fallbacks | one per style | two user families and thirteen bundled Noto | as the website, plus the space font and the pan-CJK face on demand |
+| fallbacks | one per style | two user families and thirteen bundled Noto | the same set, resolved per style and in an order a config can set, plus the space font and the pan-CJK face on demand |
 | sizes | whole points | four whole points, with 8 and 10 appended to a CJK build | as many as you like, `13.5` included, and a second family at other sizes |
 | variable fonts | the file's default instance | the file's default instance | the instance the designer named for the slot, `opsz` following the size, coordinates pinnable per slot |
 | quantizer | fixed | `--darken-aa`, one darker preset | `gamma` and all three `thresholds` |

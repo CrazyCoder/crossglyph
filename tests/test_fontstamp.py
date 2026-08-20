@@ -44,8 +44,11 @@ def _chained(tmp_path, text):
     (fonts / "MyIcons-Regular.ttf").write_bytes(b"icons")
     faces = fonts / fontbuild.FALLBACK_NAME
     faces.mkdir(exist_ok=True)
+    # Without the NotoSans styles, so a test can add one and see what that
+    # does. They are optional exactly so that such a folder still builds.
     for name in fontbuild.BUNDLED_FALLBACKS:
-        (faces / name).write_bytes(b"noto-" + name.encode())
+        if name not in fontbuild.NOTOSANS_STYLES:
+            (faces / name).write_bytes(b"noto-" + name.encode())
     for pair in fontbuild.CJK_FALLBACKS.values():
         for name in pair:
             (faces / name).write_bytes(b"cjk-" + name.encode())
