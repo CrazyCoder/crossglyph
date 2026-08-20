@@ -254,13 +254,13 @@ stepper repeats it either way.
 
 ### The Page section
 
-It folds, and starts folded. These are settings you match to
-the device you are judging against once and then leave, where everything above
-them is what a session is actually for. They are remembered in this browser, so
-they survive a reload and every font you try; the fold is remembered with them.
-A dot on the folded heading says one of them is not what the device ships with,
-which is the same dot the rows carry, said for the section while the rows are
-out of sight.
+The **Page** section starts folded. Its settings describe the device you are
+judging against, so you set them once and leave them, while the controls above
+are what a session is actually spent on. The browser remembers them, so they
+survive a reload and every font you try, and it remembers whether you left the
+section open. A dot on the folded heading means one of the settings inside is
+not what the device ships with. It is the same dot the individual rows carry,
+shown for the section while those rows are out of sight.
 
 ### Why a control is greyed
 
@@ -324,7 +324,7 @@ white. That choice is remembered independently from the page appearance. The
 reader icon removes the body while keeping the selected screen proportions and
 rounded corners.
 
-**Scale** has four meanings:
+**Scale** has four settings:
 
 - **1:1 pixels** maps one reader pixel to one physical monitor pixel, whatever
   ratio the browser puts between its own pixels and the screen's. Nothing is
@@ -417,19 +417,19 @@ That arrow compares one knob. It is a comparison and not a reset: your value is
 set aside, one press brings it back, and you can flick between the two as often
 as it takes.
 
-Which value it offers depends on where the knob stands. While the panel differs
-from the config, it offers the config, answering "undo what I just did to this
-row". Once the two agree, and saving makes that true of every knob at once, it
-offers the stock value instead, answering "what does this font change". Leave a
-knob on stock and it differs from the config again, so the arrow points back
-the other way. The tooltip names which of the two it is holding.
+Which value it offers depends on where the knob stands. While your value
+differs from the one in the config, the arrow offers the config's, which
+answers "undo what I just did to this row". Once the two agree, and saving
+makes them agree on every knob at once, it offers the stock value instead,
+which answers "what is this font doing on its own". Leave a knob on stock and
+it differs from the config again, so the arrow turns back the other way. Hover
+it to see which of the two it is holding.
 
-A value the arrow set aside lasts as long as the panel, and no longer. It is
-one press from being back on screen, and a reload, a switch of font, or the
-config changing on disk under the page all drop it without asking. So switching
-font asks only about what the panel is showing, and that is the question the
-Save button answers. While the arrow is on you are looking at what the config
-says, so both of them stay quiet.
+The value the arrow set aside lasts as long as the panel does. It is one press
+from coming back, but a reload, a switch of font, or the config changing on
+disk all drop it without asking. So a prompt about switching font asks only
+about what is on screen, which is what **Save** would write. While the arrow is
+on you are looking at the config's own value, so nothing prompts at all.
 
 Numeric axes of a variable font, such as `wdth`, use the same arrow. The
 family's config is the first comparison, the default declared by the font is
@@ -443,35 +443,37 @@ the baseline has it.
 
 ### Putting a whole section back
 
-**Reset font knobs**, in the foot of the card beside **Save**, puts the whole
-section back, including the weight pickers of a variable family. Those go to
-what the family declares, which is its config's weight if it has one and the
-font's own named instance if it has not, rather than to the first entry in the
-picker. The cross on the **Page** heading does the same for the section under
-it.
+**Reset font knobs**, in the bar at the foot of the card beside **Save**, puts
+the whole section back, the weight pickers of a variable family included. Those
+go to the weight the family declares: the one in its config where it has one,
+and the instance the font itself names where it has not. They do not go to the
+first entry in the picker. The cross on the **Page** heading does the same for
+the section under it.
 
 ## Saving
 
-**Save** sits in that foot and not inside the knobs, because it writes the
-whole `.conf` and not just the half above it. A coverage tick over on the
-export panel lights it exactly as a slider does.
+**Save** writes the whole `.conf`, the font controls and the export settings
+together. That is why it sits in the bar at the foot of the panel rather than
+among the controls, and why ticking a coverage box lights it up exactly as
+moving a slider does.
 
 A family that `all.conf` covers without naming has no file of its own. Saving
-one writes a new `<family>.conf` and leaves `all.conf` alone, since editing
-that would retune every family in the workspace.
+it writes a new `<family>.conf` and leaves `all.conf` alone, since editing that
+would retune every family in the workspace.
 
 ## The export panel
 
-It holds what a build needs and a page does not: the name, the sizes, the
-coverage, the fallback families. What each one means is behind the **?** beside
-its label, because it is an answer you want once. Its **second family** section
-folds the way **Page** does, since most families are one family, and a dot on
-the folded heading says this one is not.
+The export panel holds the settings that decide what a build writes: the family
+name, the point sizes, the coverage, and the fallback families. Press the **?**
+beside a label to read what that setting does.
 
-The panel gets its own column beside the page while the window is wide enough
-for three. Below that width it folds in beside the font knobs, and **Tune** and
-**Export** tabs above the panel decide which of the two is showing. The page
-stays where it is either way.
+The **second family** section starts folded, since most families are just the
+one. A dot on its heading means this family has a second one set up.
+
+On a window wide enough for three columns the panel gets one of its own beside
+the page. On a narrower window it shares a column with the font controls, and
+the **Tune** and **Export** tabs at the top choose which of the two you see.
+The page itself stays where it is either way.
 
 ### Name
 
@@ -542,30 +544,28 @@ something. Only what you chose is written to the config.
 
 ## Building
 
-The export panel has the same foot the knobs have: **Build** and **Build all**,
-the rule under them that a run fills, and one line saying what is being built or
-what the last build made. The rule and that line are there whether or not
-anything is running, so a build changes what the foot says and never how tall
-it is. Nothing grows it. What the two presses do is behind the **?** beside
-them.
+The export panel has a bar at its foot, the way the font controls do:
+**Build** and **Build all**, a progress bar under them, and one line saying
+what is building now or what the last build made. Both are there whether or not
+anything is running, so a build changes what the bar says and never how tall it
+is. Press the **?** beside the buttons for what each one does.
 
-**Save** is not on that tab, because a build writes the `.conf` before it
-starts. Pressing Build is pressing Save and then Build, and a second button for
-the first half of that is one to press by mistake.
+There is no **Save** on this tab, because a build saves before it starts.
+Pressing Build is pressing Save and then Build, so a second button for the first
+half of that would only be one to press by mistake.
 
-That costs you the lit Save which would have said the export settings are not
-in the file yet, so the tabs say it instead. A dot on **Tune** means a knob in
-there is unsaved, and a dot on **Export** means a setting in there is. A tab
-never marks itself, because the panel you are looking at says it for itself. A
-build running behind the Export tab marks it the same way, and supersedes the
-unsaved dot while it runs: a build is minutes, the panel it reports in may not
-be the one you are looking at, and by the time it matters the file has been
-written anyway.
+That leaves nothing to light up when an export setting is not in the file yet,
+so the tabs show it instead. A dot on **Tune** means something among the font
+controls is unsaved, and a dot on **Export** means something in the export
+panel is. Neither tab marks itself, since the panel you are looking at shows
+its own state. While a build runs, the **Export** tab carries that instead of
+the unsaved dot: a build takes minutes, you may well be looking at the other
+tab, and the file has been written by then anyway.
 
-The `.conf` is the only channel a build has, since the server re-reads it from
-disk and takes nothing from the page. A coverage tick that never reached the
-file would leave every size looking current, and that reads as a build that did
-nothing when it means a change that was never seen.
+A build reads the `.conf` from disk and takes nothing from the page, which is
+why the save has to happen first. A coverage tick that never reached the file
+would leave every size looking up to date, and that reads as a build that did
+nothing rather than as a change that was never seen.
 
 ### What a run tells you
 
@@ -589,12 +589,13 @@ showing the folder.
 
 ### Warnings and failures
 
-What a run had to complain about appears in a row under that foot, marked the
-way the note under the sample text is. A size that failed reads there, with
-what the converter said. So does a coverage preset the build could draw nothing
-of, named as the tick you put there, with the box or the **Fetch** button
-offered where one of those is the answer. A tick that drew a stray character or
-two reads there as well, saying almost nothing rather than nothing: a box like
+Anything a run had to complain about appears in a row under that bar, marked
+the way the note under the sample text is. A size that failed shows there, with
+what the converter said about it. So does a coverage preset the build could
+draw nothing of, named as the tick you put there, with the box or the **Fetch**
+button offered where one of those is the answer. A tick that drew a stray
+character or two shows there as well, saying almost nothing rather than
+nothing: a box like
 **Chinese (Simplified)** covers the fullwidth punctuation as well as the
 characters, and an ordinary Latin face draws some of that.
 
