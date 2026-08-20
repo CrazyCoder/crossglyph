@@ -564,6 +564,66 @@ def fallback_chain(config: Config) -> dict[int, list[str]]:
             for style in STYLES if style in config.styles}
 
 
+def drawable_codepoints(paths: typing.Iterable[str | pathlib.Path]) -> set[int]:
+    """Every codepoint the named faces have a glyph for, as one set.
+
+    One pass per file through the charmap, deduplicated by path first, because
+    the same face reaches several styles and the bundled CJK one is 15.7 MB.
+    Asking each face about each codepoint instead is the same answer at a
+    thousand times the cost.
+
+    A file FreeType will not open contributes nothing. Whatever is wrong with
+    it, the build reports that in its own place, and a count is not where a
+    reader should first hear about it.
+    """
+    from .cpfont.faces import open_face
+
+    found: set[int] = set()
+    for path in dict.fromkeys(str(path) for path in paths):
+        try:
+            face = open_face(path)
+            chars = list(face.get_chars())
+        except Exception:
+            continue
+        found.update(code for code, index in chars if index)
+    return found
+
+
+def token_codepoints(token: str) -> set[int]:
+    """What one coverage token asks for, or nothing for a token nobody knows.
+
+    `base` is left out on purpose. Every build carries it whatever the coverage
+    says, so counting it would report on a choice the reader never made.
+    """
+    token = token.strip().lower()
+    if not token or token in cpfont.convert.BASE_INTERVAL_PRESETS:
+        return set()
+    span = cpfont.parse_hex_range(token)
+    spans = [span] if span else cpfont.INTERVAL_PRESETS.get(token, [])
+    return {code for low, high in spans for code in range(low, high + 1)}
+
+
+def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
+    """Per coverage token, how many codepoints it asked for and how many the
+    build can draw.
+
+    Against every face the build opens, primary and fallback together, with no
+    regard for which style holds which. A codepoint the regular has and the
+    bold does not is a different subject, and the device answers it already by
+    drawing a style it has (SdCardFont::resolveStyle).
+    """
+    drawable = drawable_codepoints(
+        [config.styles[style] for style in STYLES if style in config.styles]
+        + [face for chain in fallback_chain(config).values() for face in chain])
+    counts = {}
+    for token in config.coverage.split(","):
+        wanted = token_codepoints(token)
+        if wanted:
+            counts[token.strip().lower()] = (len(wanted),
+                                             len(wanted & drawable))
+    return counts
+
+
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
     """Arguments for one generate_cpfont_multistyle call: one family, one size.
 

@@ -990,3 +990,57 @@ def test_every_offered_script_has_a_face_that_can_draw_it():
 
     assert not unanswerable, \
         f"offered with no bundled face behind them: {', '.join(unanswerable)}"
+
+
+# --- what a coverage tick actually got -----------------------------------
+
+def _family(tmp_path, codepoints, *, name="Probe"):
+    """A one-style family carrying exactly `codepoints`, and its config."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / f"{name}-Regular.ttf", codepoints, family=name)
+    return tmp_path
+
+
+def test_a_token_the_family_covers_is_counted_as_drawn(tmp_path):
+    _family(tmp_path, [0x20, 0x41, 0x3B1])
+    (tmp_path / "probe.conf").write_text("intervals = greek\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    counts = fontbuild.coverage_counts(config)
+    asked, drawable = counts["greek"]
+    assert asked > 1 and drawable == 1, "one Greek letter of the block"
+
+
+def test_a_token_no_face_covers_comes_out_at_zero(tmp_path):
+    _family(tmp_path, [0x20, 0x41])
+    (tmp_path / "probe.conf").write_text("intervals = thai\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    assert fontbuild.coverage_counts(config)["thai"] == (128, 0)
+
+
+def test_a_raw_range_is_counted_under_its_own_span(tmp_path):
+    _family(tmp_path, [0x20, 0x41, 0x2905])
+    (tmp_path / "probe.conf").write_text("ranges = (0x2900-0x29FF)\n",
+                                         encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    assert fontbuild.coverage_counts(config)["(0x2900-0x29ff)"] == (256, 1)
+
+
+def test_base_is_not_reported_because_every_build_carries_it(tmp_path):
+    _family(tmp_path, [0x20, 0x41])
+    (tmp_path / "probe.conf").write_text("intervals = base,thai\n",
+                                         encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    assert "base" not in fontbuild.coverage_counts(config)
+
+
+def test_a_fallback_face_counts_towards_the_family_it_fills_for(tmp_path):
+    from fontsmith import box_font
+
+    _family(tmp_path, [0x20, 0x41])
+    box_font(tmp_path / "Filler-Regular.ttf", [0x20, 0x0E01], family="Filler")
+    (tmp_path / "probe.conf").write_text(
+        "intervals = thai\nfallback_regular = Filler-Regular.ttf\n",
+        encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    assert fontbuild.coverage_counts(config)["thai"] == (128, 1)
