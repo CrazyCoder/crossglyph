@@ -147,6 +147,32 @@ def test_a_size_the_format_cannot_hold_exits_with_its_reason(tmp_path):
     assert said != "1", "the exit code reached the caller instead of a reason"
 
 
+def test_a_style_with_its_own_chain_does_not_inherit_style_zero():
+    """FORK: every entry is already resolved to a face for this style, so
+    appending the regular chain behind it would repeat each family at its
+    regular weight."""
+    from crossglyph.cpfont import convert
+
+    chains = {0: ["Sans-Regular.ttf"], 1: ["Sans-Bold.ttf"]}
+
+    assert convert.chain_for_style(chains, 1) == ["Sans-Bold.ttf"]
+
+
+def test_a_style_with_no_chain_of_its_own_takes_style_zero():
+    """What a caller passing only {0: ...} has always meant by it, which is
+    upstream's shape and fb2xt's."""
+    from crossglyph.cpfont import convert
+
+    assert convert.chain_for_style({0: ["Sans-Regular.ttf"]}, 2) == \
+        ["Sans-Regular.ttf"]
+
+
+def test_no_chains_at_all_is_an_empty_list():
+    from crossglyph.cpfont import convert
+
+    assert convert.chain_for_style(None, 0) == []
+
+
 def test_an_unknown_interval_preset_exits_with_the_list(tmp_path):
     """FORK: the same, for the other exit a preview render can reach. What it
     would have taken is the answer to the reader's next question."""

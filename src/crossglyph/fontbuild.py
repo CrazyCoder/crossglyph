@@ -479,30 +479,54 @@ def ensure_space_font(widths: dict[int, float] | None = None) -> pathlib.Path:
 STYLE_IDS = {"regular": 0, "bold": 1, "italic": 2, "bolditalic": 3}
 
 
+def fallback_chain(config: Config) -> dict[int, list[str]]:
+    """The faces each style falls back to, in order.
+
+    The panel's two picks first, then the ordered families when `fallbacks` is
+    on, then the space font. An entry lends its own face for the style being
+    built where it has one, and its regular face otherwise. A path already
+    taken is not taken again, so a family named twice, or named and also
+    reached through the token, costs one face.
+    """
+    entries: list[dict[str, pathlib.Path]] = []
+    for key in ("fallback_regular", "fallback2_regular"):
+        if key in config.user_fallbacks:
+            entries.append(pinned_faces(config.user_fallbacks[key]))
+    if config.fallbacks:
+        entries += ordered_entries(config,
+                                   require_bundled_fallbacks(config.root))
+
+    chain: dict[int, list[str]] = {}
+    for style in STYLES:
+        if style not in config.styles:
+            continue
+        seen: set[pathlib.Path] = set()
+        faces: list[str] = []
+        for entry in entries:
+            path = entry.get(style) or entry.get("regular")
+            if path is None or path in seen:
+                continue
+            seen.add(path)
+            faces.append(str(path))
+        # Independent of `fallbacks`: this one supplies nothing but the
+        # fixed-width spaces, so it cannot pad the build, and without it U+2006
+        # and friends are simply not drawn (see spacefont). Last, so a real
+        # face keeps its own.
+        if config.space_glyphs:
+            faces.append(str(space_font_path(config.space_widths)))
+        chain[STYLE_IDS[style]] = faces
+    return chain
+
+
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
     """Arguments for one generate_cpfont_multistyle call: one family, one size.
 
-    generate_cpfont_multistyle takes every fallback for style 0 and appends
-    that list to all four styles itself, which is why the user, bundled and
-    space faces all go into one ordered list.
+    The fallback chain is resolved per style, so a glyph borrowed into a bold
+    or an italic run comes from that family's matching face where it has one.
     """
     config: Config = variant.config
     style_fonts = {STYLE_IDS[style]: str(config.styles[style])
                    for style in STYLES if style in config.styles}
-
-    fallbacks: list[str] = []
-    for key in ("fallback_regular", "fallback2_regular"):
-        if key in config.user_fallbacks:
-            fallbacks.append(str(config.user_fallbacks[key]))
-    if config.fallbacks:
-        bundled = require_bundled_fallbacks(config.root)
-        fallbacks += [str(path)
-                      for path in wanted_fallbacks(config.coverage, bundled)]
-    # Independent of `fallbacks`: this one supplies nothing but the fixed-width
-    # spaces, so it cannot pad the build, and without it U+2006 and friends are
-    # simply not drawn (see spacefont). Last, so a real face keeps its own.
-    if config.space_glyphs:
-        fallbacks.append(str(space_font_path(config.space_widths)))
 
     # A variable file fills several slots, each at its own coordinates, and the
     # optical size axis follows the size being built -- so this is per size and
@@ -518,7 +542,7 @@ def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
         "intervals": cpfont.resolve_intervals(config.coverage),
         "output_path": str(fontstamp.cpfont_path(out_dir / variant.name,
                                                  variant, size)),
-        "fallback_style_fonts": {0: fallbacks} if fallbacks else None,
+        "fallback_style_fonts": fallback_chain(config) or None,
         "tuning": config.tuning,
     }
 

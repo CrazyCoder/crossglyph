@@ -460,6 +460,62 @@ def test_a_name_nothing_has_resolves_to_nothing(tmp_path):
     assert fontbuild.named_faces("Nowhere", folder, tmp_path) == {}
 
 
+def test_every_style_gets_a_chain_of_its_own(config, tmp_path):
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
+
+    assert sorted(kw["fallback_style_fonts"]) == [0, 1, 2, 3]
+
+
+def test_a_style_borrows_from_the_matching_face_when_there_is_one(config, tmp_path):
+    """The point of the whole change: a bold run gets the bold."""
+    (tmp_path / fontbuild.FALLBACK_NAME / "NotoSans-Bold.ttf").write_bytes(b"x")
+
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
+    bold = [pathlib.Path(p).name for p in kw["fallback_style_fonts"][1]]
+
+    assert "NotoSans-Bold.ttf" in bold
+    assert "NotoSans-Regular.ttf" not in bold
+
+
+def test_a_style_with_no_face_of_its_own_borrows_the_regular(config, tmp_path):
+    """Noto publishes no italic for twelve of the thirteen, so this is the
+    common case and not the corner."""
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
+    italic = [pathlib.Path(p).name for p in kw["fallback_style_fonts"][2]]
+
+    assert "NotoSansMath-Regular.ttf" in italic
+
+
+def test_the_panel_picks_stay_in_front_of_the_written_order(config, tmp_path):
+    """The rule the feature rests on: the panel's two picks are always in
+    front, and the config orders everything behind them."""
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
+    kw = _kwargs(config, tmp_path / "out",
+                 "fallbacks = yes\n"
+                 "fallback_regular = Fallback-Regular.ttf\n"
+                 "fallback_order = MyIcons\n")
+    names = [pathlib.Path(p).name for p in kw["fallback_style_fonts"][0]]
+
+    assert names[:2] == ["Fallback-Regular.ttf", "MyIcons-Regular.ttf"]
+
+
+def test_a_face_reached_twice_is_taken_once(config, tmp_path):
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
+    kw = _kwargs(config, tmp_path / "out",
+                 "fallbacks = yes\n"
+                 "fallback_order = MyIcons, MyIcons, bundled\n")
+    names = [pathlib.Path(p).name for p in kw["fallback_style_fonts"][0]]
+
+    assert names.count("MyIcons-Regular.ttf") == 1
+
+
+def test_the_space_font_is_last_in_every_style(config, tmp_path):
+    kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
+
+    for faces in kw["fallback_style_fonts"].values():
+        assert pathlib.Path(faces[-1]).name == spacefont.cache_name()
+
+
 def test_the_built_in_order_stands_when_the_key_is_unset(config, tmp_path):
     parsed = _parsed(config, "fallbacks = yes\n")
 

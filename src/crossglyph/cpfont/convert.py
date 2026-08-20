@@ -1470,6 +1470,19 @@ def style_sections_total_size(sections):
 
 # --- File writers ---
 
+def chain_for_style(fallback_style_fonts, style_id):
+    """The fallback faces one style rasterizes with.
+
+    FORK: a style uses its own list when it has one. Style 0's is the answer
+    for a style with none, which is what a caller passing {0: [...]} alone
+    means by it.
+    """
+    if not fallback_style_fonts:
+        return []
+    return list(fallback_style_fonts.get(style_id)
+                or fallback_style_fonts.get(0, []))
+
+
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
                                darken_aa=False, tuning=None, style_axes=None):
@@ -1490,11 +1503,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     raster_data = {}  # style_id -> StyleRasterData
     for style_id in sorted(style_fonts.keys()):
         fontfile = style_fonts[style_id]
-        fallback_fontfiles = []
-        if fallback_style_fonts:
-            if style_id != 0:
-                fallback_fontfiles.extend(fallback_style_fonts.get(style_id, []))
-            fallback_fontfiles.extend(fallback_style_fonts.get(0, []))
+        fallback_fontfiles = chain_for_style(fallback_style_fonts, style_id)
         print(f"  Rasterizing style {style_id}...", file=sys.stderr)
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
