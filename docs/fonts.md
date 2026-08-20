@@ -491,9 +491,14 @@ once per family, under that family's sizes:
 Three answers, and the build works out which one applies. A face sitting in
 the fallbacks folder that this build never opened is named by filename, and
 either `fallbacks = no` or a `fallback_order` without `bundled` in it puts a
-family there. A folder short of faces sends you to `crossglyph fetch-fallbacks`.
-A complete folder that still draws nothing leaves `fallback_regular` and
-dropping the tick.
+family there. A folder short of faces sends you to `crossglyph fetch-fallbacks`,
+and to `fallbacks = yes` as well where the family is not reading the set
+anyway. A complete folder that still draws nothing leaves `fallback_regular`
+and dropping the tick.
+
+A family that produced no file at all leaves coverage out. Every size failed.
+That is the line to read, and a note about an empty range would sit on top of
+it.
 
 The line comes only at zero. Partial is the ordinary state, since a preset
 covers codepoints no font assigns: against a fetched set Greek resolves at 92%
