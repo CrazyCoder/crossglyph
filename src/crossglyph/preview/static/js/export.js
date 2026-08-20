@@ -453,15 +453,15 @@ function showWarnings() {
   buildWarn.hidden = lines.length === 0;
 }
 
-//: Whether the coverage on screen would build a font the reader refuses.
-//: Read by the build buttons as well as shown: pressing Build on this is four
-//: sizes of work for a file that cannot load.
-export let intervalsOverCap = false;
-
+// Whether the coverage on screen would build a font the reader refuses, said
+// under the coverage boxes as they are ticked. Shown and not enforced: the
+// build refuses this family for itself, before it rasterizes anything, and a
+// button that would not press is a worse answer than a sentence saying which
+// box to untick.
 export function showIntervalLoad(count, cap, bundled = 0) {
-  intervalsOverCap = Boolean(cap) && count > cap;
-  intervalNote.hidden = !intervalsOverCap;
-  if (!intervalsOverCap) return;
+  const over = Boolean(cap) && count > cap;
+  intervalNote.hidden = !over;
+  if (!over) return;
   // The mechanism, because the number on its own does not say what to change.
   // A face that covers a block in patches is what reaches this, and one
   // preset fewer moves the count by too little to help.
