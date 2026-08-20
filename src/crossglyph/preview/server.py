@@ -821,18 +821,8 @@ def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
                     _bundled_faces(str(fontbuild.SOURCE_DIR),
                                    request.intervals or "")]
 
-    chain: dict[int, tuple[str, ...]] = {}
-    for style_id, style in enumerate(STYLES):
-        seen: set[pathlib.Path] = set()
-        faces: list[str] = []
-        for entry in entries:
-            path = entry.get(style) or entry.get("regular")
-            if path is None or path in seen:
-                continue
-            seen.add(path)
-            faces.append(str(path))
-        chain[style_id] = tuple(faces)
-    return chain
+    return {style_id: tuple(fontbuild.chain_for(entries, style))
+            for style_id, style in enumerate(STYLES)}
 
 
 @functools.lru_cache(maxsize=32)

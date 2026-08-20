@@ -529,8 +529,7 @@ def test_the_space_font_is_last_in_every_style(config, tmp_path):
 def test_the_built_in_order_stands_when_the_key_is_unset(config, tmp_path):
     parsed = _parsed(config, "fallbacks = yes\n")
 
-    entries = fontbuild.ordered_entries(
-        parsed, tmp_path / fontbuild.FALLBACK_NAME)
+    entries = fontbuild.ordered_entries(parsed)
 
     assert _entry_names(entries) == _bundled_families() + \
         ["NotoSansCJKjp-Regular.otf"]
@@ -541,8 +540,7 @@ def test_a_named_family_comes_first_and_the_token_brings_the_rest(config, tmp_pa
     parsed = _parsed(config, "fallbacks = yes\n"
                              "fallback_order = MyIcons, bundled\n")
 
-    names = _entry_names(fontbuild.ordered_entries(
-        parsed, tmp_path / fontbuild.FALLBACK_NAME))
+    names = _entry_names(fontbuild.ordered_entries(parsed))
 
     assert names[0] == "MyIcons-Regular.ttf"
     assert names[1] == _bundled_families()[0]
@@ -553,8 +551,7 @@ def test_the_token_can_come_first(config, tmp_path):
     parsed = _parsed(config, "fallbacks = yes\n"
                              "fallback_order = bundled, MyIcons\n")
 
-    names = _entry_names(fontbuild.ordered_entries(
-        parsed, tmp_path / fontbuild.FALLBACK_NAME))
+    names = _entry_names(fontbuild.ordered_entries(parsed))
 
     assert names[0] == _bundled_families()[0]
     assert names[-1] == "MyIcons-Regular.ttf"
@@ -566,17 +563,38 @@ def test_an_order_without_the_token_is_the_whole_chain(config, tmp_path):
     (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
     parsed = _parsed(config, "fallbacks = yes\nfallback_order = MyIcons\n")
 
-    entries = fontbuild.ordered_entries(
-        parsed, tmp_path / fontbuild.FALLBACK_NAME)
+    entries = fontbuild.ordered_entries(parsed)
 
     assert _entry_names(entries) == ["MyIcons-Regular.ttf"]
+
+
+def test_an_order_of_your_own_families_needs_no_fetched_set(tmp_path):
+    """`fallbacks = yes` asks for a chain and not for the Noto faces. A config
+    that names only families of its own builds where nothing was fetched."""
+    for name in ("Alto-Medium.otf", "MyIcons-Regular.ttf"):
+        (tmp_path / name).write_bytes(b"x")
+    parsed = _parsed(tmp_path / "alto.conf",
+                     "fallbacks = yes\nfallback_order = MyIcons\n")
+
+    assert _entry_names(fontbuild.ordered_entries(parsed)) == \
+        ["MyIcons-Regular.ttf"]
+
+
+def test_the_token_still_needs_the_fetched_set(tmp_path):
+    for name in ("Alto-Medium.otf", "MyIcons-Regular.ttf"):
+        (tmp_path / name).write_bytes(b"x")
+    parsed = _parsed(tmp_path / "alto.conf",
+                     "fallbacks = yes\nfallback_order = MyIcons, bundled\n")
+
+    with pytest.raises(fontbuild.FallbacksMissing, match="fetch-fallbacks"):
+        fontbuild.ordered_entries(parsed)
 
 
 def test_an_unresolvable_name_says_where_it_looked(config, tmp_path):
     parsed = _parsed(config, "fallbacks = yes\nfallback_order = Nowhere\n")
 
     with pytest.raises(fontconf.FontConfigError, match="Nowhere"):
-        fontbuild.ordered_entries(parsed, tmp_path / fontbuild.FALLBACK_NAME)
+        fontbuild.ordered_entries(parsed)
 
 
 def test_the_bundled_set_carries_the_notosans_styles():

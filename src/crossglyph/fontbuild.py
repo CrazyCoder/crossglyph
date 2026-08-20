@@ -45,12 +45,14 @@ FALLBACK_URL = ("https://raw.githubusercontent.com/crosspoint-reader/"
                 "crosspoint-tools/master/scripts/font-builder/"
                 "default-fallback-fonts/")
 
-#: Faces upstream's folder does not carry, and where they do live. Arabic is
-#: not in the set the website's converter ships, so a fetch of it has to go to
-#: the project that publishes it. Hinted, because the hinting knobs are the
+#: One static face from the Noto project, hinted -- the hinting knobs are the
 #: point at reading sizes.
 NOTO_TTF = ("https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
             "main/fonts/{family}/hinted/ttf/{name}")
+
+#: Faces upstream's folder does not carry, and where they do live. Arabic is
+#: not in the set the website's converter ships, and that folder is Regular
+#: only, so the NotoSans styles come from the project that publishes them too.
 FALLBACK_SOURCES = {
     "NotoSansArabic-Regular.ttf":
         NOTO_TTF.format(family="NotoSansArabic",
@@ -319,30 +321,37 @@ def bundled_entries(intervals: str,
     return entries
 
 
-def ordered_entries(config: Config,
-                    directory: pathlib.Path) -> list[dict[str, pathlib.Path]]:
+def ordered_entries(config: Config) -> list[dict[str, pathlib.Path]]:
     """The chain behind the panel's two picks, resolved per style.
 
     `fallback_order` is the chain when it is set, and BUNDLED_TOKEN inside it
     stands for the built-in set. Nothing is subtracted around the token: a
     family named before it holds its position, and the copy the token brings
     in repeats a path the chain has already taken, which fallback_chain drops.
+
+    The bundled set is required only where it is actually asked for. A config
+    listing families of its own, and never the token, builds in a workspace
+    that has fetched nothing.
     """
     written = config.fallback_order.strip()
     if not written:
-        return bundled_entries(config.coverage, directory)
+        return bundled_entries(config.coverage,
+                               require_bundled_fallbacks(config.root))
+    directory = fallback_dir(config.root)
     entries = []
     for token in (part.strip() for part in written.split(",")):
         if not token:
             continue
         if token.casefold() == BUNDLED_TOKEN:
-            entries.extend(bundled_entries(config.coverage, directory))
+            entries += bundled_entries(config.coverage,
+                                       require_bundled_fallbacks(config.root))
             continue
         faces = named_faces(token, directory, config.root)
         if not faces:
+            where = f"{directory} nor " if directory else ""
             raise FontConfigError(
-                f"fallback_order names {token!r}, which is neither a family in "
-                f"{directory} nor one in the font folder.")
+                f"fallback_order names {token!r}, which is neither a family "
+                f"in {where}the font folder.")
         entries.append(faces)
     return entries
 
@@ -531,43 +540,45 @@ def ensure_space_font(widths: dict[int, float] | None = None) -> pathlib.Path:
 STYLE_IDS = {"regular": 0, "bold": 1, "italic": 2, "bolditalic": 3}
 
 
+def chain_for(entries: list[dict[str, pathlib.Path]], style: str) -> list[str]:
+    """One style's faces, from the chain's entries in order.
+
+    An entry lends its own face for this style where it has one, and its
+    regular face otherwise. A path already taken is not taken again, so a
+    family named twice, or named and also reached through BUNDLED_TOKEN, costs
+    one face.
+    """
+    seen: set[pathlib.Path] = set()
+    faces: list[str] = []
+    for entry in entries:
+        path = entry.get(style) or entry.get("regular")
+        if path is None or path in seen:
+            continue
+        seen.add(path)
+        faces.append(str(path))
+    return faces
+
+
 def fallback_chain(config: Config) -> dict[int, list[str]]:
     """The faces each style falls back to, in order.
 
     The panel's two picks first, then the ordered families when `fallbacks` is
-    on, then the space font. An entry lends its own face for the style being
-    built where it has one, and its regular face otherwise. A path already
-    taken is not taken again, so a family named twice, or named and also
-    reached through the token, costs one face.
+    on, then the space font.
     """
     entries: list[dict[str, pathlib.Path]] = []
     for key in ("fallback_regular", "fallback2_regular"):
         if key in config.user_fallbacks:
             entries.append(pinned_faces(config.user_fallbacks[key]))
     if config.fallbacks:
-        entries += ordered_entries(config,
-                                   require_bundled_fallbacks(config.root))
+        entries += ordered_entries(config)
 
-    chain: dict[int, list[str]] = {}
-    for style in STYLES:
-        if style not in config.styles:
-            continue
-        seen: set[pathlib.Path] = set()
-        faces: list[str] = []
-        for entry in entries:
-            path = entry.get(style) or entry.get("regular")
-            if path is None or path in seen:
-                continue
-            seen.add(path)
-            faces.append(str(path))
-        # Independent of `fallbacks`: this one supplies nothing but the
-        # fixed-width spaces, so it cannot pad the build, and without it U+2006
-        # and friends are simply not drawn (see spacefont). Last, so a real
-        # face keeps its own.
-        if config.space_glyphs:
-            faces.append(str(space_font_path(config.space_widths)))
-        chain[STYLE_IDS[style]] = faces
-    return chain
+    # Independent of `fallbacks`: this one supplies nothing but the fixed-width
+    # spaces, so it cannot pad the build, and without it U+2006 and friends are
+    # simply not drawn (see spacefont). Last, so a real face keeps its own.
+    space = ([str(space_font_path(config.space_widths))]
+             if config.space_glyphs else [])
+    return {STYLE_IDS[style]: chain_for(entries, style) + space
+            for style in STYLES if style in config.styles}
 
 
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
@@ -754,7 +765,8 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
     nothing else. Skipped sizes keep their entry because they are still valid.
     """
     directory = out_dir / variant.name
-    current = {size: fontstamp.digest(variant, size)
+    chain = fontstamp.chain_digests(variant.config)
+    current = {size: fontstamp.digest(variant, size, chain)
                for size in variant.sizes
                if size not in failed
                and fontstamp.cpfont_path(directory, variant, size).is_file()}

@@ -41,7 +41,7 @@ def source_digest(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def _chain_digests(config) -> dict[int, list[str]]:
+def chain_digests(config) -> dict[int, list[str]]:
     """Every fallback face each style would open, hashed, in order.
 
     The generated space font is left out. It is not on disk until a build
@@ -55,20 +55,34 @@ def _chain_digests(config) -> dict[int, list[str]]:
     arriving later change this from empty to a chain, so the rebuild still
     happens.
     """
-    from . import fontbuild
+    from . import fontbuild                  # it imports this module in turn
 
     try:
         chain = fontbuild.fallback_chain(config)
     except fontbuild.FallbacksMissing:
         return {}
     space = fontbuild.space_font_path(config.space_widths)
-    return {style_id: [source_digest(path) for face in faces
-                       for path in [pathlib.Path(face)] if path != space]
+    # Hashed once per file rather than once per style. The four chains hold
+    # mostly the same faces, and each of those is a megabyte to read.
+    hashed: dict[pathlib.Path, str] = {}
+    for faces in chain.values():
+        for face in faces:
+            path = pathlib.Path(face)
+            if path != space and path not in hashed:
+                hashed[path] = source_digest(path)
+    return {style_id: [hashed[path] for face in faces
+                       for path in [pathlib.Path(face)] if path in hashed]
             for style_id, faces in sorted(chain.items())}
 
 
-def digest(variant: Variant, size: float) -> str:
-    """Everything that can change the bytes of one .cpfont, hashed."""
+def digest(variant: Variant, size: float,
+           chain: dict[int, list[str]] | None = None) -> str:
+    """Everything that can change the bytes of one .cpfont, hashed.
+
+    `chain` is chain_digests for this variant, for a caller asking about
+    several sizes. It is the same answer for all of them and a megabyte of
+    reading per fallback face, so the loops over sizes hand it in.
+    """
     config = variant.config
     payload = {
         "name": variant.name,
@@ -85,10 +99,7 @@ def digest(variant: Variant, size: float) -> str:
         # Per style, in order. Which face supplies a codepoint is the chain's
         # answer, so a reorder, or a bold face newly dropped in the folder,
         # is a different font at settings that did not move.
-        #
-        # fontbuild imports this module, so the import is here rather than at
-        # the top.
-        "chain": _chain_digests(config),
+        "chain": chain_digests(config) if chain is None else chain,
         "converter": [source_digest(path) for path in CONVERTER_SOURCES],
         # The generated file is not hashed: fontTools stamps head.created, so
         # its bytes differ run to run while the font does not.
@@ -183,9 +194,10 @@ def stale_sizes(variant: Variant, directory: pathlib.Path,
     if force:
         return list(variant.sizes)
     stamp = read_stamp(directory)
+    chain = chain_digests(variant.config)
     stale = []
     for size in variant.sizes:
-        if stamp.get(size_key(size)) != digest(variant, size):
+        if stamp.get(size_key(size)) != digest(variant, size, chain):
             stale.append(size)
         elif not cpfont_path(directory, variant, size).is_file():
             stale.append(size)
