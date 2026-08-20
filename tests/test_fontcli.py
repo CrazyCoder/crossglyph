@@ -101,3 +101,53 @@ def test_the_built_line_names_it_too(workspace, tmp_path, capsys):
     assert build(workspace, out) == 0
     assert "Probe 13.25 (ships as 13)" in capsys.readouterr().out
     assert (out / "Probe" / "Probe_13.cpfont").is_file()
+
+
+# --- a tick that came to nothing -----------------------------------------
+
+def _ticking_thai(workspace, *, face=False):
+    """The workspace with thai ticked, and optionally a face that draws it
+    sitting unused in the fallbacks folder."""
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = no\n", encoding="utf-8")
+    if face:
+        faces = workspace / "fallbacks"
+        faces.mkdir(exist_ok=True)
+        fontsmith.box_font(faces / "NotoSans-Regular.ttf", [0x20, 0x41],
+                           family="NotoSans")
+        fontsmith.box_font(faces / "NotoSansThai-Regular.ttf", [0x20, 0x0E01],
+                           family="NotoSansThai")
+    return workspace
+
+
+def test_a_range_nothing_draws_is_named_under_its_family(workspace, tmp_path,
+                                                         capsys):
+    assert build(_ticking_thai(workspace), tmp_path / "out") == 0
+    assert "nothing in this build draws thai" in capsys.readouterr().err
+
+
+def test_the_face_that_would_draw_it_is_named(workspace, tmp_path, capsys):
+    assert build(_ticking_thai(workspace, face=True), tmp_path / "out") == 0
+    said = capsys.readouterr().err
+    assert "NotoSansThai-Regular.ttf" in said
+    assert "fallbacks = yes" in said
+
+
+def test_a_range_the_build_draws_is_not_mentioned(workspace, tmp_path, capsys):
+    assert build(workspace, tmp_path / "out") == 0
+    assert "nothing in this build draws" not in capsys.readouterr().err
+
+
+def test_fail_on_warning_exits_one_and_still_writes_the_fonts(workspace,
+                                                              tmp_path):
+    out = tmp_path / "out"
+    code = fontcli.main(["--fonts", str(_ticking_thai(workspace)),
+                         "-o", str(out), "-j", "1", "--fail-on-warning"])
+    assert code == 1
+    assert list(out.rglob("*.cpfont")), \
+        "a gate that skipped the writing would be a different feature"
+
+
+def test_a_clean_build_under_the_flag_still_exits_zero(workspace, tmp_path):
+    assert fontcli.main(["--fonts", str(workspace), "-o", str(tmp_path / "out"),
+                         "-j", "1", "--fail-on-warning"]) == 0

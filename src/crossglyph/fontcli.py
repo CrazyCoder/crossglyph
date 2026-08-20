@@ -31,6 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="rebuild even when nothing changed")
     parser.add_argument("--list", dest="list_only", action="store_true",
                         help="show what each config resolves to, and build nothing")
+    parser.add_argument("--fail-on-warning", dest="fail_on_warning",
+                        action="store_true",
+                        help="return 1 when the build warns about anything, "
+                             "after every file is written; without it a build "
+                             "that produced fonts returns 0 whatever it said")
     parser.add_argument("--fetch-fallbacks", dest="fetch_fallbacks",
                         action="store_true",
                         help="put the bundled Noto fallback faces in the "
@@ -38,6 +43,49 @@ def build_parser() -> argparse.ArgumentParser:
                              "face is 15.7 MB more and comes only when a "
                              "config asks for one)")
     return parser
+
+
+def _listed(names: tuple[str, ...] | list[str]) -> str:
+    """`a`, `a or b`, `a, b or c` -- however many there are."""
+    names = list(names)
+    if len(names) < 2:
+        return names[0] if names else ""
+    return f"{', '.join(names[:-1])} or {names[-1]}"
+
+
+#: What to do about a coverage that came out at zero, one sentence per answer.
+#: In the config's own words: this is the surface where somebody edits a
+#: .conf, and a line here that named a checkbox would be naming a control the
+#: reader cannot see. The panel words the same three for itself.
+REMEDIES = {
+    "unused": "Set `fallbacks = yes`, or put `bundled` back in "
+              "`fallback_order`.",
+    "fetch": "The bundled set is short of faces here. Run "
+             "`crossglyph fetch-fallbacks` and build again.",
+    "none": "No bundled face covers it. Name a family in `fallback_regular`, "
+            "or drop the tick.",
+}
+
+
+def say_uncovered(empty: fontbuild.Uncovered) -> str:
+    """One family's empty coverage, for a terminal.
+
+    The filenames are here and not in the panel. There is no control to press
+    at a command line, so which file would draw the range is the part worth
+    its own line.
+    """
+    lines = [f"  {empty.family}: nothing in this build draws "
+             f"{_listed(empty.tokens)}."]
+    if empty.faces:
+        # What is on the disk and went unopened, without saying it answers
+        # every token above. One face can cover one of two empty ranges, and a
+        # line promising both would be wrong half the time.
+        lines.append(f"    {_listed(empty.faces)} "
+                     f"{'is' if len(empty.faces) < 2 else 'are'} in the "
+                     f"fallbacks folder and this build did not open "
+                     f"{'it' if len(empty.faces) < 2 else 'them'}.")
+    lines.append(f"    {REMEDIES[empty.remedy]}")
+    return "\n".join(lines)
 
 
 def describe(config: Config) -> None:
@@ -158,6 +206,7 @@ def main(argv=None) -> int:
               f"{'them' if len(absent) > 1 else 'it'}.",
               file=sys.stderr, flush=True)
 
+    warned = False
     workers = fontbuild.worker_count(len(jobs), opts.jobs)
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
@@ -178,11 +227,15 @@ def main(argv=None) -> int:
                   f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
             for warning in built.warnings:
                 print(f"    warning: {warning}", file=sys.stderr, flush=True)
+                warned = True
 
     for plan in plans:
         if plan.report.built or plan.report.failed:
-            fontbuild.finalize_variant(plan.variant, out_dir,
-                                       failed=set(plan.report.failed))
+            empty = fontbuild.finalize_variant(
+                plan.variant, out_dir, failed=set(plan.report.failed))
+            if empty:
+                warned = True
+                print(say_uncovered(empty), file=sys.stderr, flush=True)
 
     built = sum(len(plan.report.built) for plan in plans)
     failures = len(errors) + sum(len(plan.report.failed) for plan in plans)
@@ -191,7 +244,9 @@ def main(argv=None) -> int:
               f"{f', {failures} failed' if failures else ''}")
     elif not failures:
         print("\neverything up to date")
-    return 1 if failures else 0
+    # The gate comes after the writing. Whoever asked for it wants to stop on a
+    # warning, and they still want the fonts the run managed to produce.
+    return 1 if failures or (warned and opts.fail_on_warning) else 0
 
 
 if __name__ == "__main__":
