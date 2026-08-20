@@ -37,6 +37,16 @@ def _entry_names(entries):
     return [entry["regular"].name for entry in entries]
 
 
+def _bundled_families():
+    """One face per bundled family: what the chain holds, in its order.
+
+    BUNDLED_FALLBACKS is the fetch list and carries NotoSans four times over.
+    A chain takes each family once and resolves the styles behind it.
+    """
+    return [name for name in fontbuild.BUNDLED_FALLBACKS
+            if name not in fontbuild.NOTOSANS_STYLES]
+
+
 def test_every_discovered_style_is_passed(config, tmp_path):
     kw = _kwargs(config, tmp_path / "out")
     assert 0 in kw["style_fonts"] and 1 in kw["style_fonts"]
@@ -83,8 +93,8 @@ def _fallback_names(kw):
 def test_bundled_fallbacks_are_passed_in_the_workflow_order(config, tmp_path):
     kw = _kwargs(config, tmp_path / "out", "fallbacks = yes\n")
     assert _fallback_names(kw) == \
-        list(fontbuild.BUNDLED_FALLBACKS) + ["NotoSansCJKjp-Regular.otf",
-                                             spacefont.cache_name()]
+        _bundled_families() + ["NotoSansCJKjp-Regular.otf",
+                               spacefont.cache_name()]
 
 
 def test_bundled_fallbacks_are_disabled_by_default(config, tmp_path):
@@ -522,7 +532,7 @@ def test_the_built_in_order_stands_when_the_key_is_unset(config, tmp_path):
     entries = fontbuild.ordered_entries(
         parsed, tmp_path / fontbuild.FALLBACK_NAME)
 
-    assert _entry_names(entries) == list(fontbuild.BUNDLED_FALLBACKS) + \
+    assert _entry_names(entries) == _bundled_families() + \
         ["NotoSansCJKjp-Regular.otf"]
 
 
@@ -535,7 +545,7 @@ def test_a_named_family_comes_first_and_the_token_brings_the_rest(config, tmp_pa
         parsed, tmp_path / fontbuild.FALLBACK_NAME))
 
     assert names[0] == "MyIcons-Regular.ttf"
-    assert names[1] == fontbuild.BUNDLED_FALLBACKS[0]
+    assert names[1] == _bundled_families()[0]
 
 
 def test_the_token_can_come_first(config, tmp_path):
@@ -546,7 +556,7 @@ def test_the_token_can_come_first(config, tmp_path):
     names = _entry_names(fontbuild.ordered_entries(
         parsed, tmp_path / fontbuild.FALLBACK_NAME))
 
-    assert names[0] == fontbuild.BUNDLED_FALLBACKS[0]
+    assert names[0] == _bundled_families()[0]
     assert names[-1] == "MyIcons-Regular.ttf"
 
 

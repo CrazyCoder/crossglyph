@@ -261,6 +261,51 @@ def test_the_family_list_is_read_from_the_folder_every_time(client,
     assert "Newcomer" in named()
 
 
+def test_a_bold_run_is_offered_the_bold_fallback(tmp_path, monkeypatch):
+    """The page has to agree with the build. A folder with NotoSans in four
+    styles lends the bold one to bold and the regular one to regular."""
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        (faces / name).write_bytes(b"")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server._bundled_faces.cache_clear()
+
+    offered = server.fallbacks_for(server.RenderRequest(
+        text="a *b*", fallbacks=True, intervals="reading"))
+
+    assert any(face.endswith("NotoSans-Bold.ttf")
+               for face in offered[server.BOLD])
+    assert not any(face.endswith("NotoSans-Bold.ttf")
+                   for face in offered[server.REGULAR])
+    assert any(face.endswith("NotoSans-Regular.ttf")
+               for face in offered[server.REGULAR])
+
+
+def test_a_family_with_no_face_for_a_style_lends_its_regular(tmp_path,
+                                                             monkeypatch):
+    """Noto publishes no italic for twelve of the thirteen, so this is the
+    common case and not the corner."""
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        (faces / name).write_bytes(b"")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    server._bundled_faces.cache_clear()
+
+    offered = server.fallbacks_for(server.RenderRequest(
+        text="a", fallbacks=True, intervals="reading"))
+
+    assert any(face.endswith("NotoSansMath-Regular.ttf")
+               for face in offered[server.ITALIC])
+
+
 def test_the_page_is_told_how_many_faces_are_still_to_fetch(client, tmp_path,
                                                             two_families):
     """A folder fetched before the NotoSans styles were added has the faces an

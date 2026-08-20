@@ -380,7 +380,8 @@ def fallback_split(sources: Mapping[int, pathlib.Path | str],
 def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],
                size: float, *, tuning: Tuning | None = None,
                coverage: tuple[tuple[int, int], ...] | None = None,
-               fallbacks: tuple[pathlib.Path | str, ...] = (),
+               fallbacks: (tuple[pathlib.Path | str, ...]
+                           | Mapping[int, tuple[pathlib.Path | str, ...]]) = (),
                axes: Mapping[int, Mapping[str, float]] | None = None) -> bytes:
     """Rasterize a .cpfont in memory, from one face or up to four.
 
@@ -396,7 +397,12 @@ def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],
 
     `fallbacks` are the faces a build would fill from, in the same order the
     converter takes them: the family's own fallback families first, then the
-    bundled Noto set. They are opened only when the text needs them -- every
+    bundled Noto set. One list per style, keyed as `sources` is, so a glyph
+    borrowed into a bold run comes from the bold face where the chain has one.
+    A flat list is style 0's and serves every style, which is what a caller
+    with nothing per style means by it.
+
+    They are opened only when the text needs them -- every
     codepoint the family already has is drawn from the family, so on a page
     where nothing is missing the list costs one charmap pass and no build.
     That is what makes them affordable here at all: sized to the text, a
@@ -412,18 +418,20 @@ def build_font(sources: pathlib.Path | str | Mapping[int, pathlib.Path | str],
         sources = {REGULAR: sources}
     if coverage is None:
         coverage = coverage_for(SAMPLE_TEXT, sources)
-    if fallbacks and not uncovered(sources, coverage):
-        fallbacks = ()
+    # A flat list is style 0's, and generate_cpfont_multistyle gives style 0's
+    # to any style with none of its own -- so one list still serves all four.
+    if not isinstance(fallbacks, Mapping):
+        fallbacks = {REGULAR: tuple(fallbacks)}
+    chains = {style: [str(face) for face in faces]
+              for style, faces in fallbacks.items() if faces}
+    if chains and not uncovered(sources, coverage):
+        chains = {}
     with tempfile.TemporaryDirectory() as work:
         path = pathlib.Path(work) / "preview.cpfont"
         cpfont.generate_cpfont_multistyle(
             {style: str(source) for style, source in sources.items()},
             size, list(coverage), str(path), tuning=tuning,
-            # Style 0's list is appended to all four styles by
-            # generate_cpfont_multistyle itself, which is how a regular-only
-            # fallback covers a bold word too -- and what the build does.
-            fallback_style_fonts={0: [str(face) for face in fallbacks]}
-            if fallbacks else None,
+            fallback_style_fonts=chains or None,
             style_axes={style: dict(coords)
                         for style, coords in (axes or {}).items()
                         if style in sources and coords} or None)

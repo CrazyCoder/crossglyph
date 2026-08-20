@@ -297,14 +297,26 @@ BUNDLED_TOKEN = "bundled"
 
 def bundled_entries(intervals: str,
                     directory: pathlib.Path) -> list[dict[str, pathlib.Path]]:
-    """The built-in set, one style map per face, in workflow order.
+    """The built-in set, one style map per family, in workflow order.
 
     Which files those are is still wanted_fallbacks' answer, so the rule about
     a CJK face nobody asked for, and the error that names the fetch, are the
     ones already there.
+
+    One entry per family and not per file. BUNDLED_FALLBACKS lists the files a
+    fetch downloads, NotoSans in four styles among them, and the first of a
+    family resolves the other three itself. Left as four entries, each of the
+    styles would also stand as a family of its own, whose regular face is a
+    bold one -- and every style's chain would then carry it.
     """
-    return [pinned_faces(path)
-            for path in wanted_fallbacks(intervals, directory)]
+    entries, seen = [], set()
+    for path in wanted_fallbacks(intervals, directory):
+        family = fontconf.family_of(fontconf.font_stem(path)).casefold()
+        if family in seen:
+            continue
+        seen.add(family)
+        entries.append(pinned_faces(path))
+    return entries
 
 
 def ordered_entries(config: Config,

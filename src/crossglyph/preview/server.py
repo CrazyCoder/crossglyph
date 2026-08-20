@@ -57,7 +57,7 @@ from ..cpfont.convert import (
 )
 from ..cpfont.faces import open_face
 from ..cpfont.tuning import LineHeight, Tuning
-from ..fontconf import Config, FontConfigError
+from ..fontconf import STYLES, Config, FontConfigError
 from ..render import RenderCoreMissing, image, stamp
 from . import (
     BOLD,
@@ -765,8 +765,11 @@ def _tuning(items: tuple) -> Tuning:
 
 
 @functools.lru_cache(maxsize=8)
-def _bundled_faces(source: str, intervals: str) -> tuple[str, ...]:
-    """The bundled Noto faces a build with this coverage would fill from.
+def _bundled_faces(source: str, intervals: str) -> tuple[tuple, ...]:
+    """The bundled Noto families a build with this coverage would fill from.
+
+    One entry per family, each a style map as fontbuild.pinned_faces returns,
+    flattened to pairs so an lru_cache key can hold it.
 
     Cached: this reads all.conf and stats a dozen files, and a render must not
     do that on every keystroke. Nothing here reads a font -- which of them is
@@ -784,26 +787,29 @@ def _bundled_faces(source: str, intervals: str) -> tuple[str, ...]:
         # a blank page teaches nothing. The panel already says they are not
         # here, and has the button, a few rows under the box that asked.
         return ()
-    return tuple(str(path)
-                 for path in fontbuild.wanted_fallbacks(intervals, directory))
+    return tuple(tuple(sorted(entry.items())) for entry in
+                 fontbuild.bundled_entries(intervals, directory))
 
 
-def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
-    """The faces this request would fall back to, in the converter's order.
+def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
+    """The faces this request would fall back to, per style, in order.
 
     The two chosen families first, then the bundled set -- the same order
-    fontbuild.build_kwargs assembles, so a codepoint the family lacks is drawn
-    from the face the build would have drawn it from.
+    fontbuild.fallback_chain assembles, so a codepoint the family lacks is
+    drawn from the face the build would have drawn it from, in the style it is
+    set in. An entry lends its own face for a style where it has one, and its
+    regular face otherwise.
     """
-    faces = []
+    entries: list[dict[str, pathlib.Path]] = []
     for name in (request.fallback1, request.fallback2):
         if not name:
             continue
-        regular = sources_for(name).get(REGULAR)
-        if regular is None:
+        family_faces = sources_for(name)
+        if REGULAR not in family_faces:
             raise LookupError(f"the {name!r} family has no regular face to "
                               f"fall back to")
-        faces.append(str(regular))
+        entries.append({STYLES[style]: path
+                        for style, path in family_faces.items()})
     if request.fallbacks:
         # Not said and nothing ticked pick the same faces here: the coverage
         # only decides whether a CJK script was asked for, and neither answers
@@ -811,9 +817,22 @@ def fallbacks_for(request: RenderRequest) -> tuple[str, ...]:
         # which is the only place it means anything -- and a None reaching the
         # split below is an AttributeError out of a request nobody has to send
         # wrongly to make.
-        faces.extend(_bundled_faces(str(fontbuild.SOURCE_DIR),
-                                    request.intervals or ""))
-    return tuple(faces)
+        entries += [dict(entry) for entry in
+                    _bundled_faces(str(fontbuild.SOURCE_DIR),
+                                   request.intervals or "")]
+
+    chain: dict[int, tuple[str, ...]] = {}
+    for style_id, style in enumerate(STYLES):
+        seen: set[pathlib.Path] = set()
+        faces: list[str] = []
+        for entry in entries:
+            path = entry.get(style) or entry.get("regular")
+            if path is None or path in seen:
+                continue
+            seen.add(path)
+            faces.append(str(path))
+        chain[style_id] = tuple(faces)
+    return chain
 
 
 @functools.lru_cache(maxsize=32)
@@ -853,9 +872,9 @@ def build_font_cached(sources: tuple, size: float, coverage: tuple,
     Keyed on the coverage rather than the text it came from, so editing the
     sample text only rebuilds when it brings in a character the last build did
     not have -- which most edits do not. Every key is a tuple because an
-    lru_cache key has to hash."""
+    lru_cache key has to hash, which is why the chains arrive as pairs."""
     return build_font(dict(sources), size, tuning=_tuning(tuning_items),
-                      coverage=coverage, fallbacks=fallbacks,
+                      coverage=coverage, fallbacks=dict(fallbacks),
                       axes={style: dict(coords) for style, coords in axes})
 
 
@@ -885,11 +904,17 @@ def render(request: RenderRequest) -> Response:
         coverage = narrowed(wanted, built)
         uncovered: frozenset[int] = frozenset() if built is None else (
             frozenset(page_codepoints(request.text)) - built)
+        # Per style, because a chain can hold a bold face the regular one does
+        # not, and because what a style cannot draw is that style's own face
+        # measured against that style's own chain.
         offered = fallbacks_for(request)
-        drawable = resolved_fallbacks(keyed, coverage, offered)
+        drawable = {style: resolved_fallbacks(((style, str(path)),), coverage,
+                                              offered.get(style, ()))
+                    for style, path in sources.items()}
         font = build_font_cached(
             keyed, request.size, coverage, _cache_key(request.tuning),
-            tuple(str(path) for path in drawable.faces),
+            tuple(sorted((style, tuple(str(path) for path in resolved.faces))
+                         for style, resolved in drawable.items())),
             axes_for(request.family, request.size, request.axes))
         # What nothing can draw, narrowed to what is actually on the page: the
         # build's coverage carries the output codepoint of every ligature the
@@ -900,7 +925,12 @@ def render(request: RenderRequest) -> Response:
         # walk of every fallback face. The page's codepoints are a subset of
         # the coverage, and whether a face supplies one does not depend on what
         # else was asked for, so the two agree over the codepoints they share.
-        undrawn = drawable.undrawn & page_codepoints(request.text)
+        #
+        # Across the styles on the page, because a codepoint missing from the
+        # bold run is missing from the page whatever the regular run has.
+        undrawn = frozenset().union(
+            *(resolved.undrawn for resolved in drawable.values())
+        ) & page_codepoints(request.text)
         page = _watermark(preview_page(font, request.text, spec),
                           inverted=spec.inverted)
     # SystemExit is deliberate and not paranoia: the converter is a script at

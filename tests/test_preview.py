@@ -754,3 +754,63 @@ def test_the_size_boxes_take_what_the_size_knob_can_reach():
         assert float(declared[attribute]) == float(held[name]), \
             f"the knob's {attribute} is {declared[attribute]}, the boxes " \
             f"hold SIZE_{name} = {held[name]}"
+
+
+def _glyphs_per_style(font: bytes, styles: int) -> list[int]:
+    """Each style's glyph count, from the .cpfont style TOC.
+
+    The entries are written in ascending style id, 32 bytes each after the
+    32-byte header, with glyphCount at +8. fontbuild.style_metrics reads the
+    first one; this reads them all, which is what a per-style chain has to be
+    checked against.
+    """
+    return [struct.unpack_from("<I", font, 32 + 32 * index + 8)[0]
+            for index in range(styles)]
+
+
+def test_a_style_draws_from_its_own_fallback(tmp_path):
+    """The page has to agree with the build, and the build hands the converter
+    one chain per style. A face offered to bold alone reaches bold alone."""
+    from fontsmith import box_font
+
+    from crossglyph import preview
+
+    sources = {
+        preview.REGULAR: box_font(tmp_path / "Body-Regular.ttf", [0x20, 0x41],
+                                  family="Body", style="Regular"),
+        preview.BOLD: box_font(tmp_path / "Body-Bold.ttf", [0x20, 0x41],
+                               family="Body", style="Bold"),
+    }
+    filler = box_font(tmp_path / "Fill-Bold.ttf", [0x20, 0x2192],
+                      family="Fill", style="Bold")
+    coverage = ((0x20, 0x20), (0x41, 0x41), (0x2192, 0x2192))
+
+    font = preview.build_font(sources, 13, coverage=coverage,
+                             fallbacks={preview.BOLD: (filler,)})
+
+    regular, bold = _glyphs_per_style(font, 2)
+    assert bold == regular + 1, \
+        "the arrow should reach the bold style and no other"
+
+
+def test_a_flat_list_of_fallbacks_still_serves_every_style(tmp_path):
+    """One list means the same list for all four, which is what a caller with
+    nothing per style means by it."""
+    from fontsmith import box_font
+
+    from crossglyph import preview
+
+    sources = {
+        preview.REGULAR: box_font(tmp_path / "Body-Regular.ttf", [0x20, 0x41],
+                                  family="Body", style="Regular"),
+        preview.BOLD: box_font(tmp_path / "Body-Bold.ttf", [0x20, 0x41],
+                               family="Body", style="Bold"),
+    }
+    filler = box_font(tmp_path / "Fill-Regular.ttf", [0x20, 0x2192],
+                      family="Fill", style="Regular")
+    coverage = ((0x20, 0x20), (0x41, 0x41), (0x2192, 0x2192))
+
+    font = preview.build_font(sources, 13, coverage=coverage,
+                              fallbacks=(filler,))
+
+    assert _glyphs_per_style(font, 2) == [3, 3]
