@@ -603,6 +603,14 @@ def token_codepoints(token: str) -> set[int]:
     return {code for low, high in spans for code in range(low, high + 1)}
 
 
+def build_faces(config: Config) -> list[str]:
+    """Every face this family's build opens, primary and fallback alike."""
+    return ([str(config.styles[style]) for style in STYLES
+             if style in config.styles]
+            + [face for chain in fallback_chain(config).values()
+               for face in chain])
+
+
 def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
     """Per coverage token, how many codepoints it asked for and how many the
     build can draw.
@@ -612,9 +620,7 @@ def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
     bold does not is a different subject, and the device answers it already by
     drawing a style it has (SdCardFont::resolveStyle).
     """
-    drawable = drawable_codepoints(
-        [config.styles[style] for style in STYLES if style in config.styles]
-        + [face for chain in fallback_chain(config).values() for face in chain])
+    drawable = drawable_codepoints(build_faces(config))
     counts = {}
     for token in config.coverage.split(","):
         wanted = token_codepoints(token)
@@ -622,6 +628,66 @@ def coverage_counts(config: Config) -> dict[str, tuple[int, int]]:
             counts[token.strip().lower()] = (len(wanted),
                                              len(wanted & drawable))
     return counts
+
+
+class Uncovered(typing.NamedTuple):
+    """A family's ticked coverage that nothing in its build can draw.
+
+    `remedy` is one of three words and each reader words it for whoever is
+    looking. `faces` are the filenames that would draw the range, which only
+    the first answer has: the other two have no file to open and nothing worth
+    naming.
+    """
+    family: str
+    tokens: tuple[str, ...]
+    remedy: str
+    faces: tuple[str, ...]
+
+
+def _same(path: str | pathlib.Path) -> str:
+    """One spelling of a path, so a chain entry and a folder listing compare.
+
+    The chain is built from strings and the folder is walked as paths, and on
+    Windows the two reach the same file by different names often enough that
+    comparing them raw would call a face unused while the build was drawing
+    with it.
+    """
+    try:
+        return str(pathlib.Path(path).resolve())
+    except OSError:
+        return str(path)
+
+
+def uncovered(variant: Variant) -> Uncovered | None:
+    """What this family asked for and drew nothing of, and what would answer.
+
+    None when every ticked token got at least one glyph. Partial is the normal
+    state -- Greek resolves at 92% against the bundled set -- so only a token
+    at zero is worth anybody's attention.
+    """
+    config: Config = variant.config
+    empty = tuple(token for token, (_asked, drawable)
+                  in coverage_counts(config).items() if not drawable)
+    if not empty:
+        return None
+
+    wanted: set[int] = set()
+    for token in empty:
+        wanted |= token_codepoints(token)
+    # The bundled faces on the disk that this build did not open. With
+    # `fallbacks = no` that is all of them, and a `fallback_order` without
+    # `bundled` in it arrives here the same way.
+    opened = {_same(face) for face in build_faces(config)}
+    spare = [path for path
+             in wanted_fallbacks(config.coverage, fallback_dir(config.root))
+             if _same(path) not in opened]
+    faces = tuple(path.name for path in spare
+                  if wanted & drawable_codepoints([path]))
+    if faces:
+        return Uncovered(variant.name, empty, "unused", faces)
+    short = [name for name in missing_fallbacks(config.root, config.coverage)
+             if name != FALLBACK_LICENCE]
+    return Uncovered(variant.name, empty, "fetch" if short else "none", ())
 
 
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:

@@ -1044,3 +1044,75 @@ def test_a_fallback_face_counts_towards_the_family_it_fills_for(tmp_path):
         encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
     assert fontbuild.coverage_counts(config)["thai"] == (128, 1)
+
+
+# --- and what would answer it --------------------------------------------
+
+def _uncovered(tmp_path, conf, *, folder=(), complete=False):
+    """A variant whose Thai tick nothing in the family can draw.
+
+    `folder` is what sits in fallbacks/ as real faces; `complete` fills the
+    rest of the bundled set with empty files, so the folder is short of
+    nothing and a fetch has nothing to add.
+    """
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir(exist_ok=True)
+    for name, codepoints in folder:
+        box_font(faces / name, codepoints, family=name.split("-")[0])
+    if complete:
+        for name in (list(fontbuild.BUNDLED_FALLBACKS)
+                     + list(fontbuild.DEFAULT_CJK_FALLBACK)
+                     + [fontbuild.FALLBACK_LICENCE]):
+            if not (faces / name).is_file():
+                (faces / name).write_bytes(b"")
+    (tmp_path / "probe.conf").write_text(conf, encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    return config.variants()[0]
+
+
+THAI_FACE = ("NotoSansThai-Regular.ttf", [0x20, 0x0E01])
+
+
+def test_a_face_the_build_never_opened_is_named_as_the_answer(tmp_path):
+    """The tick has a face behind it and this build did not reach it. That is
+    a switch away, and the warning can say which file proves it."""
+    variant = _uncovered(tmp_path, "intervals = thai\nfallbacks = no\n",
+                         folder=[THAI_FACE], complete=True)
+    found = fontbuild.uncovered(variant)
+    assert found.remedy == "unused"
+    assert found.tokens == ("thai",)
+    assert found.faces == ("NotoSansThai-Regular.ttf",)
+
+
+def test_a_folder_short_of_faces_asks_for_a_fetch(tmp_path):
+    variant = _uncovered(tmp_path, "intervals = thai\nfallbacks = yes\n")
+    found = fontbuild.uncovered(variant)
+    assert found.remedy == "fetch"
+    assert found.faces == (), "nothing on the disk to name"
+
+
+def test_a_complete_folder_that_still_cannot_draw_it_offers_nothing(tmp_path):
+    variant = _uncovered(tmp_path, "intervals = thai\nfallbacks = yes\n",
+                         complete=True)
+    found = fontbuild.uncovered(variant)
+    assert found.remedy == "none"
+    assert found.faces == ()
+
+
+def test_a_bundled_face_left_out_of_the_order_is_still_unused(tmp_path):
+    """The box is on and `fallback_order` drops the bundled set, which lands
+    in the same state by another road. The panel words it differently."""
+    variant = _uncovered(
+        tmp_path,
+        "intervals = thai\nfallbacks = yes\nfallback_order = Probe\n",
+        folder=[THAI_FACE], complete=True)
+    assert fontbuild.uncovered(variant).remedy == "unused"
+
+
+def test_a_family_that_draws_what_it_asked_for_is_not_reported(tmp_path):
+    variant = _uncovered(tmp_path, "intervals = thai\nfallbacks = yes\n",
+                         folder=[THAI_FACE], complete=True)
+    assert fontbuild.uncovered(variant) is None
