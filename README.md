@@ -35,8 +35,9 @@ at the point size.
   pick: left alone, Merriweather would ship its Light as your Regular
 - four sizes of a four-style family, 795 glyphs each with kerning, built in
   about a second, one process per size
-- thirteen Noto faces on request, so a missing arrow or Greek letter is not a
-  hole in the page
+- thirteen Noto families on request, so a missing arrow or Greek letter is not
+  a hole in the page. Each lends its own bold or italic to a run set that way,
+  where it has one
 - Arabic comes out joined with any face, because the joining rules a modern one
   stores are run here and the joined shapes built in, which the device has no
   room to do for itself

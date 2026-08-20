@@ -658,8 +658,10 @@ blank space and not a row of boxes. A page with a hole in it looks exactly like
 a page that failed to draw.
 
 The remedy is under Export: **bundled fallback faces**, which is thirteen Noto
-faces covering most scripts, and the **Fetch** button beside it when they are
-not in the workspace yet. Whichever of the two is the move left to make is
+families covering most scripts, and the **Fetch** button beside it while any of
+them is still to get. A workspace filled by an older version can be short a
+face this one added, so the note beside the button says how many are left
+rather than only whether the folder is there. Whichever of the two is the move left to make is
 marked the way an unticked coverage preset is, so the answer sits where it gets
 applied. Naming a family in **fallback 1** answers it as well, and is the only
 answer left once the bundled faces are on and have no glyph either.

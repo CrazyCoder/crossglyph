@@ -364,8 +364,8 @@ def ordered_entries(config: Config, coverage: str | None = None
 
 #: What a pan-CJK face is for. Han and the two kana blocks, hangul and its
 #: jamo, the CJK punctuation those are written with, and the compatibility and
-#: fullwidth blocks a book picks up from its source. Nothing in the thirteen
-#: faces above has a glyph in any of them, so text that needs one of these
+#: fullwidth blocks a book picks up from its source. Nothing in the families
+#: above has a glyph in any of them, so text that needs one of these
 #: draws as blank space until a CJK face is fetched.
 CJK_RANGES = (
     (0x2E80, 0x2FDF),                   # radicals
@@ -596,6 +596,7 @@ def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
     config: Config = variant.config
     style_fonts = {STYLE_IDS[style]: str(config.styles[style])
                    for style in STYLES if style in config.styles}
+    chain = fallback_chain(config)
 
     # A variable file fills several slots, each at its own coordinates, and the
     # optical size axis follows the size being built -- so this is per size and
@@ -611,7 +612,9 @@ def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
         "intervals": cpfont.resolve_intervals(config.coverage),
         "output_path": str(fontstamp.cpfont_path(out_dir / variant.name,
                                                  variant, size)),
-        "fallback_style_fonts": fallback_chain(config) or None,
+        # None where no style has a face to fall back to, so what reaches the
+        # converter says "nothing here" once rather than four empty lists.
+        "fallback_style_fonts": chain if any(chain.values()) else None,
         "tuning": config.tuning,
     }
 

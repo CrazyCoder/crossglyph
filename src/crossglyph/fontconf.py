@@ -453,7 +453,7 @@ def _short_style(stem: str, wanted: str) -> str | None:
 #: Folders a walk does not enter, and the one place recursion has to be told
 #: rather than left to work it out.
 #:
-#: `fallbacks` is the load-bearing one: it holds the thirteen Noto faces a fetch
+#: `fallbacks` is the load-bearing one: it holds the Noto faces a fetch
 #: puts there to fill holes in *other* families, and they are not families to
 #: build. Walked, they turn a picker of your fonts into a list with
 #: NotoSansTifinagh in it. `conf` holds configs and `cpfonts` holds builds, so

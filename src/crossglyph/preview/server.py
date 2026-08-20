@@ -793,7 +793,11 @@ def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
         return ()
     entries = None
     if family:
-        with contextlib.suppress(LookupError, FontConfigError):
+        # LookupError alone: a name the folder no longer has is the picker
+        # holding a remembered choice, and the render says so elsewhere. A
+        # `fallback_order` this cannot resolve is a config the build would
+        # refuse, so it travels to the panel rather than being drawn around.
+        with contextlib.suppress(LookupError):
             config = family_config(family)
             if config.fallback_order.strip():
                 entries = fontbuild.ordered_entries(config, intervals)
