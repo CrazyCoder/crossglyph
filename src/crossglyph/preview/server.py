@@ -927,8 +927,14 @@ def render(request: RenderRequest) -> Response:
         # the coverage, and whether a face supplies one does not depend on what
         # else was asked for, so the two agree over the codepoints they share.
         #
-        # Across the styles on the page, because a codepoint missing from the
-        # bold run is missing from the page whatever the regular run has.
+        # Across the styles on the page. A style that exists and has no glyph
+        # draws nothing there, so a codepoint the bold style cannot reach is a
+        # hole whatever the regular one has -- asking the faces together, as
+        # one call for all of them did, answers only whether *some* style has
+        # it. Coverage is the text's and not each run's, so this can name a
+        # character the page happens to set only in the style that has it.
+        # Faces of one family rarely differ that way, and the reverse silence
+        # is the worse of the two.
         undrawn = frozenset().union(
             *(resolved.undrawn for resolved in drawable.values())
         ) & page_codepoints(request.text)
