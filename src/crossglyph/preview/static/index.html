@@ -88,7 +88,32 @@
   <!-- 0.3..4.0 is crengine's own range for the same curve. Past about 3 it
        darkens less and mostly trades grey edges for solid black. -->
   <div class="row num">
-    <label class="name" for="gamma">gamma</label>
+    <span class="name"><label for="gamma">gamma</label><span class="explain">
+        <button type="button" class="info" aria-label="What gamma does"
+                aria-describedby="gamma-tip">?</button>
+        <span class="tip" id="gamma-tip" role="tooltip">
+          How much ink a glyph gets. FreeType draws each pixel with a coverage
+          from nothing to full, and this bends that scale before the four
+          shades are picked off it. Over 1 darkens, under 1 lightens, and 1
+          leaves it alone.
+          <br><br>
+          The usual first move on an e-ink screen, where a face tuned for
+          paper or a backlit display often sets too light. Up to about 2 it
+          darkens. Past 3 it darkens barely at all and mostly turns grey edges
+          solid black.
+          <br><br>
+          It bends how much <em>white</em> is left rather than how much ink
+          there is, so a bigger number is a darker page. Plain gamma
+          arithmetic runs the other way, and so would surprise anyone who has
+          met this setting in a reader before.
+          <br><br>
+          The 0.3 to 4 range is CoolReader's, which offers 48 fixed steps over
+          the same curve, computed the same way. The steps there crowd around
+          1, where the eye can tell 1.02 from 1.05, and spread out at the top,
+          where 3.8 and 4 look alike. Here it is a plain number instead, and
+          the arrows step it by 0.05, which is that scale's finest step.
+        </span>
+      </span></span>
     <input type="range" data-slider-for="gamma" min="0.3" max="4" step="0.05" value="1" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="gamma" data-dir="-1" aria-label="decrease gamma">−</button>

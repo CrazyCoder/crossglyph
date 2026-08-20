@@ -387,8 +387,18 @@ the four levels the device stores.
 
 ### Gamma
 
-A useful `gamma` runs about 0.3 to 4.0, the range crengine offers for the same
-curve. What it does is not uniform across that range. Up to about 2 it darkens.
+A useful `gamma` runs 0.3 to 4.0. That is the range crengine offers for the
+same curve, and it computes the curve the same way: `255 - ((255 - i)/255) **
+gamma * 255`, in `Tools/GammaGen/gammagen.pl`. The exponent bends how much
+white is left behind. A bigger number therefore gives a darker page, where
+plain gamma arithmetic on the ink would lighten it.
+
+crengine ships that range as 48 fixed steps, and their spacing is the useful
+part: 0.05 up to 0.95, then 0.98, 1.00, 1.02, 1.05, then 0.05 again to 1.5,
+0.1 to 3.2, and 0.2 to the top. They crowd where the eye can tell one from the
+next and spread out where it cannot. Here the knob is a plain number stepping
+by 0.05, that scale's finest step, so any of crengine's levels can be typed in
+and the ones between them work as well. What it does is not uniform across that range. Up to about 2 it darkens.
 Past 3 it darkens barely at all and mostly converts grey edges into solid
 black, measured on a 13 px page:
 
