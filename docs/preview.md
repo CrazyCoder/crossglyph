@@ -196,6 +196,12 @@ firmware carries patterns for. On the device that comes from the book's own
 metadata instead. A control that cannot apply is greyed and stays visible, so
 hyphenating as Russian is not offered while hyphenation is off.
 
+**thresholds** is a picker and not a free field. It lists the two sets worth a
+name, default (4, 8, 12) and darkened (3, 6, 10), and the built-in fonts use
+the second. A config may set any ascending triple within 1 to 15, and a family
+whose config carries one gets a third entry naming it. That entry goes when you
+switch to a family without one.
+
 ### Hyphenation has three states
 
 `off` at the bottom of the language list is the third, and not a second way to

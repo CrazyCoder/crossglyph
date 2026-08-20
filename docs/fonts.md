@@ -111,7 +111,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | key | default | meaning |
 |---|---|---|
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
-| `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. `3 6 10` is the darker set the built-in fonts use |
+| `thresholds` | `4 8 12` | the three 4-bit cut points for grey levels 1, 2 and 3. Any ascending triple within 1 to 15. `3 6 10` is the darker set the built-in fonts use, and the two are what the preview offers |
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
 | `slant` | `0` | shear as a tangent. `0.25` is about 14 degrees, for synthesizing an oblique a family lacks |
 | `hinting` | `normal` | `normal`, `light` (vertical only, softer), `none`, or `auto` (FreeType's auto-hinter, worth trying when a font looks muddy at small sizes) |
@@ -405,6 +405,14 @@ hard edges of 1-bit rendering, and a low one lightens a face that sets too
 heavy at small sizes.
 
 ### Thresholds
+
+**All three are yours to set, and the panel offers two of them by name.** Any
+ascending triple within 1 to 15 is accepted, so `5 9 13` is as valid as the
+default. The panel's **thresholds** row lists default (4, 8, 12) and darkened
+(3, 6, 10). Those are the two sets worth a name, and the built-in fonts use the
+second. Write your own triple in the `.conf` and the row grows a third entry
+for it, `custom (5, 9, 13)`, so loading a family never quietly rounds its
+tuning to one of the two.
 
 Which of the three cut points matters depends on the reader's
 **Settings > Text > Anti-Aliasing** switch. With it on, all three are live and
@@ -974,7 +982,7 @@ that:
 | fallbacks | one per style | two user families and the bundled Noto set | the same set, resolved per style and in an order a config can set, plus the space font and the pan-CJK face on demand |
 | sizes | whole points | four whole points, with 8 and 10 appended to a CJK build | as many as you like, `13.5` included, and a second family at other sizes |
 | variable fonts | the file's default instance | the file's default instance | the instance the designer named for the slot, `opsz` following the size, coordinates pinnable per slot |
-| quantizer | fixed | `--darken-aa`, one darker preset | `gamma` and all three `thresholds` |
+| quantizer | fixed | `--darken-aa`, one darker preset | `gamma`, and `thresholds` as any ascending triple from a config or either of two presets in the panel |
 | outline and pixel grid | `--force-autohint` | `--force-autohint` | `weight`, `slant`, `hinting` in four modes, `grayscale_hinting`, `mono`, `stem_darkening` |
 | metrics | the font's own | the font's own | `line_height` in three units, `letter_spacing`, `word_spacing` |
 | pair tables | always on | always on | `kerning` as a factor, `ligatures` off, `figures = proportional` |
