@@ -230,6 +230,42 @@ def wanted_fallbacks(intervals: str, directory: pathlib.Path) -> list[pathlib.Pa
     return paths
 
 
+def pinned_faces(path: pathlib.Path) -> dict[str, pathlib.Path]:
+    """The four slots of the family a filename belongs to.
+
+    A config pins one file. Its siblings sit beside it under the same family
+    stem, so a bold run can have the bold without the config naming it. The
+    pinned file is the regular slot however it is named: it is the face
+    somebody chose, and a chain that filed it under a slot the family has no
+    bold for would drop it.
+    """
+    family = fontconf.family_of(fontconf.font_stem(path))
+    faces = fontconf.discover_styles(path.parent, family)
+    faces["regular"] = path
+    return faces
+
+
+def named_faces(name: str, directory: pathlib.Path | None,
+                source: pathlib.Path | str | None = None
+                ) -> dict[str, pathlib.Path]:
+    """The four slots of a family named in a config, or an empty dict.
+
+    The fallbacks folder is asked first, so a bundled name means the same thing
+    in every workspace. Only then are your own families tried, which is what
+    lets a fallback be a family with a config of its own: its `dir`, its
+    explicit style keys, and filenames discovery would not have guessed.
+    """
+    if directory is not None:
+        faces = fontconf.discover_styles(directory, name)
+        if "regular" in faces:
+            return faces
+    wanted = name.casefold()
+    for config in offered(source)[0]:
+        if wanted in (config.name.casefold(), config.family.casefold()):
+            return dict(config.styles)
+    return {}
+
+
 #: What a pan-CJK face is for. Han and the two kana blocks, hangul and its
 #: jamo, the CJK punctuation those are written with, and the compatibility and
 #: fullwidth blocks a book picks up from its source. Nothing in the thirteen

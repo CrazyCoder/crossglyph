@@ -1,3 +1,5 @@
+import pathlib
+
 import pytest
 
 from crossglyph import fontbuild, fontconf, spacefont
@@ -377,6 +379,77 @@ def test_a_latin_build_is_not_held_up_by_a_missing_cjk_face(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="fetch-fallbacks"):
         fontbuild.wanted_fallbacks("cjk-jp", faces)
+
+
+def test_a_pinned_face_picks_up_its_siblings(tmp_path):
+    """A config names one file. The other styles of that family are beside it,
+    and a bold run should get the bold."""
+    for name in ("NotoSerif-Regular.ttf", "NotoSerif-Bold.ttf",
+                 "NotoSerif-Italic.ttf"):
+        (tmp_path / name).write_bytes(b"")
+
+    faces = fontbuild.pinned_faces(tmp_path / "NotoSerif-Regular.ttf")
+
+    assert faces["regular"].name == "NotoSerif-Regular.ttf"
+    assert faces["bold"].name == "NotoSerif-Bold.ttf"
+    assert faces["italic"].name == "NotoSerif-Italic.ttf"
+    assert "bolditalic" not in faces
+
+
+def test_a_pinned_face_is_the_regular_whatever_its_suffix(tmp_path):
+    """Pinning a bold file means that file is what the family offers, so it
+    cannot be filed under a slot the chain would then skip."""
+    (tmp_path / "NotoSerif-Bold.ttf").write_bytes(b"")
+
+    faces = fontbuild.pinned_faces(tmp_path / "NotoSerif-Bold.ttf")
+
+    assert faces["regular"].name == "NotoSerif-Bold.ttf"
+
+
+def test_a_named_family_is_found_in_the_fallbacks_folder(tmp_path):
+    folder = tmp_path / fontbuild.FALLBACK_NAME
+    folder.mkdir()
+    for name in ("NotoSans-Regular.ttf", "NotoSans-Bold.ttf"):
+        (folder / name).write_bytes(b"")
+
+    faces = fontbuild.named_faces("NotoSans", folder, tmp_path)
+
+    assert faces["regular"].name == "NotoSans-Regular.ttf"
+    assert faces["bold"].name == "NotoSans-Bold.ttf"
+
+
+def test_a_named_family_falls_through_to_the_workspace(tmp_path):
+    """A name the bundled set does not have is looked for among your own
+    families, so a fallback can be any family in the workspace."""
+    folder = tmp_path / fontbuild.FALLBACK_NAME
+    folder.mkdir()
+    (folder / fontbuild.ANCHOR_FACE).write_bytes(b"")
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"")
+
+    faces = fontbuild.named_faces("MyIcons", folder, tmp_path)
+
+    assert faces["regular"].name == "MyIcons-Regular.ttf"
+
+
+def test_the_fallbacks_folder_wins_a_name_both_places_have(tmp_path):
+    """A bundled name means the same thing in every workspace. A family of
+    yours called NotoSans must not rewrite everyone else's chain."""
+    folder = tmp_path / fontbuild.FALLBACK_NAME
+    folder.mkdir()
+    (folder / "NotoSans-Regular.ttf").write_bytes(b"")
+    (tmp_path / "NotoSans-Regular.ttf").write_bytes(b"")
+
+    faces = fontbuild.named_faces("NotoSans", folder, tmp_path)
+
+    assert faces["regular"].parent == folder
+
+
+def test_a_name_nothing_has_resolves_to_nothing(tmp_path):
+    folder = tmp_path / fontbuild.FALLBACK_NAME
+    folder.mkdir()
+    (folder / fontbuild.ANCHOR_FACE).write_bytes(b"")
+
+    assert fontbuild.named_faces("Nowhere", folder, tmp_path) == {}
 
 
 def test_a_fetch_lands_the_licence_and_leaves_cjk_alone(tmp_path, monkeypatch):
