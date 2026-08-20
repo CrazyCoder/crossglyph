@@ -578,17 +578,32 @@ def drawable_codepoints(paths: typing.Iterable[str | pathlib.Path]) -> set[int]:
     it, the build reports that in its own place, and a count is not where a
     reader should first hear about it.
     """
-    from .cpfont.faces import open_face
-
     found: set[int] = set()
     for path in dict.fromkeys(str(path) for path in paths):
         try:
-            face = open_face(path)
-            chars = list(face.get_chars())
-        except Exception:
+            stamp = os.stat(path)
+        except OSError:
             continue
-        found.update(code for code, index in chars if index)
+        found |= _face_codepoints(path, stamp.st_mtime_ns, stamp.st_size)
     return found
+
+
+@functools.lru_cache(maxsize=64)
+def _face_codepoints(path: str, _mtime: int, _size: int) -> frozenset[int]:
+    """One face's charmap, kept.
+
+    The panel asks this of the same eighteen files every time a coverage box
+    is ticked, and the bundled CJK face is 15.7 MB of them. Keyed by what the
+    file is as well as where it is, so a face edited in place is read again
+    rather than answered from a cache that predates the edit.
+    """
+    from .cpfont.faces import open_face
+
+    try:
+        return frozenset(code for code, index in open_face(path).get_chars()
+                         if index)
+    except Exception:
+        return frozenset()
 
 
 @functools.lru_cache(maxsize=64)
@@ -662,6 +677,93 @@ def coverage_counts(config: Config) -> dict[str, Counted]:
                 len(wanted), len(assigned_codepoints(token)),
                 len(wanted & drawable))
     return counts
+
+
+def interval_runs(asked: typing.Iterable[tuple[int, int]],
+                  drawable: typing.AbstractSet[int]
+                  ) -> list[tuple[int, int]]:
+    """How many intervals a .cpfont would carry for one style.
+
+    The converter writes one interval per run of consecutive codepoints some
+    face in the chain covers (`resolve_style_coverage`), and CrossPoint refuses
+    a style with more than `MAX_INTERVALS` of them. Counted here from charmaps
+    alone, so the answer is known before anything is rasterized and without
+    opening the converter at all.
+
+    Runs never span two requested spans, because a gap between them is a gap
+    the coverage did not ask for.
+    """
+    runs = []
+    for low, high in asked:
+        start = None
+        for code in range(low, high + 1):
+            if code in drawable:
+                start = code if start is None else start
+            elif start is not None:
+                runs.append((start, code - 1))
+                start = None
+        if start is not None:
+            runs.append((start, high))
+    return runs
+
+
+def interval_counts(config: Config) -> dict[str, int]:
+    """Per style, the intervals a build of this family would write.
+
+    Per style because the chain is: a family with no bold of its own borrows
+    one, and the two can fragment a block differently. The cap is per style
+    too, so one style over it is a file the device refuses whole.
+    """
+    return {style: len(runs)
+            for style, runs in interval_spans(config).items()}
+
+
+def interval_spans(config: Config) -> dict[str, list[tuple[int, int]]]:
+    """The runs themselves, for a message that has to say where they are."""
+    asked = cpfont.resolve_intervals(config.coverage)
+    chain = fallback_chain(config)
+    spans = {}
+    for style in STYLES:
+        if style not in config.styles:
+            continue
+        faces = [str(config.styles[style])] + list(chain[STYLE_IDS[style]])
+        spans[style] = interval_runs(asked, drawable_codepoints(faces))
+    return spans
+
+
+def bundled_would_fix(config: Config) -> int | None:
+    """The worst interval count this coverage would carry with the bundled set
+    on, or None when that is not the answer.
+
+    `fallbacks` is off by default, so the family a reader points at a block is
+    often the only face over it, and a face that covers a block in patches
+    costs one interval per patch. The bundled set carries a dense pan-CJK
+    face, which merges thousands of those runs into a handful: the build that
+    reached 4390 intervals and could not load reaches 64 with this on.
+
+    None when the set is already on, when the folder has nothing to add, or
+    when turning it on would still leave the file over the cap. The point of
+    the number is that it is an answer, so it is not offered where it is not
+    one.
+    """
+    if config.fallbacks:
+        return None
+    with_them = max(interval_counts(dataclasses.replace(config,
+                                                        fallbacks=True))
+                    .values(), default=0)
+    return with_them if with_them <= cpfont.convert.MAX_INTERVALS else None
+
+
+def over_interval_cap(config: Config) -> dict[str, list[tuple[int, int]]]:
+    """The styles this coverage would push past what the reader will load.
+
+    Empty for every build that works. What a file over the cap does on the
+    device is invisible from the outside, so this is worth reporting before
+    the build rather than leaving to whoever notices the reader drawing in a
+    face nobody chose.
+    """
+    return {style: runs for style, runs in interval_spans(config).items()
+            if len(runs) > cpfont.convert.MAX_INTERVALS}
 
 
 class Uncovered(typing.NamedTuple):

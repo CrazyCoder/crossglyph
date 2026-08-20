@@ -188,3 +188,51 @@ def test_fail_on_warning_gates_on_the_folder_being_short(workspace, tmp_path):
     assert fontcli.main(["--fonts", str(workspace), "-o", str(out), "-j", "1",
                          "--force", "--fail-on-warning"]) == 1
     assert list(out.rglob("*.cpfont"))
+
+
+# --- a coverage the reader would refuse -----------------------------------
+
+def _fragmented(workspace, monkeypatch, cap=8):
+    """A family whose coverage costs one interval per covered codepoint."""
+    from crossglyph.cpfont import convert
+
+    monkeypatch.setattr(convert, "MAX_INTERVALS", cap)
+    fontsmith.box_font(workspace / "Gappy-Regular.ttf",
+                       [0x20] + list(range(0x2000, 0x2040, 2)),
+                       family="Gappy")
+    (workspace / "conf" / "gappy.conf").write_text(
+        "family = Gappy\nsizes = 12 14 16 18\n"
+        "ranges = (0x2000-0x203F)\nfallbacks = no\n", encoding="utf-8")
+    return workspace
+
+
+def test_a_refused_coverage_is_named_once_and_not_per_size(workspace, tmp_path,
+                                                           monkeypatch, capsys):
+    """The count comes from the charmaps, so all four sizes would fail with
+    one sentence. Four copies of it is not four times the answer."""
+    out = tmp_path / "out"
+    assert build(_fragmented(workspace, monkeypatch), out) == 1
+    said = capsys.readouterr().err
+    assert said.count("loads at most 8") == 1, said
+    assert "Not built." in said
+    assert not list((out / "Gappy").glob("*.cpfont")) \
+        if (out / "Gappy").is_dir() else True
+
+
+def test_a_refused_family_does_not_stop_the_others(workspace, tmp_path,
+                                                   monkeypatch):
+    """probe.conf is the fixture's own family and covers `base`, which is far
+    under any cap. It has to build."""
+    out = tmp_path / "out"
+    assert build(_fragmented(workspace, monkeypatch), out) == 1
+    assert list((out / "Probe").glob("*.cpfont")), \
+        "the family that fits still builds"
+
+
+def test_the_refusal_says_what_the_device_does_about_it(workspace, tmp_path,
+                                                        monkeypatch, capsys):
+    """Nothing on the device shows this happened, so the line has to."""
+    build(_fragmented(workspace, monkeypatch), tmp_path / "out")
+    said = capsys.readouterr().err
+    assert "read in its own font at its own sizes" in said, said
+    assert "U+2000" in said, "and where the runs are"

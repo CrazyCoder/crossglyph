@@ -3645,3 +3645,67 @@ def test_unticking_every_preset_survives_a_reload(scratch):
                     .get("/defaults").json()["families"]
                     if f["name"] == "Alto")
     assert settings["intervals"] == ""
+
+
+@pytest.fixture
+def gappy(tmp_path, monkeypatch):
+    """A family covering every other codepoint of a block, which is one
+    interval each -- the shape a sparse CJK fallback has, in miniature.
+
+    The gaps sit in Tifinagh because `base` is in every build whatever the
+    coverage says, and it spans U+0000-007F and U+2000-206F: gaps put there
+    would be counted with the boxes all clear.
+    """
+    from fontsmith import box_font
+
+    from crossglyph import fontbuild
+    from crossglyph.preview import server
+
+    box_font(tmp_path / "Gappy-Regular.ttf",
+             [0x20, 0x41] + list(range(0x2D30, 0x2D70, 2)), family="Gappy")
+    (_conf(tmp_path) / "all.conf").write_text("fallbacks = no\n",
+                                              encoding="utf-8")
+    monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
+    _forget_the_last_folder()
+    server.set_font_source(tmp_path / "Gappy-Regular.ttf", family="Gappy")
+    yield "Gappy"
+    _forget_the_last_folder()
+    server.set_font_source(SRC)
+
+
+def test_the_render_says_how_many_intervals_a_build_would_carry(client, gappy):
+    """Before the build and not after it. The count is settled by the coverage
+    and the charmaps, both of which are on screen while the boxes are being
+    ticked, so the panel can say so while there is still a tick to undo."""
+    from crossglyph.preview import server
+
+    answer = client.post("/render", json={
+        "family": gappy, "text": "A", "size": 12,
+        "intervals": "", "ranges": "(0x2D30-0x2D6F)"})
+    assert answer.status_code == 200, answer.text
+    # The 32 runs the range asks for, and the two the face has in `base`.
+    assert int(answer.headers["x-intervals"]) == 34
+    assert int(answer.headers["x-interval-cap"]) == server.MAX_INTERVALS
+
+
+def test_a_coverage_that_fits_still_reports_its_count(client, gappy):
+    """Reported and not judged, so where the line falls stays in one place.
+
+    Untick the range and the same face costs two: the fragmentation is what
+    the coverage asked for, and it goes when the asking does."""
+    answer = client.post("/render", json={
+        "family": gappy, "text": "A", "size": 12,
+        "intervals": "", "ranges": ""})
+    assert answer.status_code == 200, answer.text
+    assert int(answer.headers["x-intervals"]) == 2
+
+
+def test_a_range_half_typed_leaves_the_count_alone(client, gappy):
+    """`resolve_intervals` exits on a token it does not know, and a raw range
+    is unknown until its bracket closes. SystemExit is a BaseException, so
+    that would leave the app rather than the page."""
+    answer = client.post("/render", json={
+        "family": gappy, "text": "A", "size": 12,
+        "intervals": "", "ranges": "(0x20"})
+    assert answer.status_code == 200, answer.text
+    assert answer.headers["x-intervals"] == "0"

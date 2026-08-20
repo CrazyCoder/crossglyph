@@ -82,6 +82,40 @@ def remedy_for(remedy: str, fallbacks: bool) -> str:
             "or drop the tick.")
 
 
+def say_refused(name: str, over: dict[str, list[tuple[int, int]]],
+                bundled: int | None = None) -> str:
+    """A family whose coverage the reader would refuse, for a terminal.
+
+    Said once for the family. The count comes from the charmaps, so every size
+    would carry the same sentence and four copies of it is not four times the
+    answer.
+    """
+    style, runs = max(over.items(), key=lambda pair: len(pair[1]))
+    cap = fontbuild.cpfont.convert.MAX_INTERVALS
+    where = fontbuild.cpfont.convert.describe_fragmentation(runs)
+    return "\n".join([
+        f"  {name}: your fonts cover this coverage in {len(runs)} separate "
+        f"pieces for the {style} style, and CrossPoint loads at most {cap}.",
+        # Worth spelling out. Nothing on the device says this happened: the
+        # family lists, selects, and then draws in the built-in face at the
+        # built-in sizes, which reads as the build having gone somewhere else.
+        "    The reader would show this family in its font list, fail to open "
+        "it, and read in its own font at its own sizes instead.",
+        f"    Gaps make pieces: a font missing characters in the middle of a "
+        f"range splits it in two. {where}",
+        # The measured answer beats a general one. Dropping a preset moves the
+        # count by too little to help, and the reader has no way to know that
+        # before trying it and building again.
+        (f"    Set `fallbacks = yes` to fill those gaps. With the bundled "
+         f"faces this same coverage is {bundled} pieces."
+         if bundled is not None else
+         "    Name a font in `fallback_regular` that covers that range "
+         "without gaps. Dropping one preset usually changes the count too "
+         "little to help."),
+        "    Not built.",
+    ])
+
+
 def say_uncovered(empty: fontbuild.Uncovered) -> str:
     """One family's empty coverage, for a terminal.
 
@@ -222,6 +256,23 @@ def main(argv=None) -> int:
               f"`crossglyph fetch-fallbacks` to add "
               f"{'them' if len(absent) > 1 else 'it'}.",
               file=sys.stderr, flush=True)
+
+    # Checked here and not left to the converter. The count is settled by the
+    # charmaps, so every size of the family fails with the same sentence, and
+    # a reader who gets it four times has been told once. Their sizes are not
+    # started at all.
+    refused = set()
+    for plan in plans:
+        over = fontbuild.over_interval_cap(plan.variant.config)
+        if not over:
+            continue
+        refused.add(id(plan.variant))
+        plan.report.failed = sorted(plan.variant.sizes)
+        plan.report.error = f"{len(max(over.values(), key=len))} intervals"
+        print(say_refused(plan.variant.name, over,
+                          fontbuild.bundled_would_fix(plan.variant.config)),
+              file=sys.stderr, flush=True)
+    jobs = [job for job in jobs if id(job.variant) not in refused]
 
     # Every warning this run raises, for the gate at the end. The folder being
     # short is one of them: it is printed as a warning, and a flag that says

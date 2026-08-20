@@ -864,6 +864,12 @@
         </span>
       </span>
       <div id="presets" class="presets"></div>
+      <!-- What the device would refuse, said while the boxes are being
+           ticked. The count is settled by the coverage and the faces, so it
+           is known long before Build, and a file over the cap is the one
+           failure the reader shows nothing for: it lists the family, drops it
+           on load, and draws in its own font at its own sizes. -->
+      <div id="too-many-intervals" class="hint warn" hidden></div>
     </div>
     <div class="row wide">
       <span class="name"><label for="ranges">extra ranges</label><span

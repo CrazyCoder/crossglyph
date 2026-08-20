@@ -472,6 +472,86 @@ declared band exceeds its own pitch is not unusual: NotoSans has a negative
 `lineGap`, spanning 35 px against a 34 px pitch, and those are worst case
 bounds that adjacent lines rarely both reach.
 
+## When the reader will not load the font
+
+A font can build cleanly and still be one the reader refuses. There is nothing
+to see when it happens: the family appears in **Settings > Reader > Font**, you
+select it, and the reader goes on drawing in its own font at 12, 14, 16 and 18
+however many sizes you built. Nothing says the font was rejected.
+
+CrossGlyph checks for this now. The panel says so under the coverage boxes
+while you are still ticking them, and a build refuses to write a file that
+cannot load.
+
+### What the reader counts
+
+A `.cpfont` does not store a list of characters. It stores **runs of
+consecutive characters**, because that is far smaller: `A` to `Z` is one entry
+holding a start and an end, not twenty-six entries. CrossPoint loads at most
+4096 of these runs per style, along with 65,536 characters and 4096 kerning
+entries a side (`SdCardFont.cpp`, where the comment gives the reason as
+rejecting malformed files before allocating memory for them).
+
+A file over any of those limits is refused whole, and the three steps that
+follow are the ones you cannot see:
+
+- `SdCardFontSystem::ensureLoaded()` fails to load the family and calls
+  `clearSdFontFamily()`, which empties the setting naming it.
+- `readerFontPointSizes()` sees an empty name and returns the built-in ladder,
+  `{12, 14, 16, 18}`.
+- The family is still in the list, because the list comes from scanning the
+  folder names on the card and never opens a file.
+
+So the font looks installed and behaves as though you had never built it.
+
+### Why a font ends up with too many runs
+
+Gaps. A font that covers a range completely is one run. A font missing
+characters in the middle of that range splits it in two, and a font that
+covers a range in scattered patches costs one run for every patch.
+
+A sparse fallback does exactly this. Pointing `fallback_regular` at a
+language-specific CJK face and ticking the CJK presets asks for tens of
+thousands of characters from a face that has a few thousand of them, scattered.
+Measured on one such build:
+
+| coverage | runs | |
+|---|---|---|
+| as built | 4390 | refused |
+| the same, minus `cjk-tc` | 4194 | refused |
+| minus `cjk-tc` and `hangul` | 4192 | refused |
+| the same, with `fallbacks = yes` | 64 | loads |
+| no CJK presets at all | 123 | loads |
+
+**Unticking presets is the move that does not work.** Two presets came off and the
+count moved by 198. The count is not about how much you asked for. A build with 43,588 characters in it loads while one with
+17,546 does not, when the second one gets them in pieces.
+
+### What to do about it
+
+**Turn on bundled fallback faces.** The bundled set includes a pan-CJK face
+that covers those blocks completely, so the holes your own fallback leaves are
+filled and the runs on either side of each hole join up. That is the 4390 to 64
+row above, and it is the same characters either way.
+
+`fallbacks` is `no` by default, and that keeps a first build small and
+self-contained. It also costs you this. With the set off, whatever you name in
+`fallback_regular` is the only face behind your family, gaps and all.
+
+Failing that, name a face in `fallback_regular` that covers the range you
+ticked without gaps, or untick the range.
+
+### Where you are told
+
+- **In the panel**, under the coverage boxes, as soon as a tick pushes the
+  count over. It carries the count, the limit, and what the same coverage would
+  cost with the bundled faces on when that is under the limit.
+- **On the command line**, once per family before the build starts, with the
+  same figures. Those sizes are not built and the exit code is 1.
+- **In a build either way**, since the converter refuses to write a file over
+  any of the three limits. That check runs before any character is rasterized.
+  It costs a second, where finding out on the device costs a card swap.
+
 ## When a tick draws nothing
 
 A coverage preset can come out empty. Tick Greek on a Latin-only family with

@@ -124,11 +124,17 @@ def test_a_lazily_opened_font_yields_the_same_kerning(monkeypatch, tmp_path):
 # --- reasons the converter exits with ---------------------------------------
 
 
-def test_a_size_the_format_cannot_hold_exits_with_its_reason(tmp_path):
+def test_a_size_the_format_cannot_hold_raises_with_its_reason(tmp_path):
     """FORK: advanceY is a byte in the .cpfont TOC, and a large size on a
     loose-hhea face runs past it. Upstream prints the reason and then exits
-    with a bare code, which is fine for a command line and leaves a caller
-    that traps SystemExit -- the preview does -- with nothing to show.
+    with a bare code, which is fine for a command line and useless to a
+    caller.
+
+    Raised and not exited. sys.exit is a BaseException, so it went past
+    `except Exception` in build_size and `except FontBuildError` in _run: one
+    size over the limit ended the whole run, took every other family with it,
+    and cut the preview's build stream off mid-stream. The next test is the
+    one that pins that.
 
     150 DPI, so the pixels a line run well past a byte long before the point
     size looks unusual.
@@ -138,13 +144,113 @@ def test_a_size_the_format_cannot_hold_exits_with_its_reason(tmp_path):
     from crossglyph import cpfont
 
     path, codepoints = _kerned_face(tmp_path)
-    with pytest.raises(SystemExit) as leaving:
+    with pytest.raises(cpfont.FontBuildError) as raised:
         cpfont.generate_cpfont_multistyle(
             {0: str(path)}, 200, [(0x41, 0x42)],
             str(tmp_path / "out.cpfont"))
-    said = str(leaving.value)
+    said = str(raised.value)
     assert "255" in said and "smaller" in said, said
-    assert said != "1", "the exit code reached the caller instead of a reason"
+
+
+def test_one_size_over_a_limit_does_not_take_the_run_with_it(tmp_path):
+    """The failure mode the raise above exists for. A family the converter
+    refuses has to come back as that family failing, with every other family
+    in the run still built."""
+    import fontsmith
+
+    from crossglyph import fontbuild, fontconf
+
+    for name in ("Big", "Small"):
+        fontsmith.box_font(tmp_path / f"{name}-Regular.ttf", [0x20, 0x41],
+                           family=name)
+    (tmp_path / "big.conf").write_text(
+        "family = Big\nsizes = 200\nintervals = base\nfallbacks = no\n",
+        encoding="utf-8")
+    (tmp_path / "small.conf").write_text(
+        "family = Small\nsizes = 12\nintervals = base\nfallbacks = no\n",
+        encoding="utf-8")
+    configs = [fontconf.parse_config(tmp_path / name, root=tmp_path)
+               for name in ("big.conf", "small.conf")]
+    steps = list(fontbuild.build_families(configs, tmp_path / "out"))
+    failed = [step for step in steps if step["event"] == "failed"]
+    built = [step for step in steps if step["event"] == "size"]
+    assert [step["family"] for step in failed] == ["Big"]
+    assert "255" in failed[0]["error"]
+    assert [step["family"] for step in built] == ["Small"], \
+        "the other family still builds"
+
+
+def test_the_interval_cap_is_the_one_the_reader_enforces():
+    """The three limits are the firmware's policy and not the format's, so
+    nothing but this test notices when the firmware moves one."""
+    import re
+
+    import pytest
+
+    from crossglyph.cpfont import convert
+    from crossglyph.render import stamp
+
+    source = stamp.FIRMWARE / "lib" / "EpdFont" / "SdCardFont.cpp"
+    if not source.is_file():
+        pytest.skip(f"{source} not found (no firmware checkout beside this one)")
+    said = source.read_text(encoding="utf-8", errors="replace")
+    for name, ours in (("MAX_INTERVALS", convert.MAX_INTERVALS),
+                       ("MAX_GLYPHS", convert.MAX_GLYPHS),
+                       ("MAX_KERN_ENTRIES", convert.MAX_KERN_ENTRIES)):
+        found = re.search(rf"{name}\s*=\s*(\d+)", said)
+        assert found, f"{name} is not in SdCardFont.cpp any more"
+        assert int(found.group(1)) == ours, \
+            f"{name} is {found.group(1)} on the device and {ours} here"
+
+
+def test_a_coverage_the_reader_would_refuse_stops_before_rasterizing(tmp_path,
+                                                                     monkeypatch):
+    """FORK: over the cap the device rejects the whole file, and shows nothing
+    for it -- the family lists, drops on load, and the reader draws its own
+    font at its own sizes. A build that wrote one anyway is a build that
+    reported success for a font nobody can use."""
+    import fontsmith
+    import pytest
+
+    from crossglyph import cpfont
+    from crossglyph.cpfont import convert
+
+    # Every other codepoint, which is one interval each.
+    path = fontsmith.box_font(tmp_path / "Gappy-Regular.ttf",
+                              [0x20] + list(range(0x2000, 0x2040, 2)))
+    monkeypatch.setattr(convert, "MAX_INTERVALS", 8)
+    out = tmp_path / "out.cpfont"
+    with pytest.raises(cpfont.FontBuildError) as raised:
+        cpfont.generate_cpfont_multistyle({0: str(path)}, 12,
+                                          [(0x2000, 0x203F)], str(out))
+    said = str(raised.value)
+    assert "32 separate pieces" in said and "at most 8" in said, said
+    assert "U+2000" in said, "and where they are"
+    assert not out.exists(), "and nothing was written"
+
+
+def test_the_count_before_a_build_is_the_count_the_converter_writes(tmp_path):
+    """The panel and the command line both say what a build would carry, from
+    the charmaps alone. If that ever stops agreeing with what the converter
+    actually writes, the warning is worse than none: it would clear a font the
+    device then refuses."""
+    import fontsmith
+
+    from crossglyph import fontbuild
+    from crossglyph.cpfont import convert
+    from crossglyph.cpfont.faces import open_face
+
+    gappy = fontsmith.box_font(tmp_path / "Gappy-Regular.ttf",
+                               [0x20] + list(range(0x2000, 0x2100, 2)))
+    filler = fontsmith.box_font(tmp_path / "Filler-Regular.ttf",
+                                [0x20] + list(range(0x2001, 0x2040, 4)),
+                                family="Filler")
+    asked = [(0x2000, 0x20FF)]
+    runs, _sources, _per = convert.resolve_style_coverage(
+        open_face(str(gappy)), [open_face(str(filler))], asked)
+    mine = fontbuild.interval_runs(
+        asked, fontbuild.drawable_codepoints([str(gappy), str(filler)]))
+    assert mine == runs, "the same runs, and not merely the same count"
 
 
 def test_a_style_with_its_own_chain_does_not_inherit_style_zero():

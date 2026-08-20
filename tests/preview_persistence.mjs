@@ -807,6 +807,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // row is showing at all are read back.
     "build-warn": makeElement(),
     "build-warn-lines": makeElement(),
+    // What a build of the coverage on screen would ask the device to load.
+    "too-many-intervals": makeElement(),
     "tab-tune": pressStub("tune"),
     "tab-export": pressStub("export"),
     // The headings that fold the section or card under them.
@@ -1049,6 +1051,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                 : name === "x-fallbacks-missing"
                   ? String(opts.fallbacksLeft ?? 0)
                 : name === "x-coverage-fix" ? (opts.coverageFix ?? "")
+                : name === "x-intervals" ? String(opts.intervals ?? 0)
+                : name === "x-interval-cap" ? String(opts.intervalCap ?? 0)
+                : name === "x-intervals-bundled"
+                  ? String(opts.intervalsBundled ?? 0)
                 : null),
             },
           });
@@ -1264,6 +1270,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            warn: stubs["build-warn"],
+           intervals: stubs["too-many-intervals"],
            warnLines: () => stubs["build-warn-lines"].children
                               .map(line => line.textContent),
            builtSteps: stubs.built.steps,
@@ -5700,6 +5707,47 @@ for (const deferred of [
   check("a run-level error stands on its own",
         env.warnLines()[0] === "the font folder went away mid-run",
         env.warnLines().join(" | "));
+}
+
+
+// 94. What a build of the coverage on screen would ask the device to load.
+//     The reader refuses a style over the cap and shows nothing for it, so
+//     this is the one warning that has to arrive before Build rather than
+//     after.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, intervals: 4390,
+                             intervalCap: 4096, intervalsBundled: 64 });
+  const note = env.intervals;
+  check("a coverage over the cap is called out", note.hidden === false);
+  check("with the count and the cap",
+        note.textContent.includes("4390") && note.textContent.includes("4096"),
+        note.textContent);
+  check("and what the device would do about it",
+        note.textContent.includes("read in its own font at its own sizes"),
+        note.textContent);
+  check("and the measured answer rather than a general one",
+        note.textContent.includes("bundled fallback faces")
+        && note.textContent.includes("64"), note.textContent);
+}
+
+// 95. Under the cap it says nothing, which is every build that loads.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, intervals: 64,
+                             intervalCap: 4096 });
+  check("a coverage that fits is not mentioned", env.intervals.hidden === true);
+}
+
+// 96. Over the cap with the bundled faces on already, or with them no help:
+//     there is no number to offer, so the advice is a face of your own.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { renderOk: true, intervals: 4390,
+                             intervalCap: 4096, intervalsBundled: 0 });
+  check("with no measured answer it names fallback 1",
+        env.intervals.textContent.includes("fallback 1"),
+        env.intervals.textContent);
 }
 
 process.exit(failures ? 1 : 0);

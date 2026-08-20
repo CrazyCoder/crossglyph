@@ -277,6 +277,49 @@ def compose_raster(drawn, face, advance):
                        freetype.FT_PIXEL_MODE_GRAY, left, top, advance)
 
 
+def describe_fragmentation(intervals, bucket=0x1000, share=0.05):
+    """Where the runs are, as one sentence, or "" when they are spread thin.
+
+    FORK: the count alone tells a reader nothing about what to change. Runs
+    are bucketed by their block and the buckets carrying a real share of them
+    are reported as one span, so "4256 of them fall between U+3000 and U+9FFF"
+    names the range to cover differently.
+    """
+    if not intervals:
+        return ""
+    tally = {}
+    for start, _end in intervals:
+        tally[start // bucket] = tally.get(start // bucket, 0) + 1
+    heavy = sorted(key for key, count in tally.items()
+                   if count >= share * len(intervals))
+    if not heavy:
+        return ""
+    inside = sum(count for key, count in tally.items() if key in heavy)
+    return (f"{inside} of them fall between "
+            f"U+{heavy[0] * bucket:04X} and U+{(heavy[-1] + 1) * bucket - 1:04X}.")
+
+
+# FORK: what SdCardFont::load() refuses, mirrored here so a build cannot write
+# a file the device will always reject (SdCardFont.cpp:596-608). These are the
+# reader's policy and not the format's -- every field is wider than the limit
+# on it -- so they live in one place to be moved when the firmware moves.
+#
+# An interval is one run of consecutive codepoints some face in the chain
+# covers, so a face that covers a block in patches costs one interval per
+# patch. A sparse CJK fallback reaches 4096 long before the glyph count is
+# anywhere near its own limit.
+#
+# What the reader does with a file over the limit is worth knowing, because it
+# is invisible from the outside: loadFamily() fails, ensureLoaded() clears the
+# family setting, and readerFontPointSizes() falls back to the built-in
+# 12/14/16/18. The family still lists, because discover() reads names and
+# never opens a file. So the font appears installed, selects, and quietly
+# draws in the built-in face at sizes nobody asked for.
+MAX_INTERVALS = 4096
+MAX_GLYPHS = 65536
+MAX_KERN_ENTRIES = 4096
+
+
 def resolve_style_coverage(primary_face, fallback_faces, intervals,
                            synthesized=()):
     """Resolve intervals against primary coverage, then optional fallback chain.
@@ -1176,6 +1219,27 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         synthesized=[frozenset(runs) for runs in arabic_runs])
     total_glyphs = sum(end - start + 1 for start, end in intervals)
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
+    # FORK: here rather than at the TOC pack, which is on the far side of
+    # rasterizing every glyph at every size. The count is settled by the
+    # charmaps and does not move with the point size, so a build that cannot
+    # load stops in the first second instead of after four files nobody can
+    # use.
+    if len(intervals) > MAX_INTERVALS:
+        raise FontBuildError(
+            f"your fonts cover this coverage in {len(intervals)} separate "
+            f"pieces for the {style_label} style, and CrossPoint loads at "
+            f"most {MAX_INTERVALS}. The reader would show this family in its "
+            f"font list, fail to open it, and read in its own font at its own "
+            f"sizes instead. Gaps make pieces: a font missing characters in "
+            f"the middle of a range splits it in two. "
+            f"{describe_fragmentation(intervals)} Fill the gaps with a font "
+            f"that covers that range completely, or turn the bundled "
+            f"fallbacks on.")
+    if total_glyphs > MAX_GLYPHS:
+        raise FontBuildError(
+            f"this coverage needs {total_glyphs} characters for the "
+            f"{style_label} style and CrossPoint loads at most {MAX_GLYPHS}. "
+            f"Untick some of the coverage.")
     coverage_parts = [f"{len(source_codepoints[0])} primary"]
     for idx in range(1, len(source_codepoints)):
         fallback_name = os.path.basename(fallback_fontfiles[idx - 1]) if fallback_fontfiles else f"fallback{idx}"
@@ -1541,10 +1605,24 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     for style_id in sorted(raster_data.keys()):
         sd = raster_data[style_id]
         if sd.advanceY > 255:
-            # FORK: as above, the reason travels with the exit.
-            sys.exit(f"this font needs {sd.advanceY} pixels a line at size "
-                     f"{size}, and the .cpfont format holds 255. "
-                     f"Try a smaller size.")
+            # FORK: raised and not exited. sys.exit() is a BaseException, so a
+            # build sees it past `except Exception` in build_size and past
+            # `except FontBuildError` in _run: one size over the limit took
+            # down the whole run, every other family with it, and left the
+            # preview's stream cut off mid-build. Raising makes it one size
+            # failing with its reason, which every caller already handles.
+            raise FontBuildError(
+                f"this font needs {sd.advanceY} pixels a line at size "
+                f"{size}, and the .cpfont format holds 255. "
+                f"Try a smaller size.")
+        for side, entries in (("left", sd.kern_left_classes),
+                              ("right", sd.kern_right_classes)):
+            if len(entries) > MAX_KERN_ENTRIES:
+                raise FontBuildError(
+                    f"this font has {len(entries)} {side} kerning entries "
+                    f"for style {style_id} and CrossPoint loads at most "
+                    f"{MAX_KERN_ENTRIES}. Untick some of the coverage, or set "
+                    f"`kerning = 0`.")
         toc_data += struct.pack(STYLE_TOC_FORMAT,
                                 style_id,
                                 len(sd.intervals), len(sd.all_glyphs),

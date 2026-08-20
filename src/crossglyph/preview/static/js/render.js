@@ -1,7 +1,7 @@
 import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
 import {exportForm, exportSettings, fetchButton, presetBoxes,
-        showFallbacksLeft} from "./export.js";
+        showFallbacksLeft, showIntervalLoad} from "./export.js";
 import {familyPicker} from "./family.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
@@ -219,6 +219,9 @@ export async function renderNow() {
   }
   // Before showUndrawn, which reads whether the button is showing to decide
   // which move it advises.
+  showIntervalLoad(Number(response.headers.get("x-intervals")) || 0,
+                   Number(response.headers.get("x-interval-cap")) || 0,
+                   Number(response.headers.get("x-intervals-bundled")) || 0);
   showFallbacksLeft(Number(response.headers.get("x-fallbacks-missing")) || 0);
   showUndrawn(Number(response.headers.get("x-undrawn")) || 0);
   showUncovered(Number(response.headers.get("x-uncovered")) || 0,

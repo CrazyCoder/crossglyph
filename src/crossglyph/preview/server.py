@@ -51,9 +51,11 @@ from .. import (
 from ..cpfont.convert import (
     BASE_INTERVALS,
     INTERVAL_PRESETS,
+    MAX_INTERVALS,
     FontBuildError,
     figure_glyph_overrides,
     gsub_ligature_sequences,
+    resolve_intervals,
 )
 from ..cpfont.faces import open_face
 from ..cpfont.tuning import LineHeight, Tuning
@@ -808,6 +810,86 @@ def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
     return tuple(tuple(sorted(entry.items())) for entry in entries)
 
 
+@functools.lru_cache(maxsize=64)
+def _worst_intervals(coverage: str, faces: tuple) -> int:
+    """The most intervals any style of this family would carry, once built.
+
+    CrossPoint refuses a style with more than MAX_INTERVALS of them and says
+    nothing a reader can see, so the panel is where this belongs: the count is
+    settled by the charmaps and the coverage, both of which are on screen
+    before anybody presses Build.
+
+    Kept, because a render runs on every keystroke in the sample text and the
+    answer moves only when a box is ticked or a fallback picked.
+    """
+    asked = resolve_intervals(coverage)
+    return max((len(fontbuild.interval_runs(
+                    asked, fontbuild.drawable_codepoints(chain)))
+                for _style, chain in faces), default=0)
+
+
+def _bundled_load_or_zero(request: RenderRequest) -> int:
+    """What this coverage would cost with the bundled faces on, or 0.
+
+    0 when they are already on, when they would not bring it under the cap, or
+    when anything about the question could not be answered. The panel offers
+    the number only where it is an answer.
+    """
+    if request.fallbacks:
+        return 0
+    try:
+        under = interval_load(request.model_copy(update={"fallbacks": True}))
+    except (LookupError, OSError, FontConfigError, SystemExit):
+        return 0
+    return under if 0 < under <= MAX_INTERVALS else 0
+
+
+def _interval_load_or_zero(request: RenderRequest) -> int:
+    """interval_load, and 0 for anything that stops it answering.
+
+    This rides on a response the page already has, and a page that drew is
+    worth more than a count of what a build of it would carry. A family whose
+    faces have moved since, a fallback pick that no longer resolves: the
+    render got its own picture from somewhere, and this says nothing rather
+    than turning that into an error.
+
+    SystemExit among them, and named rather than implied: `resolve_intervals`
+    exits on a token it does not know, and a raw range half typed into the
+    field is one of those on every keystroke until the bracket closes. It is a
+    BaseException, so `except Exception` here would let it past and out of the
+    app.
+    """
+    try:
+        return interval_load(request)
+    except (LookupError, OSError, FontConfigError, SystemExit):
+        return 0
+
+
+def interval_load(request: RenderRequest) -> int:
+    """What a build of the panel as it stands would write, at its worst style.
+
+    From the request and not from the .conf. A build writes the panel to the
+    file before it runs, so what is on screen is what would be built, and a
+    count read from the saved file would be one save behind the boxes being
+    ticked.
+
+    Every style the family has, rather than the ones this page happens to set:
+    the cap is per style, and one style over it is a file the device refuses
+    whole.
+    """
+    if request.intervals is None and request.ranges is None:
+        return 0                     # the panel said nothing about coverage
+    # An empty string is the narrowest build there is and not an absent one:
+    # every box clear still carries `base`, so it still has a count.
+    coverage = ",".join(part for part in (request.intervals, request.ranges)
+                        if part)
+    styles = sources_for(request.family) if request.family else _sources
+    offered = fallbacks_for(request)
+    return _worst_intervals(coverage, tuple(sorted(
+        (style, (str(path), *offered.get(style, ())))
+        for style, path in styles.items())))
+
+
 def fallbacks_for(request: RenderRequest) -> dict[int, tuple[str, ...]]:
     """The faces this request would fall back to, per style, in order.
 
@@ -998,7 +1080,19 @@ def render(request: RenderRequest) -> Response:
                                      fontbuild.SOURCE_DIR,
                                      request.intervals or "", request.text))),
                              "x-coverage-fix":
-                                 ",".join(presets_covering(uncovered))})
+                                 ",".join(presets_covering(uncovered)),
+                             # What the device would refuse, before a build
+                             # rather than after four of them. 0 when the
+                             # count could not be worked out.
+                             "x-intervals": str(_interval_load_or_zero(request)),
+                             "x-interval-cap": str(MAX_INTERVALS),
+                             # What the same coverage would cost with the
+                             # bundled set on, when that is under the cap. The
+                             # measured answer beats a general one: dropping a
+                             # preset moves the count by too little to help,
+                             # and nothing on screen says so.
+                             "x-intervals-bundled":
+                                 str(_bundled_load_or_zero(request))})
 
 
 #: What the panel is allowed to write back, in the .conf's own spelling.

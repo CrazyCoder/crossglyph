@@ -20,6 +20,9 @@ export const builtNote = document.getElementById("built");
 //: The reserved line above holds the outcome, so a failure and a coverage
 //: warning both land here and the card never grows.
 export const buildWarn = document.getElementById("build-warn");
+//: What a build of the panel as it stands would ask the device to load. The
+//: render answers it, since it already knows the coverage and the faces.
+const intervalNote = document.getElementById("too-many-intervals");
 const buildWarnLines = document.getElementById("build-warn-lines");
 // The panel's own bar, in the foot of the panel rather than in the card: a
 // build is the one thing here that changes height while you watch it, and the
@@ -439,6 +442,36 @@ function showWarnings() {
     return line;
   }));
   buildWarn.hidden = lines.length === 0;
+}
+
+//: Whether the coverage on screen would build a font the reader refuses.
+//: Read by the build buttons as well as shown: pressing Build on this is four
+//: sizes of work for a file that cannot load.
+export let intervalsOverCap = false;
+
+export function showIntervalLoad(count, cap, bundled = 0) {
+  intervalsOverCap = Boolean(cap) && count > cap;
+  intervalNote.hidden = !intervalsOverCap;
+  if (!intervalsOverCap) return;
+  // The mechanism, because the number on its own does not say what to change.
+  // A face that covers a block in patches is what reaches this, and one
+  // preset fewer moves the count by too little to help.
+  //
+  // `bundled` is what the same coverage would cost with the bundled faces on,
+  // and it is offered only when it is under the cap. It is the answer far
+  // more often than a face of your own is: those faces are off by default,
+  // and the set carries a dense pan-CJK one.
+  intervalNote.textContent =
+    `Your fonts cover the characters you have ticked in ${count} separate `
+    + `pieces, and the reader can load at most ${cap}. It would show this `
+    + `family in the font list, fail to open it, and read in its own font at `
+    + `its own sizes instead. Gaps make pieces: a font missing characters in `
+    + `the middle of a range splits it in two. `
+    + (bundled
+       ? `Turn on bundled fallback faces to fill those gaps. With them this `
+         + `same coverage is ${bundled} pieces.`
+       : `Pick a font for fallback 1 that covers that range without gaps, or `
+         + `untick it.`);
 }
 
 export function clearWarnings() {
