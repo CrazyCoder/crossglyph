@@ -417,8 +417,16 @@ It has the same foot the knobs have: **Build** and **Build all**, the rule
 under them that a run fills, and one line saying what is being built or what
 the last build made. The rule and that line are there whether or not anything
 is running, so a build changes what the foot says and never how tall it is.
-Only an error grows it, and that is the one time the panel needs reading. What
-the two presses do is behind the **?** beside them.
+Nothing grows it. What the two presses do is behind the **?** beside them.
+
+What a run had to complain about appears in a row under that foot, marked the
+way the note under the sample text is. A size that failed reads there, with
+what the converter said. So does a coverage preset the build could draw
+nothing of, named as the tick you put there, with the box or the **Fetch**
+button offered where one of those is the answer. Lines that say the same thing
+are joined, so building every family in the folder gives you one line and the
+families in front of it. The row is empty when a run starts and stays hidden
+when there was nothing to report.
 
 **Save** is not on that tab. A build writes the `.conf` before it starts, so
 pressing Build is pressing Save and then Build, and a second button for the

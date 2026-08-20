@@ -80,7 +80,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `mod_suffix` | `Mod` | suffix for that second family |
 | `intervals` | `reading` | preset names, comma separated. `reading` already contains `default`, `latin-ext`, `symbols` and `vietnamese`, and the panel shows those as carried rather than as ticks of yours. `intervals =` with nothing after it is the narrowest build there is, since `base` is carried whatever this says |
 | `ranges` | none | raw `(0xAAAA-0xBBBB)` ranges, appended to `intervals` |
-| `fallbacks` | `no` | append the bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. A face you have not fetched is skipped, and the build says which |
+| `fallbacks` | `no` | append the bundled Noto families, and the pan-CJK face when `intervals` names a CJK script. A face you have not fetched is skipped, and the build says which, along with any preset that drew nothing. See [When a tick draws nothing](#when-a-tick-draws-nothing) |
 | `fallback_order` | none | the fallback families and their order, comma separated. `bundled` stands for the set above. Behind the two keys below, which are always in front. Inert while `fallbacks` is `no`, since there is no chain to order. See [Which face a fallback lends](#which-face-a-fallback-lends) |
 | `space_glyphs` | `yes` | add the fixed width spaces (U+2000 to U+200A, U+205F, U+3000) |
 | `gamma` | `1.0` | curve applied to glyph coverage before it is quantized, `1 - (1 - coverage)ᵞ`, so above 1 darkens. The most useful single control, see [Tuning how glyphs look](#tuning-how-glyphs-look) |
@@ -472,6 +472,43 @@ declared band exceeds its own pitch is not unusual: NotoSans has a negative
 `lineGap`, spanning 35 px against a 34 px pitch, and those are worst case
 bounds that adjacent lines rarely both reach.
 
+## When a tick draws nothing
+
+A coverage preset can come out empty. Tick Greek on a Latin-only family with
+the fallbacks off and the font builds, the glyph count moves not at all, and
+the four hundred codepoints you asked for are simply absent. The build says so,
+once per family, under that family's sizes:
+
+```
+  Bitter 13 (0.4 MB, 3812 glyphs, 2s)
+  Bitter 16 (0.6 MB, 3812 glyphs, 2s)
+  Bitter: nothing in this build draws thai or bengali.
+    NotoSansThai-Regular.ttf is in the fallbacks folder and this build did
+    not open it.
+    Set `fallbacks = yes`, or put `bundled` back in `fallback_order`.
+```
+
+Three answers, and the build works out which one applies. A face sitting in
+the fallbacks folder that this build never opened is named by filename, and
+either `fallbacks = no` or a `fallback_order` without `bundled` in it puts a
+family there. A folder short of faces sends you to `crossglyph fetch-fallbacks`.
+A complete folder that still draws nothing leaves `fallback_regular` and
+dropping the tick.
+
+The line comes only at zero. Partial is the ordinary state, since a preset
+covers codepoints no font assigns: against a fetched set Greek resolves at 92%
+and Japanese at 99%, and a warning on those would fire on nearly every build.
+
+**The exit code stays 0.** A build that wrote usable fonts succeeded. The
+empty range is a fault in the config, and the run carried the config out. Pass
+`--fail-on-warning` to return 1 instead, for any warning the build raises. The
+gate comes after the writing, so every `.cpfont` the run planned is on the disk
+either way.
+
+In the preview the same warning appears under the build buttons, worded as the
+controls on the panel. It names the tick, and offers the box or the Fetch
+button where one of those is the answer.
+
 `letter_spacing` and `word_spacing` adjust the horizontal advances the same
 way. Both are in pixels, stored at 1/16 px, and both accept negatives. Word
 spacing stacks on letter spacing exactly as CSS does, and the device takes the
@@ -686,6 +723,9 @@ to somebody who liked how it looked, and what travels with it is four
   },
   "fallbacks": {"regular": ["NotoSans-Regular.ttf", …],
                 "bold": ["NotoSans-Bold.ttf", …], …},
+  "coverage": {"reading": {"asked": 2887, "drawable": 2811},
+               "greek": {"asked": 400, "drawable": 368},
+               "thai": {"asked": 128, "drawable": 0}},
   "files": {"12": {"file": "Bitter_12.cpfont", "bytes": 1162006,
                    "glyphs": 3095}}
 }
@@ -715,6 +755,14 @@ as `_14`.
 `fallbacks` is per style, since a chain lends its bold face to the bold style
 where it has one. Which file a glyph was borrowed from is not one answer for
 the whole family, and the record is what a reproduction reads.
+
+`coverage` holds what each ticked token asked for against what the faces
+between them could supply. `settings` records the tokens, so that is the ask
+and this is the answer. A zero here is the state the build warns about.
+
+`drawable` counts what the faces have. What the converter packed is a narrower
+number, decided per style, and reaching it would cost a second pass over every
+glyph. The `glyphs` count under `files` is the packed answer for one size.
 
 A `synthesized` block appears above `fallbacks` when a face needed repairing,
 and says how much. `"synthesized": {"arabic_forms": 125}` is a build of
