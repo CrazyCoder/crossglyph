@@ -202,12 +202,23 @@ than one entry with a long list of sizes under it. Merged, the two lists write
 one set of files, so two sizes that land on the same label are refused across
 both.
 
-Two sizes are special. The built-in interface fonts render at 8, 10 and 12 pt,
-and CJK text in the interface is drawn by borrowing the selected family at the
-matching size. A CJK family therefore wants `sizes = 8 10 12 14 16 18`, or book
-titles keep showing boxes. For Latin and Cyrillic this does not apply. The
-website appends those two sizes to a CJK build for you; here they are yours to
-list, since a size list of any length is yours to write.
+Three sizes belong to the interface rather than to the page. Its own fonts are
+8, 10 and 12 pt, measured at the 150 DPI this converter works in, and where the
+interface has to draw CJK it borrows the selected family at the matching size
+(`kUiFontSizes` in `SdCardFontSystem.cpp`). A default build carries 12 already,
+so a CJK family wants the other two added:
+
+```ini
+sizes = 8 10 12 14 16 18
+```
+
+Without them a CJK book title has nothing to draw with in the menus, since the
+reader only sets up the borrowing for a size the family actually carries. It
+tests the family for Han, Hiragana, Katakana and Hangul first and skips the
+whole arrangement when it finds none, so a Latin or Cyrillic family needs no
+extra sizes and pays nothing for these. The website appends 8 and 10 to a CJK
+build for you. Here they are yours to list, since a size list of any length is
+yours to write.
 
 ### Fractional point sizes
 
