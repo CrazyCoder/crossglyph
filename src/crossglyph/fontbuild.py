@@ -665,9 +665,15 @@ def uncovered(variant: Variant) -> Uncovered | None:
     state -- Greek resolves at 92% against the bundled set -- so only a token
     at zero is worth anybody's attention.
     """
+    return uncovered_from(variant, coverage_counts(variant.config))
+
+
+def uncovered_from(variant: Variant,
+                   counts: dict[str, tuple[int, int]]) -> Uncovered | None:
+    """The same answer from counts already taken, so nothing reads twice."""
     config: Config = variant.config
-    empty = tuple(token for token, (_asked, drawable)
-                  in coverage_counts(config).items() if not drawable)
+    empty = tuple(token for token, (_asked, drawable) in counts.items()
+                  if not drawable)
     if not empty:
         return None
 
@@ -870,11 +876,15 @@ def plan_variant(variant: Variant, out_dir: pathlib.Path,
 
 
 def finalize_variant(variant: Variant, out_dir: pathlib.Path,
-                     failed: set[float]) -> None:
+                     failed: set[float]) -> Uncovered | None:
     """Record what is now current, and what it was made from.
 
     Sizes that failed are left out, so the next run retries exactly those and
     nothing else. Skipped sizes keep their entry because they are still valid.
+
+    Returns whatever coverage came out at zero, for whoever is reading to word
+    for themselves. Once per family and not per size: the answer is the same
+    four times over, and the charmaps behind it are megabytes.
     """
     directory = out_dir / variant.name
     chain = fontstamp.chain_digests(variant.config)
@@ -882,12 +892,14 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
                for size in variant.sizes
                if size not in failed
                and fontstamp.cpfont_path(directory, variant, size).is_file()}
+    counts = coverage_counts(variant.config)
     fontstamp.write_stamp(
         directory, current,
         # The same sizes, so what the record speaks for and what it calls
         # current are one list rather than two that can disagree.
         built=provenance.describe(variant, directory, current,
-                                  _fallback_faces(variant)))
+                                  _fallback_faces(variant), counts))
+    return uncovered_from(variant, counts)
 
 
 def _fallback_faces(variant: Variant) -> dict[str, list[str]]:
@@ -1092,11 +1104,19 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
         report.written += made.bytes
         done += 1
         yield {"event": "size", "family": variant.name, "size": job.size,
-               "done": done, "total": total, "bytes": made.bytes}
+               "done": done, "total": total, "bytes": made.bytes,
+               # The channel a build warning travels on. Without it the panel
+               # hears about a size only through its byte count.
+               "warnings": list(made.warnings)}
 
     for plan in plans:
         if plan.jobs:
-            finalize_variant(plan.variant, out_dir, failed=set(plan.report.failed))
+            empty = finalize_variant(plan.variant, out_dir,
+                                     failed=set(plan.report.failed))
+            if empty:
+                yield {"event": "coverage", "family": empty.family,
+                       "tokens": list(empty.tokens), "remedy": empty.remedy,
+                       "faces": list(empty.faces)}
 
     yield {"event": "done", "out": str(out_dir), "removed": removed,
            # What this run wrote, and what the sizes it left alone already take

@@ -244,3 +244,19 @@ def test_fallbacks_are_recorded_by_filename_not_by_path(tmp_path):
     # The Arabic came from the fallback, and the record has to account for it
     # rather than reporting a family that repaired nothing.
     assert block["synthesized"]["arabic_forms"] > 0
+
+
+def test_the_record_keeps_what_each_token_asked_for_and_got(tmp_path):
+    """A tick that came to nothing leaves a figure behind. Without one the
+    only trace of it is a glyph count nobody can check it against."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = no\n", encoding="utf-8")
+    out = tmp_path / "out"
+    list(fontbuild.build_families(
+        [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)], out))
+    record = json.loads((out / "Probe" / fontstamp.STAMP_NAME)
+                        .read_text(encoding="utf-8"))
+    assert record["built"]["coverage"]["thai"] == {"asked": 128, "drawable": 0}

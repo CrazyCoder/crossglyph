@@ -1116,3 +1116,45 @@ def test_a_family_that_draws_what_it_asked_for_is_not_reported(tmp_path):
     variant = _uncovered(tmp_path, "intervals = thai\nfallbacks = yes\n",
                          folder=[THAI_FACE], complete=True)
     assert fontbuild.uncovered(variant) is None
+
+
+def test_a_size_step_carries_whatever_that_size_warned_about(tmp_path):
+    """`Built.warnings` had no way out of a build the page had started, so a
+    reader who pressed Build was never told about a tight line height."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    steps = list(fontbuild.build_families(
+        [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)],
+        tmp_path / "out"))
+    sizes = [step for step in steps if step["event"] == "size"]
+    assert sizes and all("warnings" in step for step in sizes)
+
+
+def test_a_family_that_cannot_draw_a_tick_yields_a_coverage_step(tmp_path):
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = no\n", encoding="utf-8")
+    steps = [step for step in fontbuild.build_families(
+        [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)],
+        tmp_path / "out") if step["event"] == "coverage"]
+    assert len(steps) == 1
+    assert steps[0]["family"] == "Probe"
+    assert steps[0]["tokens"] == ["thai"]
+    assert steps[0]["remedy"] in ("unused", "fetch", "none")
+
+
+def test_a_family_that_draws_its_ticks_yields_no_coverage_step(tmp_path):
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = base\nfallbacks = no\n", encoding="utf-8")
+    steps = fontbuild.build_families(
+        [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)],
+        tmp_path / "out")
+    assert not [step for step in steps if step["event"] == "coverage"]

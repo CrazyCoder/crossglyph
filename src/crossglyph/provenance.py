@@ -196,13 +196,18 @@ def _files(variant: Variant, directory: pathlib.Path,
 
 def describe(variant: Variant, directory: pathlib.Path,
              sizes: typing.Iterable[float],
-             fallbacks: dict[str, list[str]] | None = None) -> dict:
+             fallbacks: dict[str, list[str]] | None = None,
+             coverage: dict[str, tuple[int, int]] | None = None) -> dict:
     """The provenance block for one built family.
 
     `fallbacks` are whole paths per style, and are recorded by filename: the
     record names the faces, and the count below has to read them. Per style
     because a chain lends its bold face to a bold run where it has one, so
     which file a glyph came from is not one answer for the family.
+
+    `coverage` is what each ticked token asked for against what the faces can
+    supply. `_settings` records the tokens themselves, so that is the ask and
+    this is what came of it.
     """
     config: Config = variant.config
     faces = list(dict.fromkeys(face for chain in (fallbacks or {}).values()
@@ -221,5 +226,10 @@ def describe(variant: Variant, directory: pathlib.Path,
            if (synthesized := _synthesized(variant, faces)) else {}),
         "fallbacks": {style: [pathlib.Path(face).name for face in chain]
                       for style, chain in (fallbacks or {}).items()},
+        # What the faces between them could draw, which is a wider number than
+        # what the converter packed. Reaching the packed one costs a second
+        # pass over every glyph; the docs carry the difference.
+        "coverage": {token: {"asked": asked, "drawable": drawable}
+                     for token, (asked, drawable) in (coverage or {}).items()},
         "files": _files(variant, directory, sizes),
     }
