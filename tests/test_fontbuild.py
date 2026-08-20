@@ -569,6 +569,39 @@ def test_an_unresolvable_name_says_where_it_looked(config, tmp_path):
         fontbuild.ordered_entries(parsed, tmp_path / fontbuild.FALLBACK_NAME)
 
 
+def test_the_bundled_set_carries_the_notosans_styles():
+    """NotoSans heads the chain and is the one bundled family Noto publishes an
+    italic for, so it is the family worth fetching per style."""
+    for name in fontbuild.NOTOSANS_STYLES:
+        assert name in fontbuild.BUNDLED_FALLBACKS
+
+
+def test_the_notosans_styles_come_from_the_noto_project():
+    """Upstream's folder is Regular only, so these come from the project that
+    publishes them, as the Arabic face does."""
+    source = fontbuild.fallback_source("NotoSans-Italic.ttf")
+
+    assert source.startswith("https://raw.githubusercontent.com/notofonts/")
+    assert source.endswith("/NotoSans-Italic.ttf")
+
+
+def test_a_folder_fetched_before_the_styles_still_builds(tmp_path):
+    """An existing workspace has the thirteen Regulars and none of the three.
+    A required new face would stop it building until it refetched."""
+    faces = tmp_path / fontbuild.FALLBACK_NAME
+    faces.mkdir()
+    for name in fontbuild.BUNDLED_FALLBACKS:
+        if name in fontbuild.NOTOSANS_STYLES:
+            continue
+        (faces / name).write_bytes(b"")
+
+    wanted = [path.name for path in
+              fontbuild.wanted_fallbacks("reading,cyrillic", faces)]
+
+    assert "NotoSans-Regular.ttf" in wanted
+    assert not set(wanted) & set(fontbuild.NOTOSANS_STYLES)
+
+
 def test_a_fetch_lands_the_licence_and_leaves_cjk_alone(tmp_path, monkeypatch):
     """15.7 MB of CJK is not something to hand someone building a Cyrillic
     family, and the OFL requires the licence to travel with the faces."""

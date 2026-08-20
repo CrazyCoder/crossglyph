@@ -49,10 +49,18 @@ FALLBACK_URL = ("https://raw.githubusercontent.com/crosspoint-reader/"
 #: not in the set the website's converter ships, so a fetch of it has to go to
 #: the project that publishes it. Hinted, because the hinting knobs are the
 #: point at reading sizes.
+NOTO_TTF = ("https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
+            "main/fonts/{family}/hinted/ttf/{name}")
 FALLBACK_SOURCES = {
     "NotoSansArabic-Regular.ttf":
-        "https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
-        "main/fonts/NotoSansArabic/hinted/ttf/NotoSansArabic-Regular.ttf",
+        NOTO_TTF.format(family="NotoSansArabic",
+                        name="NotoSansArabic-Regular.ttf"),
+    "NotoSans-Bold.ttf":
+        NOTO_TTF.format(family="NotoSans", name="NotoSans-Bold.ttf"),
+    "NotoSans-Italic.ttf":
+        NOTO_TTF.format(family="NotoSans", name="NotoSans-Italic.ttf"),
+    "NotoSans-BoldItalic.ttf":
+        NOTO_TTF.format(family="NotoSans", name="NotoSans-BoldItalic.ttf"),
 }
 
 
@@ -83,10 +91,19 @@ STARTER_DIR = pathlib.Path(__file__).resolve().parent / "starter"
 OUTPUT_NAME = "cpfonts"
 
 # .github/workflows/build-fonts.yml, in order. These fill holes the chosen
-# family does not cover, on every style: generate_cpfont_multistyle appends
-# the style-0 list to all four itself.
+# family does not cover. Each entry is a family and not a file: a style takes
+# that family's matching face where the folder has one, and its regular
+# otherwise (see pinned_faces).
+#
+# NotoSans is here in four styles and the rest in one, because Noto publishes a
+# bold for eight of the thirteen and an italic for this one alone. It also
+# heads the chain and carries Latin, Greek, Cyrillic and most punctuation, so
+# it is the family the other three files are worth their bytes for.
 BUNDLED_FALLBACKS = (
     "NotoSans-Regular.ttf",
+    "NotoSans-Bold.ttf",
+    "NotoSans-Italic.ttf",
+    "NotoSans-BoldItalic.ttf",
     "NotoSansHebrew-Regular.ttf",
     "NotoSansArabic-Regular.ttf",
     "NotoSansArmenian-Regular.ttf",
@@ -109,11 +126,19 @@ CJK_FALLBACKS = {
 }
 DEFAULT_CJK_FALLBACK = ("NotoSansCJKjp-Regular.otf",)
 
+#: The NotoSans faces past its regular, which only the styles they name use.
+NOTOSANS_STYLES = ("NotoSans-Bold.ttf", "NotoSans-Italic.ttf",
+                   "NotoSans-BoldItalic.ttf")
+
 #: Faces whose absence is not an error. The CJK one because it is 15.7 MB and
 #: only earns that when a CJK script was asked for; the Arabic one because
 #: upstream's folder does not carry it, so a workspace filled from there before
-#: FALLBACK_SOURCES existed has every other face and not this one.
-OPTIONAL_FALLBACKS = DEFAULT_CJK_FALLBACK + ("NotoSansArabic-Regular.ttf",)
+#: FALLBACK_SOURCES existed has every other face and not this one. The three
+#: NotoSans styles for the same reason: a folder fetched before they were
+#: added has none of them, and failing that workspace's builds over a face it
+#: never had a chance to get would be absurd.
+OPTIONAL_FALLBACKS = (DEFAULT_CJK_FALLBACK + ("NotoSansArabic-Regular.ttf",)
+                      + NOTOSANS_STYLES)
 
 
 class FontBuildError(RuntimeError):
