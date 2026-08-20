@@ -15,7 +15,7 @@ one is built the same way:
 * a short English paragraph, so a reader whose font has to carry both scripts
   can see them beside each other, and so every preset shows digits.
 
-Three presets add a paragraph of their own digits: English and Russian because
+Some presets add a paragraph of their own digits: English and Russian because
 the `figures` knob is what it shows, and Arabic because the tail's digits are
 Latin and say nothing about whether a face carries the Arabic-Indic ten.
 

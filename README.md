@@ -20,11 +20,11 @@ at the point size.
 
 - the firmware's own renderer, its C++ compiled to WebAssembly, so the page
   shows what the device draws and not an impression of it
-- fourteen rasterizing controls: gamma, the three grey thresholds, weight,
-  slant, hinting mode, grayscale hinting, mono rasterizing, stem darkening,
-  line height, letter and word spacing, kerning strength, ligatures,
-  proportional figures
-- eight page controls, so the page you judge is set up like the device you are
+- rasterizing controls for gamma, the three grey thresholds, weight, slant,
+  hinting mode, grayscale hinting, mono rasterizing, stem darkening, line
+  height, letter and word spacing, kerning strength, ligatures, proportional
+  figures
+- page controls, so the page you judge is set up like the device you are
   judging for: margin, alignment, line spacing, hyphenation and the language
   its patterns come from, paragraph spacing, anti-aliasing and night mode
 - the page inside the reader itself, rendered from XTEINK's own models, at one

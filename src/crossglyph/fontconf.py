@@ -885,7 +885,7 @@ def write_values(path: pathlib.Path, changes: dict[str, str | None],
     A value of None removes the key. Returns the keys that actually moved.
 
     These files are written by hand and documented in their own comments --
-    alto.conf is sixty lines of them around eight settings -- so this is a
+    alto.conf is mostly comment around a handful of settings -- so this is a
     line editor rather than a configparser round trip, which would flatten the
     lot. A key already in the file keeps its place and its padding; a key that
     is only there commented out is uncommented in place, which is where the

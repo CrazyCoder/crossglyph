@@ -124,7 +124,7 @@ uv run tools/bump-uv.py 0.12.4     # to a named one
 uv run tools/bump-uv.py --commit   # and commit the result
 ```
 
-The version and its six checksums appear in the wrapper twice, once in each
+The version and its checksums appear in the wrapper twice, once in each
 half, and a hash copied wrong lands on the one platform nobody bumping it is
 running. The script reads uv's newest tag off the redirect from its releases
 page, takes the SHA-256 that astral publishes beside each archive, and swaps

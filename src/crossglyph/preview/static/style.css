@@ -413,8 +413,8 @@
 
   /* The slider is a pointer affordance only: it is out of the tab order and
      hidden from assistive tech, because the field beside it holds the same
-     value, takes arrow keys, and says what it is. Two focus stops per knob
-     across nine knobs is a worse keyboard experience, not a better one. */
+     value, takes arrow keys, and says what it is. Two focus stops per knob,
+     over a panel of them, is a worse keyboard experience, not a better one. */
   /* The track fills to the thumb: it is what says the control is live and
      where in its range it sits, which a bare rail with a dot on it does not.
      --fill is set per slider from the value; `--mark` is the one place the

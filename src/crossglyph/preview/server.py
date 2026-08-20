@@ -1660,8 +1660,8 @@ def build(request: BuildRequest) -> StreamingResponse:
     return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
-#: This is a tool you edit while it is running, and the page is fourteen module
-#: files a browser is free to keep. Kept, they are served after the edit that
+#: This is a tool you edit while it is running, and the page is a folder of
+#: module files a browser is free to keep. Kept, they are served after the edit that
 #: was supposed to fix them: the page runs the old code, the change looks like
 #: it did nothing, and the next hour goes to the wrong question. Nothing here
 #: is worth a cache -- it is one process serving one reader off local disk.

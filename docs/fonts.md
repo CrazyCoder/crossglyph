@@ -763,7 +763,7 @@ that:
 | metrics | the font's own | the font's own | `line_height` in three units, `letter_spacing`, `word_spacing` |
 | pair tables | always on | always on | `kerning` as a factor, `ligatures` off, `figures = proportional` |
 
-The fourteen in the last four rows are what the fork is for. One of them came
+The knobs in the last four rows are what the fork is for. One of them came
 from upstream and the rest are new here: `figures` is the firmware's `--pnum`,
 and that flag sits in the script for the built-in fonts, not in the SD card
 script the other two columns are, so the website never had it either.
