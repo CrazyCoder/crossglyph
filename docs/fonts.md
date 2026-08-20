@@ -107,6 +107,34 @@ The four explicit style keys are the exact equivalent of the four upload slots
 on the CrossPoint font website. Auto-discovery is a convenience on top of them.
 When it guesses wrong, name the files.
 
+### The same settings in the preview
+
+The preview writes these keys, and it labels them for a reader. Most of the
+tuning controls carry the key's own words, so only the ones that differ are
+here:
+
+| in the preview | in a `.conf` |
+|---|---|
+| **name**, under Export | `name` |
+| the four **sizes** boxes, and **more sizes** | `sizes` |
+| **second family**, its sizes and its **suffix** | `sizes_mod`, `mod_suffix` |
+| the **coverage** ticks | `intervals` |
+| **extra ranges** | `ranges` |
+| **bundled fallback faces** | `fallbacks` |
+| **fallback 1**, **fallback 2** | `fallback_regular`, `fallback2_regular` |
+| **output** | `out`, in `all.conf` |
+| **use the font's own**, beside line height | `line_height` left unset |
+| the **text** and **bold** pickers, on a variable family | `regular` and the rest, with `@wght=` on them |
+
+Some keys have no control. `dir`, `family`, `space_glyphs`, `space_width_XXXX`,
+`fallback_order` and `fallback_dir` are settings you write in the file, and the
+preview reads them and builds accordingly. `fallback_order` is the one you are
+most likely to want: see
+[Which face a fallback lends](#which-face-a-fallback-lends).
+
+The preview writes the `.conf` before every build, so pressing **Build**
+saves first. Whatever is on screen gets built.
+
 ## Sizes
 
 CrossPoint's **Settings > Reader > Font Size** lists every size the active
@@ -212,7 +240,8 @@ face is. Asking for the letters is enough, by preset or by a raw `ranges`
 entry: the shapes they are drawn by follow from the letters and are added for
 you.
 
-A face named in `fallback_regular` is repaired the same way, so a Latin family
+A face named in **fallback 1** (`fallback_regular`) is repaired the same way,
+so a Latin family
 that borrows its Arabic from one still gets joined text.
 
 The built family records what it repaired, under `synthesized` in
@@ -510,8 +539,9 @@ Gaps. A font that covers a range completely is one run. A font missing
 characters in the middle of that range splits it in two, and a font that
 covers a range in scattered patches costs one run for every patch.
 
-A sparse fallback does exactly this. Pointing `fallback_regular` at a
-language-specific CJK face and ticking the CJK presets asks for tens of
+A sparse fallback does exactly this. Pointing **fallback 1**
+(`fallback_regular` in a config) at a language-specific CJK face and ticking
+the CJK presets asks for tens of
 thousands of characters from a face that has a few thousand of them, scattered.
 Measured on one such build:
 
@@ -529,17 +559,18 @@ count moved by 198. The count is not about how much you asked for. A build with 
 
 ### What to do about it
 
-**Turn on bundled fallback faces.** The bundled set includes a pan-CJK face
+**Turn on bundled fallback faces** (`fallbacks = yes`). The bundled set
+includes a pan-CJK face
 that covers those blocks completely, so the holes your own fallback leaves are
 filled and the runs on either side of each hole join up. That is the 4390 to 64
 row above, and it is the same characters either way.
 
-`fallbacks` is `no` by default, and that keeps a first build small and
-self-contained. It also costs you this. With the set off, whatever you name in
-`fallback_regular` is the only face behind your family, gaps and all.
+The box is off by default (`fallbacks = no`), and that keeps a first build
+small and self-contained. It also costs you this. With the set off, whatever
+you put in **fallback 1** is the only face behind your family, gaps and all.
 
-Failing that, name a face in `fallback_regular` that covers the range you
-ticked without gaps, or untick the range.
+Failing that, put a face in **fallback 1** that covers the range you ticked
+without gaps, or untick the range.
 
 ### Where you are told
 
@@ -573,8 +604,8 @@ the fallbacks folder that this build never opened is named by filename, and
 either `fallbacks = no` or a `fallback_order` without `bundled` in it puts a
 family there. A folder short of faces sends you to `crossglyph fetch-fallbacks`,
 and to `fallbacks = yes` as well where the family is not reading the set
-anyway. A complete folder that still draws nothing leaves `fallback_regular`
-and dropping the tick.
+anyway. A complete folder that still draws nothing leaves **fallback 1** and
+dropping the tick.
 
 A family that produced no file at all leaves coverage out. Every size failed.
 That is the line to read, and a note about an empty range would sit on top of

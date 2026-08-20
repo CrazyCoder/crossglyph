@@ -411,7 +411,11 @@ function coverageAdvice(remedy, bundled) {
   // .conf is what left them out, and telling anybody to press a control that
   // is on would send them nowhere.
   return bundled
-    ? "fallback_order leaves the bundled faces out of this family."
+    // Named as what it is, since there is no control here to point at: it is
+    // a line in the family's .conf, and a reader hunting the panel for it
+    // would be hunting for something that was never put there.
+    ? "The `fallback_order` line in this family's .conf leaves the bundled "
+      + "faces out."
     : "Turn on bundled fallback faces and build again.";
 }
 

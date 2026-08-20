@@ -179,10 +179,11 @@ A family whose files have gone falls back the way a fresh page would.
 
 ## What the controls do
 
-Font controls (`gamma`, `weight`, `line_height`, the spacings, `kerning`,
-`slant`, `thresholds`, `hinting`, `grayscale_hinting`, `mono`,
-`stem_darkening`, `ligatures`, `figures`) rebuild the `.cpfont` behind the
-page. Page controls (margin, alignment, hyphenation and the language its
+Font controls (gamma, weight, line height, the spacings, kerning, slant,
+thresholds, hinting, grayscale hinting, mono rasterizing, stem darkening,
+ligatures, figures) rebuild the `.cpfont` behind the page. Those are the labels
+on the panel; [docs/fonts.md](fonts.md#the-same-settings-in-the-preview) has
+what each one is called in a config, for the few whose names differ. Page controls (margin, alignment, hyphenation and the language its
 patterns come from, line spacing, paragraph spacing, antialiasing) are the
 reader's own settings, and they only re-lay-out. The language list holds every
 one the firmware carries patterns for. On the device that comes from the book's
