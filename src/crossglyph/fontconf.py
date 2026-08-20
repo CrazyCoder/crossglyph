@@ -97,7 +97,8 @@ PATH_KEYS = {"regular", "bold", "italic", "bolditalic",
 # belongs in all.conf. It is listed here so that file may carry it; parse_config
 # ignores it, and fontbuild.output_dir is what reads it.
 KNOWN_KEYS = ({"name", "family", "dir", "out", "fallback_dir", "sizes",
-               "sizes_mod", "mod_suffix", "intervals", "ranges"}
+               "sizes_mod", "mod_suffix", "intervals", "ranges",
+               "fallback_order"}
               | BOOL_KEYS | TUNING_KEYS | PATH_KEYS)
 
 # space_width_2006 = 0.25 -- one key per overridable space, so they cannot be
@@ -598,6 +599,9 @@ class Config:
     mod_suffix: str
     intervals: str
     ranges: str
+    #: The fallback families and their order, empty when the built-in order
+    #: stands. `bundled` inside it stands for the built-in set.
+    fallback_order: str
     fallbacks: bool
     space_glyphs: bool
     tuning: Tuning
@@ -1018,6 +1022,7 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
         mod_suffix=sanitize_name(values.get("mod_suffix", "Mod")),
         intervals=values.get("intervals", DEFAULT_INTERVALS).strip() or DEFAULT_INTERVALS,
         ranges=values.get("ranges", "").strip(),
+        fallback_order=values.get("fallback_order", "").strip(),
         fallbacks=_bool(values.get("fallbacks", "no"), "fallbacks", where),
         space_glyphs=_bool(values.get("space_glyphs", "yes"), "space_glyphs", where),
         tuning=tuning_from(values, where),

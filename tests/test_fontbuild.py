@@ -22,11 +22,19 @@ def config(tmp_path):
     return tmp_path / "alto.conf"
 
 
-def _kwargs(config, out, text="", size_index=0, size=None):
+def _parsed(config, text=""):
     config.write_text(text, encoding="utf-8")
-    parsed = fontconf.parse_config(config)
+    return fontconf.parse_config(config)
+
+
+def _kwargs(config, out, text="", size_index=0, size=None):
+    parsed = _parsed(config, text)
     variant = parsed.variants()[size_index]
     return fontbuild.build_kwargs(variant, size or variant.sizes[0], out)
+
+
+def _entry_names(entries):
+    return [entry["regular"].name for entry in entries]
 
 
 def test_every_discovered_style_is_passed(config, tmp_path):
@@ -450,6 +458,59 @@ def test_a_name_nothing_has_resolves_to_nothing(tmp_path):
     (folder / fontbuild.ANCHOR_FACE).write_bytes(b"")
 
     assert fontbuild.named_faces("Nowhere", folder, tmp_path) == {}
+
+
+def test_the_built_in_order_stands_when_the_key_is_unset(config, tmp_path):
+    parsed = _parsed(config, "fallbacks = yes\n")
+
+    entries = fontbuild.ordered_entries(
+        parsed, tmp_path / fontbuild.FALLBACK_NAME)
+
+    assert _entry_names(entries) == list(fontbuild.BUNDLED_FALLBACKS) + \
+        ["NotoSansCJKjp-Regular.otf"]
+
+
+def test_a_named_family_comes_first_and_the_token_brings_the_rest(config, tmp_path):
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
+    parsed = _parsed(config, "fallbacks = yes\n"
+                             "fallback_order = MyIcons, bundled\n")
+
+    names = _entry_names(fontbuild.ordered_entries(
+        parsed, tmp_path / fontbuild.FALLBACK_NAME))
+
+    assert names[0] == "MyIcons-Regular.ttf"
+    assert names[1] == fontbuild.BUNDLED_FALLBACKS[0]
+
+
+def test_the_token_can_come_first(config, tmp_path):
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
+    parsed = _parsed(config, "fallbacks = yes\n"
+                             "fallback_order = bundled, MyIcons\n")
+
+    names = _entry_names(fontbuild.ordered_entries(
+        parsed, tmp_path / fontbuild.FALLBACK_NAME))
+
+    assert names[0] == fontbuild.BUNDLED_FALLBACKS[0]
+    assert names[-1] == "MyIcons-Regular.ttf"
+
+
+def test_an_order_without_the_token_is_the_whole_chain(config, tmp_path):
+    """Dropping a bundled face you do not want, and reordering within the set,
+    both need the written list to be the whole answer."""
+    (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
+    parsed = _parsed(config, "fallbacks = yes\nfallback_order = MyIcons\n")
+
+    entries = fontbuild.ordered_entries(
+        parsed, tmp_path / fontbuild.FALLBACK_NAME)
+
+    assert _entry_names(entries) == ["MyIcons-Regular.ttf"]
+
+
+def test_an_unresolvable_name_says_where_it_looked(config, tmp_path):
+    parsed = _parsed(config, "fallbacks = yes\nfallback_order = Nowhere\n")
+
+    with pytest.raises(fontconf.FontConfigError, match="Nowhere"):
+        fontbuild.ordered_entries(parsed, tmp_path / fontbuild.FALLBACK_NAME)
 
 
 def test_a_fetch_lands_the_licence_and_leaves_cjk_alone(tmp_path, monkeypatch):

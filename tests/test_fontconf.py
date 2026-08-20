@@ -1,6 +1,6 @@
 import pytest
 
-from crossglyph import fontconf
+from crossglyph import fontbuild, fontconf
 
 
 def _touch(directory, *names):
@@ -783,3 +783,27 @@ def test_a_tuning_round_trips_through_the_files_own_spelling(tmp_path):
               for key, value in fontconf.tuning_values(tuning).items()
               if value is not None}
     assert fontconf.tuning_from(values, "test.conf") == tuning
+
+
+def test_the_fallback_order_is_read_as_written(tmp_path):
+    (tmp_path / "Alto-Regular.ttf").write_bytes(b"")
+    conf = tmp_path / "alto.conf"
+    conf.write_text("fallback_order = NotoSerif, bundled\n", encoding="utf-8")
+
+    parsed = fontconf.parse_config(conf)
+
+    assert parsed.fallback_order == "NotoSerif, bundled"
+
+
+def test_the_fallback_order_defaults_to_empty(tmp_path):
+    (tmp_path / "Alto-Regular.ttf").write_bytes(b"")
+    conf = tmp_path / "alto.conf"
+    conf.write_text("", encoding="utf-8")
+
+    assert fontconf.parse_config(conf).fallback_order == ""
+
+
+def test_all_conf_may_carry_the_fallback_order():
+    """It names families and not one specific file, so it is shareable. That is
+    the useful place for it: one order for the workspace."""
+    assert "fallback_order" in fontbuild.DEFAULTS_KEYS

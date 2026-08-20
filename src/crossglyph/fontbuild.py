@@ -266,6 +266,50 @@ def named_faces(name: str, directory: pathlib.Path | None,
     return {}
 
 
+#: Stands for the built-in set inside `fallback_order`, spliced in place.
+BUNDLED_TOKEN = "bundled"
+
+
+def bundled_entries(intervals: str,
+                    directory: pathlib.Path) -> list[dict[str, pathlib.Path]]:
+    """The built-in set, one style map per face, in workflow order.
+
+    Which files those are is still wanted_fallbacks' answer, so the rule about
+    a CJK face nobody asked for, and the error that names the fetch, are the
+    ones already there.
+    """
+    return [pinned_faces(path)
+            for path in wanted_fallbacks(intervals, directory)]
+
+
+def ordered_entries(config: Config,
+                    directory: pathlib.Path) -> list[dict[str, pathlib.Path]]:
+    """The chain behind the panel's two picks, resolved per style.
+
+    `fallback_order` is the chain when it is set, and BUNDLED_TOKEN inside it
+    stands for the built-in set. Nothing is subtracted around the token: a
+    family named before it holds its position, and the copy the token brings
+    in repeats a path the chain has already taken, which fallback_chain drops.
+    """
+    written = config.fallback_order.strip()
+    if not written:
+        return bundled_entries(config.coverage, directory)
+    entries = []
+    for token in (part.strip() for part in written.split(",")):
+        if not token:
+            continue
+        if token.casefold() == BUNDLED_TOKEN:
+            entries.extend(bundled_entries(config.coverage, directory))
+            continue
+        faces = named_faces(token, directory, config.root)
+        if not faces:
+            raise FontConfigError(
+                f"fallback_order names {token!r}, which is neither a family in "
+                f"{directory} nor one in the font folder.")
+        entries.append(faces)
+    return entries
+
+
 #: What a pan-CJK face is for. Han and the two kana blocks, hangul and its
 #: jamo, the CJK punctuation those are written with, and the compatibility and
 #: fullwidth blocks a book picks up from its source. Nothing in the thirteen
