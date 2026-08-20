@@ -23,7 +23,12 @@
 # --- what gets built -------------------------------------------------------
 
 # The sizes are what the reader's Font Size setting lists, one entry each.
+# Nothing on the device limits how many one family carries.
 # sizes        = 12 14 16 18
+
+# More sizes. With mod_suffix set they build <name><mod_suffix>, a second
+# family beside the first in the reader's font list. Set mod_suffix to
+# nothing and they join the family above instead.
 # sizes_mod    = 13 15 17 19
 # mod_suffix   = Mod
 

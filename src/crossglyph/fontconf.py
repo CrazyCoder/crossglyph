@@ -85,6 +85,7 @@ KEYWORD_RANK = {
 #: not draw. Listing them made the panel look as though five ticks were needed.
 DEFAULT_INTERVALS = "reading"
 DEFAULT_SIZES = [12, 14, 16, 18]
+DEFAULT_MOD_SUFFIX = "Mod"
 
 BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "grayscale_hinting",
              "mono", "ligatures"}
@@ -743,6 +744,21 @@ def check_labels(sizes: list[float], where: str) -> None:
         seen[label] = size
 
 
+def mod_suffix_from(values: dict[str, str]) -> str:
+    """What a second list of sizes builds under, or "" for the family itself.
+
+    An absent key is the default suffix, so a workspace written before this
+    was a choice keeps building the two families it built. A key set to
+    nothing is the choice: those sizes join the family above, which the
+    reader then lists among its own, since nothing on the device limits how
+    many sizes one family carries.
+    """
+    raw = values.get("mod_suffix")
+    if raw is None:
+        return DEFAULT_MOD_SUFFIX
+    return sanitize_name(raw) if raw.strip() else ""
+
+
 def _bool(raw: str, key: str, where: str) -> bool:
     value = raw.strip().lower()
     if value in _TRUE:
@@ -1028,12 +1044,8 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
 
     sizes = parse_sizes(values.get("sizes", ""), where) or DEFAULT_SIZES
     sizes_mod = parse_sizes(values.get("sizes_mod", ""), where)
-    # An absent key is the default suffix. A key set to nothing is a choice,
-    # and it says these sizes belong to the family above rather than to a
-    # second one, so the two lists then share a set of .cpfont names.
-    raw_suffix = values.get("mod_suffix")
-    mod_suffix = ("Mod" if raw_suffix is None else
-                  sanitize_name(raw_suffix) if raw_suffix.strip() else "")
+    mod_suffix = mod_suffix_from(values)
+    # Merged, the two lists write one set of .cpfont names between them.
     if sizes_mod and not mod_suffix:
         check_labels(sizes + sizes_mod, where)
 
