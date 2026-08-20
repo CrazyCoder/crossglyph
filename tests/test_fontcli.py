@@ -175,3 +175,16 @@ def test_with_the_set_switched_on_a_fetch_is_the_whole_answer(workspace,
     said = capsys.readouterr().err
     assert "fetch-fallbacks" in said
     assert "fallbacks = yes" not in said, "it already is"
+
+
+def test_fail_on_warning_gates_on_the_folder_being_short(workspace, tmp_path):
+    """That line is printed as a warning, and a flag that says it fails on any
+    warning has to mean it."""
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 12\nintervals = base\nfallbacks = yes\n", encoding="utf-8")
+    out = tmp_path / "out"
+    assert fontcli.main(["--fonts", str(workspace), "-o", str(out),
+                         "-j", "1"]) == 0
+    assert fontcli.main(["--fonts", str(workspace), "-o", str(out), "-j", "1",
+                         "--force", "--fail-on-warning"]) == 1
+    assert list(out.rglob("*.cpfont"))

@@ -362,9 +362,10 @@ export function fillFallbackPickers() {
 
 //: This run's complaints, in the order they arrived and grouped when they
 //: read alike. Failures first: a family that produced no file is why the card
-//: is empty, and that outranks a range that came out blank.
+//: is empty, and that outranks a range that came out blank. The second list
+//: takes a size's own warnings as well as the coverage ones.
 let runFailures = [];
-let runCoverage = [];
+let runWarnings = [];
 
 //: `a`, `a or b`, `a, b or c`.
 function listed(names) {
@@ -421,14 +422,15 @@ function coverageSentence(step) {
 //: the row is emptied when a run starts and filled as its events arrive.
 function showWarnings() {
   const lines = [];
-  for (const group of [runFailures, runCoverage]) {
+  for (const group of [runFailures, runWarnings]) {
     const byText = new Map();
     for (const {family, text} of group) {
       if (!byText.has(text)) byText.set(text, []);
       byText.get(text).push(family);
     }
     for (const [text, families] of byText) {
-      lines.push(`${whichFamilies(families)}: ${text}`);
+      const named = families.filter(Boolean);
+      lines.push(named.length ? `${whichFamilies(named)}: ${text}` : text);
     }
   }
   buildWarnLines.replaceChildren(...lines.map(text => {
@@ -441,7 +443,7 @@ function showWarnings() {
 
 export function clearWarnings() {
   runFailures = [];
-  runCoverage = [];
+  runWarnings = [];
   showWarnings();
 }
 
@@ -472,11 +474,11 @@ export function showStep(step) {
   } else if (step.event === "size") {
     progress.show(step.done, step.total, `${step.family} ${step.size}`);
     for (const warning of step.warnings || []) {
-      runCoverage.push({family: `${step.family} ${step.size}`, text: warning});
+      runWarnings.push({family: `${step.family} ${step.size}`, text: warning});
     }
     if ((step.warnings || []).length) showWarnings();
   } else if (step.event === "coverage") {
-    runCoverage.push({family: step.family, text: coverageSentence(step)});
+    runWarnings.push({family: step.family, text: coverageSentence(step)});
     showWarnings();
   } else if (step.event === "failed") {
     // One size of many, and the build carries on: the bar keeps running and
@@ -486,7 +488,9 @@ export function showStep(step) {
     showWarnings();
   } else if (step.event === "error") {
     progress.end();
-    runFailures.push({family: "build", text: step.error});
+    // The run itself, rather than one family in it, so nothing is named in
+    // front of the sentence.
+    runFailures.push({family: "", text: step.error});
     showWarnings();
   } else if (step.event === "done") {
     progress.end();
@@ -578,8 +582,16 @@ export async function buildFamilies(family, force = false) {
       showWarnings();
       return;
     }
-    await streamInto("/build", {family: family, force: force},
-                     showStep, builtNote);
+    // streamInto writes a refusal or a dropped connection into the note it is
+    // handed, and both arrive with their own lines. That is the row's job now,
+    // so it is moved across: left in the note it would take the foot's one
+    // reserved line and every line after it.
+    if (!await streamInto("/build", {family: family, force: force},
+                          showStep, builtNote)) {
+      runFailures.push({family: label, text: builtNote.textContent});
+      builtNote.textContent = "nothing built";
+      showWarnings();
+    }
   } finally {
     // Whatever happened -- a dropped connection, a line that would not parse --
     // the buttons come back, or the panel is dead until a reload. The bar

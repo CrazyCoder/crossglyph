@@ -1161,3 +1161,26 @@ def test_a_family_that_draws_its_ticks_yields_no_coverage_step(tmp_path):
         [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)],
         tmp_path / "out")
     assert not [step for step in steps if step["event"] == "coverage"]
+
+
+def test_a_family_whose_sizes_all_failed_reports_no_coverage(tmp_path):
+    """Every size failed, and that is the headline. A line about a range the
+    family cannot draw would sit on top of it saying less."""
+    import unittest.mock
+
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = no\n", encoding="utf-8")
+
+    def every_size_fails(jobs, out_dir, workers=None):
+        for job in jobs:
+            yield fontbuild.Landed(job, 1.0, "the converter said no", None)
+
+    with unittest.mock.patch.object(fontbuild, "run_jobs", every_size_fails):
+        steps = list(fontbuild.build_families(
+            [fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)],
+            tmp_path / "out"))
+    assert [step for step in steps if step["event"] == "failed"]
+    assert not [step for step in steps if step["event"] == "coverage"]

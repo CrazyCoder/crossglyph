@@ -2291,8 +2291,11 @@ for (const { name, text } of sources) {
 {
   const env = await loaded(fakeStorage(), undefined, { buildFails: true });
   await env.builds.one();
-  check("a failed build says so", env.built.textContent.includes("no such family"),
-        env.built.textContent);
+  check("a failed build says so in the row, where its own lines survive",
+        env.warnLines().some(line => line.includes("no such family")),
+        env.warnLines().join(" | "));
+  check("and the reserved line keeps to one outcome",
+        env.built.textContent === "nothing built", env.built.textContent);
   check("and the buttons come back anyway",
         env.buildEls.every(b => b.disabled === false),
         env.buildEls.map(b => b.disabled).join());
@@ -5682,6 +5685,20 @@ for (const deferred of [
   await env.builds.one();
   check("and the next run starts empty",
         env.warn.hidden === true && env.warnLines().length === 0,
+        env.warnLines().join(" | "));
+}
+
+
+// 93. An error that ended the whole run belongs to no family, so no name goes
+//     in front of it. "build: ..." reads as a family called build.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "error", error: "the font folder went away mid-run" },
+  ] });
+  await env.builds.one();
+  check("a run-level error stands on its own",
+        env.warnLines()[0] === "the font folder went away mid-run",
         env.warnLines().join(" | "));
 }
 

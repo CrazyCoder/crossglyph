@@ -899,14 +899,18 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
                for size in variant.sizes
                if size not in failed
                and fontstamp.cpfont_path(directory, variant, size).is_file()}
-    counts = coverage_counts(variant.config)
+    # Nothing on the disk means nothing to report on. Every size failed, that
+    # is the headline, and a line about a range the family cannot draw would
+    # sit on top of it saying less. It also saves reading every charmap for a
+    # family that produced no file.
+    counts = coverage_counts(variant.config) if current else {}
     fontstamp.write_stamp(
         directory, current,
         # The same sizes, so what the record speaks for and what it calls
         # current are one list rather than two that can disagree.
         built=provenance.describe(variant, directory, current,
                                   _fallback_faces(variant), counts))
-    return uncovered_from(variant, counts)
+    return uncovered_from(variant, counts) if current else None
 
 
 def _fallback_faces(variant: Variant) -> dict[str, list[str]]:

@@ -212,7 +212,9 @@ def main(argv=None) -> int:
                   source, " ".join(plan.variant.config.coverage
                                    for plan in plans))
               if name != fontbuild.FALLBACK_LICENCE]
-    if absent and any(plan.variant.config.fallbacks for plan in plans):
+    short_of_faces = absent and any(plan.variant.config.fallbacks
+                                    for plan in plans)
+    if short_of_faces:
         print(f"fallbacks: {fontbuild.fallback_dir(source) or source} is short "
               f"{', '.join(absent)}. Whatever only "
               f"{'those faces' if len(absent) > 1 else 'that face'} could have "
@@ -221,7 +223,10 @@ def main(argv=None) -> int:
               f"{'them' if len(absent) > 1 else 'it'}.",
               file=sys.stderr, flush=True)
 
-    warned = False
+    # Every warning this run raises, for the gate at the end. The folder being
+    # short is one of them: it is printed as a warning, and a flag that says
+    # it fails on any warning has to mean it.
+    warned = bool(short_of_faces)
     workers = fontbuild.worker_count(len(jobs), opts.jobs)
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
