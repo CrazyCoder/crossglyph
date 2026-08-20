@@ -35,12 +35,30 @@
 # intervals    = reading
 # ranges       = (0x2900-0x29FF),(0x2E00-0x2E7F)
 
-# The twelve bundled Noto faces fill codepoints the family itself lacks, with a
+# The bundled Noto families fill codepoints the family itself lacks, with a
 # pan-CJK face as well when `intervals` names a CJK script. They are opt-in:
 # fetch them with `crossglyph fetch-fallbacks`, or from the preview, before
-# changing this to `yes`.
+# changing this to `yes`. A face that has not been fetched is skipped rather
+# than being an error, so what a build carries is what the folder holds.
 # fallbacks    = no
 # space_glyphs = yes
+
+# Which families fill those holes, and in what order. `bundled` stands for the
+# set above, so this is a way to put a family of your own in front of it:
+#
+#   fallback_order = NotoSerif, bundled
+#
+# A name is a family, not a filename, and is looked for in the fallbacks folder
+# first and then among your own families. Leave `bundled` out and the list is
+# the whole chain, which is how a family is dropped from the set or the set
+# itself reordered:
+#
+#   fallback_order = NotoSansMath, NotoSansSymbols2
+#
+# The two families the preview's fallback 1 and fallback 2 pick are always in
+# front of all of this, so a config never has to account for them. The key does
+# nothing while `fallbacks` is `no`.
+# fallback_order =
 
 # --- how the glyphs look ---------------------------------------------------
 

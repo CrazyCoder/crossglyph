@@ -138,35 +138,46 @@ def main(argv=None) -> int:
             print(f"{plan.variant.name}: up to date "
                   f"{' '.join(size_with_label(s) for s in plan.report.skipped)}")
 
+    # Faces the coverage asks for that the folder does not have. Said once
+    # before the run and not per family, because it is the workspace's answer
+    # and the same for all of them, and said rather than raised: fetching them
+    # is the only thing that fixes it, and a build that stops has still not
+    # built the families it could have.
+    # Faces only. A fetch brings the licence down beside them, and a line about
+    # what a build could not draw has no business naming it.
+    absent = [name for name in fontbuild.missing_fallbacks(
+                  source, " ".join(plan.variant.config.coverage
+                                   for plan in plans))
+              if name != fontbuild.FALLBACK_LICENCE]
+    if absent and any(plan.variant.config.fallbacks for plan in plans):
+        print(f"fallbacks: {fontbuild.fallback_dir(source) or source} is short "
+              f"{', '.join(absent)}. Whatever only "
+              f"{'those faces' if len(absent) > 1 else 'that face'} could have "
+              f"drawn is left out of this build. Run "
+              f"`crossglyph fetch-fallbacks` to add "
+              f"{'them' if len(absent) > 1 else 'it'}.",
+              file=sys.stderr, flush=True)
+
     workers = fontbuild.worker_count(len(jobs), opts.jobs)
     if jobs:
         print(f"building {len(jobs)} size(s) on {workers} worker(s)", flush=True)
     started = time.monotonic()
-    try:
-        for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir,
-                                                             workers):
-            report = reports[id(job.variant)]
-            if error:
-                report.failed.append(job.size)
-                print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
-                      file=sys.stderr, flush=True)
-            else:
-                report.built.append(job.size)
-                # Glyph count alongside the size: it is what distinguishes a
-                # genuinely wide family from a narrow one padded out by the
-                # bundled fallbacks.
-                print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
-                      f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
-                for warning in built.warnings:
-                    print(f"    warning: {warning}", file=sys.stderr, flush=True)
-    except fontbuild.FallbacksMissing as exc:
-        # Not one size's failure but the workspace's, and it is the same for
-        # every family that wanted them, so it is said once and the run stops.
-        # Caught here because the sizes are rasterized in worker processes: an
-        # exception crossing back out of the pool arrives wrapped in its own
-        # traceback and this one carries the sentence that says what to do.
-        print(exc, file=sys.stderr)
-        return 2
+    for job, elapsed, error, built in fontbuild.run_jobs(jobs, out_dir,
+                                                         workers):
+        report = reports[id(job.variant)]
+        if error:
+            report.failed.append(job.size)
+            print(f"  {job.label} FAILED after {elapsed:.0f}s: {error}",
+                  file=sys.stderr, flush=True)
+        else:
+            report.built.append(job.size)
+            # Glyph count alongside the size: it is what distinguishes a
+            # genuinely wide family from a narrow one padded out by the
+            # bundled fallbacks.
+            print(f"  {job.label} ({built.bytes / 1024 / 1024:.1f} MB, "
+                  f"{built.glyphs} glyphs, {elapsed:.0f}s)", flush=True)
+            for warning in built.warnings:
+                print(f"    warning: {warning}", file=sys.stderr, flush=True)
 
     for plan in plans:
         if plan.report.built or plan.report.failed:

@@ -657,9 +657,9 @@ glyph the device does not have gets no width at all, so a paragraph of them is
 blank space and not a row of boxes. A page with a hole in it looks exactly like
 a page that failed to draw.
 
-The remedy is under Export: **bundled fallback faces**, which is thirteen Noto
-families covering most scripts, and the **Fetch** button beside it while any of
-them is still to get. A workspace filled by an older version can be short a
+The remedy is under Export: **bundled fallback faces**, a set of Noto families
+covering most scripts, and the **Fetch** button beside it while any of them is
+still to get. A workspace filled by an older version can be short a
 face this one added, so the note beside the button says how many are left
 rather than only whether the folder is there. Whichever of the two is the move left to make is
 marked the way an unticked coverage preset is, so the answer sits where it gets
@@ -678,12 +678,12 @@ folder on its own cannot tell you. The count is worked out again on each
 render, against the text and coverage in front of you. Paste Japanese into a
 fully fetched workspace and the button comes back with one face to bring.
 
-A face the folder does not have stops a build and not the page. The page is
-for tuning a family, and a sample of Russian has nothing to do with a Chinese
-face being absent, so it draws with the faces that are there and counts what
-they could not draw under the box. A build is the other way round: a `.cpfont`
-is read on a device months later, so a script the coverage asked for going
-quietly missing is worth refusing over, and the message names the fetch.
+A face the folder does not have stops nothing. The page draws with the faces
+that are there and counts what none of them could draw, and a build writes the
+family those faces can make. Refusing would produce no font and leave the
+folder exactly as empty. What each does instead is say what is absent: the page
+beside the button that fetches it, and a build in one line naming the files and
+the command.
 
 ## What this is not
 

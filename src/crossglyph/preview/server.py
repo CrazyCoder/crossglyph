@@ -802,9 +802,9 @@ def _bundled_faces(source: str, intervals: str, family: str = "") -> tuple:
         with contextlib.suppress(LookupError):
             config = family_config(family)
             if config.fallback_order.strip():
-                entries = fontbuild.ordered_entries(config, intervals, False)
+                entries = fontbuild.ordered_entries(config, intervals)
     if entries is None:
-        entries = fontbuild.bundled_entries(intervals, directory, False)
+        entries = fontbuild.bundled_entries(intervals, directory)
     return tuple(tuple(sorted(entry.items())) for entry in entries)
 
 
@@ -862,17 +862,6 @@ def resolved_fallbacks(sources: tuple, coverage: tuple,
     face.
     """
     return fallback_split(dict(sources), coverage, fallbacks)
-
-
-def _with_the_button(exc: Exception) -> str:
-    """The fallbacks message as the panel should tell it.
-
-    The command in it is right for a terminal, and the reader of this one is
-    looking at a page with the button on it. Kept out of fontbuild for that
-    reason: the same words on the command line would name something that is
-    not there.
-    """
-    return f"{exc}\nOr press Fetch, beside 'bundled fallback faces' above."
 
 
 @functools.lru_cache(maxsize=32)
@@ -1664,11 +1653,6 @@ def build(request: BuildRequest) -> StreamingResponse:
                 yield json.dumps(step) + "\n"
         # Every one of these means the build stopped, and the headers are long
         # gone, so they travel as the last line rather than as a status.
-        # Fallbacks that were asked for and never fetched are the one of them
-        # this page can offer to fix, so that one says how.
-        except fontbuild.FallbacksMissing as exc:
-            yield json.dumps(
-                {"event": "error", "error": _with_the_button(exc)}) + "\n"
         except (*CLIENT_ERRORS, OSError, FontBuildError,
                 fontbuild.FontBuildError) as exc:
             yield json.dumps({"event": "error", "error": str(exc)}) + "\n"

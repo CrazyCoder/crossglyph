@@ -98,7 +98,7 @@ OUTPUT_NAME = "cpfonts"
 # otherwise (see pinned_faces).
 #
 # NotoSans is here in four styles and the rest in one, because Noto publishes a
-# bold for eight of the thirteen and an italic for this one alone. It also
+# bold for only some of them and an italic for this one alone. It also
 # heads the chain and carries Latin, Greek, Cyrillic and most punctuation, so
 # it is the family the other three files are worth their bytes for.
 BUNDLED_FALLBACKS = (
@@ -132,28 +132,9 @@ DEFAULT_CJK_FALLBACK = ("NotoSansCJKjp-Regular.otf",)
 NOTOSANS_STYLES = ("NotoSans-Bold.ttf", "NotoSans-Italic.ttf",
                    "NotoSans-BoldItalic.ttf")
 
-#: Faces whose absence is not an error. The CJK one because it is 15.7 MB and
-#: only earns that when a CJK script was asked for; the Arabic one because
-#: upstream's folder does not carry it, so a workspace filled from there before
-#: FALLBACK_SOURCES existed has every other face and not this one. The three
-#: NotoSans styles for the same reason: a folder fetched before they were
-#: added has none of them, and failing that workspace's builds over a face it
-#: never had a chance to get would be absurd.
-OPTIONAL_FALLBACKS = (DEFAULT_CJK_FALLBACK + ("NotoSansArabic-Regular.ttf",)
-                      + NOTOSANS_STYLES)
-
 
 class FontBuildError(RuntimeError):
     """The converter failed for one family."""
-
-
-class FallbacksMissing(FileNotFoundError):
-    """The bundled Noto faces are not in the workspace.
-
-    A type of its own because it is the one missing file a caller can offer to
-    go and get: the message below names the command, and the preview adds its
-    own button to it. Anything else that is not there is not that.
-    """
 
 
 def output_dir(source: pathlib.Path | str | None = None) -> pathlib.Path:
@@ -200,24 +181,6 @@ def fallback_dir(source: pathlib.Path | str | None = None) -> pathlib.Path | Non
     return None
 
 
-def require_bundled_fallbacks(source: pathlib.Path | str | None = None) -> pathlib.Path:
-    """Where the bundled Noto faces are, or how to get them.
-
-    These fonts are large, unmodified and OFL, so they are neither vendored in
-    this repo nor rewritten: they are fetched once into the font source folder,
-    or read from a checkout that already has them.
-    """
-    found = fallback_dir(source)
-    if found is not None:
-        return found
-    looked = "\n".join(f"  {path}" for path in fallback_candidates(source))
-    raise FallbacksMissing(
-        "the bundled fallback fonts were not found. Looked in:\n"
-        f"{looked}\n"
-        "Fetch them with `crossglyph fetch-fallbacks` (3.4 MB, or 19 MB "
-        "with a CJK script), or set 'fallbacks = no' in the font config.")
-
-
 def bundled_fallbacks(intervals: str) -> list[str]:
     """Bundled fallback filenames for a coverage string, workflow order."""
     requested = {token.strip().lower() for token in intervals.split(",")}
@@ -227,43 +190,19 @@ def bundled_fallbacks(intervals: str) -> list[str]:
     return list(BUNDLED_FALLBACKS) + list(DEFAULT_CJK_FALLBACK)
 
 
-def wanted_fallbacks(intervals: str, directory: pathlib.Path,
-                     strict: bool = True) -> list[pathlib.Path]:
-    """The bundled faces this coverage needs, in workflow order.
+def wanted_fallbacks(intervals: str,
+                     directory: pathlib.Path | None) -> list[pathlib.Path]:
+    """The faces this coverage asks for that the folder actually has, in order.
 
-    A CJK face is 15.7 MB and only earns that when a CJK script was asked for.
-    The one appended to every build is a catch-all, so it is skipped when it is
-    not there rather than failing a Latin family over it; anything else missing
-    was requested outright, and that is an error with the fetch in it.
-
-    OPTIONAL_FALLBACKS says which those are. A CJK face still counts as
-    requested once a CJK script is in the coverage, which is what the flag
-    below is for.
-
-    `strict` is what makes that an error, and only a build sets it. A .cpfont
-    is read on a device long after it is written, so a script quietly absent
-    from one is worth refusing over. The preview passes False: it draws a page
-    to tune a family by, and a face the coverage asked for has nothing to do
-    with the sample in front of you. Nothing is hidden by that -- what a face
-    would have drawn is counted under the box, and the offer to fetch it is a
-    few rows down.
+    A face that is not there is not an error anywhere. It cannot be repaired
+    by stopping, only by fetching it, and everything that calls this can say
+    so while carrying on: missing_fallbacks names what a fetch would add, and
+    the build and the page each report it their own way.
     """
-    asked_for_cjk = any(preset in intervals.lower() for preset in CJK_FALLBACKS)
-    paths, missing = [], []
-    for name in bundled_fallbacks(intervals):
-        path = directory / name
-        if path.is_file():
-            paths.append(path)
-        elif name in OPTIONAL_FALLBACKS and not (
-                asked_for_cjk and name in DEFAULT_CJK_FALLBACK):
-            continue                    # not fetched, and not asked for
-        else:
-            missing.append(name)
-    if missing and strict:
-        raise FallbacksMissing(
-            f"{directory} is missing {', '.join(missing)}. Fetch the set with "
-            f"`crossglyph fetch-fallbacks`, or set 'fallbacks = no'.")
-    return paths
+    if directory is None:
+        return []
+    return [path for name in bundled_fallbacks(intervals)
+            for path in [directory / name] if path.is_file()]
 
 
 def pinned_faces(path: pathlib.Path) -> dict[str, pathlib.Path]:
@@ -317,13 +256,12 @@ def workspace_faces(name: str,
 BUNDLED_TOKEN = "bundled"
 
 
-def bundled_entries(intervals: str, directory: pathlib.Path,
-                    strict: bool = True) -> list[dict[str, pathlib.Path]]:
+def bundled_entries(intervals: str, directory: pathlib.Path | None
+                    ) -> list[dict[str, pathlib.Path]]:
     """The built-in set, one style map per family, in workflow order.
 
-    Which files those are is still wanted_fallbacks' answer, so the rule about
-    a CJK face nobody asked for, and `strict` deciding whether a face the
-    coverage asked for is an error, are the ones already there.
+    Which files those are is still wanted_fallbacks' answer, so a face the
+    folder does not have simply is not here.
 
     One entry per family and not per file. BUNDLED_FALLBACKS lists the files a
     fetch downloads, NotoSans in four styles among them, and the first of a
@@ -332,7 +270,7 @@ def bundled_entries(intervals: str, directory: pathlib.Path,
     bold one -- and every style's chain would then carry it.
     """
     entries, seen = [], set()
-    for path in wanted_fallbacks(intervals, directory, strict):
+    for path in wanted_fallbacks(intervals, directory):
         family = fontconf.family_of(fontconf.font_stem(path)).casefold()
         if family in seen:
             continue
@@ -341,8 +279,8 @@ def bundled_entries(intervals: str, directory: pathlib.Path,
     return entries
 
 
-def ordered_entries(config: Config, coverage: str | None = None,
-                    strict: bool = True) -> list[dict[str, pathlib.Path]]:
+def ordered_entries(config: Config, coverage: str | None = None
+                    ) -> list[dict[str, pathlib.Path]]:
     """The chain behind the panel's two picks, resolved per style.
 
     `fallback_order` is the chain when it is set, and BUNDLED_TOKEN inside it
@@ -356,18 +294,17 @@ def ordered_entries(config: Config, coverage: str | None = None,
 
     `coverage` overrides the config's own, for the preview: the panel's ticks
     are what a render draws against, and they decide whether a CJK face joins
-    the set. `strict` is wanted_fallbacks', and travels with it.
+    the set.
 
-    A name this cannot resolve is an error either way. The reader chose that
-    word and no fetch brings it, so the panel has to say so where a face the
-    fetch would bring is drawn around instead.
+    A name this cannot resolve is an error, where a face that is not in the
+    folder is not. The reader chose that word and no fetch brings it, so it
+    has to be said rather than drawn around.
     """
     coverage = config.coverage if coverage is None else coverage
+    directory = fallback_dir(config.root)
     written = config.fallback_order.strip()
     if not written:
-        return bundled_entries(coverage,
-                               require_bundled_fallbacks(config.root), strict)
-    directory = fallback_dir(config.root)
+        return bundled_entries(coverage, directory)
     entries = []
     # Gathered on the first name the fallbacks folder cannot answer, and not
     # before: a list of bundled names only, which is the common one, never
@@ -377,8 +314,7 @@ def ordered_entries(config: Config, coverage: str | None = None,
         if not token:
             continue
         if token.casefold() == BUNDLED_TOKEN:
-            entries += bundled_entries(
-                coverage, require_bundled_fallbacks(config.root), strict)
+            entries += bundled_entries(coverage, directory)
             continue
         faces = named_faces(token, directory)
         if not faces:

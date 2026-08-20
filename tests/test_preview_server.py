@@ -2157,11 +2157,11 @@ def test_saving_writes_the_thresholds_triple(scratch):
         (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
 
 
-def test_asking_for_bundled_fallbacks_without_them_says_where_to_get_them(
+def test_asking_for_bundled_fallbacks_without_them_still_builds(
         scratch, monkeypatch):
     """They are large, unmodified and OFL, so this repo does not vendor them.
-    Ticking the box without them is a state of the workspace: the answer says
-    where it looked and how to fetch them, rather than being a traceback."""
+    Ticking the box without them builds the family the faces at hand can make.
+    Refusing would leave the reader with no font and the same empty folder."""
     from fastapi.testclient import TestClient
 
     from crossglyph import fontbuild
@@ -2169,18 +2169,16 @@ def test_asking_for_bundled_fallbacks_without_them_says_where_to_get_them(
 
     (_conf(scratch) / "alto.conf").write_text("sizes = 12\nfallbacks = yes\n",
                                                 encoding="utf-8")
+    client = TestClient(server.app)
 
-    # A line rather than a status: the response starts before the first font
-    # is built, so by the time this is known the headers are long gone.
-    steps = _steps(TestClient(server.app).post("/build", json={"family": "Alto"}))
-    assert steps[-1]["event"] == "error", steps
-    assert "fetch-fallbacks" in steps[-1]["error"]
-    assert str(scratch / "fallbacks") in steps[-1]["error"], \
-        "the answer has to say where it looked"
-    # And the way out that this reader has: the command is for a terminal they
-    # are not in, and the button is three rows above the note they are reading.
-    assert "Fetch" in steps[-1]["error"], \
-        "the panel's own answer has to name the panel's own button"
+    steps = _steps(client.post("/build", json={"family": "Alto"}))
+
+    assert steps[-1]["event"] == "done", steps
+    # The panel says what is absent where it can be acted on, which is beside
+    # the button that fetches it rather than at the end of a build log.
+    payload = client.get("/defaults").json()
+    assert payload["fallbacks"] == ""
+    assert payload["fallbacks_missing"] == len(fontbuild.fetch_plan())
 
 
 # --- variable families ----------------------------------------------------

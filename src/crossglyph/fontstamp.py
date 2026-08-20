@@ -48,19 +48,14 @@ def chain_digests(config) -> dict[int, list[str]]:
     makes it, and its bytes differ run to run whatever its widths are, which
     is why `space_glyphs` hashes the spec instead.
 
-    A workspace whose bundled faces are not fetched has no chain to hash and
-    no build to be stale against. An empty answer here lets the staleness
-    check finish, and the build then stops with the sentence naming the fetch,
-    which is the one place that failure reads as something to fix. The faces
-    arriving later change this from empty to a chain, so the rebuild still
-    happens.
+    A workspace whose bundled faces are not fetched has no chain to hash, so
+    this is empty and every size is current on its own settings. The faces
+    arriving later turn that into a chain, which is a different digest and a
+    rebuild.
     """
     from . import fontbuild                  # it imports this module in turn
 
-    try:
-        chain = fontbuild.fallback_chain(config)
-    except fontbuild.FallbacksMissing:
-        return {}
+    chain = fontbuild.fallback_chain(config)
     space = fontbuild.space_font_path(config.space_widths)
     # Hashed once per file rather than once per style. The four chains hold
     # mostly the same faces, and each of those is a megabyte to read.

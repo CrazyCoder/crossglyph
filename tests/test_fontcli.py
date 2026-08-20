@@ -40,14 +40,16 @@ def test_the_stray_space_face_is_swept_from_the_command_line_too(workspace,
 
 def test_missing_fallbacks_are_reported_rather_than_raised(workspace, tmp_path,
                                                            capsys):
-    """A workspace without them is a thing to fix, not a crash. The sizes are
-    rasterized in worker processes, so nothing catching this leaves the
-    sentence that says what to do at the bottom of two tracebacks."""
+    """A workspace without them is a thing to fix, and fetching them is the
+    only thing that fixes it. Stopping builds nothing and leaves the family
+    that would have been fine unbuilt."""
     (workspace / "conf" / "probe.conf").write_text(
         "sizes = 12\nintervals = base\nfallbacks = yes\n", encoding="utf-8")
-    assert build(workspace, tmp_path / "out") == 2
-    said = capsys.readouterr().err
-    assert "crossglyph fetch-fallbacks" in said
+    assert build(workspace, tmp_path / "out") == 0
+    said = capsys.readouterr()
+    assert "crossglyph fetch-fallbacks" in said.err
+    assert (tmp_path / "out" / "Probe" / "Probe_12.cpfont").is_file(), \
+        "and the font it could build is built"
 
 
 def test_it_is_said_once_however_many_sizes_wanted_them(workspace, tmp_path,
@@ -57,7 +59,7 @@ def test_it_is_said_once_however_many_sizes_wanted_them(workspace, tmp_path,
     (workspace / "conf" / "probe.conf").write_text(
         "sizes = 12 14 16 18\nintervals = base\nfallbacks = yes\n",
         encoding="utf-8")
-    assert build(workspace, tmp_path / "out", jobs="4") == 2
+    assert build(workspace, tmp_path / "out", jobs="4") == 0
     assert capsys.readouterr().err.count("crossglyph fetch-fallbacks") == 1
 
 

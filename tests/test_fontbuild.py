@@ -381,10 +381,10 @@ def test_all_conf_can_say_where_they_are(tmp_path):
     assert fontbuild.fallback_dir(tmp_path) == shared
 
 
-def test_a_latin_build_is_not_held_up_by_a_missing_cjk_face(tmp_path):
-    """One CJK face is appended to every build as a catch-all and is 15.7 MB.
-    Failing a Cyrillic family over it would be absurd; failing one that ticked
-    Japanese is exactly right."""
+def test_a_face_that_is_not_there_is_not_an_error(tmp_path):
+    """Whichever face it is and whoever asked. Ticking Japanese with no CJK
+    face fetched builds the family without Japanese, which is what the folder
+    can do; stopping instead builds nothing and fixes nothing."""
     from crossglyph import fontbuild
 
     faces = tmp_path / "fallbacks"
@@ -395,8 +395,11 @@ def test_a_latin_build_is_not_held_up_by_a_missing_cjk_face(tmp_path):
     wanted = fontbuild.wanted_fallbacks("reading,cyrillic", faces)
     assert len(wanted) == len(fontbuild.BUNDLED_FALLBACKS)
 
-    with pytest.raises(FileNotFoundError, match="fetch-fallbacks"):
-        fontbuild.wanted_fallbacks("cjk-jp", faces)
+    asked = fontbuild.wanted_fallbacks("cjk-jp", faces)
+    assert [path.name for path in asked] == list(fontbuild.BUNDLED_FALLBACKS)
+    assert set(fontbuild.CJK_FALLBACKS["cjk-jp"]) <= \
+        set(fontbuild.missing_fallbacks(tmp_path, "cjk-jp")), \
+        "and what a fetch would add is what says so instead"
 
 
 def test_a_pinned_face_picks_up_its_siblings(tmp_path):
@@ -586,14 +589,16 @@ def test_an_order_of_your_own_families_needs_no_fetched_set(tmp_path):
         ["MyIcons-Regular.ttf"]
 
 
-def test_the_token_still_needs_the_fetched_set(tmp_path):
+def test_the_token_stands_for_nothing_when_nothing_is_fetched(tmp_path):
+    """The names beside it still resolve. A workspace with no bundled faces
+    builds the chain it can, rather than refusing over the half it cannot."""
     for name in ("Alto-Medium.otf", "MyIcons-Regular.ttf"):
         (tmp_path / name).write_bytes(b"x")
     parsed = _parsed(tmp_path / "alto.conf",
                      "fallbacks = yes\nfallback_order = MyIcons, bundled\n")
 
-    with pytest.raises(fontbuild.FallbacksMissing, match="fetch-fallbacks"):
-        fontbuild.ordered_entries(parsed)
+    assert _entry_names(fontbuild.ordered_entries(parsed)) == \
+        ["MyIcons-Regular.ttf"]
 
 
 def test_an_unresolvable_name_says_where_it_looked(config, tmp_path):
@@ -944,10 +949,16 @@ def test_every_other_face_still_comes_from_upstream():
         fontbuild.FALLBACK_URL + "NotoSansHebrew-Regular.ttf"
 
 
-def test_a_missing_arabic_face_does_not_fail_a_latin_build(tmp_path):
-    """The treatment CJK already gets: not fetched yet is not an error."""
+def test_a_face_upstreams_folder_never_had_does_not_fail_a_build(tmp_path):
+    """A workspace filled from upstream's folder has no Arabic face, and one
+    filled before the NotoSans styles existed has none of those. Neither ever
+    had a chance to get them."""
+    absent = ("NotoSansArabic-Regular.ttf",) + fontbuild.NOTOSANS_STYLES
     for name in fontbuild.BUNDLED_FALLBACKS:
-        if name not in fontbuild.OPTIONAL_FALLBACKS:
+        if name not in absent:
             (tmp_path / name).write_bytes(b"")
-    wanted = fontbuild.wanted_fallbacks("reading", tmp_path)
-    assert all(path.name != "NotoSansArabic-Regular.ttf" for path in wanted)
+
+    wanted = [path.name for path in fontbuild.wanted_fallbacks("reading",
+                                                               tmp_path)]
+
+    assert wanted and not set(wanted) & set(absent)
