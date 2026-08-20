@@ -238,14 +238,12 @@ export function familyLabel() {
          || "this family";
 }
 
-// What the second family's name ends with, as a save would write it. Empty is
-// an answer rather than a gap: those sizes go to the family above. One
-// function, so the heading and the note under the boxes cannot disagree.
-export const modSuffix = () => exportForm.elements.mod_suffix.value.trim();
-
-// What these sizes build: the family above while the suffix is empty, and a
-// second one named after it once there is a suffix to name it with.
-export const modFamilyLabel = () => familyLabel() + modSuffix();
+// What the second list of sizes builds: the family above while the suffix is
+// empty, since an empty one is an answer rather than a gap, and a family named
+// after it once there is a suffix to name one with. One function, so the
+// heading and the note under the boxes cannot disagree.
+export const modFamilyLabel = () =>
+  familyLabel() + exportForm.elements.mod_suffix.value.trim();
 
 // The suffix only names something when there is a second family to name, and a
 // field that cannot matter yet should not invite typing into it.

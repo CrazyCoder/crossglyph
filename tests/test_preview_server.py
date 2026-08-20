@@ -1787,8 +1787,16 @@ def test_a_second_family_saves_with_the_suffix_that_names_it(scratch):
     assert _alto_says(scratch, "mod_suffix") == ""
     entry = next(f for f in server.families() if f["name"] == "Alto")
     assert entry["export"]["mod_suffix"] == ""
-    assert "AltoMod" not in {f["name"] for f in server.families()}, \
-        "the sizes were meant to join the family above"
+    # claimed_names is what orphan cleanup keeps, so it is where a second
+    # family exists or does not. `families()` lists configs and would answer
+    # the same either way.
+    from crossglyph import fontbuild
+    merged = fontbuild.claimed_names(scratch)
+    _save_export("Alto", sizes_mod="13 15", mod_suffix="Mod")
+    named = fontbuild.claimed_names(scratch)
+    assert len(named) == len(merged) + 1, \
+        f"merged claims {sorted(merged)}, named claims {sorted(named)}"
+    assert (named - merged).pop().endswith("Mod")
 
     # One family writes one set of files, so a label may be claimed once
     # across both lists. Under two names they are two directories and free to

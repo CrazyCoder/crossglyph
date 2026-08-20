@@ -1246,7 +1246,13 @@ def export_changes(request_export: dict, config: Config,
     # names no second family, and these sizes join the one above instead.
     raw_suffix = str(request_export.get("mod_suffix", "")).strip()
     suffix = fontconf.sanitize_name(raw_suffix) if raw_suffix else ""
-    inherited_suffix = fontconf.sanitize_name(shared.get("mod_suffix", "Mod"))
+    # The rule parse_config follows, so the comparison below is against what
+    # the family would actually inherit: an absent key is the default suffix,
+    # and a key set to nothing is one family.
+    inherited_raw = shared.get("mod_suffix")
+    inherited_suffix = (
+        "Mod" if inherited_raw is None else
+        fontconf.sanitize_name(inherited_raw) if inherited_raw.strip() else "")
     if not sizes_mod:
         wanted["mod_suffix"] = None
     elif not suffix:

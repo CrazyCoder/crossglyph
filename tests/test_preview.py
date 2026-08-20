@@ -909,6 +909,8 @@ def test_every_help_badge_describes_a_tip_that_is_there():
     html = _page_html()
     ids = set(re.findall(r'<span class="tip" id="([^"]+)"', html))
     named = set(re.findall(r'aria-describedby="([^"]+)"', html))
+    # A regex that stopped matching would leave both sides empty and pass.
+    assert len(named) > 5 and len(ids) > 5, f"{len(named)} badges, {len(ids)} tips"
     assert named <= ids, f"no tip carries: {', '.join(sorted(named - ids))}"
 
 
