@@ -962,3 +962,31 @@ def test_a_face_upstreams_folder_never_had_does_not_fail_a_build(tmp_path):
                                                                tmp_path)]
 
     assert wanted and not set(wanted) & set(absent)
+
+
+def test_every_offered_script_has_a_face_that_can_draw_it():
+    """A preset with nothing behind it draws blank however long you wait: no
+    fetch brings a face the set does not name. Thai and Bengali shipped that
+    way, tickable and unanswerable, until they were added."""
+    from crossglyph.cpfont import convert
+    from crossglyph.preview.server import COVERAGE_PRESETS
+
+    # Scripts, not the mixed presets: `reading` and `symbols` gather ranges
+    # from wherever they live, and `base` is in every build by construction.
+    families = {name.removeprefix("NotoSans").removesuffix("-Regular.ttf")
+                .removesuffix("-Regular.otf").casefold()
+                for name in fontbuild.BUNDLED_FALLBACKS}
+    families |= {name.removeprefix("NotoSans").removesuffix("-Regular.otf")
+                 .casefold()
+                 for names in fontbuild.CJK_FALLBACKS.values()
+                 for name in names}
+    skip = {"base", "default", "reading", "symbols", "latin-ext", "greek",
+            "cyrillic", "vietnamese", "ipa-chars", "cjk-sc", "cjk-tc",
+            "cjk-jp", "hangul"}
+
+    unanswerable = [name for name, _label, _note in COVERAGE_PRESETS
+                    if name not in skip and name in convert.INTERVAL_PRESETS
+                    and name.replace("-", "") not in families]
+
+    assert not unanswerable, \
+        f"offered with no bundled face behind them: {', '.join(unanswerable)}"

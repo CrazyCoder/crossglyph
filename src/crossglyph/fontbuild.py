@@ -50,13 +50,20 @@ FALLBACK_URL = ("https://raw.githubusercontent.com/crosspoint-reader/"
 NOTO_TTF = ("https://raw.githubusercontent.com/notofonts/notofonts.github.io/"
             "main/fonts/{family}/hinted/ttf/{name}")
 
-#: Faces upstream's folder does not carry, and where they do live. Arabic is
-#: not in the set the website's converter ships, and that folder is Regular
-#: only, so the NotoSans styles come from the project that publishes them too.
+#: Faces upstream's folder does not carry, and where they do live. Arabic,
+#: Thai and Bengali are not in the set the website's converter ships, and that
+#: folder is Regular only, so the NotoSans styles come from the project that
+#: publishes them too.
 FALLBACK_SOURCES = {
     "NotoSansArabic-Regular.ttf":
         NOTO_TTF.format(family="NotoSansArabic",
                         name="NotoSansArabic-Regular.ttf"),
+    "NotoSansThai-Regular.ttf":
+        NOTO_TTF.format(family="NotoSansThai",
+                        name="NotoSansThai-Regular.ttf"),
+    "NotoSansBengali-Regular.ttf":
+        NOTO_TTF.format(family="NotoSansBengali",
+                        name="NotoSansBengali-Regular.ttf"),
     "NotoSans-Bold.ttf":
         NOTO_TTF.format(family="NotoSans", name="NotoSans-Bold.ttf"),
     "NotoSans-Italic.ttf":
@@ -114,6 +121,8 @@ BUNDLED_FALLBACKS = (
     "NotoSansCherokee-Regular.ttf",
     "NotoSansTifinagh-Regular.ttf",
     "NotoSansCoptic-Regular.ttf",
+    "NotoSansThai-Regular.ttf",
+    "NotoSansBengali-Regular.ttf",
     "NotoSansMath-Regular.ttf",
     "NotoSansSymbols-Regular.ttf",
     "NotoSansSymbols2-Regular.ttf",

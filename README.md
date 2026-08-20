@@ -155,8 +155,8 @@ offers three of them.
 
 CrossPoint draws nothing for a codepoint no font in the chain has, so a family
 that lacks an arrow leaves a gap where it should be. The bundled Noto faces fill
-those holes, covering Hebrew, Arabic, Armenian, Georgian, Ethiopic, Cherokee,
-Tifinagh, Coptic, mathematics, symbols and emoji.
+those holes, covering Hebrew, Arabic, Thai, Bengali, Armenian, Georgian,
+Ethiopic, Cherokee, Tifinagh, Coptic, mathematics, symbols and emoji.
 
 They are OFL licensed and unmodified, so they are downloaded on request and
 not shipped here:
