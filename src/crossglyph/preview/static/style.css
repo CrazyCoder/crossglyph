@@ -1008,6 +1008,12 @@
      it. A foot is the bottom of its column and its badge is at the right end
      of the bar, so this tip opens upwards and hangs from that end: down and
      from the left, it would leave the page on both axes at once. */
+  /* A switch is half the panel wide, so a 26rem tip hung from the label of
+     one in the right-hand column would leave the page on that side. The block
+     of switches is the anchor instead, which starts every one of them at the
+     panel's left edge, where the tips above them start. */
+  .checks { position: relative; }
+  .checks .name:has(.explain) { position: static; }
   .explain.up .tip {
     top: auto; bottom: calc(100% + .45rem); left: auto; right: -.5rem;
   }

@@ -248,7 +248,33 @@
 
 
   <div class="row">
-    <label class="name" for="hinting">hinting</label>
+    <span class="name"><label for="hinting">hinting</label><span
+        class="explain">
+        <button type="button" class="info" aria-label="What hinting does"
+                aria-describedby="hinting-tip">?</button>
+        <span class="tip" id="hinting-tip" role="tooltip">
+          How the outline is fitted to the pixel grid. A letter's outline
+          rarely lands on whole pixels, so an upright stem can straddle two of
+          them and come out as two pale columns instead of one dark one.
+          Hinting nudges the outline until it lands cleanly.
+          <br><br>
+          <strong>normal</strong> runs the font's own hinting instructions
+          where it carries them, and lets FreeType work it out where it does
+          not. <strong>light</strong> fits vertically only, which keeps the
+          shapes the designer drew and lets the widths fall where they may.
+          <strong>none</strong> fits nothing. <strong>auto</strong> has
+          FreeType fit the font whatever instructions it carries, and is worth
+          trying on a face that looks muddy at small sizes.
+          <br><br>
+          This row also decides what two of the switches below it can do.
+          <strong>grayscale hinting</strong> is a choice between two ways of
+          running the font's own instructions, so it needs a mode where those
+          run, which for almost every font means <strong>normal</strong>.
+          <strong>stem darkening</strong> reaches a
+          TrueType face only under <strong>light</strong>. Each greys itself
+          out when the pair you have chosen leaves it nothing to do.
+        </span>
+      </span></span>
     <select id="hinting" name="hinting">
       <option>normal</option><option>light</option>
       <option>none</option><option>auto</option></select>
@@ -265,7 +291,31 @@
          rather than hinting for a subpixel display this panel does not have.
          Only reaches a TrueType face whose own bytecode is what draws it. -->
     <div class="row check">
-      <label class="name" for="grayscale_hinting">grayscale hinting</label>
+      <span class="name"><label for="grayscale_hinting">grayscale hinting</label><span
+          class="explain">
+          <button type="button" class="info"
+                  aria-label="What grayscale hinting does"
+                  aria-describedby="grayscale_hinting-tip">?</button>
+          <span class="tip" id="grayscale_hinting-tip" role="tooltip">
+            Which of FreeType's two engines runs a font's own hinting. A font
+            can carry hinting instructions, a small program that nudges each
+            outline so its stems land on whole pixels instead of straddling
+            two of them.
+            <br><br>
+            The engine used by default was written for colour LCD screens,
+            where fitting a stem sideways costs more than it gains, so it fits
+            vertically only. This one fits both directions, which is what a
+            grey screen wants: a stem lands on one pixel rather than being
+            spread over two in grey.
+            <br><br>
+            It reaches a face only while that face's own instructions are what
+            draw it. A font carrying none, and any font under
+            <strong>light</strong>, <strong>auto</strong> or
+            <strong>none</strong> hinting, is fitted by FreeType's own
+            auto-hinter instead. The row greys itself in those cases and says
+            which one it is.
+          </span>
+        </span></span>
       <input id="grayscale_hinting" name="grayscale_hinting" type="checkbox">
       <span class="mark" data-mark="grayscale_hinting" aria-hidden="true" hidden>&#8226;</span>
     </div>
@@ -274,19 +324,88 @@
          by a coverage threshold. Not tied to the reader's anti-aliasing
          switch: the font draws in two levels whatever the page is set to. -->
     <div class="row check">
-      <label class="name" for="mono">mono rasterizing</label>
+      <span class="name"><label for="mono">mono rasterizing</label><span
+          class="explain">
+          <button type="button" class="info"
+                  aria-label="What mono rasterizing does"
+                  aria-describedby="mono-tip">?</button>
+          <span class="tip" id="mono-tip" role="tooltip">
+            Builds the font with no greys in it at all. Every pixel comes out
+            paper or ink, chosen by FreeType's dropout control, a rule that
+            keeps a stroke too thin to land on a pixel from disappearing
+            altogether. Nothing measures coverage and cuts it at the
+            thresholds.
+            <br><br>
+            Worth trying for a reader with <strong>anti-aliasing</strong> off.
+            The device paints every shade above the first cut point solid
+            black, so a pixel a quarter covered goes black and strokes fatten
+            into each other. Picking the pixels for a two level page directly
+            leaves the letters open.
+            <br><br>
+            It belongs to the font and not to the page: one built this way
+            draws in two levels whatever the reader's anti-aliasing is set to.
+            <strong>gamma</strong> and <strong>thresholds</strong> have no
+            coverage left to work on while it is on, so both grey out. Fitting
+            to whole pixels also moves some advance widths, so lines break in
+            slightly different places.
+          </span>
+        </span></span>
       <input id="mono" name="mono" type="checkbox">
       <span class="mark" data-mark="mono" aria-hidden="true" hidden>&#8226;</span>
     </div>
 
     <div class="row check">
-      <label class="name" for="stem_darkening">stem darkening</label>
+      <span class="name"><label for="stem_darkening">stem darkening</label><span
+          class="explain">
+          <button type="button" class="info"
+                  aria-label="What stem darkening does"
+                  aria-describedby="stem_darkening-tip">?</button>
+          <span class="tip" id="stem_darkening-tip" role="tooltip">
+            Thickens the strokes a little, to make up for how thin type looks
+            once it is drawn small. Spacing does not move, so the page darkens
+            without setting to different lines.
+            <br><br>
+            Where it applies depends on the <strong>hinting</strong> row as
+            much as on the font. FreeType darkens in two places, and each adds
+            a condition of its own: the engine that draws CFF and OpenType
+            outlines darkens a glyph loaded at a size, and the auto-hinter
+            darkens at a light target. So a CFF or OTF face moves under any
+            hinting but <strong>auto</strong>, a TrueType face moves only
+            under <strong>light</strong>, and nothing moves under
+            <strong>auto</strong>. The row greys itself on those two cases.
+            <br><br>
+            The amount differs as much as the reach does. Through the CFF
+            engine it is slight, well under a percent of the inked pixels.
+            Through the light auto-hinter it is substantial. A face left live
+            can still come out unchanged, its stems falling where the curve
+            rounds to nothing, and <strong>weight</strong> is the control that
+            will move it.
+          </span>
+        </span></span>
       <input id="stem_darkening" name="stem_darkening" type="checkbox">
       <span class="mark" data-mark="stem_darkening" aria-hidden="true" hidden>&#8226;</span>
     </div>
 
     <div class="row check">
-      <label class="name" for="ligatures">ligatures</label>
+      <span class="name"><label for="ligatures">ligatures</label><span
+          class="explain">
+          <button type="button" class="info" aria-label="What ligatures does"
+                  aria-describedby="ligatures-tip">?</button>
+          <span class="tip" id="ligatures-tip" role="tooltip">
+            Whether a pair such as <code>fi</code> is drawn as one shape. A
+            font can carry rules for that, and the build reads them and writes
+            the joined shapes into the file.
+            <br><br>
+            Turn them off when a face's <code>fi</code> or <code>fl</code>
+            comes out as a blot at reading sizes. Four shades of grey are far
+            less forgiving than paper, and the hood of the f meeting the dot
+            of the i is exactly the detail that goes muddy.
+            <br><br>
+            The shapes are baked into each style at build time, so this is not
+            something the reader can change later. A family carrying no
+            ligature rules greys the row.
+          </span>
+        </span></span>
       <input id="ligatures" name="ligatures" type="checkbox" checked>
       <span class="mark" data-mark="ligatures" aria-hidden="true" hidden>&#8226;</span>
     </div>
@@ -297,7 +416,28 @@
        digits they drew: some faces substitute all ten, some a handful, most
        none at all. -->
   <div class="row">
-    <label class="name" for="figures">figures</label>
+    <span class="name"><label for="figures">figures</label><span
+        class="explain">
+        <button type="button" class="info" aria-label="What figures does"
+                aria-describedby="figures-tip">?</button>
+        <span class="tip" id="figures-tip" role="tooltip">
+          Which of the two digit widths the font is built with. Tabular pads
+          every digit out to a common width so that columns of numbers line
+          up, and it is what most fonts hand out by default. Proportional lets
+          each digit take its own width, so a 1 is narrower than a 0.
+          <br><br>
+          A book is prose and not a table, and there the padding reads as a
+          gap around every narrow digit. The sample text carries
+          <code>111 118 181 811 1118</code> so the difference is visible
+          rather than taken on trust.
+          <br><br>
+          It applies the font's own proportional figures while the glyphs are
+          drawn, so the device never knows about it. That means it moves only
+          a font whose designer drew them, and only the digits they drew: some
+          faces substitute all ten, some a handful, most none at all. A family
+          with none greys the row.
+        </span>
+      </span></span>
     <select id="figures" name="figures">
       <option value="default">default (tabular)</option>
       <option value="proportional">proportional</option></select>

@@ -191,11 +191,12 @@ A family whose files have gone falls back the way a fresh page would.
 Font controls (gamma, weight, line height, the spacings, kerning, slant,
 thresholds, hinting, grayscale hinting, mono rasterizing, stem darkening,
 ligatures, figures) rebuild the `.cpfont` behind the page.
+The ones whose names give least away carry a **?** beside the label with the
+short version in it, and
 [Tuning how glyphs look](fonts.md#tuning-how-glyphs-look) explains what each
-one does to the type, and **gamma** and **thresholds**, the two you reach for
-first, carry the short version behind the **?** beside their labels. [The same
-settings in the preview](fonts.md#the-same-settings-in-the-preview) gives what
-each one is called in a config, for the few whose names differ.
+one does to the type at length. [The same settings in the
+preview](fonts.md#the-same-settings-in-the-preview) gives what each one is
+called in a config, for the few whose names differ.
 
 Page controls (margin, alignment, hyphenation and the language its patterns
 come from, line spacing, paragraph spacing, anti-aliasing) are the reader's own

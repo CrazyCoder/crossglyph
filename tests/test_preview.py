@@ -893,3 +893,31 @@ def test_the_page_about_the_panel_uses_the_panel_words():
     assert not named, (
         f"docs/preview.md names these by their config spelling, and the panel "
         f"labels them differently: {', '.join(named)}")
+
+
+def _page_html():
+    return (pathlib.Path(__file__).resolve().parents[1] / "src" / "crossglyph"
+            / "preview" / "static" / "index.html").read_text(encoding="utf-8")
+
+
+def test_every_help_badge_describes_a_tip_that_is_there():
+    """The badge is inert without its tip: `aria-describedby` naming an id
+    nothing carries reads as an empty description to a screen reader, and the
+    hover shows a box with nothing in it."""
+    import re
+
+    html = _page_html()
+    ids = set(re.findall(r'<span class="tip" id="([^"]+)"', html))
+    named = set(re.findall(r'aria-describedby="([^"]+)"', html))
+    assert named <= ids, f"no tip carries: {', '.join(sorted(named - ids))}"
+
+
+def test_a_help_badge_is_never_inside_the_label_it_explains():
+    """A press anywhere in a label works the control under it, so a badge in
+    there would toggle the switch it is there to explain. The badge sits
+    beside the label inside `.name`, which is why `.name` is a span wherever
+    one appears."""
+    import re
+
+    for body in re.findall(r"<label\b[^>]*>(.*?)</label>", _page_html(), re.S):
+        assert "class=\"info\"" not in body, body[:120]
