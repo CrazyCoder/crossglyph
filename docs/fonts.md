@@ -1,8 +1,19 @@
 # Building fonts
 
-One `<family>.conf` per family, in the workspace's `conf` folder. Plain
-`key = value`, no section header, `#` and `;` start comments. Every key is
-optional, and the shortest useful config is empty.
+A build turns your TTF or OTF files into `.cpfont` files, one for each point
+size. A `.cpfont` holds a picture of every character at that size, in the four
+greys the screen draws, along with the tables that space pairs of letters and
+join `fi` into one shape. The device cannot scale type itself, which is why
+each size is a separate file.
+
+Three words run through this page. A family is what you pick on the device,
+such as NotoSans. A style is one of its four slots: regular, bold, italic and
+bold italic. A face is the file that fills a slot.
+
+Settings live in one `<family>.conf` per family, in the workspace's `conf`
+folder. Plain `key = value`, no section header, `#` and `;` start comments.
+Every key is optional, and the shortest useful config is empty. The preview
+writes the same files, so nothing here belongs to the command line alone.
 
 ```sh
 ./crossglyph.sh build             # everything that changed
@@ -22,8 +33,9 @@ It holds settings shared by every family in the workspace. A `<family>.conf`
 inherits from it and states only what it does differently, and a family with no
 config at all is built from it alone. Delete it and nothing changes.
 
-Discovery does not depend on it either. Drop four files in the workspace and
-they build on the next run, taking their name from the filenames.
+Discovery does not depend on it either. Drop the four style files in the
+workspace and they build on the next run, taking their name from the
+filenames alone.
 
 Subfolders are walked, so a family that arrives as a folder can stay one. The
 folder is organization and nothing else. A face is known by its filename
@@ -212,6 +224,11 @@ because there the two cannot be confused.
 
 ## Coverage
 
+Coverage is the list of characters that go into the file. Every character has a
+number that identifies it, called a codepoint, and a preset such as `greek` is
+a named set of those numbers. Anything you leave out is not in the font, and
+the device draws nothing at all where it appears.
+
 `intervals` takes the same preset names as the website's checkboxes:
 
 | checkbox | preset | | checkbox | preset |
@@ -360,8 +377,10 @@ it: `ChapterHtmlSlimParser.cpp:1229` rewrites only U+00A0 and U+202F into a
 space token, and everything else reaches `renderCharImpl`, which logs
 `No glyph for codepoint 8198` and draws nothing. The space silently vanishes.
 
-Each width can be overridden per family, as a fraction of an em, when the
-typographic default reads wrong at your size:
+Each width can be overridden per family, as a fraction of an em. An em is the
+font's own design square, the box every character is drawn inside, so a width
+written this way scales with the point size. Use it when the typographic
+default reads wrong at your size:
 
 ```ini
 space_width_2006 = 0.25    # widen the dialogue dash space from 1/6 em
@@ -379,13 +398,22 @@ folder you copy across.
 
 ## Tuning how glyphs look
 
-The device stores two bits per pixel, four levels, so every glyph passes
-through a quantizer. A face gains or loses its character there.
-FreeType renders 8-bit coverage at 150 DPI, so 13 pt is 27.08 px/em. `gamma`
-curves that coverage, it is truncated to 4 bits, then `thresholds` cuts it into
-the four levels the device stores.
+Every pixel on the reader's screen is white, black or one of two greys, and
+nothing else. FreeType draws a character in far more shades than that, so each
+pixel has to be squashed down into one of the four. A face gains or loses its
+character in that step, and `gamma` and `thresholds` are the two controls over
+it.
+
+In order: FreeType renders the outline as coverage, meaning how much of each
+pixel the letter actually sits on, at 150 DPI, so 13 pt is 27.08 px/em, which
+is to say the design square comes out 27 pixels across. `gamma` bends that
+coverage, the result is rounded to 16 steps, then `thresholds` cuts those steps
+into the four levels the device stores.
 
 ### Gamma
+
+`gamma` is the darkness control. Raise it and the page inks more heavily; lower
+it and a face that sets too black at small sizes lightens off.
 
 A useful `gamma` runs 0.3 to 4.0. That is the range crengine offers for the
 same curve, and it computes the curve the same way: `255 - ((255 - i)/255) **
@@ -415,6 +443,11 @@ hard edges of 1-bit rendering, and a low one lightens a face that sets too
 heavy at small sizes.
 
 ### Thresholds
+
+A threshold is the point where a pixel stops being one grey and becomes the
+next one darker. There are three of them, because there are three levels above
+white, and where you put them decides how much of the page comes out solid
+black rather than grey.
 
 **All three are yours to set, and the panel offers two of them by name.** Any
 ascending triple within 1 to 15 is accepted, so `5 9 13` is as valid as the
@@ -448,8 +481,16 @@ produced, and change none of it:
 ### Weight, slant and the hinting knobs
 
 `weight`, `slant`, `hinting`, `grayscale_hinting` and `stem_darkening` act
-earlier, on the outline and on how FreeType fits it to the pixel grid, so they
-change the coverage the quantizer then sees. Three of them are worth a note.
+earlier, on the outline itself, so they change the coverage that then gets
+squashed into four levels.
+
+Hinting is the one to understand first. A letter's outline rarely lands on
+whole pixels, so an upright stem can straddle two of them and come out as two
+pale columns instead of one dark one. Hinting nudges the outline onto the grid
+so that stops happening. A font can carry its own hinting instructions, and
+FreeType can also work them out for itself, which is what `auto` asks for.
+
+Three of these are worth a note.
 
 `weight` uses `FT_Outline_Embolden`, which fattens the outline and leaves the
 advance width alone. Text gets heavier at unchanged spacing. That is right at
@@ -457,15 +498,16 @@ reading sizes, and it is no substitute for a real bold face.
 
 ### Stem darkening
 
-`stem_darkening` is narrower than its name suggests, and where it applies
-depends on `hinting` as much as on the font. FreeType has the code in two
-engines, and each adds a condition on top of the setting. The Adobe CF2
-interpreter, which draws CFF and Type 1 faces, darkens a scaled load. The
-auto-hinter darkens at a light target. So a CFF or OTF face moves under any
-hinting but `auto`, while a TrueType face has no CF2 path and moves only at
-`hinting = light`, the one setting that hands it to the auto-hinter. Under
-`auto` neither format moves: it targets normal hinting, and the auto-hinter
-reloads the glyph unscaled, failing both conditions at once.
+Stem darkening thickens the strokes a little, to make up for how thin type
+looks once it is drawn small. `stem_darkening` is narrower than its name
+suggests, and where it applies depends on `hinting` as much as on the font.
+FreeType has the code in two engines, and each adds a condition on top of the
+setting. The Adobe CF2 interpreter, which draws CFF and Type 1 faces, darkens a
+scaled load. The auto-hinter darkens at a light target. So a CFF or OTF face
+moves under any hinting but `auto`, while a TrueType face has no CF2 path and
+moves only at `hinting = light`, the one setting that hands it to the
+auto-hinter. Under `auto` neither format moves: it targets normal hinting, and
+the auto-hinter reloads the glyph unscaled, failing both conditions at once.
 
 The two are not the same size either. Through CF2 the effect is slight, well
 under a percent of the set pixels; through the light auto-hinter it is
@@ -477,15 +519,18 @@ nothing short of rasterizing both ways would know.
 
 ### Grayscale hinting
 
-`grayscale_hinting` chooses which of FreeType's two TrueType bytecode
-interpreters runs a font's own hinting. The default is version 40, which
-FreeType calls roughly equivalent to DirectWrite ClearType. It hints vertically
-only, because on a subpixel display snapping a stem sideways costs more than it
-buys. Version 35 fits both axes, and FreeType documents it as supporting
-grayscale and black and white rasterizing only. That is all this device does.
-A stem then lands on a pixel instead of straddling two and being drawn twice in
-grey. Measured over 303 hinted faces it leaves 3.8% fewer midtone pixels, and a
-third fewer on a face like DejaVu.
+A font's own hinting instructions are a small program, and FreeType has two
+interpreters that can run one. `grayscale_hinting` picks the one written for
+grey screens instead of colour ones.
+
+The default is version 40, which FreeType calls roughly equivalent to
+DirectWrite ClearType. It hints vertically only, because on a subpixel display
+snapping a stem sideways costs more than it buys. Version 35 fits both axes,
+and FreeType documents it as supporting grayscale and black and white
+rasterizing only. That is all this device does. A stem then lands on a pixel
+instead of straddling two and being drawn twice in grey. Measured over 303
+hinted faces it leaves 3.8% fewer midtone pixels, and a third fewer on a face
+like DejaVu.
 
 It is narrow in the same way `stem_darkening` is, for a different reason: it
 reaches a face only while that face's own bytecode draws it. A CFF family has
@@ -496,13 +541,17 @@ everywhere else.
 
 ### Mono rasterizing
 
-`mono` changes what a pixel is decided by. Normally the converter takes
-FreeType's coverage and cuts it at the three thresholds, and the reader with
-anti-aliasing off then paints every non-white level solid black: a pixel a
-quarter covered goes black, which at 12px fattens strokes into each other.
-With `mono` on, FreeType rasterizes at one bit per pixel and decides each one
-with dropout control instead. Measured on DejaVu Serif at 12px that is a third
-less ink, and none of the ink that was holding the letters open.
+`mono` builds a font with no greys in it at all: every pixel comes out black
+or white. What decides each one changes too.
+
+Normally the converter takes FreeType's coverage and cuts it at the three
+thresholds, and the reader with anti-aliasing off then paints every non-white
+level solid black: a pixel a quarter covered goes black, which at 12px fattens
+strokes into each other. With `mono` on, FreeType rasterizes at one bit per
+pixel and decides each one with dropout control instead, a rule that keeps a
+stroke too thin to land on a pixel from vanishing altogether. Measured on
+DejaVu Serif at 12px that is a third less ink, and none of the ink that was
+holding the letters open.
 
 It is not tied to the reader's setting. A font built this way draws in two
 levels whatever the page is set to, which is the only way to see what it does
@@ -524,9 +573,10 @@ before choosing.
 
 ## Line spacing
 
-Line pitch is stored in the font, and the device does not decide it.
-`getLineHeight()` is `advanceY` from the `.cpfont` times a compression factor
-(`GfxRenderer.cpp:2005`), and for SD card fonts that factor is 0.95, 1.00 or
+Line pitch is the distance from one line of text down to the next. It is stored
+in the font, and the device does not decide it. `getLineHeight()` is `advanceY`
+from the `.cpfont` times a compression factor (`GfxRenderer.cpp:2005`), and for
+SD card fonts that factor is 0.95, 1.00 or
 1.10 for Tight, Normal and Wide, hardcoded to one family's table for every font
 (`CrossPointSettings.cpp:268`). So Tight buys 5%, calibrated for a font you are
 not using.
@@ -572,9 +622,9 @@ to see when it happens: the family appears in **Settings > Reader > Font**, you
 select it, and the reader goes on drawing in its own font at 12, 14, 16 and 18
 however many sizes you built. Nothing says the font was rejected.
 
-CrossGlyph checks for this now. The panel says so under the coverage boxes
-while you are still ticking them, and a build refuses to write a file that
-cannot load.
+CrossGlyph checks for this. The panel says so under the coverage boxes while
+you are still ticking them, and a build refuses to write a file that cannot
+load.
 
 ### What the reader counts
 
@@ -651,7 +701,7 @@ without gaps, or untick the range.
 
 A coverage preset can come out empty. Tick Greek on a Latin-only family with
 the fallbacks off and the font builds, the glyph count moves not at all, and
-the four hundred codepoints you asked for are simply absent. The build says so,
+the Greek codepoints you asked for are simply absent. The build says so,
 once per family, under that family's sizes:
 
 ```
@@ -683,7 +733,7 @@ quarter of `reading`. A warning on those would fire on nearly every build.
 The line comes when a tick drew under 2% of the characters in its block, which
 is a little wider than nothing on purpose. A preset spans more than the script
 it is named for: `cjk-sc` includes the fullwidth punctuation, and every Latin
-serif measured for this draws one of the 1,172 codepoints in `arabic`. Testing
+serif measured for this draws one of the codepoints `arabic` spans. Testing
 for an exact zero passed all of those, so a family with no Arabic and no CJK in
 it said nothing at all. Where a tick drew a handful rather than none the line
 says "almost nothing" instead.
@@ -704,14 +754,21 @@ button where one of those is the answer.
 
 ## Letter and word spacing
 
-`letter_spacing` and `word_spacing` adjust the horizontal advances the way
-`line_height` adjusts the vertical one, at build time and in the file. Both are
-in pixels, stored at 1/16 px, and both accept negatives. Word spacing stacks
+An advance is how far the pen moves along after drawing a character.
+`letter_spacing` and `word_spacing` adjust those the way `line_height` adjusts
+the gap between lines, at build time and in the file. Both are in pixels,
+stored at 1/16 px, and both accept negatives. Word spacing stacks
 on letter spacing exactly as CSS does, and the device takes the word gap from
 the font's own U+0020 glyph (`GfxRenderer.cpp:1880`). A little positive
 tracking often reads better on e-ink than on a screen.
 
 ## Kerning and ligatures
+
+Kerning pulls particular pairs of letters closer, so the A and the V in "AV"
+tuck under each other instead of leaving a hole. A ligature replaces a pair
+with one drawn shape, which is how a well set `fi` avoids a collision between
+the f's hood and the dot on the i. Both come from tables the font carries,
+named GPOS and GSUB, and the build reads them and writes the answers in.
 
 Both tables are baked into the `.cpfont` per style and cannot be turned off on
 the device: kerning as a class matrix of int8 4.4 fixed point pixels, ligatures
@@ -767,8 +824,8 @@ The rules come from the website's folder picker.
 
 So `NotoSans-Regular.ttf` is the roman face, and
 `Roboto_SemiCondensed-Light.ttf` strips to `Roboto_SemiCondensed-Light`, its
-own family, which is how an
-eighteen file Roboto SemiCondensed folder narrows to the four faces you want.
+own family. That is how a Roboto SemiCondensed folder carrying every weight the
+foundry ships narrows to the four faces you want.
 
 Where two files claim one slot, an explicit weight beats a bare stem and
 `Regular` beats `Medium`. `--list` always prints the winner.
@@ -826,8 +883,10 @@ need the explicit keys.
 
 ## Variable fonts
 
-A variable font is several faces in one file, so a family that ships two of
-them ships four:
+A variable font is not one face but a range of them in a single file. What
+varies is set by its axes, each one a dial the designer left open: `wght` runs
+from thin to heavy, and `opsz` adjusts the drawing for the size it will be read
+at. A family shipping two such files fills all four slots:
 
 | slot | file | built at |
 |---|---|---|
@@ -989,16 +1048,16 @@ still know.
 ## How long a build takes
 
 Sizes are rasterized in parallel, one process each. The default is a worker per
-core less one, so the machine stays usable while a build runs, and never more
-than twelve however many cores there are. `-j` changes it. One size on its own
-skips the pool, since starting an interpreter to do a job this process could
-have done costs more than the job. The
-converter's own progress output is captured and shown only on failure, because
-a dozen concurrent streams interleave into nonsense.
+core less one, so the machine stays usable while a build runs, and there is a
+ceiling on top of that, so a machine with a great many cores does not start a
+process for each. `-j` changes it. One size on its own skips the pool, since
+starting an interpreter to do a job this process could have done costs more
+than the job. The converter's own progress output is captured and shown only on
+failure, because a dozen concurrent streams interleave into nonsense.
 
 The preview's Build button runs the same pool, so both take about the same
-time: eight sizes of Literata are 17s one at a time and 3s across eight
-workers.
+time. A family of several sizes finishes in a fraction of what those sizes cost
+one after another.
 
 ## Which converter this drives
 

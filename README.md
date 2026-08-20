@@ -2,12 +2,13 @@
 
 Tune a font for an Xteink reader running
 [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader), and watch
-the page redraw as you move each control. A change lands in 10 to 300 ms,
-depending on your hardware and how much of the font is being built.
+the page redraw as you move each control. Changes appear as fast as your
+machine can rebuild that part of the font, which is fast enough to keep turning
+a knob and watching what happens.
 
-Most fonts need tuning to read well at two bits per pixel. Without a preview
-every guess costs a card swap or an emulator run, which is why most people stop
-at the point size.
+These readers draw in four shades of grey and nothing else, so most fonts need
+work before they read well on one. Without a preview, every guess costs a card
+swap or an emulator run, which is why most people stop at the point size.
 
 <p align="center">
   <a href="docs/images/tune.png"><img src="docs/images/tune.png" width="32%"
@@ -18,36 +19,43 @@ at the point size.
      alt="The Export panel with sizes, coverage, fallbacks and build controls"></a>
 </p>
 
-- the firmware's own renderer, its C++ compiled to WebAssembly, so the page
-  shows what the device draws and not an impression of it
-- rasterizing controls for gamma, the three grey thresholds, weight, slant,
-  hinting mode, grayscale hinting, mono rasterizing, stem darkening, line
-  height, letter and word spacing, kerning strength, ligatures, proportional
-  figures
-- page controls, so the page you judge is set up like the device you are
-  judging for: margin, alignment, line spacing, hyphenation and the language
-  its patterns come from, paragraph spacing, anti-aliasing and night mode
-- the page inside the reader itself, rendered from XTEINK's own models, at one
-  screen pixel to one of your monitor's with neither the page nor the body
-  resampled, shaded to the cast measured off a real device and adjustable from
-  there, and copied out as an image in one press
-- variable fonts build at the weight their designer named, or at any weight you
-  pick: left alone, Merriweather would ship its Light as your Regular
-- four sizes of a four-style family, 795 glyphs each with kerning, built in
-  about a second, one process per size
-- the bundled Noto families on request, so a missing arrow or Greek letter is not
-  a hole in the page. Each lends its own bold or italic to a run set that way,
-  where it has one
-- Arabic comes out joined with any face, because the joining rules a modern one
-  stores are run here and the joined shapes built in, which the device has no
-  room to do for itself
-- nothing installed system wide, since the launcher fetches uv, Python and the
-  dependencies into a cache directory you can delete
+- **The reader's own renderer.** The firmware's drawing code, compiled to run
+  in the browser, so the page shows what the device will draw and not an
+  impression of it.
+- **Controls for the letters.** How dark the type is (gamma, and the three grey
+  cut points), how thick or thin the strokes are (weight, and stem darkening),
+  a slant for a face with no italic of its own, how the outline is snapped onto
+  the pixel grid (hinting, grayscale hinting, and a one-bit mode that drops the
+  greys), the space between letters, words and lines, how hard pairs are pulled
+  together (kerning), whether `fi` joins into one shape (ligatures), and
+  whether digits are all one width. [docs/fonts.md](docs/fonts.md) explains
+  what every one of them does to the type.
+- **Controls for the page.** Margins, alignment, line and paragraph spacing,
+  hyphenation and the language its rules come from, anti-aliasing and night
+  mode, so the page you are judging is set up like the device you are judging
+  it for.
+- **The page inside the reader.** Drawn from XTEINK's own models, one screen
+  pixel to one of your monitor's, shaded to match a real device and adjustable
+  from there. One press copies it out as an image.
+- **Variable fonts.** These carry a range of weights in a single file. Build
+  one at the weight its designer named, or at any weight you pick. Left alone,
+  Merriweather would hand you its Light as your Regular.
+- **A family in seconds.** Regular, bold, italic and bold italic, at every
+  point size you asked for, one process per size.
+- **The bundled Noto faces on request**, so a missing arrow or Greek letter is
+  not a hole in the page. Each one lends its own bold or italic to text set
+  that way, where it has one.
+- **Arabic comes out joined** with any face. A modern Arabic font carries the
+  rules for how letters connect, and CrossGlyph runs them and builds the joined
+  shapes in. The device has no room to do that itself.
+- **Nothing installed system wide.** The launcher fetches uv, Python and the
+  dependencies into a cache directory you can delete.
 
-CrossGlyph turns TTF and OTF files into `.cpfont`, the format the device
-reads: glyph bitmaps at two bits per pixel, one file per point size, with
-kerning and ligature tables baked in. The device has no rasterizer, so every size is a
-separate build.
+CrossGlyph turns TTF and OTF files into `.cpfont`, the format the device reads.
+A `.cpfont` holds a picture of every letter at one point size, in the four
+greys the screen has, along with the tables that space letter pairs and join
+`fi` into one shape. The device cannot scale type itself, so each point size is
+a separate file and a separate build.
 
 ## Quick start
 
@@ -134,13 +142,13 @@ fonts/
 `$CROSSGLYPH_FONTS` names another workspace, and so does `--fonts DIR`. Builds
 land in `cpfonts` unless `out` in `all.conf` says otherwise.
 
-A family needs no config at all. Drop four files in, name them the way their
-foundry did, and they build on the next run. `all.conf` holds settings shared
-by every family. It is yours and starts absent; copy `all.conf.example` beside
-it to start from a commented list of every key. Write a `<family>.conf` when
-one family needs settings the others do not. See
-[docs/fonts.md](docs/fonts.md) for every key, and for what the tuning controls
-actually do.
+A family needs no config at all. Drop the regular, bold, italic and bold italic
+files in, name them the way their foundry did, and they build on the next run.
+`all.conf` holds settings shared by every family. It is yours and starts
+absent; copy `all.conf.example` beside it to start from a commented list of
+every key. Write a `<family>.conf` when one family needs settings the others do
+not. See [docs/fonts.md](docs/fonts.md) for every key, and for what the tuning
+controls actually do.
 
 ## Getting the fonts onto the device
 
@@ -153,10 +161,11 @@ offers three of them.
 
 ## Fallback faces
 
-CrossPoint draws nothing for a codepoint no font in the chain has, so a family
-that lacks an arrow leaves a gap where it should be. The bundled Noto faces fill
-those holes, covering Hebrew, Arabic, Thai, Bengali, Armenian, Georgian,
-Ethiopic, Cherokee, Tifinagh, Coptic, mathematics, symbols and emoji.
+A codepoint is one character as the computer stores it, and CrossPoint draws
+nothing at all for one that no font in the chain has. A family with no arrow in
+it leaves a gap where the arrow should be. The bundled Noto faces fill those
+gaps, covering Hebrew, Arabic, Thai, Bengali, Armenian, Georgian, Ethiopic,
+Cherokee, Tifinagh, Coptic, mathematics, symbols and emoji.
 
 They are OFL licensed and unmodified, so they are downloaded on request and
 not shipped here:
@@ -165,16 +174,17 @@ not shipped here:
 ./crossglyph.sh fetch-fallbacks
 ```
 
-That is 3.4 MB, and it puts `OFL.txt` beside them. A CJK face is another
-15.7 MB and comes only when something has asked for it: a config naming a CJK
-script, or, in the preview, text on the page that cannot be drawn without one.
-One face answers all four languages, Korean included, so there is no choice to
-make between them.
+That is a few megabytes, and it puts `OFL.txt` beside them. The face for
+Chinese, Japanese and Korean is a much larger download on its own, and it comes
+only when something has asked for it: a config naming one of those scripts, or,
+in the preview, text on the page that cannot be drawn without it. That one face
+covers Chinese in both its written forms, Japanese and Korean, so there is no
+choice to make between them.
 
 The preview offers the same download as a button, with a bar, since it takes a
 while. Bundled fallbacks are off by default, which keeps a first build
-self-contained and makes a narrow face about twelve times smaller. After
-fetching them, turn on **bundled fallback faces** in the preview or set
+self-contained and makes a narrow face a fraction of the size. After fetching
+them, turn on **bundled fallback faces** in the preview or set
 `fallbacks = yes` in a config to fill codepoints the family lacks.
 
 ## What is here

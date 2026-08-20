@@ -5,15 +5,16 @@ on the host. The container can read and write one mounted workspace. That
 folder holds the source fonts, configuration files, downloaded fallback faces
 and built `.cpfont` families.
 
-The preview has no authentication. The supplied Compose service publishes it
-on `127.0.0.1` so that only the Docker host can open it.
+The preview has no login. Anyone who can reach the address can retune a
+family, save a config and start a build, so the supplied Compose service
+publishes it on `127.0.0.1` and only the Docker host can open it.
 
 ## Command cheat sheet
 
 Run every command from the folder that contains `compose.yaml`. That can be a
 Git checkout or an unpacked release ZIP.
 
-| Folder | `docker compose` uses | Local build context |
+| Folder | `docker compose` uses | What `--local` builds from |
 |---|---|---|
 | Git checkout | `ghcr.io/crazycoder/crossglyph:latest` | Current checkout |
 | Unpacked release | Image tagged with the release version | `versions/<release>` |
@@ -44,6 +45,10 @@ explain how to install it and point to `crossglyph.cmd` or `crossglyph.sh` for
 running CrossGlyph directly instead.
 
 ### Run Compose directly
+
+Compose is the part of Docker that reads a `compose.yaml` file and runs what
+it describes. CrossGlyph ships those files, so the commands below work as
+printed from the folder that holds them.
 
 To use the published image:
 
@@ -124,9 +129,9 @@ of this cleanup.
 
 ## Run builds and other commands
 
-The image entrypoint is `crossglyph`. A command after the Compose service name
-replaces the default preview command while keeping the workspace mount and the
-container restrictions.
+Everything in the image runs `crossglyph`, so a word after the Compose service
+name is a CrossGlyph command. It replaces the default preview command and keeps
+the mounted workspace and the container restrictions.
 
 ```sh
 docker compose run --rm crossglyph build
@@ -204,11 +209,11 @@ docker run --rm \
 
 ## Update the image
 
-The preview checks the release manifest at startup and when you press
-**Check now**. If the selected image is behind, the version row names the
-release and says to pull the new image. The check state stays in the
-container's private temporary filesystem rather than adding a file to the
-mounted workspace.
+The preview checks `latest.json`, the small file on the web that names the
+newest release, at startup and when you press **Check now**. If the selected
+image is behind, the version row names the release and says to pull the new
+image. The check state stays in the container's private temporary filesystem
+rather than adding a file to the mounted workspace.
 
 An installed ZIP defaults to its own version so native and container launches
 run the same code. Set `CROSSGLYPH_TAG` in `.env` to move a container-only
@@ -230,7 +235,8 @@ deployment settings in `.env` so the managed Compose files can update without
 a conflict.
 
 Published images support `linux/amd64` and `linux/arm64`. Each release also
-carries build provenance and an SBOM in the GitHub Container Registry.
+carries build provenance in the GitHub Container Registry, along with an SBOM,
+which is a list of everything that went into the image.
 
 ## Security boundary
 
@@ -248,7 +254,4 @@ login, and its save and build endpoints write to the workspace. Put an
 authenticated TLS reverse proxy in front of CrossGlyph before making it
 available on another machine.
 
-The bind mount is the current input and output path. A future upload and
-download interface can use the same `/workspace` contract with a Docker volume
-instead of a host folder. That change does not require another image entrypoint
-or another internal storage layout.
+The mounted folder is the only way fonts get in and builds get out.

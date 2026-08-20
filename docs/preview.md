@@ -5,6 +5,11 @@
      alt="A rendered page inside the white Xteink X4 frame, with the device preview controls below"></a>
 </p>
 
+The preview draws one page of text the way the reader would draw it, and
+redraws it every time you move a control. It is where you decide how a font
+should be built, before anything is copied to a card. What it shows is the
+device's own drawing code, so the page is not an approximation of the reader.
+
 ```sh
 ./crossglyph.sh preview                    # the first family in the workspace
 ./crossglyph.sh preview --family notosans  # a family by name
@@ -185,9 +190,12 @@ A family whose files have gone falls back the way a fresh page would.
 
 Font controls (gamma, weight, line height, the spacings, kerning, slant,
 thresholds, hinting, grayscale hinting, mono rasterizing, stem darkening,
-ligatures, figures) rebuild the `.cpfont` behind the page. Those are the labels
-on the panel; [docs/fonts.md](fonts.md#the-same-settings-in-the-preview) has
-what each one is called in a config, for the few whose names differ.
+ligatures, figures) rebuild the `.cpfont` behind the page.
+[Tuning how glyphs look](fonts.md#tuning-how-glyphs-look) explains what each
+one does to the type, and **gamma** and **thresholds**, the two you reach for
+first, carry the short version behind the **?** beside their labels. [The same
+settings in the preview](fonts.md#the-same-settings-in-the-preview) gives what
+each one is called in a config, for the few whose names differ.
 
 Page controls (margin, alignment, hyphenation and the language its patterns
 come from, line spacing, paragraph spacing, anti-aliasing) are the reader's own
@@ -255,9 +263,14 @@ out of sight.
 
 ### Why a control is greyed
 
-The font decides two of them. **ligatures** needs GSUB rules the converter can
-read, and **figures** needs a `pnum` feature. A family with neither draws the
-same page whichever way those are set, so both rows are greyed for it and say
+A greyed row is one that would change nothing about this font, and each of them
+says why. The row stays where it is instead of disappearing, so a panel does
+not change shape as you switch families.
+
+The font decides two of them. **ligatures** needs the font to carry ligature
+rules, in a table called GSUB, and **figures** needs a feature called `pnum`
+that many fonts do not have. A family with neither draws the same page
+whichever way those are set, so both rows are greyed for it and say
 which feature is missing. Every face is asked, because a family whose regular
 has ligatures and whose bold does not still has something to turn off. A face
 that will not open leaves the rows live: greying them would be a claim about a
@@ -290,12 +303,13 @@ so those two rows are greyed.
 
 ### Night mode
 
-It is the reader's inverted screen. The device draws the page exactly
-as it does by day and complements the framebuffer on its way to the panel, so
-what moves is the level each pixel lands on: paper and ink swap, and the two
-greys swap with each other. That is a level complement. Subtracting a value
-from 255 would ask for greys this panel cannot make. Look at a font both ways:
-a face that is comfortable in black on white can read heavy in white on black.
+It is the reader's inverted screen. The device draws the page exactly as it
+does by day, then flips the finished picture on its way to the screen, so what
+moves is the level each pixel lands on: paper and ink swap, and the two greys
+swap with each other. The flip runs over those four levels and not over a 0
+to 255 range, which would ask for greys this panel cannot make. Look at a font
+both ways: a face that is comfortable in black on white can read heavy in
+white on black.
 
 ## Device preview
 
@@ -309,10 +323,11 @@ rounded corners.
 
 **Scale** has four meanings:
 
-- **1:1 pixels** maps one reader pixel to one physical monitor pixel, accounting
-  for the browser's device pixel ratio. Nothing is resampled, the body included:
-  each device ships a second render of its frame whose screen opening is the
-  panel's own size, and this scale draws that one at its own pixels. The other
+- **1:1 pixels** maps one reader pixel to one physical monitor pixel, whatever
+  ratio the browser puts between its own pixels and the screen's. Nothing is
+  resampled, the body included: each device ships a second render of its frame
+  whose screen opening is the panel's own size, and this scale draws that one
+  at its own pixels. The other
   scales take the taller render, which has the resolution they ask for.
 - **Device size** uses the reader body's documented dimensions at 100%.
 - **Fit** scales the selected body or bare screen into the available window.
@@ -605,19 +620,20 @@ renderer: `EpdFont` and `GfxRenderer` from the firmware, compiled to
 WebAssembly, driven from Python. Bytes in, bytes out, no syscalls.
 
 That is what makes the preview honest. Everything that decides how a page looks
-lives in those files: how a `.cpfont` is parsed, how a glyph is blitted at four
-grey levels, where lines break, how justification distributes slack, how
+lives in those files: how a `.cpfont` is read, how a character is painted at
+four grey levels, where lines break, how justification distributes slack, how
 hyphenation patterns apply. A Python reimplementation would agree with the
 device until it did not, and the disagreement would be silent.
 
-The module is `src/crossglyph/render/render.wasm`, about 530 KB, most of it the
-compiled hyphenation tries for ten languages. It is committed, because a
-release has no toolchain to build one with. See
+The module is `src/crossglyph/render/render.wasm`. Most of its size is the
+compiled hyphenation patterns for the languages the firmware carries. It is
+committed, because a release has no toolchain to build one with. See
 [CONTRIBUTING.md](../CONTRIBUTING.md) for rebuilding it.
 
 ### Freestanding, and why that is enforced
 
-The module imports three WASI functions and nothing else:
+WASI is the standard way a WebAssembly module asks its host for anything
+outside itself. This module asks for three functions and nothing else:
 `fd_close`, `fd_seek` and `fd_write`. libc links stdio unconditionally, so they
 come along even though nothing calls them. They are standard, so any host can
 satisfy them, and a browser needs no shim beyond an off the shelf one.
@@ -664,10 +680,10 @@ because a caller naming a file has already said which one they mean.
 A control moves and the page redraws. Everything on that path is cached.
 
 The workspace is walked once per family and the result held, so moving a slider
-does not re-resolve the folder. Kerning is read from GPOS once per face, size
-and figure setting, since parsing GPOS twice for the same font is most of the
-cost of a rebuild. Rendered pages are cached on the whole request, so returning
-to a setting you just left costs nothing.
+does not re-resolve the folder. Kerning is read out of the font's own table
+once per face, size and figure setting, since reading it twice for the same
+font is most of the cost of a rebuild. Rendered pages are cached on the whole
+request, so returning to a setting you just left costs nothing.
 
 The page coalesces its own requests. Dragging a slider issues one render at a
 time and discards what is superseded, so a drag cannot queue thirty renders and
@@ -680,19 +696,20 @@ milliseconds. The page prints the elapsed time under the image.
 ## The sample text
 
 The **Text** card starts folded and remembers whether it is open. Its language
-picker stays in the heading, so changing the specimen does not require opening
+picker stays in the heading, so changing the sample does not require opening
 the text and its notes.
 
 The picker holds one preset per language, and the page opens on one the browser
-says you read. A specimen you cannot read says nothing about a font you are
+says you read. A sample you cannot read says nothing about a font you are
 choosing.
 
-Each preset is the pangram the device itself shows under Settings > Font,
-Article 1 of the Universal Declaration of Human Rights in that language, and a
-short English paragraph so a font that has to carry both scripts can be judged
-on both. Between them they exercise what a font decision depends on: tabular
-figures, a justified line, a word long enough to hyphenate, and emphasis inside
-running text. See `src/crossglyph/preview/samples.py`.
+Each preset holds three things: the sentence the device itself shows under
+Settings > Font, which uses every letter of that alphabet, Article 1 of the
+Universal Declaration of Human Rights in the same language, and a short English
+paragraph so a font that has to carry both scripts can be judged on both.
+Between them they exercise what a font decision depends on: digits padded to a
+common width, a justified line, a word long enough to hyphenate, and emphasis
+inside running text. See `src/crossglyph/preview/samples.py`.
 
 Custom is the first entry and holds whatever you type. Choosing a language
 never costs you your own text, and switching back returns it; typing while a
@@ -700,14 +717,14 @@ preset is showing moves the picker to Custom under your hands. Both the choice
 and your own text are remembered between sessions.
 
 Choosing a preset moves `hyphenate as` with it when the core has patterns for
-that language, and leaves it alone when it has none, so a Japanese specimen is
+that language, and leaves it alone when it has none, so a Japanese sample is
 not quietly hyphenated as English.
 
 Your own text is in some language too, so Custom keeps a `hyphenate as` of its
 own and brings it back with the words. Set one while Custom is showing and it
 is remembered; go through a preset and return, and both the text and the
 language you were reading it in come back. Changing `hyphenate as` while a
-preset is showing is about that specimen and is not kept, and Custom with
+preset is showing is about that sample and is not kept, and Custom with
 nothing of its own recorded leaves whatever is showing alone.
 
 On a first visit only, the browser's languages also pick `hyphenate as`,
@@ -733,7 +750,7 @@ applied. Naming a family in **fallback 1** answers it as well, and is the only
 answer left once the bundled faces are on and have no glyph either.
 
 A fetch takes the page into account. Pressing **Fetch** on a Japanese sample
-brings the 15.7 MB CJK face as well and turns the box on, so you do not have to
+brings the large CJK face as well and turns the box on, so you do not have to
 work out which coverage would have asked for it. One CJK face answers Japanese,
 Korean and both Chinese scripts. It is a slow download, so the same bar the
 build uses says how far it has got, and the button is out until it finishes.

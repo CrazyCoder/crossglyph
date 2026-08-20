@@ -397,7 +397,26 @@ would be a second name. `crossglyph --version` reports what the stamp says.
 
 ## Writing
 
-Comments explain why, not what. They describe what the code does now, never
-what it used to do: git has that, and a comment retelling it is wrong by the
-next change. A firmware behaviour a value works around is worth a citation, and
+This covers the README, `docs/`, `--help` text, error messages, the strings in
+the preview, the release notes and the comments in the code.
+
+Write for somebody who wants to build a font and is not a programmer. Plain
+English, short common words, no em dashes and no `--` standing in for one,
+straight quotes, no emoji, sentence case in headings.
+
+Font and rasterizing terms are the point of this tool and strange to most
+readers. Gloss each one the first time a page uses it. "Stem darkening thickens
+the strokes, which helps on a screen where thin letters look washed out" tells
+the reader something; "stem darkening applies a stem darkening factor" does
+not. Name settings the way the reader's own surface names them: the label for
+anything about the preview, the config key for anything about `build`.
+
+Leave out numbers that go stale. Version numbers, glyph counts, download sizes
+and benchmark timings are all wrong a few commits later and nobody notices.
+Give the shape instead, and keep a number when something fixed holds it in
+place, such as the four greys the screen draws.
+
+Comments explain why, not what. Both comments and pages describe what the code
+does now. Git holds the rest, and a comment retelling it is wrong by the next
+change. A firmware behaviour a value works around is worth a citation, and
 those citations are why several comments here are long.

@@ -16,8 +16,8 @@ It never runs while you are waiting for anything:
 - the preview checks on a background thread while it starts, so the page is
   never later for it.
 
-Either way it gives up after two seconds, and it asks at most once per
-interval. An install with no network costs one two second wait a day and says
+Either way it gives up after a couple of seconds, and it asks at most once per
+interval. An install with no network costs one short wait a day and says
 nothing.
 
 ## What you see
@@ -40,7 +40,7 @@ found. Its version is whatever the last release set, so a tree taken from the
 default branch after that reports the release and compares as up to date while
 holding a good deal more.
 
-In the preview, the island under the specimen answers the question: the new
+In the preview, the panel under the sample text answers the question: the new
 version when there is one, and **Up to date.** when there is not. When it last
 looked is a fact about that answer and not the answer itself, so it sits on the
 line below with the rest of what this install is. Beside it is one button:
@@ -83,8 +83,8 @@ download or another restart while the first one is working.
 `crossglyph update` does the same install from the command line, without
 restarting a process you may be using for something else.
 
-The updater fetches the manifest, stops if there is nothing newer, downloads
-the release, checks it against the SHA-256 the manifest gave, unpacks it into
+The updater fetches `latest.json`, stops if there is nothing newer, downloads
+the release, checks it against the SHA-256 that file gave, unpacks it into
 `versions/<new version>`, and writes that version into `current`.
 
 The version you were on stays where it is. `update.conf` and your `fonts`
@@ -97,10 +97,11 @@ environment; it recommends closing CrossGlyph and opening it again only after
 the handoff exits or the replacement server fails to appear.
 
 The same instruction appears when a preview cannot hand itself to the new
-version. This includes an update requested through a non-loopback address,
-because a remote page is not allowed to stop the server, and an update run
-with `crossglyph update`. On the next launch, the native launcher runs the
-version named by `current`.
+version. A handoff is the running server starting its replacement and stepping
+aside. It cannot happen for an update asked for from another machine, since a
+page somewhere else is not allowed to stop the server, and it does not happen
+for an update run with `crossglyph update`. On the next launch, the native
+launcher runs the version named by `current`.
 
 Automatic handoff is a capability of the version that is running. The one it
 has just downloaded does not decide it. So the first update from a release
@@ -222,10 +223,10 @@ removed at the next launch, on a background thread in the preview, so a large
 removal never delays the page. `keep_versions` in `update.conf` changes the
 count.
 
-A version costs about 3 MB unpacked, and about 80 MB once it has been run and
-uv has built its environment. Nothing removes the version in use, the version
-`current` names, or the one this process is running from, and a directory that
-will not go is left for the next launch, and nothing fails.
+A version is a few megabytes unpacked, and a good deal larger once it has been
+run and uv has built its environment inside it. Nothing removes the version in
+use, the version `current` names, or the one this process is running from, and
+a directory that will not go is left for the next launch, and nothing fails.
 
 ## Settings
 
