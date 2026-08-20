@@ -199,8 +199,8 @@ preview](fonts.md#the-same-settings-in-the-preview) gives what each one is
 called in a config, for the few whose names differ.
 
 Page controls (margin, alignment, hyphenation and the language its patterns
-come from, line spacing, paragraph spacing, anti-aliasing) are the reader's own
-settings, and they only re-lay-out. The language list holds every one the
+come from, line spacing, paragraph spacing, anti-aliasing, night mode) are the
+reader's own settings, and they only re-lay-out. The language list holds every one the
 firmware carries patterns for. On the device that comes from the book's own
 metadata instead. A control that cannot apply is greyed and stays visible, so
 hyphenating as Russian is not offered while hyphenation is off.
@@ -507,10 +507,11 @@ Anything between two steps rounds to the nearer one when you leave the box, and
 anything outside the range is pulled back in, so the sizes you ship are sizes
 you were able to look at first.
 
-A family may carry more than four sizes, and the boxes are not the limit: a
+A family may carry more than four sizes, and the boxes are not the limit. A
 config with a longer list of them opens a **more sizes** field beside the boxes
-holding the rest. The field appears only for a family that already has one, so
-a fifth size is added in the config rather than here.
+holding the rest, and that field appears only for a family that already has
+one. To add a fifth from the panel, put it in **second family** below and leave
+the **suffix** empty: those sizes join this family instead of naming another.
 
 A comma is a decimal point in one of those boxes, since each holds a single
 size. In **more sizes**, which is a list, it separates one from the next, and so
