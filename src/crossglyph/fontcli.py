@@ -53,18 +53,33 @@ def _listed(names: tuple[str, ...] | list[str]) -> str:
     return f"{', '.join(names[:-1])} or {names[-1]}"
 
 
-#: What to do about a coverage that came out at zero, one sentence per answer.
-#: In the config's own words: this is the surface where somebody edits a
-#: .conf, and a line here that named a checkbox would be naming a control the
-#: reader cannot see. The panel words the same three for itself.
-REMEDIES = {
-    "unused": "Set `fallbacks = yes`, or put `bundled` back in "
-              "`fallback_order`.",
-    "fetch": "The bundled set is short of faces here. Run "
-             "`crossglyph fetch-fallbacks` and build again.",
-    "none": "No bundled face covers it. Name a family in `fallback_regular`, "
-            "or drop the tick.",
-}
+def remedy_for(remedy: str, fallbacks: bool) -> str:
+    """What to do about a coverage that came out at zero.
+
+    In the config's own words. This is the surface where somebody edits a
+    .conf, and a line naming a checkbox would be naming a control the reader
+    cannot see. The panel words the same answers for itself.
+
+    Two of the three depend on whether the family reads the bundled set at
+    all. Fetching faces into a folder this build does not open leaves the
+    range as empty as it was, so with the set switched off the line carries
+    both moves.
+    """
+    if remedy == "unused":
+        return ("`fallback_order` leaves the bundled faces out. Put `bundled` "
+                "back in it." if fallbacks
+                else "Set `fallbacks = yes` and build again.")
+    if remedy == "fetch":
+        return ("The bundled set is short of faces here. Run "
+                "`crossglyph fetch-fallbacks` and build again." if fallbacks
+                else "The bundled set is short of faces here, and this family "
+                     "does not read it anyway. Run "
+                     "`crossglyph fetch-fallbacks`, set `fallbacks = yes`, "
+                     "and build again.")
+    # Nothing in a complete set draws it, which is true whatever `fallbacks`
+    # says: the folder was read for this answer and the chain was not.
+    return ("No bundled face covers it. Name a family in `fallback_regular`, "
+            "or drop the tick.")
 
 
 def say_uncovered(empty: fontbuild.Uncovered) -> str:
@@ -84,7 +99,7 @@ def say_uncovered(empty: fontbuild.Uncovered) -> str:
                      f"{'is' if len(empty.faces) < 2 else 'are'} in the "
                      f"fallbacks folder and this build did not open "
                      f"{'it' if len(empty.faces) < 2 else 'them'}.")
-    lines.append(f"    {REMEDIES[empty.remedy]}")
+    lines.append(f"    {remedy_for(empty.remedy, empty.fallbacks)}")
     return "\n".join(lines)
 
 

@@ -381,27 +381,40 @@ function whichFamilies(names) {
 
 // What to do about a coverage that came out at zero, in the panel's own terms:
 // the tick above, the box above that, the button beside it. The command line
-// words the same three answers in config terms, since a reader there has no
-// control to press.
-function coverageAdvice(remedy) {
-  const box = exportForm.elements.fallbacks;
-  if (remedy === "fetch") return "Press Fetch, above, then build again.";
+// words the same answers in config terms, since a reader there has no control
+// to press.
+//
+// `bundled` is what the build read, off the event rather than off the box. The
+// warning describes the run that produced it, and a box someone has since
+// tapped would otherwise change what a finished build is reported to have
+// done.
+function coverageAdvice(remedy, bundled) {
   if (remedy === "none") {
     return "No bundled face draws it. Pick a family for fallback 1, "
       + "or untick it.";
   }
+  if (remedy === "fetch") {
+    // Fetching alone is half an answer while the box is off: the faces land in
+    // a folder the build does not read, and the range comes out as empty as
+    // it was.
+    return bundled
+      ? "Press Fetch, above, then build again."
+      : "Press Fetch, above, turn on bundled fallback faces, then build "
+        + "again.";
+  }
   // The faces are here and this build did not use them. Usually the box is
-  // off and pressing it is the whole answer; with it already on, the order in
-  // the .conf is what left them out, and telling anybody to press a control
-  // that is on would send them nowhere.
-  return box && box.checked
+  // off and pressing it is the whole answer; with it on, the order in the
+  // .conf is what left them out, and telling anybody to press a control that
+  // is on would send them nowhere.
+  return bundled
     ? "fallback_order leaves the bundled faces out of this family."
     : "Turn on bundled fallback faces and build again.";
 }
 
 function coverageSentence(step) {
   const names = (step.tokens || []).map(one => presetLabels.get(one) || one);
-  return `nothing here draws ${listed(names)}. ${coverageAdvice(step.remedy)}`;
+  return `nothing here draws ${listed(names)}. `
+    + coverageAdvice(step.remedy, Boolean(step.fallbacks));
 }
 
 //: Both lists, grouped by what they say. Nothing accumulates across builds:

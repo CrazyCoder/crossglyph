@@ -1085,6 +1085,8 @@ def test_a_face_the_build_never_opened_is_named_as_the_answer(tmp_path):
     assert found.remedy == "unused"
     assert found.tokens == ("thai",)
     assert found.faces == ("NotoSansThai-Regular.ttf",)
+    assert found.fallbacks is False, \
+        "which is how the answer knows to name the switch as well"
 
 
 def test_a_folder_short_of_faces_asks_for_a_fetch(tmp_path):
@@ -1092,6 +1094,7 @@ def test_a_folder_short_of_faces_asks_for_a_fetch(tmp_path):
     found = fontbuild.uncovered(variant)
     assert found.remedy == "fetch"
     assert found.faces == (), "nothing on the disk to name"
+    assert found.fallbacks is True
 
 
 def test_a_complete_folder_that_still_cannot_draw_it_offers_nothing(tmp_path):

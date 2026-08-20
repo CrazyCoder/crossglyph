@@ -151,3 +151,27 @@ def test_fail_on_warning_exits_one_and_still_writes_the_fonts(workspace,
 def test_a_clean_build_under_the_flag_still_exits_zero(workspace, tmp_path):
     assert fontcli.main(["--fonts", str(workspace), "-o", str(tmp_path / "out"),
                          "-j", "1", "--fail-on-warning"]) == 0
+
+
+def test_fetching_is_half_an_answer_while_the_set_is_switched_off(workspace,
+                                                                  tmp_path,
+                                                                  capsys):
+    """The faces would land in a folder this build does not read, so a line
+    that said only "fetch" sends somebody through a download to the same empty
+    range."""
+    _ticking_thai(workspace)
+    assert build(workspace, tmp_path / "out") == 0
+    said = capsys.readouterr().err
+    assert "fetch-fallbacks" in said and "fallbacks = yes" in said
+
+
+def test_with_the_set_switched_on_a_fetch_is_the_whole_answer(workspace,
+                                                              tmp_path,
+                                                              capsys):
+    _ticking_thai(workspace)
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = yes\n", encoding="utf-8")
+    assert build(workspace, tmp_path / "out") == 0
+    said = capsys.readouterr().err
+    assert "fetch-fallbacks" in said
+    assert "fallbacks = yes" not in said, "it already is"

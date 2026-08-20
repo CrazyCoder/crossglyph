@@ -5551,7 +5551,8 @@ for (const deferred of [
     { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 100,
       warnings: [] },
     { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "unused",
-      faces: ["NotoSansGreek-Regular.ttf"] },
+      faces: ["NotoSansGreek-Regular.ttf"],
+      fallbacks: false },
     { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
   ] });
   await env.builds.one();
@@ -5566,45 +5567,46 @@ for (const deferred of [
         env.built.textContent === "1 built (100 B)", env.built.textContent);
 }
 
-// 87. Which sentence the unused answer takes depends on the box, since telling
-//     anybody to press a control that is already on sends them nowhere.
+// 87. Which sentence an answer takes depends on whether the build read the
+//     bundled set. Off the event and not off the box: the warning describes
+//     the run that produced it, and a box tapped since would otherwise change
+//     what a finished build is reported to have done.
+//
+// 88. Fetching is half an answer while the set is switched off, since the
+//     faces land in a folder the build does not read.
 {
-  const steps = [
-    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
-    { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "unused",
-      faces: [] },
-    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
-  ];
-  const off = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });
-  off.exportForm.elements.fallbacks.checked = false;
-  await off.builds.one();
-  check("with the box off the answer is to turn it on",
-        off.warnLines()[0].includes("Turn on bundled fallback faces"),
-        off.warnLines()[0]);
-
-  const on = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });
-  on.exportForm.elements.fallbacks.checked = true;
-  await on.builds.one();
-  check("with it on the order is what left them out",
-        on.warnLines()[0].includes("fallback_order"), on.warnLines()[0]);
-}
-
-// 88. The other two answers, which have no face to name and no box to blame.
-{
-  const answer = async (remedy) => {
+  const answer = async (remedy, fallbacks) => {
     const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
       { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
       { event: "coverage", family: "Alto", tokens: ["cyrillic", "greek"],
-        remedy, faces: [] },
+        remedy, faces: [], fallbacks },
       { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
     ] });
+    // The opposite of what the event says, so a page reading the control
+    // instead of the run fails here rather than passing by luck.
+    env.exportForm.elements.fallbacks.checked = !fallbacks;
     await env.builds.one();
     return env.warnLines()[0];
   };
-  check("a folder short of faces sends you to Fetch",
-        (await answer("fetch")).includes("Press Fetch"));
-  const none = await answer("none");
-  check("and nothing bundled leaves fallback 1 and the tick",
+
+  const unusedOff = await answer("unused", false);
+  check("with the set off the answer is to turn it on",
+        unusedOff.includes("Turn on bundled fallback faces"), unusedOff);
+  const unusedOn = await answer("unused", true);
+  check("with it on the order is what left them out",
+        unusedOn.includes("fallback_order"), unusedOn);
+
+  const fetchOff = await answer("fetch", false);
+  check("a fetch with the set off names both moves",
+        fetchOff.includes("Press Fetch")
+        && fetchOff.includes("turn on bundled fallback faces"), fetchOff);
+  const fetchOn = await answer("fetch", true);
+  check("and with it on, only the one",
+        fetchOn.includes("Press Fetch") && !fetchOn.includes("turn on"),
+        fetchOn);
+
+  const none = await answer("none", true);
+  check("nothing bundled leaves fallback 1 and the tick",
         none.includes("fallback 1") && none.includes("untick"), none);
   check("both ranges are listed in one sentence",
         none.includes("Cyrillic or Greek"), none);
@@ -5616,7 +5618,7 @@ for (const deferred of [
   const many = [];
   for (let n = 0; n < 12; n += 1) {
     many.push({ event: "coverage", family: `Fam${n}`, tokens: ["greek"],
-                remedy: "none", faces: [] });
+                remedy: "none", faces: [], fallbacks: true });
   }
   const env = await loaded(fakeStorage(), DEFAULTS,
                            { buildSteps: [{ event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] }, ...many, { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] }] });
@@ -5670,7 +5672,7 @@ for (const deferred of [
   const steps = [
     { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
     { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "none",
-      faces: [] },
+      faces: [], fallbacks: true },
     { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
   ];
   const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });

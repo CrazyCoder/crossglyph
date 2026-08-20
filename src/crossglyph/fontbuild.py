@@ -637,11 +637,17 @@ class Uncovered(typing.NamedTuple):
     looking. `faces` are the filenames that would draw the range, which only
     the first answer has: the other two have no file to open and nothing worth
     naming.
+
+    `fallbacks` is the family's own setting, and it decides how many moves the
+    answer takes. Fetching faces into a folder a build is not reading leaves
+    the range exactly as empty as it was, so a reader with the set switched off
+    has to be told both halves.
     """
     family: str
     tokens: tuple[str, ...]
     remedy: str
     faces: tuple[str, ...]
+    fallbacks: bool
 
 
 def _same(path: str | pathlib.Path) -> str:
@@ -690,10 +696,11 @@ def uncovered_from(variant: Variant,
     faces = tuple(path.name for path in spare
                   if wanted & drawable_codepoints([path]))
     if faces:
-        return Uncovered(variant.name, empty, "unused", faces)
+        return Uncovered(variant.name, empty, "unused", faces, config.fallbacks)
     short = [name for name in missing_fallbacks(config.root, config.coverage)
              if name != FALLBACK_LICENCE]
-    return Uncovered(variant.name, empty, "fetch" if short else "none", ())
+    return Uncovered(variant.name, empty, "fetch" if short else "none", (),
+                     config.fallbacks)
 
 
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
@@ -1116,7 +1123,8 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
             if empty:
                 yield {"event": "coverage", "family": empty.family,
                        "tokens": list(empty.tokens), "remedy": empty.remedy,
-                       "faces": list(empty.faces)}
+                       "faces": list(empty.faces),
+                       "fallbacks": empty.fallbacks}
 
     yield {"event": "done", "out": str(out_dir), "removed": removed,
            # What this run wrote, and what the sizes it left alone already take
