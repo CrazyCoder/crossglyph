@@ -634,6 +634,12 @@ class Config:
         return ",".join(p for p in parts if p)
 
     def variants(self) -> list[Variant]:
+        # An empty suffix asks for one family: the second list of sizes joins
+        # the first instead of naming a font of its own. Nothing on the device
+        # limits how many sizes a family carries, so both are one build.
+        if self.sizes_mod and not self.mod_suffix:
+            merged = sorted(self.sizes + self.sizes_mod)
+            return [Variant(self.name, merged, self)] if merged else []
         out = []
         if self.sizes:
             out.append(Variant(self.name, self.sizes, self))
@@ -712,9 +718,19 @@ def parse_sizes(raw: str, where: str) -> list[float]:
                 f"{where}: size {size} labels as {size_label(size)}, and the "
                 f"device only reads 1..255")
 
-    # Two sizes that land on the same label would write the same .cpfont, and
-    # since fontcli builds sizes in a pool they would race for the file. Equal
-    # sizes count too: `13.5 13.5` is one output asked for twice.
+    check_labels(sizes, where)
+    return sizes
+
+
+def check_labels(sizes: list[float], where: str) -> None:
+    """Refuse two sizes that would write one file.
+
+    Two that land on the same label would write the same .cpfont, and since
+    fontcli builds sizes in a pool they would race for it. Equal sizes count
+    too: `13.5 13.5` is one output asked for twice. Taken as a list rather
+    than as a string, because a family whose second size list joins the first
+    has to be checked across both.
+    """
     seen: dict[int, float] = {}
     for size in sizes:
         label = size_label(size)
@@ -725,7 +741,6 @@ def parse_sizes(raw: str, where: str) -> list[float]:
                 f"{where}: sizes {both} both land on {label}, so they would "
                 f"write the same .cpfont")
         seen[label] = size
-    return sizes
 
 
 def _bool(raw: str, key: str, where: str) -> bool:
@@ -1011,15 +1026,26 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
             f"Set 'family' to the shared part of the filenames, or name the files "
             f"explicitly with 'regular = ...'.")
 
+    sizes = parse_sizes(values.get("sizes", ""), where) or DEFAULT_SIZES
+    sizes_mod = parse_sizes(values.get("sizes_mod", ""), where)
+    # An absent key is the default suffix. A key set to nothing is a choice,
+    # and it says these sizes belong to the family above rather than to a
+    # second one, so the two lists then share a set of .cpfont names.
+    raw_suffix = values.get("mod_suffix")
+    mod_suffix = ("Mod" if raw_suffix is None else
+                  sanitize_name(raw_suffix) if raw_suffix.strip() else "")
+    if sizes_mod and not mod_suffix:
+        check_labels(sizes + sizes_mod, where)
+
     return Config(
         path=path,
         derived=derived,
         name=name,
         family=family,
         dir=directory,
-        sizes=parse_sizes(values.get("sizes", ""), where) or DEFAULT_SIZES,
-        sizes_mod=parse_sizes(values.get("sizes_mod", ""), where),
-        mod_suffix=sanitize_name(values.get("mod_suffix", "Mod")),
+        sizes=sizes,
+        sizes_mod=sizes_mod,
+        mod_suffix=mod_suffix,
         # `intervals =` with nothing after it is a choice, and the narrowest
         # one: every build carries `base` whatever this says, so an empty list
         # is a font of ASCII and its punctuation. Only an absent key takes the

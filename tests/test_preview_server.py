@@ -1780,13 +1780,24 @@ def test_a_second_family_saves_with_the_suffix_that_names_it(scratch):
     text = (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
     assert "sizes_mod" not in text and "mod_suffix" not in text
 
-    # An empty box is the absence of the key rather than the key set to
-    # nothing: written down, it comes back as "CustomFont" and the second
-    # family builds under that.
+    # An empty box is a choice and is written as one: those sizes join the
+    # family above, so the key has to say so. Dropped, it would hand the
+    # family the default suffix back and build the second one after all.
     _save_export("Alto", sizes_mod="13 15", mod_suffix="")
-    assert _alto_says(scratch, "mod_suffix") is None
+    assert _alto_says(scratch, "mod_suffix") == ""
     entry = next(f for f in server.families() if f["name"] == "Alto")
-    assert entry["export"]["mod_suffix"] == "Mod"
+    assert entry["export"]["mod_suffix"] == ""
+    assert "AltoMod" not in {f["name"] for f in server.families()}, \
+        "the sizes were meant to join the family above"
+
+    # One family writes one set of files, so a label may be claimed once
+    # across both lists. Under two names they are two directories and free to
+    # share one.
+    refused = _save_export("Alto", sizes="13.5", sizes_mod="14", mod_suffix="")
+    assert refused.status_code == 422, refused.text
+    assert "both land on 14" in refused.text
+    assert _save_export("Alto", sizes="13.5", sizes_mod="14",
+                        mod_suffix="Alt").status_code == 200
 
 
 def _alto_says(scratch, key):
@@ -1850,7 +1861,8 @@ def test_the_second_family_a_config_builds_takes_its_name_too(scratch):
     """`sizes_mod` builds <name><mod_suffix> from the same faces, so a config
     holds two names in the output folder rather than one. Landing on the
     second is the same overwrite as landing on the first."""
-    assert _save_export("Ledger", sizes_mod="9 10").status_code == 200
+    assert _save_export("Ledger", sizes_mod="9 10",
+                        mod_suffix="Mod").status_code == 200
 
     response = _save_export("Alto", name="LedgerMod")
     assert response.status_code == 422

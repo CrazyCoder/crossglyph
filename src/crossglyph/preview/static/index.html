@@ -986,12 +986,14 @@
         <button type="button" class="info" aria-label="What a second family is"
                 aria-describedby="mod-tip">?</button>
         <span class="tip" id="mod-tip" role="tooltip">
-          Sizes here build <strong id="mod-name">a second family</strong> from
-          the same faces, listed beside this one on the device under a name of
-          its own. One family can carry as many sizes as you give it, so this
-          is for when two entries in the font list suit you better than one
-          entry with a long list of sizes under it. Leave these empty for a
-          single family; the suffix is what the second name ends with.
+          More sizes, built from the same faces. With the suffix empty they
+          join the family above, and the reader lists them among its sizes:
+          nothing limits how many one family carries. Fill the suffix in and
+          they build <strong id="mod-name">a second family</strong> instead,
+          listed beside the first under that name, which is worth having when
+          two entries suit you better than one long list of sizes.
+          <br><br>
+          Leave the sizes empty for neither.
         </span>
       </span></h2>
       <span id="mod-dot" aria-hidden="true" hidden
@@ -1036,7 +1038,7 @@
     <div class="row wide">
       <label class="name" for="mod-suffix">suffix</label>
       <input class="mono" id="mod-suffix" name="mod_suffix" type="text"
-             placeholder="Mod">
+             placeholder="none, so one family">
     </div>
     </div>
 

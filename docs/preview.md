@@ -468,12 +468,13 @@ name, the point sizes, the coverage, and the fallback families. Press the **?**
 beside a label to read what that setting does.
 
 The four **sizes** boxes cover what most families ship. The **second family**
-section builds those same faces again under the same name plus a suffix, at
-another set of sizes, and the device lists that as a font of its own beside the
-first. It is not a way past a limit on sizes: one family carries as many as you
-give it. Use it when two entries in the font list suit you better than one
-entry with a long list of sizes under it. The section starts folded, and a dot
-on its heading means this family has one.
+section holds more of them, and its **suffix** decides where they land. Leave
+the suffix empty and they join the family above, which the reader then lists
+among its own sizes: nothing on the device limits how many one family carries.
+Fill the suffix in and they build a font of its own beside the first, named
+after it, which is worth having when two entries suit you better than one entry
+with a long list of sizes under it. The section starts folded, and a dot on its
+heading means this family has sizes in there.
 
 On a window wide enough for three columns the panel gets one of its own beside
 the page. On a narrower window it shares a column with the font controls, and

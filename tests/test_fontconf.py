@@ -552,6 +552,45 @@ def test_mod_suffix_is_configurable(tmp_path):
         == "AltoAlt"
 
 
+def test_an_empty_suffix_puts_the_second_list_in_the_first_family(tmp_path):
+    """Nothing on the device limits how many sizes a family carries, so a
+    second list with no name of its own is simply more sizes."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text(
+        "sizes = 12 14\nsizes_mod = 13 15\nmod_suffix =\n", encoding="utf-8")
+    variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
+    assert [(v.name, v.sizes) for v in variants] == [("Alto", [12, 13, 14, 15])]
+
+
+def test_an_absent_suffix_still_names_a_second_family(tmp_path):
+    """Only a key set to nothing is the choice. A config that never mentioned
+    the suffix keeps building what it built."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text(
+        "sizes = 12 14\nsizes_mod = 13 15\n", encoding="utf-8")
+    variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
+    assert [v.name for v in variants] == ["Alto", "AltoMod"]
+
+
+def test_one_family_cannot_hold_two_sizes_that_share_a_label(tmp_path):
+    """Merged, the two lists write one set of .cpfont files, so the labels
+    have to be checked across both."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text(
+        "sizes = 13.5\nsizes_mod = 14\nmod_suffix =\n", encoding="utf-8")
+    with pytest.raises(fontconf.FontConfigError, match="both land on 14"):
+        fontconf.parse_config(tmp_path / "alto.conf")
+
+
+def test_two_lists_under_two_names_may_share_a_label(tmp_path):
+    """They write into directories of their own, so nothing collides."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text(
+        "sizes = 13.5\nsizes_mod = 14\n", encoding="utf-8")
+    variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
+    assert [v.name for v in variants] == ["Alto", "AltoMod"]
+
+
 def test_without_sizes_mod_there_is_one_variant(tmp_path):
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text("", encoding="utf-8")

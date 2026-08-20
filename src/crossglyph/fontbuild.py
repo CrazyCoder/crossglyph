@@ -1583,8 +1583,14 @@ def claimed_names(source: pathlib.Path) -> set[str]:
         name = fontconf.sanitize_name(values.get("name", "").strip() or family)
         names.add(name)
         if values.get("sizes_mod", "").strip():
-            names.add(name + fontconf.sanitize_name(
-                values.get("mod_suffix", "Mod").strip() or "Mod"))
+            # The same rule the config reader follows: absent is the default
+            # suffix, and set to nothing means those sizes join the family
+            # above, which claims no directory of its own.
+            raw_suffix = values.get("mod_suffix")
+            if raw_suffix is None:
+                names.add(name + "Mod")
+            elif raw_suffix.strip():
+                names.add(name + fontconf.sanitize_name(raw_suffix))
     return names
 
 

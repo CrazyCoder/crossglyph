@@ -1242,16 +1242,24 @@ def export_changes(request_export: dict, config: Config,
         fontconf.parse_sizes(sizes_mod, "sizes_mod")
     wanted["sizes_mod"] = sizes_mod or None
     # sanitize_name answers "CustomFont" for a string with nothing usable in it,
-    # which is right for a family name and wrong for a suffix: empty here means
-    # "whatever the family would be called anyway", not a name of its own.
+    # which is right for a family name and wrong for a suffix: an empty box
+    # names no second family, and these sizes join the one above instead.
     raw_suffix = str(request_export.get("mod_suffix", "")).strip()
     suffix = fontconf.sanitize_name(raw_suffix) if raw_suffix else ""
     inherited_suffix = fontconf.sanitize_name(shared.get("mod_suffix", "Mod"))
-    # `and suffix`, because an empty one is the absence of a key and not a key
-    # set to nothing: written down, it comes back through sanitize_name as
-    # "CustomFont" and the second family builds under that.
-    wanted["mod_suffix"] = (
-        suffix if sizes_mod and suffix and suffix != inherited_suffix else None)
+    if not sizes_mod:
+        wanted["mod_suffix"] = None
+    elif not suffix:
+        # Written as an empty key rather than dropped. Dropping it would hand
+        # the family the default suffix back and build the second one after
+        # all, which is the opposite of what an empty box asks for.
+        wanted["mod_suffix"] = ""
+    else:
+        wanted["mod_suffix"] = suffix if suffix != inherited_suffix else None
+    # One family carries both lists, so they share a set of .cpfont names and
+    # two sizes that land on one label would write the same file.
+    if sizes_mod and not suffix:
+        fontconf.parse_sizes(f"{sizes} {sizes_mod}", "sizes")
 
     # Written even when it is empty, where every other key here is dropped at
     # that point. Nothing ticked is a coverage the panel can show and a build
@@ -1277,8 +1285,8 @@ def export_changes(request_export: dict, config: Config,
     # costs a walk of the folder, and it can only have moved when one of these
     # three did.
     built = {chosen}
-    if wanted["sizes_mod"]:
-        built.add(chosen + (wanted["mod_suffix"] or inherited_suffix))
+    if sizes_mod and suffix:
+        built.add(chosen + suffix)
     if built != {variant.name for variant in config.variants()}:
         taken = _name_taken(built, config)
         if taken:

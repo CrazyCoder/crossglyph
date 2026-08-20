@@ -238,11 +238,14 @@ export function familyLabel() {
          || "this family";
 }
 
-// What the second family's name ends with, as a save would write it: the panel
-// posts a trimmed suffix and an empty one means the default. One function, so
-// the heading and the note under the boxes cannot name two different families.
-export const modSuffix = () =>
-  exportForm.elements.mod_suffix.value.trim() || "Mod";
+// What the second family's name ends with, as a save would write it. Empty is
+// an answer rather than a gap: those sizes go to the family above. One
+// function, so the heading and the note under the boxes cannot disagree.
+export const modSuffix = () => exportForm.elements.mod_suffix.value.trim();
+
+// What these sizes build: the family above while the suffix is empty, and a
+// second one named after it once there is a suffix to name it with.
+export const modFamilyLabel = () => familyLabel() + modSuffix();
 
 // The suffix only names something when there is a second family to name, and a
 // field that cannot matter yet should not invite typing into it.
@@ -251,7 +254,7 @@ export function showModState() {
   const suffix = exportForm.elements.mod_suffix;
   suffix.disabled = !sizes;
   // They are one build, and the second family is named after the first.
-  modName.textContent = sizes ? familyLabel() + modSuffix() : "a second family";
+  modName.textContent = sizes ? modFamilyLabel() : "a second family";
   modDot.hidden = !sizes;
 }
 
@@ -300,7 +303,7 @@ export function showShipsAs() {
                familyLabel());
   spellShipsAs(modShipsAs,
                joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more),
-               familyLabel() + modSuffix());
+               modFamilyLabel());
 }
 
 // The config spells coverage as one comma-separated string, because that is

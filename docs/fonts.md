@@ -96,8 +96,8 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | key | default | meaning |
 |---|---|---|
 | `sizes` | `12 14 16 18` | point sizes to build. Fractions are allowed, see below |
-| `sizes_mod` | none | point sizes for a second family, `<name><mod_suffix>` |
-| `mod_suffix` | `Mod` | suffix for that second family |
+| `sizes_mod` | none | more point sizes. They join this family when `mod_suffix` is empty, and build `<name><mod_suffix>` otherwise |
+| `mod_suffix` | `Mod` | what the second family's name ends with. Set to nothing and `sizes_mod` joins the first family instead |
 | `out` | `cpfonts` | in `all.conf` only: where builds go, resolved against the workspace |
 
 #### Which characters go in
@@ -181,11 +181,26 @@ CrossPoint's **Settings > Reader > Font Size** lists every size the active
 family carries, one entry each. It is a point size that is stored and shown,
 not an abstract small, medium or large slot.
 
-`sizes_mod` builds a second family from the same faces at another set of sizes,
-so `NotoSans` at 12, 14, 16, 18 and `NotoSansMod` at 13, 15, 17, 19. The reader
-lists it as a font of its own beside the first. Nothing limits how many sizes
-one family may carry, so this is for keeping two lists apart and not for
-getting past a cap.
+`sizes_mod` is more sizes from the same faces. Where they land depends on
+`mod_suffix`:
+
+```ini
+sizes      = 12 14 16 18
+sizes_mod  = 13 15 17 19
+mod_suffix =                 # one family, NotoSans, at all eight sizes
+```
+
+```ini
+sizes      = 12 14 16 18
+sizes_mod  = 13 15 17 19     # two, NotoSans and NotoSansMod
+```
+
+An absent `mod_suffix` is the default `Mod`, and a `mod_suffix` set to nothing
+is the choice. Nothing on the device limits how many sizes one family carries,
+so a second family is for when two entries in the font list suit you better
+than one entry with a long list of sizes under it. Merged, the two lists write
+one set of files, so two sizes that land on the same label are refused across
+both.
 
 Two sizes are special. The built-in interface fonts render at 8, 10 and 12 pt,
 and CJK text in the interface is drawn by borrowing the selected family at the

@@ -2519,17 +2519,17 @@ for (const { name, text } of sources) {
             + "as.", modNote.textContent);
   fields.mod_suffix.value = "Alt";
   env.exportForm.edit("mod_suffix");
-  check("which follows its suffix", modNote.textContent.includes("AltoAlt_14"),
-        modNote.textContent);
+  check("and a suffix names a second family instead",
+        modNote.textContent.includes("AltoAlt_14"), modNote.textContent);
 
-  // The heading and this note name the same second family or the panel is
-  // saying two things at once, and a save posts the suffix trimmed.
+  // The heading and this note name the same family or the panel is saying two
+  // things at once, and a save posts the suffix trimmed.
   const heading = env.sandbox.document.getElementById("mod-name");
   fields.mod_suffix.value = " ";
   env.exportForm.edit("mod_suffix");
-  check("and a suffix of nothing but space is the default in both places",
-        heading.textContent === "AltoMod"
-        && modNote.textContent.includes("AltoMod_14"),
+  check("and a suffix of nothing but space is no suffix in both places",
+        heading.textContent === "Alto"
+        && modNote.textContent.includes("Alto_14"),
         `${heading.textContent} | ${modNote.textContent}`);
   fields.mod_suffix.value = "";
   env.exportForm.edit("mod_suffix");
