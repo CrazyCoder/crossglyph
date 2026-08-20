@@ -185,7 +185,31 @@
 
 
   <div class="row num">
-    <label class="name" for="kerning">kerning <span class="unit">×</span></label>
+    <span class="name"><label for="kerning">kerning <span class="unit">×</span></label><span
+        class="explain">
+        <button type="button" class="info" aria-label="What kerning does"
+                aria-describedby="kerning-tip">?</button>
+        <span class="tip" id="kerning-tip" role="tooltip">
+          How hard particular pairs of letters are pulled together. A font
+          carries a table of them, so that the A and the V in "AV" tuck under
+          each other instead of leaving a hole, and the build reads that table
+          and writes the answers into the file.
+          <br><br>
+          This is a factor and not a switch, because the useful setting is
+          often part of the way. 1 is the amount the designer drew, 0 leaves
+          the pairs alone, and 0.5 keeps the shape of their decisions at half
+          the amount. A face kerned for print often over-tightens on a screen
+          this size, where the device stores each adjustment in sixteenths of
+          a pixel and one of those is already a good fraction of a stem.
+          <br><br>
+          Turning it down makes the file smaller as well. The pairs are scaled
+          before they are grouped, so pairs that flatten into each other are
+          then grouped together, and those that round away to nothing are
+          dropped. A style with more kerning entries than the reader will load
+          is refused outright, and turning this down is one of the two ways
+          out. Narrower coverage is the other.
+        </span>
+      </span></span>
     <input type="range" data-slider-for="kerning" min="0" max="2" step="0.05" value="1" tabindex="-1" aria-hidden="true">
     <span class="stepper">
       <button type="button" class="step mono" data-for="kerning" data-dir="-1" aria-label="decrease kerning">−</button>
@@ -260,8 +284,8 @@
           <br><br>
           <strong>normal</strong> runs the font's own hinting instructions
           where it carries them, and lets FreeType work it out where it does
-          not. <strong>light</strong> fits vertically only, which keeps the
-          shapes the designer drew and lets the widths fall where they may.
+          not. <strong>light</strong> snaps to the grid vertically only, which
+          keeps the horizontal shapes and the spacing the designer drew.
           <strong>none</strong> fits nothing. <strong>auto</strong> has
           FreeType fit the font whatever instructions it carries, and is worth
           trying on a face that looks muddy at small sizes.
@@ -314,6 +338,10 @@
             <strong>none</strong> hinting, is fitted by FreeType's own
             auto-hinter instead. The row greys itself in those cases and says
             which one it is.
+            <br><br>
+            One case it does not grey: with <strong>mono rasterizing</strong>
+            on, FreeType drops back to this older engine's behaviour of its
+            own accord, so the switch changes nothing either way.
           </span>
         </span></span>
       <input id="grayscale_hinting" name="grayscale_hinting" type="checkbox">
@@ -332,8 +360,8 @@
           <span class="tip" id="mono-tip" role="tooltip">
             Builds the font with no greys in it at all. Every pixel comes out
             paper or ink, chosen by FreeType's dropout control, a rule that
-            keeps a stroke too thin to land on a pixel from disappearing
-            altogether. Nothing measures coverage and cuts it at the
+            turns a pixel on where a stroke would otherwise break up or vanish
+            between two of them. Nothing measures coverage and cuts it at the
             thresholds.
             <br><br>
             Worth trying for a reader with <strong>anti-aliasing</strong> off.
@@ -345,9 +373,10 @@
             It belongs to the font and not to the page: one built this way
             draws in two levels whatever the reader's anti-aliasing is set to.
             <strong>gamma</strong> and <strong>thresholds</strong> have no
-            coverage left to work on while it is on, so both grey out. Fitting
-            to whole pixels also moves some advance widths, so lines break in
-            slightly different places.
+            coverage left to work on while it is on, so both grey out. The
+            outline is fitted differently as well, so some advance widths land
+            on other whole pixels and the text sets to slightly different
+            lines.
           </span>
         </span></span>
       <input id="mono" name="mono" type="checkbox">
@@ -380,6 +409,11 @@
             can still come out unchanged, its stems falling where the curve
             rounds to nothing, and <strong>weight</strong> is the control that
             will move it.
+            <br><br>
+            FreeType means this for a screen that blends in linear light,
+            which this one does not: it has four levels and nothing between
+            them. Its own documentation warns that the result is heavy and
+            fuzzy elsewhere. Judge it on the page rather than leaving it on.
           </span>
         </span></span>
       <input id="stem_darkening" name="stem_darkening" type="checkbox">

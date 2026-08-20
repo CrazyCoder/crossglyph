@@ -4200,6 +4200,10 @@ for (const deferred of [
         grayscaleReason("truetype", true, false, "light") !== "");
   check("a family whose faces disagree on format is judged on its bytecode",
         grayscaleReason("mixed", true, false, "normal") === "");
+  // FreeType turns backward compatibility off for a monochrome render, which
+  // is the difference between the two interpreters, so the choice is moot.
+  check("and mono rasterizing takes the row whatever the font is",
+        grayscaleReason("truetype", true, false, "normal", true) !== "");
 }
 
 // 36. Mono rasterizing leaves a pixel empty or full, so the two knobs that

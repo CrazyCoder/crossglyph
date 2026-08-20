@@ -298,7 +298,9 @@ switch that works is the worse mistake.
 The first picks FreeType's other bytecode interpreter, so it is out of reach
 for a face with no bytecode to run: a CFF family, a TrueType family with no
 instructions, and any family under `light`, `auto` or `none`, where the
-auto-hinter draws instead. The second leaves a pixel empty or full. While it is
+auto-hinter draws instead. It is out of reach while **mono rasterizing** is on
+as well, since FreeType hints the way that interpreter does whenever the
+raster is monochrome, whichever of the two you have picked. The second leaves a pixel empty or full. While it is
 on there is no coverage in between for **gamma** or the thresholds to act on,
 so those two rows are greyed.
 

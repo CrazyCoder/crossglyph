@@ -1005,6 +1005,13 @@ def apply_interpreter(grayscale):
     so does any face under `light`, `auto` or `none`, unless FreeType calls it
     tricky, which exempts it from that dispatch entirely.
 
+    `mono` takes it too, for a reason of its own. FreeType turns backward
+    compatibility off for a monochrome render (truetype/ttgload.c, the
+    TT_INTERPRETER_VERSION_40 gate on `mode != FT_RENDER_MODE_MONO`), and
+    truetype/ttinterp.h calls that falling back to version 35 behaviour. What
+    backward compatibility gates is the set of x-axis hacks that separate the
+    two interpreters, so under `mono` both values draw the same glyph.
+
     Nothing reports a build that does not carry the property: the binding
     discards FreeType's error, so the call does nothing and the page is drawn
     with whichever interpreter the build defaults to. See apply_stem_darkening.

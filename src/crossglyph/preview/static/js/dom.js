@@ -73,7 +73,14 @@ export function darkeningReason(outlines, hinting) {
 // does any face under light, auto or none. A tricky font is FreeType's own
 // exception to that last one -- it is never handed to the auto-hinter, so its
 // bytecode runs in every mode that hints at all.
-export function grayscaleReason(outlines, bytecode, tricky, hinting) {
+//
+// Mono rasterizing takes it away for a reason of its own. FreeType turns
+// backward compatibility off for a monochrome render (ttgload.c, the
+// TT_INTERPRETER_VERSION_40 gate on `mode != FT_RENDER_MODE_MONO`), and
+// ttinterp.h calls that falling back to version 35 behaviour. The x-axis
+// hacks that separate the two interpreters are what backward compatibility
+// gates, so with mono on both settings draw the same glyph.
+export function grayscaleReason(outlines, bytecode, tricky, hinting, mono) {
   if (outlines && outlines !== "truetype" && outlines !== "mixed") {
     return "These are not TrueType outlines, so there is no bytecode for "
       + "either interpreter to run.";
@@ -91,6 +98,10 @@ export function grayscaleReason(outlines, bytecode, tricky, hinting) {
   if ((hinting === "light" || hinting === "auto") && !tricky) {
     return "The auto-hinter draws it under " + hinting + " hinting, so the "
       + "bytecode interpreter has nothing to do.";
+  }
+  if (mono) {
+    return "FreeType hints as this interpreter does whenever the raster is "
+      + "monochrome, so mono rasterizing already gets you it.";
   }
   return "";
 }
@@ -134,7 +145,8 @@ export function syncFeatures() {
   const dark = darkeningReason(outlines, hinting.value);
   darkening.disabled = Boolean(dark);
   darkening.title = dark;
-  const grey = grayscaleReason(outlines, bytecode, tricky, hinting.value);
+  const grey = grayscaleReason(outlines, bytecode, tricky, hinting.value,
+                               Boolean(form.elements.mono?.checked));
   grayscale.disabled = Boolean(grey);
   grayscale.title = grey;
 }

@@ -127,7 +127,7 @@ bolditalic     = NotoSans-BoldItalic.ttf
 | `weight` | `0` | outline emboldening in pixels. Advance widths do not move, so text gets heavier at the same spacing |
 | `slant` | `0` | shear as a tangent. `0.25` is about 14 degrees, for synthesizing an oblique a family lacks |
 | `hinting` | `normal` | `normal`, `light` (vertical only, softer), `none`, or `auto` (FreeType's auto-hinter, worth trying when a font looks muddy at small sizes) |
-| `grayscale_hinting` | `no` | run FreeType's interpreter version 35, which fits stems on both axes rather than hinting for a subpixel display. Only reaches a TrueType face carrying bytecode, under `hinting = normal`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
+| `grayscale_hinting` | `no` | run FreeType's interpreter version 35, which fits stems on both axes rather than hinting for a subpixel display. Only reaches a TrueType face carrying bytecode, under `hinting = normal` and with `mono` off. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `mono` | `no` | rasterize each glyph as one bit per pixel, with FreeType's dropout control, instead of thresholding coverage. The font then draws in two levels whatever the reader's anti-aliasing setting is. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 | `stem_darkening` | `no` | FreeType stem darkening. Narrow: a CFF or OTF face under any hinting but `auto`, and a TrueType face only under `hinting = light`. See [Tuning how glyphs look](#tuning-how-glyphs-look) |
 
@@ -538,6 +538,12 @@ none. A TrueType family with no glyph instructions goes to the auto-hinter
 anyway, and so does any family under `light`, `auto` or `none`. So this is a
 `hinting = normal` control on a TrueType face, and the preview greys the row
 everywhere else.
+
+`mono` takes it as well, for a reason of its own. FreeType turns backward
+compatibility off whenever the raster is monochrome, which its own source
+calls falling back to version 35 behaviour, and that behaviour is the whole
+difference between the two interpreters. So under `mono = yes` both settings
+draw the same glyph, and the row greys there too.
 
 ### Mono rasterizing
 
