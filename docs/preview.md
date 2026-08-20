@@ -81,6 +81,8 @@ and `--port` mean the same things. It waits for the page to answer before it
 prints anything. A start that failed says so at the prompt, and never opens a
 browser on nothing; the reason is in `preview.log` beside the launcher.
 
+### Asking what is running
+
 `status` asks the server itself, so it reports whatever is actually serving. A
 process list would only show what was launched:
 
@@ -107,6 +109,8 @@ a preview on http://127.0.0.1:8000 (pid 41288) is not answering.
 
 `preview.log` is written unbuffered, so you can read it while the server is
 still up. A buffered one would fill in at the moment it exits.
+
+### Another address, and another tool's port
 
 `stop` and `status` take `--host` and `--port` too. There the address picks
 which preview to act on. Without one they act on the preview this install
@@ -183,14 +187,18 @@ Font controls (gamma, weight, line height, the spacings, kerning, slant,
 thresholds, hinting, grayscale hinting, mono rasterizing, stem darkening,
 ligatures, figures) rebuild the `.cpfont` behind the page. Those are the labels
 on the panel; [docs/fonts.md](fonts.md#the-same-settings-in-the-preview) has
-what each one is called in a config, for the few whose names differ. Page controls (margin, alignment, hyphenation and the language its
-patterns come from, line spacing, paragraph spacing, antialiasing) are the
-reader's own settings, and they only re-lay-out. The language list holds every
-one the firmware carries patterns for. On the device that comes from the book's
-own metadata instead. A control that cannot apply is greyed and stays visible,
-so hyphenating as Russian is not offered while hyphenation is off.
+what each one is called in a config, for the few whose names differ.
 
-`off` at the bottom of that list is a third state, and not a second way to
+Page controls (margin, alignment, hyphenation and the language its patterns
+come from, line spacing, paragraph spacing, anti-aliasing) are the reader's own
+settings, and they only re-lay-out. The language list holds every one the
+firmware carries patterns for. On the device that comes from the book's own
+metadata instead. A control that cannot apply is greyed and stays visible, so
+hyphenating as Russian is not offered while hyphenation is off.
+
+### Hyphenation has three states
+
+`off` at the bottom of the language list is the third, and not a second way to
 untick the box. The difference shows on any text with a compound in it:
 
 ```
@@ -209,6 +217,8 @@ own. That is what the device does with a book whose language it does not
 recognise, so it is worth being able to look at. A language on top of that adds
 its patterns.
 
+### Steppers, and how far a press moves
+
 Each numeric knob has a slider for covering distance and a field with `-` and
 `+` buttons for landing on a value.
 
@@ -224,7 +234,9 @@ has no such declaration to make, so it derives a round number sized off its
 range: sixteen coarse presses from one end of the axis to the other. Holding a
 stepper repeats it either way.
 
-The **Page** section folds, and starts folded. These are settings you match to
+### The Page section
+
+It folds, and starts folded. These are settings you match to
 the device you are judging against once and then leave, where everything above
 them is what a session is actually for. They are remembered in this browser, so
 they survive a reload and every font you try; the fold is remembered with them.
@@ -232,29 +244,31 @@ A dot on the folded heading says one of them is not what the device ships with,
 which is the same dot the rows carry, said for the section while the rows are
 out of sight.
 
-The font decides two of them. `ligatures` needs GSUB rules the converter can
-read, and `figures` needs a `pnum` feature. A family with neither draws the
+### Why a control is greyed
+
+The font decides two of them. **ligatures** needs GSUB rules the converter can
+read, and **figures** needs a `pnum` feature. A family with neither draws the
 same page whichever way those are set, so both rows are greyed for it and say
 which feature is missing. Every face is asked, because a family whose regular
 has ligatures and whose bold does not still has something to turn off. A face
 that will not open leaves the rows live: greying them would be a claim about a
 font that was never read.
 
-`stem darkening` is greyed by the font and the `hinting` row together, and that
-makes it the confusing one. FreeType darkens in two engines: the Adobe CF2
+**stem darkening** is greyed by the font and the **hinting** row together,
+which makes it the confusing one. FreeType darkens in two engines: the Adobe CF2
 interpreter that draws CFF and Type 1 faces, and the auto-hinter. Each adds a
 condition on top. CF2 darkens a scaled load, and the auto-hinter darkens at a
 light target. A TrueType family has no CF2 path, so the switch leaves it
-unmoved except at `hinting = light`, the one setting that hands it to the
-auto-hinter. Nothing moves under `hinting = auto` either: that targets normal
-hinting and reloads the glyph unscaled, failing both conditions at once. Turn
-hinting and the row follows.
+unmoved except with hinting on **light**, the one setting that hands it to the
+auto-hinter. Nothing moves under **auto** either: that targets normal hinting
+and reloads the glyph unscaled, failing both conditions at once. Turn hinting
+and the row follows.
 
 Only those two cases are greyed, so the switch may still do nothing where it is
 left live. A CFF face whose stems fall where the darkening curve rounds to
 nothing is unmoved too, and that cannot be known without rasterizing the page
 both ways. A face FreeType calls tricky never reaches the auto-hinter at all,
-so `light` does nothing for it either. Both are left live, because greying a
+so **light** does nothing for it either. Both are left live, because greying a
 switch that works is the worse mistake.
 
 **grayscale hinting** and **mono rasterizing** are greyed on separate facts.
@@ -265,14 +279,16 @@ auto-hinter draws instead. The second leaves a pixel empty or full. While it is
 on there is no coverage in between for **gamma** or the thresholds to act on,
 so those two rows are greyed.
 
-Night mode is the reader's inverted screen. The device draws the page exactly
+### Night mode
+
+It is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so
 what moves is the level each pixel lands on: paper and ink swap, and the two
 greys swap with each other. That is a level complement. Subtracting a value
 from 255 would ask for greys this panel cannot make. Look at a font both ways:
 a face that is comfortable in black on white can read heavy in white on black.
 
-### Device preview
+## Device preview
 
 The **Device preview** under the page puts the rendered screen into an X3 or
 X4 body. It starts folded. X4 is the default; choosing X3 redraws at its native
@@ -358,7 +374,9 @@ chat message may, fills that in with its own background. Even a white body on
 white still reads, because the edge is in the render and not in a surround
 behind it.
 
-To see what your tuning is doing, take it away: `untuned` at the top, the `\`
+## Comparing what you changed
+
+To see what your tuning is doing, take it away: **untuned** at the top, the `\`
 key, or press and hold the page itself. The size stays where it is, since it is
 the size you are working at and not part of the tuning. Holding is a look and
 not a change, so whatever the toggle was set to comes back on release.
@@ -366,15 +384,18 @@ not a change, so whatever the toggle was set to comes back on release.
 Size is a view setting. The browser remembers it for the next visit, but it is
 not written to the family's config, and neither reset action changes it.
 
-The arrow beside a knob compares that one knob. It is a comparison and not a
-reset: your value is set aside, one press brings it back, and you can flick
-between the two as often as it takes. Which value it offers depends on where
-the knob stands. While the panel differs from the config, it offers the config,
-answering "undo what I just did to this row". Once the two agree, and saving
-makes that true of every knob at once, it offers the stock value instead,
-answering "what does this font change". Leave a knob on stock and it differs
-from the config again, so the arrow points back the other way. The tooltip
-names which of the two it is holding.
+### The arrow beside a knob
+
+That arrow compares one knob. It is a comparison and not a reset: your value is
+set aside, one press brings it back, and you can flick between the two as often
+as it takes.
+
+Which value it offers depends on where the knob stands. While the panel differs
+from the config, it offers the config, answering "undo what I just did to this
+row". Once the two agree, and saving makes that true of every knob at once, it
+offers the stock value instead, answering "what does this font change". Leave a
+knob on stock and it differs from the config again, so the arrow points back
+the other way. The tooltip names which of the two it is holding.
 
 A value the arrow set aside lasts as long as the panel, and no longer. It is
 one press from being back on screen, and a reload, a switch of font, or the
@@ -385,13 +406,15 @@ says, so both of them stay quiet.
 
 Numeric axes of a variable font, such as `wdth`, use the same arrow. The
 family's config is the first comparison, the default declared by the font is
-the stock comparison, and **Untuned** shows that stock value. Weight pickers
+the stock comparison, and **untuned** shows that stock value. Weight pickers
 stay face choices, and are not one shared tuning axis.
 
 A switch has no arrow. The value you are not looking at is the other one, a
 click away on the box itself, so there is nothing to set aside. A checkbox
 carries a mark instead: it says the row differs, and the tooltip says which way
 the baseline has it.
+
+### Putting a whole section back
 
 **Reset font knobs**, in the foot of the card beside **Save**, puts the whole
 section back, including the weight pickers of a variable family. Those go to
@@ -400,133 +423,161 @@ font's own named instance if it has not, rather than to the first entry in the
 picker. The cross on the **Page** heading does the same for the section under
 it.
 
+## Saving
+
 **Save** sits in that foot and not inside the knobs, because it writes the
 whole `.conf` and not just the half above it. A coverage tick over on the
 export panel lights it exactly as a slider does.
 
-The export panel holds what a build needs and a page does not: the name, the
-sizes, the coverage intervals, the fallback families. What each one means is
-behind the **?** beside its label, because it is an answer you want once. Its
-**Second family** section folds the way **Page** does, since most families are
-one family, and a dot on the folded heading says this one is not.
+A family that `all.conf` covers without naming has no file of its own. Saving
+one writes a new `<family>.conf` and leaves `all.conf` alone, since editing
+that would retune every family in the workspace.
+
+## The export panel
+
+It holds what a build needs and a page does not: the name, the sizes, the
+coverage, the fallback families. What each one means is behind the **?** beside
+its label, because it is an answer you want once. Its **second family** section
+folds the way **Page** does, since most families are one family, and a dot on
+the folded heading says this one is not.
 
 The panel gets its own column beside the page while the window is wide enough
 for three. Below that width it folds in beside the font knobs, and **Tune** and
 **Export** tabs above the panel decide which of the two is showing. The page
 stays where it is either way.
 
-It has the same foot the knobs have: **Build** and **Build all**, the rule
-under them that a run fills, and one line saying what is being built or what
-the last build made. The rule and that line are there whether or not anything
-is running, so a build changes what the foot says and never how tall it is.
-Nothing grows it. What the two presses do is behind the **?** beside them.
+### Name
 
-What a run had to complain about appears in a row under that foot, marked the
-way the note under the sample text is. A size that failed reads there, with
-what the converter said. So does a coverage preset the build could draw
-nothing of, named as the tick you put there, with the box or the **Fetch**
-button offered where one of those is the answer. Lines that say the same thing
-are joined, so building every family in the folder gives you one line and the
-families in front of it. The row is empty when a run starts and stays hidden
-when there was nothing to report.
+**name** is what the family is called once it is built, whatever the source
+files happen to be called. It reaches a filename, so it keeps letters, digits,
+`_` and `-` and nothing else: the rest is stripped on the way in, and the box
+shows what landed. Empty means the name the files already have.
 
-**Save** is not on that tab. A build writes the `.conf` before it starts, so
-pressing Build is pressing Save and then Build, and a second button for the
-first half of what the button beside it already does is one to press by
-mistake. That costs you the lit Save which would have said the export settings
-are not in the file yet, so the tabs say it instead. A dot on **Tune** means a
-knob in there is unsaved, and a dot on **Export** means a setting in there is.
-A tab never marks itself, because the panel you are looking at says it for
-itself. A build running behind the Export tab marks it the same way, and
-supersedes the unsaved dot while it runs: a build is minutes, the panel it
-reports in may not be the one you are looking at, and by the time it matters
-the file has been written anyway.
+Two families may not build under one name, since they would write over each
+other in the output folder, so a name another family has taken is refused with
+a line saying which. A second family counts as a name, being called after the
+first one. The picker follows a rename as soon as it is saved, and so does any
+family falling back to the one that moved.
 
-**name** is what the family is called once it is built. That is the name the
-reader picks from on a phone-sized screen, whatever the source files happen to
-be called. It reaches a filename, so it can keep letters, digits, `_` and `-`
-and nothing else: the rest is stripped on the way in, and the box shows what
-landed. Empty means the name the files already have. Two families may not build
-under one name, because they would write over each other in the output folder,
-so a name another family has taken is refused with a line saying which. A
-second family counts as a name, being called after the first one. The picker
-follows a rename as soon as it is saved, and so does any family falling back to
-the one that moved.
+### Sizes
 
-**sizes** is what the reader's Font Size setting will list, one entry per box,
-and it is not the **size** knob on the left, which is only the size you are
-looking at. A box takes a fraction. The **size** knob steps a quarter point,
-because a whole point is 2.08 px/em at 150 DPI and about a 10% jump at reading
-sizes, and these boxes take the same quarter points over the same 6 to 40
-range: step through the page until 13.25 looks better than 13, then put 13.25
-in the box. Anything between two steps rounds to the nearer one when you leave
-the box, and anything outside the range is pulled back into it, so the sizes
-you ship are sizes you were able to look at first. A comma is a decimal point
-in one of those boxes, since each holds a single size; in **more sizes**, which
-is a list, it still separates one from the next, and so does a space.
+**sizes** is what the reader's Font Size setting will list, one entry per box.
+It is not the **size** knob on the left, which is only the size you are looking
+at.
 
-Press a box's title and the knob goes to what that box holds. It saves typing
-a shipped size into the knob to look at it. The knob takes the size the box
-will hold and not the characters in it, so a box still being typed into shows
-as it will land, and an empty one does nothing. The knob is a view setting, so
-nothing about the config moves with the press.
+Both take quarter points over the same 6 to 40 range, because a whole point is
+2.08 px/em at 150 DPI and about a 10% jump at reading sizes. So you can step
+through the page until 13.25 looks better than 13, then put 13.25 in a box.
+Anything between two steps rounds to the nearer one when you leave the box, and
+anything outside the range is pulled back in, so the sizes you ship are sizes
+you were able to look at first.
 
-A fractional size is rasterized at the size you asked for and shipped under the
-whole number it rounds to, half up. The device parses the size out of the
-filename into a single byte and cannot hold a fraction there, so 13.25 builds
-`Family_13.cpfont` and the Font Size list reads 13 while the glyphs are 13.25
-pt. The line under the boxes says so whenever a size is fractional, naming the
-file each one will write. Two sizes that round to the same label would write
-over each other, so that line turns into a warning and the save refuses it:
-13.5 and 13.75 are both 14.
+A comma is a decimal point in one of those boxes, since each holds a single
+size. In **more sizes**, which is a list, it separates one from the next, and so
+does a space.
+
+Press a box's title and the knob goes to what that box holds, which saves
+typing a shipped size in to look at it. The knob takes the size the box will
+hold rather than the characters in it, so a box still being typed into shows as
+it will land and an empty one does nothing.
+
+**A fractional size ships under a whole number.** It is rasterized at the size
+you asked for, and the device parses the size out of the filename into a single
+byte that cannot hold a fraction. So 13.25 builds `Family_13.cpfont` and the
+Font Size list reads 13 while the glyphs are 13.25 pt. The line under the boxes
+says so whenever a size is fractional, naming the file each one will write. Two
+sizes that round to the same label would write over each other, so that line
+turns into a warning and the save refuses it: 13.5 and 13.75 are both 14.
+
+### Coverage
 
 The page draws what a build of this coverage would draw. A preview build is
-sized to the text in the box and not to the whole coverage, which keeps it to a
-few dozen glyphs, but it is held to what the coverage would carry. Untick a
-range the text uses and the page goes blank where those characters are, exactly
-as the built font would. A family cannot look finished here and reach the
-device unreadable.
+sized to the text in the box rather than to the whole coverage, which keeps it
+to a few dozen glyphs, but it is held to what the coverage would carry. Untick
+a range the text uses and the page goes blank where those characters are,
+exactly as the built font would. A family cannot look finished here and reach
+the device unreadable.
 
 When that happens the note under the box says how many characters it is and
-which preset would carry them, and the preset's tick is marked in the coverage
+which preset would carry them, and that preset's tick is marked in the coverage
 row, so the answer sits where it gets applied. Nothing is ticked for you.
 Coverage is what a build writes, and that is not a setting to change behind
 your back.
 
-The coverage presets overlap, and the row says so instead of leaving you to
-work it out. `reading` is the converter's `default` block and a good deal more,
-so ticking it shows Default, Latin Extended, Symbols and Vietnamese as carried,
-greyed, and out of your hands while it is on. A preset you chose that another
-of your choices already covers stays yours to untick, greyed with a note saying
-it adds nothing. Greek and Cyrillic are never carried: `reading` has the main
-blocks but not polytonic Greek or the Cyrillic Supplement, so ticking those
-still adds something. Only what you chose is written to the config.
+The presets overlap, and the row says so instead of leaving you to work it out.
+Reading is the converter's Default block and a good deal more, so ticking it
+shows Default, Latin Extended, Symbols and Vietnamese as carried, greyed, and
+out of your hands while it is on. A preset you chose that another of your
+choices already covers stays yours to untick, greyed with a note saying it adds
+nothing. Greek and Cyrillic are never carried: Reading has the main blocks but
+not polytonic Greek or the Cyrillic Supplement, so ticking those still adds
+something. Only what you chose is written to the config.
 
-**Save** writes the lot back to the family's config, and Build then runs the
-same build the command line runs. The `.conf` is the only channel a build has,
-because the server re-reads it from disk and takes nothing from the page. So
-Build writes it first. A coverage tick that never reached the file would leave
-every size looking current, and that reads as a build that did nothing when it
-means a change that was never seen.
+## Building
+
+The export panel has the same foot the knobs have: **Build** and **Build all**,
+the rule under them that a run fills, and one line saying what is being built or
+what the last build made. The rule and that line are there whether or not
+anything is running, so a build changes what the foot says and never how tall
+it is. Nothing grows it. What the two presses do is behind the **?** beside
+them.
+
+**Save** is not on that tab, because a build writes the `.conf` before it
+starts. Pressing Build is pressing Save and then Build, and a second button for
+the first half of that is one to press by mistake.
+
+That costs you the lit Save which would have said the export settings are not
+in the file yet, so the tabs say it instead. A dot on **Tune** means a knob in
+there is unsaved, and a dot on **Export** means a setting in there is. A tab
+never marks itself, because the panel you are looking at says it for itself. A
+build running behind the Export tab marks it the same way, and supersedes the
+unsaved dot while it runs: a build is minutes, the panel it reports in may not
+be the one you are looking at, and by the time it matters the file has been
+written anyway.
+
+The `.conf` is the only channel a build has, since the server re-reads it from
+disk and takes nothing from the page. A coverage tick that never reached the
+file would leave every size looking current, and that reads as a build that did
+nothing when it means a change that was never seen.
+
+### What a run tells you
 
 A build runs its sizes across a process pool, the same one the command line
-uses. A family with four sizes therefore takes about as long as its slowest
-one, and not all four end to end. They finish in whatever order they finish in.
+uses, so a family with four sizes takes about as long as its slowest one rather
+than all four end to end. They finish in whatever order they finish in.
 
-A build reports as it goes, and that matters because one with the fallbacks on
-runs for minutes. The bar under the two buttons fills with the sizes done, and
-the line under it names the family and size in hand, the count, and once there
-is enough of the run to judge by, what is left.
+It reports as it goes, which matters because a build with the fallbacks on runs
+for minutes. The bar under the two buttons fills with the sizes done, and the
+line under it names the family and size in hand, the count, and once there is
+enough of the run to judge by, what is left.
 
 The sentence that stays when it finishes says what was built, what was already
 current and anything that failed, with the bytes beside each count. A card has
 a fixed amount of room, and a build is when you want to know what a family
-costs on it. The two numbers are separate because they answer different
-questions: what this run wrote, and what the sizes it left alone already take
-up. A count of nothing is left out instead of written as a zero, so a run that
-built every size says what it built and stops there. Where it all went is not
-in that line. The foot keeps one line for it, an output path is most of a panel
-wide, and the box three rows up is already showing the folder.
+costs on it. The two numbers answer different questions: what this run wrote,
+and what the sizes it left alone already take up. A count of nothing is left
+out instead of written as a zero. Where it all went is not in that line, since
+an output path is most of a panel wide and the box three rows up is already
+showing the folder.
+
+### Warnings and failures
+
+What a run had to complain about appears in a row under that foot, marked the
+way the note under the sample text is. A size that failed reads there, with
+what the converter said. So does a coverage preset the build could draw nothing
+of, named as the tick you put there, with the box or the **Fetch** button
+offered where one of those is the answer.
+
+Lines that say the same thing are joined, so building every family in the
+folder gives you one line and the families in front of it. The row is empty when
+a run starts and stays hidden when there was nothing to report.
+
+### Rebuilding, and tidying up
+
+A build does the sizes whose inputs changed. Hold shift and it does the lot,
+current or not. That is what you want when the inputs are the same and the
+answer should not be: a converter that has moved on, or a face edited in place.
+Both buttons say **Rebuild** for as long as the key is held.
 
 A build also tidies the output folder against the workspace. A family you
 renamed, dropped, or took the second size list off leaves a whole directory
@@ -534,15 +585,6 @@ behind, and the note says which ones went. Either button does it, because what
 belongs in that folder does not depend on which family you pressed Build on. A
 family whose config still names it keeps what it built even when its face has
 gone missing, and a directory the tool did not build is never touched.
-
-A build does the sizes whose inputs changed. Hold shift and it does the lot,
-current or not. That is what you want when the inputs are the same and the
-answer should not be: a converter that has moved on, or a face edited in place.
-Both buttons say `Rebuild` for as long as the key is held.
-
-A family that `all.conf` covers without naming has no file of its own. Saving
-one writes a new `<family>.conf` and leaves `all.conf` alone, since editing
-that would retune every family in the workspace.
 
 ## The render core
 
@@ -660,6 +702,8 @@ On a first visit only, the browser's languages also pick `hyphenate as`,
 English when none of them has patterns. That is a default and not a decision:
 it is never written down, and the cross on the **Page** heading goes back to
 it.
+
+### When a character will not draw
 
 If the family and its fallbacks have no glyph for something on the page, a line
 under the box says how many characters that is. The line is there because a
