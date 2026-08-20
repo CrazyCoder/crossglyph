@@ -781,25 +781,25 @@ def finalize_variant(variant: Variant, out_dir: pathlib.Path,
         # The same sizes, so what the record speaks for and what it calls
         # current are one list rather than two that can disagree.
         built=provenance.describe(variant, directory, current,
-                                  _fallback_faces(variant, out_dir)))
+                                  _fallback_faces(variant)))
 
 
-def _fallback_faces(variant: Variant, out_dir: pathlib.Path) -> list[str]:
-    """The faces this family fills its holes from, in full.
+def _fallback_faces(variant: Variant) -> dict[str, list[str]]:
+    """The faces each style fills its holes from, in full.
 
-    Off build_kwargs rather than worked out again, so what is recorded is what
-    was passed -- including the order, which decides who wins a codepoint two
-    of them have. Whole paths, because provenance reads these faces as well as
+    The chain the build passes to the converter, so what is recorded is what
+    was used -- including the order, which decides who wins a codepoint two of
+    them have. Whole paths, because provenance reads these faces as well as
     naming them, and reduces them to filenames itself.
 
     Without the space face, which is generated here and is nothing anybody can
     look up. That it was used at all is `space_glyphs` in the settings.
     """
-    size = variant.sizes[0] if variant.sizes else 12
-    passed = build_kwargs(variant, size, out_dir)["fallback_style_fonts"] or {}
     ours = space_font_path(variant.config.space_widths).name
-    return [str(path) for path in passed.get(0, [])
-            if pathlib.Path(path).name != ours]
+    return {style: [face for face in fallback_chain(variant.config)[style_id]
+                    if pathlib.Path(face).name != ours]
+            for style in STYLES if style in variant.config.styles
+            for style_id in [STYLE_IDS[style]]}
 
 
 class Plan(typing.NamedTuple):

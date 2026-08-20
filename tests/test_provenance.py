@@ -50,7 +50,7 @@ def test_the_record_says_which_face_each_style_borrowed_from(tmp_path):
     record = json.loads((out / "Probe" / fontstamp.STAMP_NAME)
                         .read_text(encoding="utf-8"))
 
-    chain = record["built"]["settings"]["fallback_chain"]
+    chain = record["built"]["fallbacks"]
 
     assert chain["regular"][0] == "Fill-Regular.ttf"
     assert chain["bold"][0] == "Fill-Bold.ttf"
@@ -177,7 +177,8 @@ def test_the_generated_space_face_is_not_listed_as_a_source(built):
     """It is written by this tool for this build and is nothing anybody can
     look up. That it was used is a setting, not a provenance entry."""
     assert not any("crossglyph-spaces" in name
-                   for name in built["built"]["fallbacks"])
+                   for chain in built["built"]["fallbacks"].values()
+                   for name in chain)
 
 
 def test_a_rewrite_with_no_record_keeps_the_one_already_there(tmp_path, built):
@@ -236,8 +237,10 @@ def test_fallbacks_are_recorded_by_filename_not_by_path(tmp_path):
     block = json.loads((out / "Plain" / fontstamp.STAMP_NAME)
                        .read_text(encoding="utf-8"))["built"]
 
-    assert block["fallbacks"] == ["Joins-Regular.ttf"]
-    assert not any("/" in name or "\\" in name for name in block["fallbacks"])
+    assert block["fallbacks"]["regular"] == ["Joins-Regular.ttf"]
+    assert not any("/" in name or "\\" in name
+                   for chain in block["fallbacks"].values()
+                   for name in chain)
     # The Arabic came from the fallback, and the record has to account for it
     # rather than reporting a family that repaired nothing.
     assert block["synthesized"]["arabic_forms"] > 0

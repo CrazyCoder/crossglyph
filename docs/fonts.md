@@ -682,7 +682,8 @@ to somebody who liked how it looked, and what travels with it is four
                 "licence_url": "https://openfontlicense.org",
                 "instance": {"wght": 500.0}, "instance_name": "Medium"}
   },
-  "fallbacks": ["NotoSans-Regular.ttf", …],
+  "fallbacks": {"regular": ["NotoSans-Regular.ttf", …],
+                "bold": ["NotoSans-Bold.ttf", …], …},
   "files": {"12": {"file": "Bitter_12.cpfont", "bytes": 1162006,
                    "glyphs": 3095}}
 }
@@ -708,6 +709,10 @@ default instance, which is Thin for Bitter and not the face that was built.
 `point_size` appears for a fractional size, because the filename cannot hold
 one. The device parses the label with `strtol`, so a family built at 13.5 ships
 as `_14`.
+
+`fallbacks` is per style, since a chain lends its bold face to the bold style
+where it has one. Which file a glyph was borrowed from is not one answer for
+the whole family, and the record is what a reproduction reads.
 
 A `synthesized` block appears above `fallbacks` when a face needed repairing,
 and says how much. `"synthesized": {"arabic_forms": 125}` is a build of

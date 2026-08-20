@@ -160,17 +160,6 @@ def _settings(variant: Variant) -> dict:
     if config.space_widths:
         settings["space_widths"] = {f"{cp:04X}": width for cp, width
                                     in sorted(config.space_widths.items())}
-    # Which face lent a glyph to which style, in the order they were asked.
-    # fontbuild imports this module, so the import is here rather than at the
-    # top.
-    from . import fontbuild
-
-    chain = fontbuild.fallback_chain(config)
-    if chain:
-        settings["fallback_chain"] = {
-            style: [pathlib.Path(face).name
-                    for face in chain[fontbuild.STYLE_IDS[style]]]
-            for style in STYLES if fontbuild.STYLE_IDS[style] in chain}
     return settings
 
 
@@ -207,14 +196,17 @@ def _files(variant: Variant, directory: pathlib.Path,
 
 def describe(variant: Variant, directory: pathlib.Path,
              sizes: typing.Iterable[float],
-             fallbacks: list[str] | None = None) -> dict:
+             fallbacks: dict[str, list[str]] | None = None) -> dict:
     """The provenance block for one built family.
 
-    `fallbacks` are whole paths, and are recorded by filename: the record
-    names the faces, and the count below has to read them.
+    `fallbacks` are whole paths per style, and are recorded by filename: the
+    record names the faces, and the count below has to read them. Per style
+    because a chain lends its bold face to a bold run where it has one, so
+    which file a glyph came from is not one answer for the family.
     """
     config: Config = variant.config
-    faces = list(fallbacks or [])
+    faces = list(dict.fromkeys(face for chain in (fallbacks or {}).values()
+                               for face in chain))
     stamped = datetime.datetime.now(datetime.timezone.utc)
     return {
         "at": stamped.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -227,6 +219,7 @@ def describe(variant: Variant, directory: pathlib.Path,
         # needed repairing and says how much.
         **({"synthesized": synthesized}
            if (synthesized := _synthesized(variant, faces)) else {}),
-        "fallbacks": [pathlib.Path(face).name for face in faces],
+        "fallbacks": {style: [pathlib.Path(face).name for face in chain]
+                      for style, chain in (fallbacks or {}).items()},
         "files": _files(variant, directory, sizes),
     }
