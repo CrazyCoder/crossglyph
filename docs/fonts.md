@@ -675,9 +675,22 @@ A family that produced no file at all leaves coverage out. Every size failed.
 That is the line to read, and a note about an empty range would sit on top of
 it.
 
-The line comes only at zero. Partial is the ordinary state, since a preset
+Falling short does not raise it. Partial is the ordinary state, since a preset
 covers codepoints no font assigns: against a fetched set Greek resolves at 92%
-and Japanese at 99%, and a warning on those would fire on nearly every build.
+and Japanese at 99%, and with the set off an ordinary face covers about a
+quarter of `reading`. A warning on those would fire on nearly every build.
+
+The line comes when a tick drew under 2% of the characters in its block, which
+is a little wider than nothing on purpose. A preset spans more than the script
+it is named for: `cjk-sc` includes the fullwidth punctuation, and every Latin
+serif measured for this draws one of the 1,172 codepoints in `arabic`. Testing
+for an exact zero passed all of those, so a family with no Arabic and no CJK in
+it said nothing at all. Where a tick drew a handful rather than none the line
+says "almost nothing" instead.
+
+A run with nothing left to build says it too. The fonts are on the card and the
+range they cannot draw is as empty as it was, so a gate that only saw what this
+run wrote would pass on the second attempt whatever it said on the first.
 
 **The exit code stays 0.** A build that wrote usable fonts succeeded. The
 empty range is a fault in the config, and the run carried the config out. Pass
@@ -689,11 +702,14 @@ In the preview the same warning appears under the build buttons, worded as the
 controls on the panel. It names the tick, and offers the box or the Fetch
 button where one of those is the answer.
 
-`letter_spacing` and `word_spacing` adjust the horizontal advances the same
-way. Both are in pixels, stored at 1/16 px, and both accept negatives. Word
-spacing stacks on letter spacing exactly as CSS does, and the device takes the
-word gap from the font's own U+0020 glyph (`GfxRenderer.cpp:1880`). A little
-positive tracking often reads better on e-ink than on a screen.
+## Letter and word spacing
+
+`letter_spacing` and `word_spacing` adjust the horizontal advances the way
+`line_height` adjusts the vertical one, at build time and in the file. Both are
+in pixels, stored at 1/16 px, and both accept negatives. Word spacing stacks
+on letter spacing exactly as CSS does, and the device takes the word gap from
+the font's own U+0020 glyph (`GfxRenderer.cpp:1880`). A little positive
+tracking often reads better on e-ink than on a screen.
 
 ## Kerning and ligatures
 

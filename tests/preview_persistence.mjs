@@ -5769,4 +5769,28 @@ for (const deferred of [
         env.intervals.textContent);
 }
 
+// 97. A tick that drew a handful rather than none. A CJK box covers the
+//     fullwidth punctuation as well as the characters, so an ordinary Latin
+//     face draws some of it -- and a flat "nothing" is a sentence the built
+//     font disproves.
+{
+  const sentence = async (partial) => {
+    const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+      { event: "plan", total: 1, out: "D:\fonts\cpfonts", families: ["Alto"] },
+      { event: "coverage", family: "Alto", tokens: ["cjk-sc"], remedy: "none",
+        faces: [], fallbacks: true, partial },
+      { event: "done", out: "D:\fonts\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+    ] });
+    await env.builds.one();
+    return env.warnLines()[0];
+  };
+  const some = await sentence(true);
+  const none = await sentence(false);
+  check("a tick that drew a stray character says almost nothing",
+        some.includes("almost nothing here draws"), some);
+  check("and one that drew none says nothing",
+        none.includes("nothing here draws")
+        && !none.includes("almost nothing"), none);
+}
+
 process.exit(failures ? 1 : 0);

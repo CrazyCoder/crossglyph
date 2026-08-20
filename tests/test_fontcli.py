@@ -236,3 +236,32 @@ def test_the_refusal_says_what_the_device_does_about_it(workspace, tmp_path,
     said = capsys.readouterr().err
     assert "read in its own font at its own sizes" in said, said
     assert "U+2000" in said, "and where the runs are"
+
+
+def test_the_gate_holds_on_a_run_with_nothing_left_to_build(workspace,
+                                                            tmp_path):
+    """A gate that only sees what this run wrote passes on the second attempt
+    whatever it said on the first. The fonts are still on the disk and the
+    range they cannot draw is still empty."""
+    out = tmp_path / "out"
+    _ticking_thai(workspace)
+    assert fontcli.main(["--fonts", str(workspace), "-o", str(out), "-j", "1",
+                         "--fail-on-warning"]) == 1
+    assert fontcli.main(["--fonts", str(workspace), "-o", str(out), "-j", "1",
+                         "--fail-on-warning"]) == 1, \
+        "the second run built nothing and the warning is as true as it was"
+
+
+def test_a_stray_character_does_not_pass_for_covering_the_block(workspace,
+                                                                tmp_path,
+                                                                capsys):
+    """A CJK preset spans the fullwidth punctuation as well as the
+    ideographs, so a Latin face draws one codepoint of it. Testing for an
+    exact zero let every such family through without a word."""
+    fontsmith.box_font(workspace / "Probe-Regular.ttf",
+                       list(range(0x41, 0x5B)) + [0x20, 0x3000])
+    (workspace / "conf" / "probe.conf").write_text(
+        "sizes = 12\nintervals = cjk-sc\nfallbacks = no\n", encoding="utf-8")
+    assert build(workspace, tmp_path / "out") == 0
+    said = capsys.readouterr().err
+    assert "almost nothing in this build draws cjk-sc" in said, said

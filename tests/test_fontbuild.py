@@ -1074,7 +1074,13 @@ def _uncovered(tmp_path, conf, *, folder=(), complete=False):
     return config.variants()[0]
 
 
-THAI_FACE = ("NotoSansThai-Regular.ttf", [0x20, 0x0E01])
+#: A Thai face that really covers Thai. One character of the block used to be
+#: enough here, and it stopped being enough when a tick that draws next to
+#: nothing started counting as blank -- which is the behaviour these cases sit
+#: on the other side of.
+THAI_FACE = ("NotoSansThai-Regular.ttf",
+             [0x20] + [code for code in range(0x0E00, 0x0E80)
+                       if unicodedata.category(chr(code)) != "Cn"])
 
 
 def test_a_face_the_build_never_opened_is_named_as_the_answer(tmp_path):
@@ -1206,3 +1212,77 @@ def test_a_block_is_wider_than_the_characters_in_it(tmp_path):
     counted = fontbuild.coverage_counts(config)["thai"]
     assert counted.asked == 128, "the block"
     assert counted.assigned == counted.drawable == 87, "and every character"
+
+
+# --- a tick that drew a stray character and nothing else -------------------
+
+def test_one_character_of_a_block_is_not_the_block(tmp_path):
+    """A CJK preset spans the fullwidth punctuation as well as the
+    ideographs, and an ordinary Latin face draws some of that. Testing for an
+    exact zero passed every such family, so a build with no CJK in it at all
+    reported nothing at all."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41, 0x3000],
+             family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "intervals = cjk-sc\nfallbacks = no\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    counted = fontbuild.coverage_counts(config)["cjk-sc"]
+    assert counted.drawable == 1, "the ideographic space, and nothing else"
+    assert counted.blank, "1 of 21,753 is not coverage"
+
+    found = fontbuild.uncovered(config.variants()[0])
+    assert found is not None and found.tokens == ("cjk-sc",)
+    assert found.partial, \
+        "which is what makes the sentence say almost nothing rather than none"
+
+
+def test_a_face_that_covers_part_of_a_block_is_left_alone(tmp_path):
+    """Falling short is the ordinary state with the bundled set off. A
+    warning that fired on it would fire on nearly every family here."""
+    from fontsmith import box_font
+
+    third = [code for code in range(0x0E01, 0x0E30)
+             if unicodedata.category(chr(code)) != "Cn"]
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41] + third,
+             family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "intervals = thai\nfallbacks = no\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    counted = fontbuild.coverage_counts(config)["thai"]
+    assert counted.drawable > counted.assigned * fontbuild.BLANK_SHARE
+    assert not counted.blank
+    assert fontbuild.uncovered(config.variants()[0]) is None
+
+
+def test_a_tick_at_a_flat_zero_is_not_called_partial(tmp_path):
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "intervals = thai\nfallbacks = no\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    found = fontbuild.uncovered(config.variants()[0])
+    assert found is not None and not found.partial
+
+
+def test_a_family_with_nothing_to_build_still_reports_its_coverage(tmp_path):
+    """The fonts are on the disk and the range they cannot draw is as true as
+    it was when they were written. Reporting only on what this run built made
+    the warning survive exactly one build, and a gate on it pass on the second
+    attempt whatever it said on the first."""
+    from fontsmith import box_font
+
+    box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41], family="Probe")
+    (tmp_path / "probe.conf").write_text(
+        "sizes = 12\nintervals = thai\nfallbacks = no\n", encoding="utf-8")
+    config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
+    first = list(fontbuild.build_families([config], tmp_path / "out"))
+    assert [step for step in first if step["event"] == "size"], "it built"
+
+    again = list(fontbuild.build_families([config], tmp_path / "out"))
+    assert not [step for step in again if step["event"] == "size"], \
+        "and the second run had nothing to do"
+    assert [step for step in again if step["event"] == "coverage"] == \
+        [step for step in first if step["event"] == "coverage"]

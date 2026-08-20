@@ -575,7 +575,10 @@ What a run had to complain about appears in a row under that foot, marked the
 way the note under the sample text is. A size that failed reads there, with
 what the converter said. So does a coverage preset the build could draw nothing
 of, named as the tick you put there, with the box or the **Fetch** button
-offered where one of those is the answer.
+offered where one of those is the answer. A tick that drew a stray character or
+two reads there as well, saying almost nothing rather than nothing: a box like
+**Chinese (Simplified)** covers the fullwidth punctuation as well as the
+characters, and an ordinary Latin face draws some of that.
 
 Lines that say the same thing are joined, so building every family in the
 folder gives you one line and the families in front of it. The row is empty when

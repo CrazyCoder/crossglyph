@@ -423,3 +423,62 @@ def test_the_arabic_preset_reaches_the_honorific_ligatures():
                for cp in range(start, end + 1)}
     assert 0xFDFA in covered
     assert 0xFDFB in covered
+
+
+# --- and what the interval count predicts ---------------------------------
+
+def _predicted(face_path, coverage):
+    """The count fontbuild would show for that face and coverage."""
+    from crossglyph import fontbuild
+
+    asked = fontbuild.asked_intervals(coverage)
+    return len(fontbuild.interval_runs(
+        asked, fontbuild.chain_codepoints([face_path], asked)))
+
+
+def _packed(face_path, coverage):
+    """And the count the converter would actually write.
+
+    Resolved the way generate_cpfont_multistyle resolves it rather than
+    through fontbuild, or the two sides of the comparison would move together
+    and agree about a coverage neither of them builds.
+    """
+    asked = convert.merge_intervals(
+        arabic.implied_coverage(convert.resolve_intervals(coverage)))
+    shaped = frozenset(arabic.presentation_forms(face_path))
+    intervals, _, _ = convert.resolve_style_coverage(
+        freetype.Face(str(face_path)), [], asked, synthesized=[shaped])
+    return len(intervals)
+
+
+def test_the_predicted_interval_count_carries_the_implied_forms(tmp_path):
+    """The panel warns off this number and the command line refuses a build on
+    it, so it has to be the count the converter reaches. Resolving the tokens
+    alone left out the shapes the device asks for, which is a different
+    question from the one the build answers."""
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    coverage = "(0x0600-0x06ff)"
+    assert _predicted(path, coverage) == _packed(path, coverage)
+
+
+def test_a_face_that_only_shapes_its_forms_still_counts_as_drawing_them(
+        tmp_path):
+    """A face joining through GSUB has no cmap entry at any presentation
+    form. Counting off charmaps alone calls a working Arabic build empty."""
+    from crossglyph import fontbuild
+
+    path = tmp_path / "joining.ttf"
+    fontsmith.joining_font(path)
+    initial = arabic.PRESENTATION_FORMS[(0x0628, arabic.INITIAL)]
+    asked = [(initial, initial)]
+
+    assert initial not in fontbuild.drawable_codepoints([path]),         "no charmap entry, which is the whole reason this exists"
+    assert initial in fontbuild.chain_codepoints([path], asked)
+
+
+def test_a_coverage_with_no_arabic_asks_no_face_to_shape(tmp_path):
+    """The shaping opens every face in the chain with fontTools, and a chain
+    can hold a 15.7 MB CJK one. A Latin build must not pay for that."""
+    assert not arabic.wants_forms([(0x0000, 0x00FF), (0x2000, 0x206F)])
+    assert arabic.wants_forms([(0x0000, 0x10FFFF)])

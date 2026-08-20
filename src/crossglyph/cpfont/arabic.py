@@ -61,6 +61,24 @@ LAM_ALEF = {
     (0x0627, ISOLATED): 0xFEFB, (0x0627, FINAL): 0xFEFC,
 }
 
+#: Every codepoint the device asks a face for once it has shaped a letter.
+#: A face that draws one of these through GSUB has no cmap entry at it, so
+#: anything counting coverage off charmaps alone is short by this much.
+SHAPED_FORMS = (frozenset(PRESENTATION_FORMS.values())
+                | frozenset(LAM_ALEF.values()))
+
+#: The bounds of that set, for a caller holding intervals rather than
+#: codepoints. Asking whether a coverage could want a shaped form at all is
+#: two comparisons per span this way, against materializing a CJK build's
+#: hundred thousand codepoints to find out it has no Arabic in it.
+FORM_FIRST, FORM_LAST = min(SHAPED_FORMS), max(SHAPED_FORMS)
+
+
+def wants_forms(intervals) -> bool:
+    """Whether this coverage reaches any codepoint shaping produces."""
+    return any(start <= FORM_LAST and end >= FORM_FIRST
+               for start, end in intervals)
+
 
 def forms_for(codepoints: Iterable[int]) -> set[int]:
     """Every codepoint the device can ask for, given these letters.

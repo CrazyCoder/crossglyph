@@ -55,7 +55,6 @@ from ..cpfont.convert import (
     FontBuildError,
     figure_glyph_overrides,
     gsub_ligature_sequences,
-    resolve_intervals,
 )
 from ..cpfont.faces import open_face
 from ..cpfont.tuning import LineHeight, Tuning
@@ -822,9 +821,9 @@ def _worst_intervals(coverage: str, faces: tuple) -> int:
     Kept, because a render runs on every keystroke in the sample text and the
     answer moves only when a box is ticked or a fallback picked.
     """
-    asked = resolve_intervals(coverage)
+    asked = fontbuild.asked_intervals(coverage)
     return max((len(fontbuild.interval_runs(
-                    asked, fontbuild.drawable_codepoints(chain)))
+                    asked, fontbuild.chain_codepoints(chain, asked)))
                 for _style, chain in faces), default=0)
 
 

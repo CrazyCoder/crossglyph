@@ -640,12 +640,51 @@ def assigned_codepoints(token: str) -> frozenset[int]:
                      if unicodedata.category(chr(code)) != "Cn")
 
 
+def asked_intervals(coverage: str) -> list[tuple[int, int]]:
+    """The spans a build of this coverage resolves to, before any face is read.
+
+    What the converter builds against, and not what the tokens name: an Arabic
+    coverage carries the shaped forms of every letter in it, because the device
+    asks for those rather than for the letter that was typed (see
+    arabic.implied_coverage). Counting against the tokens alone would answer a
+    question the build never asks.
+    """
+    return list(cpfont.convert.merge_intervals(
+        cpfont.arabic.implied_coverage(cpfont.resolve_intervals(coverage))))
+
+
+def chain_codepoints(paths: typing.Iterable[str | pathlib.Path],
+                     asked: typing.Iterable[tuple[int, int]]) -> set[int]:
+    """Every codepoint these faces can draw for that coverage.
+
+    Their charmaps, and the shaped Arabic forms they reach through GSUB. A
+    face that joins its letters has no cmap entry at any presentation form, so
+    a count taken off charmaps alone calls a working Arabic build empty.
+
+    The shaping is resolved only where the coverage could ask for a form,
+    since it opens every face in the chain with fontTools and the chain can
+    hold a 15.7 MB CJK one.
+    """
+    found = drawable_codepoints(paths)
+    if not cpfont.arabic.wants_forms(asked):
+        return found
+    for path in dict.fromkeys(str(path) for path in paths):
+        with contextlib.suppress(Exception):
+            found |= set(cpfont.arabic.presentation_forms(path))
+    return found
+
+
 def build_faces(config: Config) -> list[str]:
     """Every face this family's build opens, primary and fallback alike."""
     return ([str(config.styles[style]) for style in STYLES
              if style in config.styles]
             + [face for chain in fallback_chain(config).values()
                for face in chain])
+
+
+#: Below this share of a block's assigned characters, a tick counts as having
+#: drawn nothing. See Counted.blank for where the number comes from.
+BLANK_SHARE = 0.02
 
 
 class Counted(typing.NamedTuple):
@@ -659,6 +698,30 @@ class Counted(typing.NamedTuple):
     assigned: int
     drawable: int
 
+    @property
+    def blank(self) -> bool:
+        """Whether this tick got so little that the reader asked for nothing.
+
+        Not `drawable == 0`. A preset spans more than the script it is named
+        for, and a face that has none of the script often draws one character
+        of the rest: every Latin serif measured for this carries 1 of the
+        1,172 codepoints in `arabic`, and Merriweather carries 1 of the 21,753
+        in `cjk-sc`. An exact-zero test passes all of them, which is how a
+        build with no Arabic and no CJK in it comes out silent.
+
+        A share and not a count, because the same stray character means
+        nothing in a 21,753-codepoint block and would be a third of a
+        12-codepoint range. The two populations do not separate cleanly:
+        measured over every face in this workspace against every preset, the
+        thin ticks run from 0.004% to about 2.5% with no gap in them. So the
+        cut is a judgement about what is useless rather than a line nature
+        drew. Below it are stray currency signs and fullwidth commas; the
+        thinnest tick that covers a real part of its block is 4.6%, a face
+        holding a quarter of `reading`, which is the ordinary state with the
+        bundled set off.
+        """
+        return self.drawable < self.assigned * BLANK_SHARE
+
 
 def coverage_counts(config: Config) -> dict[str, Counted]:
     """Per coverage token, what it asked for and what the build can draw.
@@ -668,7 +731,8 @@ def coverage_counts(config: Config) -> dict[str, Counted]:
     bold does not is a different subject, and the device answers it already by
     drawing a style it has (SdCardFont::resolveStyle).
     """
-    drawable = drawable_codepoints(build_faces(config))
+    drawable = chain_codepoints(build_faces(config),
+                                asked_intervals(config.coverage))
     counts = {}
     for token in config.coverage.split(","):
         wanted = token_codepoints(token)
@@ -720,14 +784,14 @@ def interval_counts(config: Config) -> dict[str, int]:
 
 def interval_spans(config: Config) -> dict[str, list[tuple[int, int]]]:
     """The runs themselves, for a message that has to say where they are."""
-    asked = cpfont.resolve_intervals(config.coverage)
+    asked = asked_intervals(config.coverage)
     chain = fallback_chain(config)
     spans = {}
     for style in STYLES:
         if style not in config.styles:
             continue
         faces = [str(config.styles[style])] + list(chain[STYLE_IDS[style]])
-        spans[style] = interval_runs(asked, drawable_codepoints(faces))
+        spans[style] = interval_runs(asked, chain_codepoints(faces, asked))
     return spans
 
 
@@ -778,12 +842,18 @@ class Uncovered(typing.NamedTuple):
     answer takes. Fetching faces into a folder a build is not reading leaves
     the range exactly as empty as it was, so a reader with the set switched off
     has to be told both halves.
+
+    `partial` is true when one of these ticks drew a handful of characters
+    rather than none at all, which is what a shared punctuation mark inside a
+    CJK block does. Both readers say "almost nothing" for those, since a
+    sentence claiming nothing was drawn is one the record beside it disproves.
     """
     family: str
     tokens: tuple[str, ...]
     remedy: str
     faces: tuple[str, ...]
     fallbacks: bool
+    partial: bool = False
 
 
 def _same(path: str | pathlib.Path) -> str:
@@ -803,9 +873,10 @@ def _same(path: str | pathlib.Path) -> str:
 def uncovered(variant: Variant) -> Uncovered | None:
     """What this family asked for and drew nothing of, and what would answer.
 
-    None when every ticked token got at least one glyph. Partial is the normal
-    state -- Greek resolves at 92% against the bundled set -- so only a token
-    at zero is worth anybody's attention.
+    None when every ticked token drew a real share of itself. Falling short is
+    the normal state -- an ordinary face covers a quarter of `reading` with
+    the bundled set off -- so only a token that drew next to nothing is worth
+    anybody's attention. See Counted.blank.
     """
     return uncovered_from(variant, coverage_counts(variant.config))
 
@@ -814,10 +885,10 @@ def uncovered_from(variant: Variant,
                    counts: dict[str, Counted]) -> Uncovered | None:
     """The same answer from counts already taken, so nothing reads twice."""
     config: Config = variant.config
-    empty = tuple(token for token, counted in counts.items()
-                  if not counted.drawable)
+    empty = tuple(token for token, counted in counts.items() if counted.blank)
     if not empty:
         return None
+    partial = any(counts[token].drawable for token in empty)
 
     wanted: set[int] = set()
     for token in empty:
@@ -832,11 +903,12 @@ def uncovered_from(variant: Variant,
     faces = tuple(path.name for path in spare
                   if wanted & drawable_codepoints([path]))
     if faces:
-        return Uncovered(variant.name, empty, "unused", faces, config.fallbacks)
+        return Uncovered(variant.name, empty, "unused", faces,
+                         config.fallbacks, partial)
     short = [name for name in missing_fallbacks(config.root, config.coverage)
              if name != FALLBACK_LICENCE]
     return Uncovered(variant.name, empty, "fetch" if short else "none", (),
-                     config.fallbacks)
+                     config.fallbacks, partial)
 
 
 def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
@@ -1257,14 +1329,19 @@ def build_families(configs, out_dir: pathlib.Path, force: bool = False,
                "warnings": list(made.warnings)}
 
     for plan in plans:
-        if plan.jobs:
-            empty = finalize_variant(plan.variant, out_dir,
-                                     failed=set(plan.report.failed))
-            if empty:
+        # A family with nothing to build still has a card's worth of font on
+        # the disk, and a coverage that draws nothing is as true of it as of
+        # one that just built. Only the stamp is skipped: rewriting it would
+        # move the build date of a run that built nothing.
+        empty = (finalize_variant(plan.variant, out_dir,
+                                  failed=set(plan.report.failed))
+                 if plan.jobs else uncovered(plan.variant))
+        if empty:
                 yield {"event": "coverage", "family": empty.family,
                        "tokens": list(empty.tokens), "remedy": empty.remedy,
                        "faces": list(empty.faces),
-                       "fallbacks": empty.fallbacks}
+                       "fallbacks": empty.fallbacks,
+                       "partial": empty.partial}
 
     yield {"event": "done", "out": str(out_dir), "removed": removed,
            # What this run wrote, and what the sizes it left alone already take

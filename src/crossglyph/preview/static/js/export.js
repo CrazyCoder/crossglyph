@@ -419,9 +419,14 @@ function coverageAdvice(remedy, bundled) {
     : "Turn on bundled fallback faces and build again.";
 }
 
+// "almost nothing" where a tick drew a handful rather than none. A CJK box
+// covers the fullwidth punctuation as well as the characters, and an ordinary
+// Latin face draws some of that, so a flat "nothing" would be a sentence the
+// built font disproves.
 function coverageSentence(step) {
   const names = (step.tokens || []).map(one => presetLabels.get(one) || one);
-  return `nothing here draws ${listed(names)}. `
+  const much = step.partial ? "almost nothing" : "nothing";
+  return `${much} here draws ${listed(names)}. `
     + coverageAdvice(step.remedy, Boolean(step.fallbacks));
 }
 

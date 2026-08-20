@@ -123,8 +123,13 @@ def say_uncovered(empty: fontbuild.Uncovered) -> str:
     at a command line, so which file would draw the range is the part worth
     its own line.
     """
-    lines = [f"  {empty.family}: nothing in this build draws "
-             f"{_listed(empty.tokens)}."]
+    # "almost nothing" where a tick drew a handful rather than none. A CJK
+    # preset spans the fullwidth punctuation as well as the ideographs, and an
+    # ordinary Latin face draws some of that -- so a flat "nothing" would be a
+    # sentence the record beside it disproves.
+    lines = [f"  {empty.family}: "
+             f"{'almost nothing' if empty.partial else 'nothing'} in this "
+             f"build draws {_listed(empty.tokens)}."]
     if empty.faces:
         # What is on the disk and went unopened, without saying it answers
         # every token above. One face can cover one of two empty ranges, and a
@@ -301,12 +306,22 @@ def main(argv=None) -> int:
                 warned = True
 
     for plan in plans:
+        # A family that had nothing to build is asked anyway. Its fonts are on
+        # the disk and a range they cannot draw is as true as it was the day
+        # they were written, so a run that says nothing here is a gate that
+        # passes on the second attempt whatever it said on the first. Only the
+        # stamp is skipped: rewriting it would move the build date of a run
+        # that built nothing.
         if plan.report.built or plan.report.failed:
             empty = fontbuild.finalize_variant(
                 plan.variant, out_dir, failed=set(plan.report.failed))
-            if empty:
-                warned = True
-                print(say_uncovered(empty), file=sys.stderr, flush=True)
+        elif plan.report.skipped:
+            empty = fontbuild.uncovered(plan.variant)
+        else:
+            continue
+        if empty:
+            warned = True
+            print(say_uncovered(empty), file=sys.stderr, flush=True)
 
     built = sum(len(plan.report.built) for plan in plans)
     failures = len(errors) + sum(len(plan.report.failed) for plan in plans)
