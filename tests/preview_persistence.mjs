@@ -802,6 +802,11 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     built: recording(),
     // The export panel's foot, which is the row the build's bar is drawn in.
     buildbar: progressRow(),
+    // What the run had to complain about, under that foot. Real elements: the
+    // lines are children the page builds, and both the text and whether the
+    // row is showing at all are read back.
+    "build-warn": makeElement(),
+    "build-warn-lines": makeElement(),
     "tab-tune": pressStub("tune"),
     "tab-export": pressStub("export"),
     // The headings that fold the section or card under them.
@@ -1258,6 +1263,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
+           warn: stubs["build-warn"],
+           warnLines: () => stubs["build-warn-lines"].children
+                              .map(line => line.textContent),
            builtSteps: stubs.built.steps,
            root: sandbox.document.documentElement,
            tabs: { tune: stubs["tab-tune"], export: stubs["tab-export"],
@@ -2327,7 +2335,7 @@ for (const { name, text } of sources) {
   check("a refused save cancels the build",
         env.fetches.builds.length === 0, JSON.stringify(env.fetches.builds));
   check("and says the build did not happen",
-        env.built.textContent.startsWith("not built"), env.built.textContent);
+        env.built.textContent === "nothing built", env.built.textContent);
   check("with the server's own sentence under the button, not the envelope "
         + "it arrived in",
         env.note.textContent === "could not write arial.conf",
@@ -2335,10 +2343,12 @@ for (const { name, text } of sources) {
   // That button is under the knobs, and behind a tab this panel does not show
   // it. The refusal is the half worth having -- a name another family has
   // taken, a size the device could not read -- so it is said beside the press
-  // that failed as well, where whoever pressed it is looking.
+  // that failed as well, where whoever pressed it is looking. In the row under
+  // the foot, with everything else a run has to complain about.
   check("and the reason beside the press that failed, not only under Save",
-        env.built.textContent.includes("could not write arial.conf"),
-        env.built.textContent);
+        env.warnLines().some(line =>
+          line.includes("could not write arial.conf")),
+        env.warnLines().join(" | "));
   check("and hands the buttons back",
         env.buildEls.every(one => one.disabled === false),
         env.buildEls.map(one => one.disabled).join());
@@ -5513,6 +5523,164 @@ for (const deferred of [
         box.parentElement.classes.has("needed") === false
         && button.classes.has("needed") === false,
         `${[...box.parentElement.classes]} / ${[...button.classes]}`);
+}
+
+
+// --- what a run had to complain about --------------------------------------
+
+// 85. The row under the build bar. A run with nothing to say leaves it hidden,
+//     which is every build that works.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 100,
+      warnings: [] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a clean run shows no warning row", env.warn.hidden === true);
+  check("and the note carries the outcome",
+        env.built.textContent === "1 built (100 B)", env.built.textContent);
+}
+
+// 86. A tick that came to nothing, said as the tick and not as the token. The
+//     panel knows the labels; a .conf is where the token belongs.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 100,
+      warnings: [] },
+    { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "unused",
+      faces: ["NotoSansGreek-Regular.ttf"] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  const lines = env.warnLines();
+  check("the row comes out for a coverage warning", env.warn.hidden === false);
+  check("named by its label rather than its token",
+        lines.length === 1 && lines[0].includes("Greek")
+        && !lines[0].includes("greek"), lines.join(" | "));
+  check("with the family in front of it", lines[0].startsWith("Alto: "),
+        lines[0]);
+  check("and the note still carries the outcome",
+        env.built.textContent === "1 built (100 B)", env.built.textContent);
+}
+
+// 87. Which sentence the unused answer takes depends on the box, since telling
+//     anybody to press a control that is already on sends them nowhere.
+{
+  const steps = [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "unused",
+      faces: [] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+  ];
+  const off = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });
+  off.exportForm.elements.fallbacks.checked = false;
+  await off.builds.one();
+  check("with the box off the answer is to turn it on",
+        off.warnLines()[0].includes("Turn on bundled fallback faces"),
+        off.warnLines()[0]);
+
+  const on = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });
+  on.exportForm.elements.fallbacks.checked = true;
+  await on.builds.one();
+  check("with it on the order is what left them out",
+        on.warnLines()[0].includes("fallback_order"), on.warnLines()[0]);
+}
+
+// 88. The other two answers, which have no face to name and no box to blame.
+{
+  const answer = async (remedy) => {
+    const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+      { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+      { event: "coverage", family: "Alto", tokens: ["cyrillic", "greek"],
+        remedy, faces: [] },
+      { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+    ] });
+    await env.builds.one();
+    return env.warnLines()[0];
+  };
+  check("a folder short of faces sends you to Fetch",
+        (await answer("fetch")).includes("Press Fetch"));
+  const none = await answer("none");
+  check("and nothing bundled leaves fallback 1 and the tick",
+        none.includes("fallback 1") && none.includes("untick"), none);
+  check("both ranges are listed in one sentence",
+        none.includes("Cyrillic or Greek"), none);
+}
+
+// 89. Build all over many families warning about one range is one line. Twelve
+//     lines saying a single thing is a row nobody reads.
+{
+  const many = [];
+  for (let n = 0; n < 12; n += 1) {
+    many.push({ event: "coverage", family: `Fam${n}`, tokens: ["greek"],
+                remedy: "none", faces: [] });
+  }
+  const env = await loaded(fakeStorage(), DEFAULTS,
+                           { buildSteps: [{ event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] }, ...many, { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] }] });
+  await env.builds.one();
+  const lines = env.warnLines();
+  check("twelve families make one line", lines.length === 1, lines.join(" | "));
+  check("naming three and counting the rest",
+        lines[0].startsWith("Fam0, Fam1, Fam2 and 9 more: "), lines[0]);
+}
+
+// 90. A failure reads in the row too, and the reserved line keeps its counts.
+//     Both wear the one alarm: a second mark would be a second thing to learn
+//     for one fault, and the sentence is what tells them apart.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "failed", family: "Alto", size: 12, done: 1, total: 1,
+      error: "the converter said no" },
+    { event: "done", out: "D:\\fonts", bytes: 0, families: [
+      { name: "Alto", bytes: 0, sizes: [12], built: [], skipped: [],
+        failed: [12], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("the failure is in the row",
+        env.warnLines()[0].includes("the converter said no"),
+        env.warnLines().join(" | "));
+  check("and the note keeps to the outcome",
+        env.built.textContent === "1 failed", env.built.textContent);
+}
+
+// 91. A build warning that is not about coverage reaches the page at all.
+//     `Built.warnings` never had a way out of a build the panel started, so a
+//     tight line height was said to a terminal and to nobody else.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "size", family: "Alto", size: 12, done: 1, total: 1, bytes: 100,
+      warnings: ["line height 1.05 is under the band"] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+  ] });
+  await env.builds.one();
+  check("a size's own warning is shown",
+        env.warnLines()[0].includes("under the band"),
+        env.warnLines().join(" | "));
+}
+
+// 92. Nothing carries over from the build before.
+{
+  // The one array the stubbed stream reads from, so the second press can be a
+  // different run on the same page.
+  const steps = [
+    { event: "plan", total: 1, out: "D:\\fonts\\cpfonts", families: ["Alto"] },
+    { event: "coverage", family: "Alto", tokens: ["greek"], remedy: "none",
+      faces: [] },
+    { event: "done", out: "D:\\fonts\\cpfonts", bytes: 100, families: [{ name: "Alto", bytes: 100, sizes: [12], built: [12], skipped: [], failed: [], removed: [], error: null }] },
+  ];
+  const env = await loaded(fakeStorage(), DEFAULTS, { buildSteps: steps });
+  await env.builds.one();
+  check("something to clear", env.warn.hidden === false);
+  steps.splice(1, 1);
+  await env.builds.one();
+  check("and the next run starts empty",
+        env.warn.hidden === true && env.warnLines().length === 0,
+        env.warnLines().join(" | "));
 }
 
 process.exit(failures ? 1 : 0);

@@ -16,6 +16,11 @@ export const exportForm = document.getElementById("export");
 export const presetList = document.getElementById("presets");
 export const outField = exportForm.elements.out;
 export const builtNote = document.getElementById("built");
+//: What the last run had to complain about, under the foot rather than in it.
+//: The reserved line above holds the outcome, so a failure and a coverage
+//: warning both land here and the card never grows.
+export const buildWarn = document.getElementById("build-warn");
+const buildWarnLines = document.getElementById("build-warn-lines");
 // The panel's own bar, in the foot of the panel rather than in the card: a
 // build is the one thing here that changes height while you watch it, and the
 // foot is where it can. The island under the specimen has another, for the
@@ -39,12 +44,21 @@ export let presetNames = [];
 export const presetRanges = new Map();
 export let baseRanges = [];
 
+//: What each preset is called on the boxes above. A build reports what it
+//: could not draw by the token a .conf spells, and this panel has to say it
+//: back as the tick somebody put there. The note goes in the name, so
+//: Chinese Simplified and Chinese Traditional are two different answers.
+export const presetLabels = new Map();
+
 export function fillPresets(presets, base = []) {
   presetNames = presets.map(preset => preset.name);
   baseRanges = base;
   presetRanges.clear();
+  presetLabels.clear();
   presetList.replaceChildren(...presets.map(preset => {
     presetRanges.set(preset.name, preset.ranges || []);
+    presetLabels.set(preset.name, preset.note
+                     ? `${preset.label} (${preset.note})` : preset.label);
     const label = document.createElement("label");
     const box = document.createElement("input");
     box.type = "checkbox";
@@ -346,6 +360,78 @@ export function fillFallbackPickers() {
   }
 }
 
+//: This run's complaints, in the order they arrived and grouped when they
+//: read alike. Failures first: a family that produced no file is why the card
+//: is empty, and that outranks a range that came out blank.
+let runFailures = [];
+let runCoverage = [];
+
+//: `a`, `a or b`, `a, b or c`.
+function listed(names) {
+  if (names.length < 2) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+}
+
+//: The families in front of a line, up to three of them. A Build all over
+//: twelve families warning about one range is one line, not twelve.
+function whichFamilies(names) {
+  const shown = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${shown} and ${names.length - 3} more` : shown;
+}
+
+// What to do about a coverage that came out at zero, in the panel's own terms:
+// the tick above, the box above that, the button beside it. The command line
+// words the same three answers in config terms, since a reader there has no
+// control to press.
+function coverageAdvice(remedy) {
+  const box = exportForm.elements.fallbacks;
+  if (remedy === "fetch") return "Press Fetch, above, then build again.";
+  if (remedy === "none") {
+    return "No bundled face draws it. Pick a family for fallback 1, "
+      + "or untick it.";
+  }
+  // The faces are here and this build did not use them. Usually the box is
+  // off and pressing it is the whole answer; with it already on, the order in
+  // the .conf is what left them out, and telling anybody to press a control
+  // that is on would send them nowhere.
+  return box && box.checked
+    ? "fallback_order leaves the bundled faces out of this family."
+    : "Turn on bundled fallback faces and build again.";
+}
+
+function coverageSentence(step) {
+  const names = (step.tokens || []).map(one => presetLabels.get(one) || one);
+  return `nothing here draws ${listed(names)}. ${coverageAdvice(step.remedy)}`;
+}
+
+//: Both lists, grouped by what they say. Nothing accumulates across builds:
+//: the row is emptied when a run starts and filled as its events arrive.
+function showWarnings() {
+  const lines = [];
+  for (const group of [runFailures, runCoverage]) {
+    const byText = new Map();
+    for (const {family, text} of group) {
+      if (!byText.has(text)) byText.set(text, []);
+      byText.get(text).push(family);
+    }
+    for (const [text, families] of byText) {
+      lines.push(`${whichFamilies(families)}: ${text}`);
+    }
+  }
+  buildWarnLines.replaceChildren(...lines.map(text => {
+    const line = document.createElement("div");
+    line.textContent = text;
+    return line;
+  }));
+  buildWarn.hidden = lines.length === 0;
+}
+
+export function clearWarnings() {
+  runFailures = [];
+  runCoverage = [];
+  showWarnings();
+}
+
 // A line of JSON per step, read as it arrives. A build is minutes when the
 // fallbacks are on, and a button that says "building" the whole time is
 // indistinguishable from one that has hung.
@@ -372,13 +458,23 @@ export function showStep(step) {
     }
   } else if (step.event === "size") {
     progress.show(step.done, step.total, `${step.family} ${step.size}`);
+    for (const warning of step.warnings || []) {
+      runCoverage.push({family: `${step.family} ${step.size}`, text: warning});
+    }
+    if ((step.warnings || []).length) showWarnings();
+  } else if (step.event === "coverage") {
+    runCoverage.push({family: step.family, text: coverageSentence(step)});
+    showWarnings();
   } else if (step.event === "failed") {
     // One size of many, and the build carries on: the bar keeps running and
-    // the note says which one went wrong.
-    builtNote.textContent = `${step.family} ${step.size}: ${step.error}`;
+    // the row says which one went wrong.
+    runFailures.push({family: `${step.family} ${step.size}`,
+                      text: step.error});
+    showWarnings();
   } else if (step.event === "error") {
     progress.end();
-    builtNote.textContent = step.error;
+    runFailures.push({family: "build", text: step.error});
+    showWarnings();
   } else if (step.event === "done") {
     progress.end();
     const count = (key) =>
@@ -455,14 +551,18 @@ export async function buildFamilies(family, force = false) {
     // nothing" when it means "your change was never seen". Write it first.
     progress.start(`${force ? "rebuilding" : "planning"} ${label}…`);
     builtNote.textContent = "";
+    clearWarnings();
     if (!saveButton.hidden && knobsDiffer() && !(await saveKnobs())) {
       // With the reason, which is the half worth having: a refusal here is
       // something to act on -- a name another family has taken, a size the
       // device could not read -- and saveKnobs writes it under Save, which is
-      // a bar this tab does not show. Said here it is beside the press that
-      // failed. The foot grows for it, as it does for any other error.
-      builtNote.textContent = `not built: ${label} could not be saved`
-        + (savedNote.textContent ? `\n${savedNote.textContent}` : "");
+      // a bar this tab does not show. Said in the row, beside the press that
+      // failed, so the reserved line keeps to the outcome.
+      builtNote.textContent = "nothing built";
+      runFailures.push({family: label,
+                        text: `could not be saved${savedNote.textContent
+                               ? `. ${savedNote.textContent}` : ""}`});
+      showWarnings();
       return;
     }
     await streamInto("/build", {family: family, force: force},

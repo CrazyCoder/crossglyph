@@ -571,8 +571,9 @@
   #buildbar .bar { margin-top: .6rem; background: var(--line); }
   /* One line, reserved, whether or not there is anything in it. Both children
      sit in the same grid cell's worth of space and neither carries a margin,
-     so a build starting or ending changes the words and nothing else. An error
-     is what grows it, and that is the one time this card should be read. */
+     so a build starting or ending changes the words and nothing else. Nothing
+     grows it: what a run has to complain about is in the row below the foot,
+     so this line holds the outcome and only that. */
   #build-status {
     display: grid; margin-top: .45rem;
     font-size: 11.5px; line-height: 1.45; min-height: 1.45em;
@@ -1056,11 +1057,10 @@
                    cursor: pointer; }
   .presets .note { color: var(--muted); font-size: 11px; }
   #built, #fetched, #have-fallbacks { color: var(--muted); font-size: 11.5px; }
-  /* An error arrives with its own lines: what went wrong, where it looked,
-     what to do. Collapsed to one paragraph the path runs into the sentence
-     after it, which is how a message written to be read becomes a wall. No
-     margin: the line it sits on is reserved by the block around it. */
-  #built { white-space: pre-line; }
+  /* The row under the foot. Its lines stack rather than sitting side by side,
+     since .hint.warn is a flex row and every child of one would otherwise
+     share the line with the mark. */
+  #build-warn-lines { display: grid; gap: .35rem; }
 
   /* One of the panel's own rules, filling. Every row here is separated by one
      of these, so progress drawn in that material belongs to the panel, where a

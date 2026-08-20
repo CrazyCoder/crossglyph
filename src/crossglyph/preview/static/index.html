@@ -980,8 +980,8 @@
        one of those rules and a build only fills it. Nothing appears and
        nothing moves. The one line under it is reserved for the same reason --
        running, it is what is being built and how many are left; finished, it
-       is what the build made. An error is the one thing allowed past that
-       line, and the one time the card should be asking to be read. -->
+       is what the build made. Nothing is allowed past it. A failure and a
+       coverage warning both land in the row below this bar. -->
   <div class="bar" role="progressbar" aria-label="build progress"
        aria-valuemin="0" aria-hidden="true"><span class="bar-fill"></span></div>
   <div id="build-status">
@@ -1007,6 +1007,12 @@
     <div id="built"></div>
   </div>
 </div>
+<!-- What the last run had to complain about, below the foot and never inside
+     it, so the card holds still while this appears under it. Failures and
+     coverage warnings share it: the panel has one alarm and a second mark
+     would be a second thing to learn for one fault. The sentence is what
+     tells them apart. Emptied when a run starts. -->
+<div id="build-warn" class="hint warn" hidden><div id="build-warn-lines"></div></div>
 </div><!-- #exportcol: the card above and the foot above that -->
 
 <!-- The frame PNGs carry the measured cast baked in, so the warm and tint knobs
