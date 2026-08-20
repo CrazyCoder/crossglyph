@@ -814,3 +814,82 @@ def test_a_flat_list_of_fallbacks_still_serves_every_style(tmp_path):
                               fallbacks=(filler,))
 
     assert _glyphs_per_style(font, 2) == [3, 3]
+
+
+# --- the panel's words and the config's ------------------------------------
+
+#: Where fonts.md maps one to the other.
+NAMING_SECTION = "### The same settings in the preview"
+
+
+def _panel_labels():
+    """Every label on the panel, lowercased, without its unit annotation.
+
+    The unit is an annotation on the control and not part of its name: the box
+    reads "weight px" and a reader looking for `weight` has found it.
+    """
+    import re
+
+    html = (pathlib.Path(__file__).resolve().parents[1] / "src" / "crossglyph"
+            / "preview" / "static" / "index.html").read_text(encoding="utf-8")
+    found = set()
+    for body in re.findall(r"<label\b[^>]*>(.*?)</label>", html, re.S):
+        body = re.sub(r'<span class="unit">.*?</span>', "", body, flags=re.S)
+        found.add(re.sub(r"\s+", " ",
+                         re.sub(r"<[^>]*>", "", body)).strip().lower())
+    return found
+
+
+def _written_keys():
+    """Every config key the panel writes, plus the one all.conf holds."""
+    from crossglyph.preview import server
+
+    return server.SAVED_KEYS + server.EXPORT_KEYS + ("out",)
+
+
+def _docs():
+    return (pathlib.Path(__file__).resolve().parents[1] / "docs"
+            / "fonts.md").read_text(encoding="utf-8")
+
+
+def test_a_setting_the_panel_renames_is_mapped_in_the_docs():
+    """A reader who works in the preview has never seen `fallback_regular`.
+    The panel calls it fallback 1, `intervals` is the coverage ticks, and
+    `fallbacks` is a box called bundled fallback faces -- so a config
+    reference that names only the keys answers a question nobody asked.
+
+    Anything whose control carries the key's own words needs no row. This is
+    for the rest, and it fails when a control is renamed or a key gains one.
+    """
+    doc = _docs()
+    table = doc[doc.index(NAMING_SECTION):][:3000]
+    labels = _panel_labels()
+    renamed = [key for key in _written_keys()
+               if key.replace("_", " ") not in labels]
+    missing = [key for key in renamed if f"`{key}`" not in table]
+    assert not missing, (
+        f"the panel calls these something else and {NAMING_SECTION!r} in "
+        f"docs/fonts.md does not say what: {', '.join(missing)}")
+
+
+def test_every_setting_the_panel_writes_is_in_the_config_reference():
+    """A key the panel can write and the docs never mention is one nobody can
+    look up, whichever surface they came from."""
+    doc = _docs()
+    missing = [key for key in _written_keys() if f"`{key}`" not in doc]
+    assert not missing, \
+        f"docs/fonts.md never mentions: {', '.join(missing)}"
+
+
+def test_the_page_about_the_panel_uses_the_panel_words():
+    """docs/preview.md is read beside the preview, so a key spelled the config
+    way sends the reader looking for a control that is labelled otherwise."""
+    page = (pathlib.Path(__file__).resolve().parents[1] / "docs"
+            / "preview.md").read_text(encoding="utf-8")
+    labels = _panel_labels()
+    renamed = [key for key in _written_keys()
+               if key.replace("_", " ") not in labels]
+    named = [key for key in renamed if f"`{key}`" in page]
+    assert not named, (
+        f"docs/preview.md names these by their config spelling, and the panel "
+        f"labels them differently: {', '.join(named)}")

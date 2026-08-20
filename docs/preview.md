@@ -257,12 +257,13 @@ both ways. A face FreeType calls tricky never reaches the auto-hinter at all,
 so `light` does nothing for it either. Both are left live, because greying a
 switch that works is the worse mistake.
 
-`grayscale hinting` and `mono` are greyed on separate facts. The first picks
-FreeType's other bytecode interpreter, so it is out of reach for a face with no
-bytecode to run: a CFF family, a TrueType family with no instructions, and any
-family under `light`, `auto` or `none`, where the auto-hinter draws instead.
-The second leaves a pixel empty or full. While it is on there is no coverage in
-between for `gamma` or the thresholds to act on, so those two rows are greyed.
+**grayscale hinting** and **mono rasterizing** are greyed on separate facts.
+The first picks FreeType's other bytecode interpreter, so it is out of reach
+for a face with no bytecode to run: a CFF family, a TrueType family with no
+instructions, and any family under `light`, `auto` or `none`, where the
+auto-hinter draws instead. The second leaves a pixel empty or full. While it is
+on there is no coverage in between for **gamma** or the thresholds to act on,
+so those two rows are greyed.
 
 Night mode is the reader's inverted screen. The device draws the page exactly
 as it does by day and complements the framebuffer on its way to the panel, so

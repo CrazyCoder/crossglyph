@@ -122,6 +122,7 @@ here:
 | **extra ranges** | `ranges` |
 | **bundled fallback faces** | `fallbacks` |
 | **fallback 1**, **fallback 2** | `fallback_regular`, `fallback2_regular` |
+| **mono rasterizing** | `mono` |
 | **output** | `out`, in `all.conf` |
 | **use the font's own**, beside line height | `line_height` left unset |
 | the **text** and **bold** pickers, on a variable family | `regular` and the rest, with `@wght=` on them |
