@@ -488,6 +488,11 @@ let toned = null;
 // What each destination pixel takes from the source, as a run of weights: the
 // source pixels its own width covers, each weighted by how much of it falls
 // inside. Worked out once per axis, since every row wants the same answer.
+//
+// Not kept between resamples, which looks like an oversight and is not. It is
+// a hundredth of what the resample costs, and the run that would want it most
+// is a window being dragged, where every frame asks for a size the last one
+// did not.
 function contributions(from, to) {
   const step = from / to;
   const starts = new Int32Array(to);
@@ -512,6 +517,9 @@ function contributions(from, to) {
 //: costs. Grown when a bigger size comes along and never shrunk.
 let between = null;
 let resampled = null;
+//: The page and the size the canvas is holding now, so a layout that changed
+//: neither can leave it alone.
+let drawn = null;
 
 function scratch(size) {
   if (!between || between.length < size) between = new Float32Array(size);
@@ -652,6 +660,15 @@ function drawDevicePage() {
     width: Math.max(1, Math.round(device.aperture.width * factor)),
     height: Math.max(1, Math.round(device.aperture.height * factor)),
   };
+  // Every layout comes through here, and most of them leave this alone: the
+  // box does not follow the colour, and outside the fitted scale it does not
+  // follow the frame either, so picking either would otherwise resample the
+  // page to the size it is already at. Compared by identity, which holds
+  // because toning always builds a new picture rather than writing into the
+  // old one.
+  if (drawn && drawn.of === toned &&
+      drawn.width === to.width && drawn.height === to.height) return;
+  drawn = {of: toned, width: to.width, height: to.height};
   const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
   canvas.width = to.width;
   canvas.height = to.height;

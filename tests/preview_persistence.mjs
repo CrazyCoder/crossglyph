@@ -371,7 +371,7 @@ function makeElement() {
       const owner = this;
       return {
         add: (name) => owner.classes.add(name),
-        remove: (name) => owner.classes.remove(name),
+        remove: (name) => owner.classes.delete(name),
         contains: (name) => owner.classes.has(name),
         toggle: (name, on) => (on ? owner.classes.add(name)
                                   : owner.classes.delete(name)),
@@ -5307,6 +5307,48 @@ for (const deferred of [
         Math.abs(big.mean - own.mean) < 2,
         `${big.mean} against ${own.mean}`);
   env.device.ratio(1);
+
+  // Laying out again is not on its own a reason to work the page over. The
+  // colour moves nothing the canvas holds, and outside the fitted scale nor
+  // does the frame, so both have to leave it alone; a new tone has to not.
+  scaled("device");
+  env.device.canvas.pixels = "left alone";
+  env.device.color.value = "black";
+  env.device.change(env.device.color);
+  await settle();
+  check("changing the colour does not resample the page",
+        env.device.canvas.pixels === "left alone",
+        typeof env.device.canvas.pixels);
+  env.device.frame.checked = false;
+  env.device.edit(env.device.frame);
+  await settle();
+  check("nor does taking the frame away at the reader's real size",
+        env.device.canvas.pixels === "left alone",
+        typeof env.device.canvas.pixels);
+  env.device.ink.value = "95";
+  env.device.edit(env.device.ink);
+  await settle();
+  check("but a new tone does",
+        env.device.canvas.pixels !== "left alone",
+        typeof env.device.canvas.pixels);
+}
+
+// Copying before there is a page. The copy is built from the toned page rather
+// than from the canvas, so it has to say what is missing: the button reports
+// whatever it is handed, and a press that threw nothing would read as a press
+// that did nothing.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {});
+  await settle();
+  let said = "nothing was thrown";
+  try {
+    await env.modules.get("device.js").deviceImage();
+  } catch (error) {
+    said = error.message;
+  }
+  check("copying before anything is rendered says what is missing",
+        said === "there is no page to copy yet", said);
 }
 
 // The warm and tint knobs. They span the cast's chromatic plane and nothing
