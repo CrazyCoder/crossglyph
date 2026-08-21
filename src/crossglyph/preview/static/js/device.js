@@ -215,6 +215,11 @@ export function layoutDevice() {
   canvas.style.width = `${device.aperture.width * factor}px`;
   canvas.style.height = `${device.aperture.height * factor}px`;
   canvas.style.borderRadius = `${device.aperture.radius * factor}px`;
+  // The canvas holds real pixels of this screen, so a new size is a new
+  // picture. Here rather than left to the caller: every route that changes the
+  // size comes through here, and one that forgot the redraw would leave the
+  // page at the last size, stretched by the browser to fit the new one.
+  drawDevicePage();
   frame.hidden = !shown;
   frame.src = frameUrl();
   frame.style.width = `${device.frame.width * factor}px`;
@@ -355,7 +360,19 @@ async function decoded(url) {
 // Exported so it can be measured in a browser. Neither suite can: the JS one
 // runs against a stub DOM with no canvas, and pytest never opens a page, so a
 // composite that came out wrong would pass both.
+// The toned page as something that can be drawn. It is held as pixels, and
+// pixels can only be written straight into a canvas, which would ignore the
+// rounded corners the bare screen is clipped to.
+function tonedPage() {
+  const sheet = document.createElement("canvas");
+  sheet.width = toned.width;
+  sheet.height = toned.height;
+  sheet.getContext("2d").putImageData(toned, 0, 0);
+  return sheet;
+}
+
 export async function deviceImage() {
+  if (!toned) throw new Error("there is no page to copy yet");
   const device = profile("pixels");
   const framed = frameShown.checked;
   const sheet = document.createElement("canvas");
@@ -367,10 +384,10 @@ export async function deviceImage() {
     context.beginPath();
     context.roundRect(0, 0, sheet.width, sheet.height, device.aperture.radius);
     context.clip();
-    context.drawImage(canvas, 0, 0);
+    context.drawImage(tonedPage(), 0, 0);
     return sheet;
   }
-  context.drawImage(canvas, device.aperture.x, device.aperture.y,
+  context.drawImage(tonedPage(), device.aperture.x, device.aperture.y,
                     device.aperture.width, device.aperture.height);
   context.drawImage(tintedFrame(await decoded(frameUrl("pixels"))), 0, 0);
   return sheet;
@@ -459,14 +476,148 @@ async function downloadDeviceImage() {
 //: flaky decoder can strand the pipeline.
 let page = null;
 
-export function paintDevicePage() {
-  if (!page || typeof canvas.getContext !== "function") return;
+//: The page with the paper and ink applied, at the panel's own size, as the
+//: pixels themselves rather than a canvas. The screen scales this to whatever
+//: the mode asks for and the copy takes it whole, so both read one set of
+//: pixels and a saved file cannot come out depending on the zoom the screen
+//: happened to be at. Kept rather than built again each time because applying
+//: the two tones walks every pixel, while the size on screen changes on every
+//: drag of the window edge.
+let toned = null;
+
+// What each destination pixel takes from the source, as a run of weights: the
+// source pixels its own width covers, each weighted by how much of it falls
+// inside. Worked out once per axis, since every row wants the same answer.
+function contributions(from, to) {
+  const step = from / to;
+  const starts = new Int32Array(to);
+  const counts = new Int32Array(to);
+  const weights = [];
+  for (let at = 0; at < to; ++at) {
+    const low = at * step, high = low + step;
+    const first = Math.max(0, Math.floor(low));
+    const last = Math.min(from, Math.ceil(high));
+    starts[at] = first;
+    counts[at] = last - first;
+    for (let source = first; source < last; ++source) {
+      weights.push(Math.min(source + 1, high) - Math.max(source, low));
+    }
+  }
+  return {starts, counts, weights: Float32Array.from(weights)};
+}
+
+// Resample by area: a destination pixel is the mean of the source it covers.
+//
+// One filter serves both directions, which is why there is no second one for
+// enlarging. Enlarging leaves most destination pixels sitting inside a single
+// source pixel, and those hold that pixel exactly, so the strokes stay hard and
+// only the boundaries between two source pixels blend. Bilinear softens the
+// whole glyph instead, and a sharper filter overshoots and leaves a pale halo
+// around every letter. Shrinking averages, so a stroke thinner than a
+// destination pixel arrives at part weight rather than being kept whole or
+// dropped whole, which is what nearest neighbour does to it, and why small text
+// breaks up into a different thickness every few letters.
+//
+// The browser will not do this one. Its own smoothing is a sharper filter that
+// haloes, and the quality hint that is supposed to choose between filters is
+// read and ignored: low, medium and high come back byte for byte the same.
+//
+// Separable, so it costs two passes over the picture rather than one over every
+// pair of pixels.
+//: Scratch for the pass between the two, and the picture the second one fills.
+//: Both are kept: dragging a window edge resamples on every frame, and handing
+//: back several megabytes each time to ask for them again is most of what that
+//: costs. Grown when a bigger size comes along and never shrunk.
+let between = null;
+let resampled = null;
+
+function scratch(size) {
+  if (!between || between.length < size) between = new Float32Array(size);
+  return between;
+}
+
+function resampleByArea(data, from, to, out) {
+  const across = contributions(from.width, to.width);
+  const down = contributions(from.height, to.height);
+  const wide = scratch(to.width * from.height * 3);
+  // A destination pixel that covers exactly one source pixel is that pixel, so
+  // the weights cancel and there is nothing to add up. Enlarging makes that
+  // almost every pixel, which is the difference between this being noticeable
+  // while a window edge is dragged and not being.
+  for (let y = 0; y < from.height; ++y) {
+    const row = y * from.width;
+    const line = y * to.width;
+    let weight = 0;
+    for (let x = 0; x < to.width; ++x) {
+      const count = across.counts[x];
+      const start = across.starts[x];
+      const at = (line + x) * 3;
+      if (count === 1) {
+        const one = (row + start) * 4;
+        wide[at] = data[one];
+        wide[at + 1] = data[one + 1];
+        wide[at + 2] = data[one + 2];
+      } else {
+        let red = 0, green = 0, blue = 0, total = 0;
+        for (let n = 0; n < count; ++n) {
+          const share = across.weights[weight + n];
+          const from4 = (row + start + n) * 4;
+          red += data[from4] * share;
+          green += data[from4 + 1] * share;
+          blue += data[from4 + 2] * share;
+          total += share;
+        }
+        wide[at] = red / total;
+        wide[at + 1] = green / total;
+        wide[at + 2] = blue / total;
+      }
+      weight += count;
+    }
+  }
+  let weight = 0;
+  for (let y = 0; y < to.height; ++y) {
+    const count = down.counts[y];
+    const start = down.starts[y];
+    const line = y * to.width;
+    for (let x = 0; x < to.width; ++x) {
+      const at = (line + x) * 4;
+      if (count === 1) {
+        const one = (start * to.width + x) * 3;
+        out[at] = wide[one];
+        out[at + 1] = wide[one + 1];
+        out[at + 2] = wide[one + 2];
+      } else {
+        let red = 0, green = 0, blue = 0, total = 0;
+        for (let n = 0; n < count; ++n) {
+          const share = down.weights[weight + n];
+          const from3 = ((start + n) * to.width + x) * 3;
+          red += wide[from3] * share;
+          green += wide[from3 + 1] * share;
+          blue += wide[from3 + 2] * share;
+          total += share;
+        }
+        out[at] = red / total;
+        out[at + 1] = green / total;
+        out[at + 2] = blue / total;
+      }
+      out[at + 3] = 255;
+    }
+    weight += count;
+  }
+  return out;
+}
+
+// The rendered page with the two tones applied, at the panel's own size. The
+// canvas is the scratch it is done on, and drawDevicePage puts the result back
+// at the size the screen wants.
+function tonePage() {
+  if (!page || typeof canvas.getContext !== "function") return null;
   const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
   canvas.width = page.width;
   canvas.height = page.height;
   context.imageSmoothingEnabled = false;
   context.drawImage(page, 0, 0);
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, page.width, page.height);
   // Both controls measure "more": more paper is lighter, more ink is darker.
   const paperLevel = Math.round(Number(paper.value) * 255 / 100);
   const inkLevel = Math.round((100 - Number(ink.value)) * 255 / 100);
@@ -486,14 +637,49 @@ export function paintDevicePage() {
     pixels.data[offset + 2] = palette[base + 2];
     pixels.data[offset + 3] = 255;
   }
-  context.putImageData(pixels, 0, 0);
+  return pixels;
+}
+
+// The toned page at the size it takes on this screen, counted in real pixels of
+// it. Filling a canvas of that size here, rather than handing the browser a
+// panel-sized one and letting it scale, is what puts the choice of filter in
+// this file instead of in the browser's.
+function drawDevicePage() {
+  if (!toned || typeof canvas.getContext !== "function") return;
+  const device = profile();
+  const factor = sourceFactor(device, frameShown.checked) * dpr();
+  const to = {
+    width: Math.max(1, Math.round(device.aperture.width * factor)),
+    height: Math.max(1, Math.round(device.aperture.height * factor)),
+  };
+  const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
+  canvas.width = to.width;
+  canvas.height = to.height;
+  context.imageSmoothingEnabled = false;
+  if (to.width === toned.width && to.height === toned.height) {
+    // The page is at its own size, where resampling is an identity that costs a
+    // pass over every pixel and risks not being one.
+    context.putImageData(toned, 0, 0);
+  } else {
+    if (!resampled || resampled.width !== to.width ||
+        resampled.height !== to.height) {
+      resampled = context.createImageData(to.width, to.height);
+    }
+    resampleByArea(toned.data, toned, to, resampled.data);
+    context.putImageData(resampled, 0, 0);
+  }
   canvas.classList.add("shown");
+}
+
+export function paintDevicePage() {
+  toned = tonePage();
+  drawDevicePage();
 }
 
 export function showRenderedPage(bitmap) {
   if (page && typeof page.close === "function") page.close();
   page = bitmap;
-  paintDevicePage();
+  toned = tonePage();
   layoutDevice();
 }
 
@@ -627,7 +813,7 @@ function resetDevice(scheduleRender) {
   color.value = themeColor();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
-  paintDevicePage();
+  toned = tonePage();
   layoutDevice();
   if (changedDevice) scheduleRender();
 }

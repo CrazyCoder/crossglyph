@@ -789,13 +789,29 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   };
   const deviceCanvas = makeElement();
   deviceCanvas.getBoundingClientRect = () => ({left: 0, top: 0});
+  // Sized to what is asked for, rather than four pixels whatever the caller
+  // wanted: the page is resampled to the size the screen takes, and a fixture
+  // that ignores the size cannot tell a resample that worked from one that read
+  // off the end of it. The four device levels repeat across it, so the first
+  // pixel is ink and the last is paper however big the page is.
   deviceCanvas.getContext = () => ({
     drawImage(source) { deviceCanvas.painted = source; },
-    getImageData: () => ({
-      data: new Uint8ClampedArray([0, 0, 0, 255, 96, 96, 96, 255,
-                                  200, 200, 200, 255, 255, 255, 255, 255]),
-    }),
-    putImageData(pixels) { deviceCanvas.pixels = [...pixels.data]; },
+    getImageData: (left, top, width, height) => {
+      const levels = [0, 96, 200, 255];
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let at = 0; at < width * height; ++at) {
+        const level = levels[at % levels.length];
+        data[at * 4] = data[at * 4 + 1] = data[at * 4 + 2] = level;
+        data[at * 4 + 3] = 255;
+      }
+      return {width, height, data};
+    },
+    createImageData: (width, height) => (
+      {width, height, data: new Uint8ClampedArray(width * height * 4)}),
+    // Copied, so a later paint into the same buffer cannot rewrite what an
+    // earlier assertion is holding. A typed array, which is what slice and
+    // join here already expect.
+    putImageData(pixels) { deviceCanvas.pixels = pixels.data.slice(); },
   });
   const deviceFrameImage = makeElement();
   const deviceReset = button("reset-device");
