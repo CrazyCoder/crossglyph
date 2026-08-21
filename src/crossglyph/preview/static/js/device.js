@@ -164,14 +164,32 @@ function sourceFactor(device, shown) {
   return fitFactor(device, shown);
 }
 
+// Nudge the page onto whole device pixels. Through `left` and `top` rather
+// than a transform, and the difference is the whole point: a transform is
+// applied exactly, so the canvas rasterizes at the fraction it carries, and
+// `image-rendering: pixelated` settles that by nearest neighbour. Half a device
+// pixel is the tie in that rounding, and the page comes out with stems a pixel
+// wide in one place and two in the next. A relative offset is snapped to whole
+// device pixels when it paints, so the same fraction costs nothing.
+//
+// Only one case ever asks for half a pixel, which is why this is easy to miss:
+// the stage centres the surface, and the X3 frame is odd on both axes where the
+// X4 frame is even, so an X3 with its frame shown is the one that lands between
+// pixels. Every other reader, and every reader with the frame off, is already
+// aligned and reaches this with nothing to correct.
+//
+// getBoundingClientRect() reports where a transform put the element, so it
+// calls both spellings aligned and cannot tell them apart. What tells them
+// apart is a screenshot compared against the canvas's own bitmap.
 function alignPixelGrid() {
   if (scale.value !== "pixels" ||
       typeof canvas.getBoundingClientRect !== "function") return;
   const rect = canvas.getBoundingClientRect();
   const ratio = dpr();
-  const dx = (Math.round(rect.left * ratio) - rect.left * ratio) / ratio;
-  const dy = (Math.round(rect.top * ratio) - rect.top * ratio) / ratio;
-  surface.style.transform = `translate(${dx}px, ${dy}px)`;
+  surface.style.left =
+    `${(Math.round(rect.left * ratio) - rect.left * ratio) / ratio}px`;
+  surface.style.top =
+    `${(Math.round(rect.top * ratio) - rect.top * ratio) / ratio}px`;
 }
 
 export function layoutDevice() {
@@ -191,7 +209,9 @@ export function layoutDevice() {
   frame.src = frameUrl();
   frame.style.width = `${device.frame.width * factor}px`;
   frame.style.height = `${device.frame.height * factor}px`;
-  surface.style.transform = "";
+  // Cleared before alignPixelGrid measures, so it reads the surface where
+  // layout put it rather than where the last correction left it.
+  surface.style.left = surface.style.top = "";
   syncFrameTint();
   alignPixelGrid();
   syncPreviewColumns();
