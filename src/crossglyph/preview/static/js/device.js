@@ -181,6 +181,16 @@ function sourceFactor(device, shown) {
 // getBoundingClientRect() reports where a transform put the element, so it
 // calls both spellings aligned and cannot tell them apart. What tells them
 // apart is a screenshot compared against the canvas's own bitmap.
+//
+// The size needs no such care, which is worth saying because it looks as
+// though it should. A CSS length is a multiple of a sixty-fourth of a pixel,
+// so asking for the panel over the ratio can miss by half of that, and the
+// box comes out a fraction of a device pixel off the bitmap it holds. That
+// fraction is the whole drift from one edge to the other, so the furthest any
+// column moves is the ratio over 128, well under a hundredth of a pixel, and
+// nearest neighbour does not move a column until half of one. Measured at
+// ratios where the panel is not expressible at all, every pixel still lands
+// where the bitmap put it.
 function alignPixelGrid() {
   if (scale.value !== "pixels" ||
       typeof canvas.getBoundingClientRect !== "function") return;
