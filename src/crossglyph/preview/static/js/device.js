@@ -347,6 +347,17 @@ async function decoded(url) {
   return image;
 }
 
+// The toned page as something that can be drawn. It is held as pixels, and
+// pixels can only be written straight into a canvas, which would ignore the
+// rounded corners the bare screen is clipped to.
+function tonedPage() {
+  const sheet = document.createElement("canvas");
+  sheet.width = toned.width;
+  sheet.height = toned.height;
+  sheet.getContext("2d").putImageData(toned, 0, 0);
+  return sheet;
+}
+
 // What the preview is showing, at the panel's own resolution: the body around
 // the page when the frame is on, the page alone when it is off. The frame
 // toggle is the whole of the choice, which is what it already means on screen.
@@ -360,17 +371,6 @@ async function decoded(url) {
 // Exported so it can be measured in a browser. Neither suite can: the JS one
 // runs against a stub DOM with no canvas, and pytest never opens a page, so a
 // composite that came out wrong would pass both.
-// The toned page as something that can be drawn. It is held as pixels, and
-// pixels can only be written straight into a canvas, which would ignore the
-// rounded corners the bare screen is clipped to.
-function tonedPage() {
-  const sheet = document.createElement("canvas");
-  sheet.width = toned.width;
-  sheet.height = toned.height;
-  sheet.getContext("2d").putImageData(toned, 0, 0);
-  return sheet;
-}
-
 export async function deviceImage() {
   if (!toned) throw new Error("there is no page to copy yet");
   const device = profile("pixels");
@@ -506,6 +506,18 @@ function contributions(from, to) {
   return {starts, counts, weights: Float32Array.from(weights)};
 }
 
+//: Scratch for the pass between the two, and the picture the second one fills.
+//: Both are kept: dragging a window edge resamples on every frame, and handing
+//: back several megabytes each time to ask for them again is most of what that
+//: costs. Grown when a bigger size comes along and never shrunk.
+let between = null;
+let resampled = null;
+
+function scratch(size) {
+  if (!between || between.length < size) between = new Float32Array(size);
+  return between;
+}
+
 // Resample by area: a destination pixel is the mean of the source it covers.
 //
 // One filter serves both directions, which is why there is no second one for
@@ -524,18 +536,6 @@ function contributions(from, to) {
 //
 // Separable, so it costs two passes over the picture rather than one over every
 // pair of pixels.
-//: Scratch for the pass between the two, and the picture the second one fills.
-//: Both are kept: dragging a window edge resamples on every frame, and handing
-//: back several megabytes each time to ask for them again is most of what that
-//: costs. Grown when a bigger size comes along and never shrunk.
-let between = null;
-let resampled = null;
-
-function scratch(size) {
-  if (!between || between.length < size) between = new Float32Array(size);
-  return between;
-}
-
 function resampleByArea(data, from, to, out) {
   const across = contributions(from.width, to.width);
   const down = contributions(from.height, to.height);
@@ -655,7 +655,6 @@ function drawDevicePage() {
   const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
   canvas.width = to.width;
   canvas.height = to.height;
-  context.imageSmoothingEnabled = false;
   if (to.width === toned.width && to.height === toned.height) {
     // The page is at its own size, where resampling is an identity that costs a
     // pass over every pixel and risks not being one.
@@ -676,6 +675,9 @@ export function paintDevicePage() {
   drawDevicePage();
 }
 
+// Toning and laying out, rather than paintDevicePage and then laying out:
+// the layout draws the page itself, so going through paintDevicePage here
+// would resample it twice for one new page. Same in resetDevice.
 export function showRenderedPage(bitmap) {
   if (page && typeof page.close === "function") page.close();
   page = bitmap;
