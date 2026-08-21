@@ -110,6 +110,10 @@ done
   -sEXPORTED_FUNCTIONS="$EXPORTS" \
   -o "$OUT/render.wasm"
 
+# em++ writes the module executable, and off Windows git records that: without
+# this a rebuild on macOS or Linux shows a mode change on a file nothing runs.
+chmod 644 "$OUT/render.wasm"
+
 # Record what this was built from, beside it. crossglyph.render.is_stale() reads
 # this and refuses to load a module the firmware has moved past -- a preview
 # drawn by the wrong renderer is worse than no preview.
@@ -142,5 +146,7 @@ else
   rm -f "$OUT/render.built-from.json"
 fi
 
-echo "built $OUT/render.wasm ($(stat -c%s "$OUT/render.wasm") bytes)"
+# wc -c rather than stat: the size flag is -c%s on GNU and -f%z on BSD, and
+# macOS has the BSD one.
+echo "built $OUT/render.wasm ($(wc -c < "$OUT/render.wasm" | tr -d ' ') bytes)"
 echo "  from $SOURCE @ ${COMMIT:0:12}"
