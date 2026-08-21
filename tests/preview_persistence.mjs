@@ -797,10 +797,15 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   deviceCanvas.getContext = () => ({
     drawImage(source) { deviceCanvas.painted = source; },
     getImageData: (left, top, width, height) => {
+      // In runs rather than one pixel each, because a page of strokes is runs:
+      // neighbours mostly match, and the levels meet only at an edge. Every
+      // neighbour differing would make enlarging blend everywhere, which is
+      // true of that picture and of no real page.
       const levels = [0, 96, 200, 255];
+      const RUN = 4;
       const data = new Uint8ClampedArray(width * height * 4);
       for (let at = 0; at < width * height; ++at) {
-        const level = levels[at % levels.length];
+        const level = levels[Math.floor(at / RUN) % levels.length];
         data[at * 4] = data[at * 4 + 1] = data[at * 4 + 2] = level;
         data[at * 4 + 3] = 255;
       }
@@ -975,6 +980,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   }});
   const sandbox = {
     ...HOST,
+    // The page reads this to work out how many real pixels its box is, which
+    // decides whether it shrinks the render or enlarges it. Settable, because
+    // the two directions go down different paths.
+    devicePixelRatio: 1,
     addEventListener(kind, fn) {
       if (kind === "resize") resizes.push(fn);
     },
@@ -1323,6 +1332,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            pageError: stubs["page-error"], status: stubs.status,
            sheet,
            device: {
+             ratio(value) { sandbox.devicePixelRatio = value; },
              model: deviceModel, color: deviceColor, frame: deviceFrame,
              scale: deviceScale, paper: devicePaper, ink: deviceInk,
              calibration: deviceCalibration, surface: deviceSurface,
@@ -5225,6 +5235,78 @@ for (const deferred of [
         env.device.canvas.pixels.join());
   check("reset device preview removes its saved state",
         !("crossglyph.device" in storage.data));
+}
+
+// Fitting the page to the box the screen gives it. Both directions go through
+// the resampler and neither is what the browser would have done with it.
+//
+// Nearest neighbour can only ever put out a level the render already had, so a
+// value between two of them is the proof that a filter ran at all. Enlarging
+// has to show both: blends where a destination pixel straddles two source
+// pixels, and the source levels themselves everywhere else, since a stroke that
+// went soft all over would be bilinear rather than this.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+
+  // The render is 480x800, and the four device levels come back through the
+  // default tones as these. Anything else on the canvas was worked out.
+  const RENDERED = {width: 480, height: 800};
+  const LEVELS = new Set([27, 94, 163, 231]);
+  const census = () => {
+    const pixels = env.device.canvas.pixels;
+    const seen = new Set();
+    let total = 0, count = 0, exact = 0;
+    for (let at = 0; at < pixels.length; at += 4) {
+      seen.add(pixels[at]);
+      if (LEVELS.has(pixels[at])) ++exact;
+      total += pixels[at];
+      ++count;
+    }
+    return {seen, mean: total / count, exact, count,
+            width: env.device.canvas.width, height: env.device.canvas.height};
+  };
+  const scaled = (name) => {
+    env.device.scale.value = name;
+    env.device.change(env.device.scale);
+    return census();
+  };
+
+  env.device.frame.checked = true;
+  env.device.edit(env.device.frame);
+  const own = scaled("pixels");
+  check("at its own size the page is the render and nothing has been worked out",
+        own.width === RENDERED.width && own.height === RENDERED.height &&
+        [...own.seen].every(level => LEVELS.has(level)),
+        `${own.width}x${own.height} of ${[...own.seen].join()}`);
+
+  const small = scaled("device");
+  check("at the reader's real size the page is smaller than the render",
+        small.width < RENDERED.width && small.height < RENDERED.height,
+        `${small.width}x${small.height}`);
+  check("and strokes narrower than a pixel arrive at part weight",
+        [...small.seen].some(level => !LEVELS.has(level)),
+        [...small.seen].join());
+  check("shrinking keeps the ink it started with",
+        Math.abs(small.mean - own.mean) < 2,
+        `${small.mean} against ${own.mean}`);
+
+  env.device.ratio(2);
+  const big = scaled("fit");
+  check("a fitted page on a doubled screen is larger than the render",
+        big.width > RENDERED.width && big.height > RENDERED.height,
+        `${big.width}x${big.height}`);
+  check("enlarging blends where a pixel straddles two of the source",
+        [...big.seen].some(level => !LEVELS.has(level)),
+        [...big.seen].join());
+  check("but leaves most of it on the levels it came from, so strokes stay hard",
+        big.exact / big.count > 0.6,
+        `${big.exact} of ${big.count} on a source level`);
+  check("enlarging keeps the ink it started with too",
+        Math.abs(big.mean - own.mean) < 2,
+        `${big.mean} against ${own.mean}`);
+  env.device.ratio(1);
 }
 
 // The warm and tint knobs. They span the cast's chromatic plane and nothing
