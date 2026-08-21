@@ -6,6 +6,7 @@ the one reader guaranteed to disagree with today's defaults.
 """
 import json
 
+import freetype
 import pytest
 
 from crossglyph import fontbuild, fontconf, fontstamp, provenance
@@ -79,6 +80,7 @@ def test_it_says_what_made_it(built):
 
     made = built["built"]
     assert made["by"] == f"crossglyph {version.installed()}"
+    assert made["freetype"] == ".".join(map(str, freetype.version()))
     assert made["cpfont_format"] == fontbuild.cpfont.CPFONT_VERSION
     assert made["config"] == "probe.conf"
     assert made["at"].endswith("Z")

@@ -23,6 +23,8 @@ import datetime
 import pathlib
 import typing
 
+import freetype
+
 from . import cpfont, fontstamp, version
 from .fontconf import STYLES, Config, Variant, size_label, variable_font
 
@@ -220,6 +222,7 @@ def describe(variant: Variant, directory: pathlib.Path,
     return {
         "at": stamped.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "by": f"crossglyph {version.installed()}",
+        "freetype": ".".join(map(str, freetype.version())),
         "cpfont_format": cpfont.CPFONT_VERSION,
         "config": config.path.name,
         "settings": _settings(variant),

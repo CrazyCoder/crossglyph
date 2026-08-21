@@ -1000,6 +1000,7 @@ to somebody who liked how it looked, and what travels with it is four
 "built": {
   "at": "2026-08-15T08:44:43Z",
   "by": "crossglyph X.Y.Z",
+  "freetype": "X.Y.Z",
   "cpfont_format": 4,
   "config": "bitter.conf",
   "settings": {"gamma": 1.0, "hinting": "light", "figures": "proportional", …},
@@ -1023,6 +1024,9 @@ to somebody who liked how it looked, and what travels with it is four
 Every setting, including the ones no config set. Defaults move between
 versions, so a record of the departures alone would reproduce a different font
 later, and neither copy could say which one shipped.
+
+`freetype` is the version of FreeType that drew the glyphs, read from the
+library itself rather than from the Python package that loads it.
 
 Some of it serves a reader instead of a rebuild. `sha256` settles whether the
 face you have is the face this was made from, where a version string is a claim
