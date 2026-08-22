@@ -1,11 +1,11 @@
 # CrossGlyph
 
-CrossGlyph tunes and converts fonts for e-readers that run
-[CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader) firmware.
-It turns TTF and OTF files into `.cpfont` files that CrossPoint can load from an
-SD card.
+CrossGlyph tunes and converts fonts for e-readers that use the `.cpfont` format
+from [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader),
+including CrossPoint itself and compatible firmware forks. It turns TTF and OTF
+files into fonts those readers can load from an SD card.
 
-The browser preview uses the same text renderer as the firmware. Move a control
+The browser preview uses CrossPoint's text renderer. Move a control
 and the page redraws with the new font settings.
 
 <p align="center">
