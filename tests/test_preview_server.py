@@ -1886,18 +1886,24 @@ def test_the_second_family_a_config_builds_takes_its_name_too(scratch):
     assert "Ledger" in response.text
 
 
-def test_a_fallback_family_is_stored_as_its_regular_file(scratch):
-    """The converter takes a file; the panel offers families, because that is
-    the only sane way to pick one. The trip in has to land on the face."""
+def test_each_fallback_family_slot_is_stored_as_its_regular_file(scratch):
+    """The converter takes a file; the panel offers families, so each trip
+    through the save path has to land on that family's regular face."""
     response = _save_export("Alto", fallback1="Ledger")
     assert response.status_code == 200, response.text
-    assert "fallback_1 = Ledger.ttf" in \
-        (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
+    conf = _conf(scratch) / "alto.conf"
+    assert "fallback_1 = Ledger.ttf" in conf.read_text(encoding="utf-8")
 
-    _save_export("Alto", fallback1="")
-    assert "fallback_1" not in \
-        (_conf(scratch) / "alto.conf").read_text(encoding="utf-8"), \
-        "clearing the picker left the file behind"
+    response = _save_export("Alto", fallback1="", fallback2="Ledger")
+    assert response.status_code == 200, response.text
+    text = conf.read_text(encoding="utf-8")
+    assert "fallback_1" not in text, \
+        "clearing the first picker left its family behind"
+    assert "fallback_2 = Ledger.ttf" in text
+
+    _save_export("Alto", fallback2="")
+    assert "fallback_2" not in conf.read_text(encoding="utf-8"), \
+        "clearing the second picker left its family behind"
 
 
 def test_sizes_the_device_could_not_read_are_refused(scratch):
