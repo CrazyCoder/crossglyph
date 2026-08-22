@@ -861,12 +861,11 @@ def _space_widths(values: dict[str, str], where: str) -> dict[int, float]:
 
 def _migrate_legacy_fallbacks(path: pathlib.Path,
                               values: dict[str, str]) -> dict[str, str]:
-    """Rename the two family fallback keys in place, once.
+    """Replace compatibility spellings with the family fallback keys.
 
-    The config used to name the regular source file that identifies each
-    fallback family. The build has always resolved the rest of that family
-    from the file. Keep a new key when both spellings are present, and remove
-    the stale spelling either way.
+    Both spellings store the regular source file that identifies a fallback
+    family. Keep the current key when both are present, and remove each
+    compatibility spelling after reading it.
     """
     migrated = dict(values)
     changes: dict[str, str | None] = {}
