@@ -5,8 +5,8 @@ preview font. Page controls lay out the page again. Both changes appear in the
 browser as soon as they are ready.
 
 <p align="center">
-  <a href="images/preview.png"><img src="images/preview.png" width="50%"
-     alt="A rendered page inside a reader frame with preview controls below"></a>
+  <a href="images/preview.png"><img src="images/preview.png" width="80%"
+     alt="The Export panel beside a rendered page in the two-column layout"></a>
 </p>
 
 For a first build, follow [Getting started](getting-started.md). This page is a
@@ -137,6 +137,11 @@ language of the sample text you pasted into the preview.
 
 **Reset page settings** returns the section to its starting values.
 
+<p align="center">
+  <a href="images/tune.png"><img src="images/tune.png" width="80%"
+     alt="The Tune panel beside a rendered page, with Page and Device preview settings open"></a>
+</p>
+
 ## Change the sample text
 
 Open **Text** below the rendered page. Choose one of the supplied samples or
@@ -166,6 +171,11 @@ The controls include:
 
 These are viewing settings. They do not change the font or its config. The
 browser remembers them.
+
+<p align="center">
+  <a href="images/preview-text.png"><img src="images/preview-text.png" width="65%"
+     alt="The Device preview and Text settings open"></a>
+</p>
 
 ## Save font settings
 
@@ -204,6 +214,11 @@ entry with a long size list.
 Coverage controls which characters are placed in the files. More coverage
 creates larger files and takes longer to build. Fallback faces fill characters
 that the main family lacks.
+
+<p align="center">
+  <a href="images/export.png"><img src="images/export.png" width="55%"
+     alt="The complete Export panel with sizes, coverage, fallbacks and build controls"></a>
+</p>
 
 ## Build
 

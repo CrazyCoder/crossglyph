@@ -9,12 +9,8 @@ The browser preview uses the same text renderer as the firmware. Move a control
 and the page redraws with the new font settings.
 
 <p align="center">
-  <a href="docs/images/tune.png"><img src="docs/images/tune.png" width="32%"
-     alt="The Tune panel with font controls"></a>
-  <a href="docs/images/preview.png"><img src="docs/images/preview.png" width="32%"
-     alt="A rendered page inside a reader frame"></a>
-  <a href="docs/images/export.png"><img src="docs/images/export.png" width="32%"
-     alt="The Export panel with build settings"></a>
+  <a href="docs/images/overview.png"><img src="docs/images/overview.png"
+     width="100%" alt="CrossGlyph in its three-column layout, with Tune, the rendered page and Export"></a>
 </p>
 
 ## Why use the converter
