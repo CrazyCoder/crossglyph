@@ -1,272 +1,95 @@
 # Updating
 
-CrossGlyph looks for a newer release about once a day and tells you when there
-is one. It installs nothing until you ask it to.
+CrossGlyph checks for a newer release about once a day. The check only reports
+what is available. An update starts when you press **Update** or run the update
+command.
 
-## What it does, and when
+## Check in the browser
 
-The check reads one small file on the web, `latest.json`, which says what the
-newest release is. It compares that with the version you are running and says
-something only when the release is newer.
+The status below the sample text shows one of these results:
 
-It never runs while you are waiting for anything:
+- **Up to date**
+- a newer release is available
+- the check is off
+- the release server could not be reached
 
-- the command line checks **after** the work is done, so a build is never
-  slower for it;
-- the preview checks on a background thread while it starts, so the page is
-  never later for it.
+Press **Check now** to check immediately. This works even when automatic checks
+are off.
 
-Either way it gives up after a couple of seconds, and it asks at most once per
-interval. An install with no network costs one short wait a day and says
-nothing.
+Automatic checks run in the background. They do not delay a preview render or a
+font build.
 
-## What you see
+## Install an update
 
-On the command line, after `crossglyph build` or `crossglyph fetch-fallbacks`,
-one line:
+When a newer release is available, **Check now** becomes **Update**.
 
-```
-note: X.Y.Z is available. Run crossglyph update to install it.
-```
+Press **Update** to:
 
-The second sentence depends on how CrossGlyph was installed. A clone is told
-to pull, a container to take the new image, an unpacked release to run the
-command above. None of them hears anything while there is nothing to do. The
-check compares the version this install reports against the published one, so
-a clone behind that release hears about it and one that is current stays quiet.
+1. download the release;
+2. verify its SHA-256 checksum;
+3. install it beside the current version;
+4. restart the local preview;
+5. reload the browser page.
 
-A source download is the exception, and says what it is whatever the check
-found. Its version is whatever the last release set, so a tree taken from the
-default branch after that reports the release and compares as up to date while
-holding a good deal more.
+The page may lose its connection while the preview restarts. It waits for the
+new process and reloads after the server answers.
 
-In the preview, the panel under the sample text answers the question: the new
-version when there is one, and **Up to date.** when there is not. When it last
-looked is a fact about that answer and not the answer itself, so it sits on the
-line below with the rest of what this install is. Beside it is one button:
-**Check now** ordinarily, and **Update** in its place when there is a release
-this install can take. The name at the left of that line links the project, and
-the address comes from the same constant the updater fetches from, so the two
-cannot drift apart.
+A container, source checkout or read-only installation may require another
+update method. The status line tells you what to do for that installation.
 
-Where that button can do the whole job, the line below leaves out how to
-update. A command beside a button that runs it is only noise. The kinds the
-button cannot help still say what would, and so does a source download, whose
-answer is not the command but what pressing it would do to the install.
+## Files kept during an update
 
-## Asking on purpose
+Updates keep the font workspace and its settings. This includes:
 
-```sh
-crossglyph update --check
-```
+- source fonts;
+- family config files;
+- built `.cpfont` files;
+- downloaded fallback faces;
+- `update.conf`.
 
-Asks straight away, whatever the interval says and whether or not automatic
-checks are turned off. It reports every answer, including the three the
-automatic check keeps to itself: that you are up to date, that it could not
-reach the server, and a release you rolled back from.
+CrossGlyph also protects editable templates and Docker configuration. If you
+changed a shipped file, the update places the new copy beside it with a `.new`
+suffix.
 
-**Check now** in the preview does the same thing, and offers what it finds.
+## Roll back
 
-## Installing one
+Rollback is a command-line operation. It selects the previous retained release.
+See [Updates on the command line](cli.md#updates).
 
-```sh
-crossglyph update
-```
+After a rollback, automatic checks do not offer the release you left. A newer
+release will appear normally. **Check now** still reports the release you left
+and explains why the automatic check did not offer it.
 
-The **Update** button in a local preview downloads the release, installs it,
-restarts CrossGlyph on the same address and reloads the page after the new
-version answers. The port can disappear briefly between the two processes.
-The page waits through that gap and does not call it a failed update.
-Only one install request runs at a time. A second tab cannot start another
-download or another restart while the first one is working.
+## Automatic check settings
 
-`crossglyph update` does the same install from the command line, without
-restarting a process you may be using for something else.
+`update.conf` is beside the launcher. These keys control automatic checks:
 
-The updater fetches `latest.json`, stops if there is nothing newer, downloads
-the release, checks it against the SHA-256 that file gave, unpacks it into
-`versions/<new version>`, and writes that version into `current`.
-
-The version you were on stays where it is. `update.conf` and your `fonts`
-folder persist at the root, while the launcher and Docker configuration follow
-the rules below.
-
-The detached restart writes its setup and failure output to `preview.log`.
-The page keeps waiting while that process is still building the new
-environment; it recommends closing CrossGlyph and opening it again only after
-the handoff exits or the replacement server fails to appear.
-
-The same instruction appears when a preview cannot hand itself to the new
-version. A handoff is the running server starting its replacement and stepping
-aside. It cannot happen for an update asked for from another machine, since a
-page somewhere else is not allowed to stop the server, and it does not happen
-for an update run with `crossglyph update`. On the next launch, the native
-launcher runs the version named by `current`.
-
-Automatic handoff is a capability of the version that is running. The one it
-has just downloaded does not decide it. So the first update from a release
-without that capability asks you to close CrossGlyph and open it once. Later
-updates can restart in the page.
-
-The preview stops offering a release as soon as it is on disk. That fact comes
-from the disk and not from the page that pressed the button, so a reload, a
-second browser and an update run from the command line while the preview is
-open are all told the same thing.
-
-An update interrupted anywhere leaves an install that still runs. The download
-goes to `versions/.tmp-<version>.zip` and the unpack to
-`versions/.incoming-<version>`, neither of which the launcher will ever start,
-and both of which are swept at the next launch.
-
-Rolling forward after a rollback installs a version whose directory is already
-there. That directory is moved to `versions/.old-<version>` and not deleted.
-Deleting it is not something the installer can rely on: the environment uv
-built inside it shares its files with every other environment on the drive, and
-while CrossGlyph is running those files cannot be removed at all. The moved
-directory is another name the launcher will never start, and it goes at the
-next launch.
-
-One thing stops it before it downloads anything: an install that does not own
-its files. That means a clone, a container, or a folder you cannot write to.
-The notice says what to do instead.
-
-### The launchers
-
-The four root launchers are scripts, and a shell may be reading one while an
-update runs. Both cmd.exe and a POSIX shell resume at the byte offset they had
-reached, so a file that changed length underneath them is read from the middle
-of a word.
-
-A launcher that is already installed is therefore updated beside itself with
-`.staged` on the end. It applies that copy at its next launch before doing any
-other work, and keeps the replaced file with `.previous` on the end. If a
-launcher ever ships broken, renaming that copy back undoes it without
-reinstalling anything.
-
-A launcher introduced by a release is installed directly because no running
-process could have opened a file that was not there. Nothing about either path
-needs doing by hand. An install whose launcher is one release behind still
-runs, because the native launcher reads `current` and starts the version it
-names.
-
-### Your workspace
-
-An update never writes over a file you edited. For each file it ships into
-`fonts`, today `README.md` and `conf/all.conf.example`:
-
-- if it is not there, it is written;
-- if it is exactly as it shipped, it is replaced, since you never touched it;
-- otherwise yours is kept, the new one is written beside it as
-  `<name>.new`, and the update says so.
-
-A template is skipped entirely where you already have the file it is a
-template for. An install with a `conf/all.conf` is never offered
-`conf/all.conf.example`, so the copy you started from does not reappear beside
-your settings at every update.
-
-`conf/all.conf` itself is never shipped and never touched. Everything else in
-`fonts` is yours and is not looked at.
-
-### Docker configuration
-
-The root `compose.yaml` and `compose.build.yaml` follow the same rule as the
-workspace templates. An untouched copy is replaced with the new release's
-file. If you edited one, yours is kept and the new one is written as
-`<name>.new`.
-
-Each release's Compose files select that release's image and versioned local
-build context by default. Where you can, put deployment settings in `.env`
-and leave the Compose files alone. CrossGlyph does not write `.env`.
-
-### A source download
-
-A tree from the **Code** button on GitHub has no `versions` folder and no
-`current`, so it runs where it stands. `crossglyph update` converts it: it
-adds those two things and changes nothing else. The launcher already prefers
-the versioned layout, so the next run starts the new version, and the install
-updates normally from then on.
-
-The source files from the flat layout stay at the root, and the launcher does
-not read them. The shared `fonts` workspace and `compose.yaml` stay at the root
-too, because native and container launches both use them.
-
-The offer only appears when the published release is newer than the version in
-the tree. A snapshot taken from the default branch reports the version of the
-last release while holding rather more than it did, so installing that release
-over the top would be a step backwards.
-
-## Going back
-
-```sh
-crossglyph update --rollback
-```
-
-Puts `current` back to the version before this one and says so. Restart
-CrossGlyph and you are on it.
-
-The version you left is recorded, and the checks CrossGlyph makes on its own
-stay quiet about it until something newer than it appears. Otherwise the next
-one would offer you the release you just escaped, and go on offering it every
-day.
-
-That silence is the tool not raising the subject, and it is nothing more than
-that. Ask and you are answered: `crossglyph update --check` and **Check now**
-both name that release and say why nothing had mentioned it, the button
-appears beside it, and `crossglyph update` installs it. A rollback is a
-decision about being nagged, and you can change your mind without undoing
-it.
-
-## How many versions are kept
-
-The one in use and one more, which is all a rollback needs. Older ones are
-removed at the next launch, on a background thread in the preview, so a large
-removal never delays the page. `keep_versions` in `update.conf` changes the
-count.
-
-A version is a few megabytes unpacked, and a good deal larger once it has been
-run and uv has built its environment inside it. Nothing removes the version in
-use, the version `current` names, or the one this process is running from, and
-a directory that will not go is left for the next launch, and nothing fails.
-
-## Settings
-
-`update.conf` sits beside the launcher, at the top of the folder you unpacked.
-It ships fully commented, so having it changes nothing until you edit a line.
-
-| Key | Default | What it does |
+| Key | Default | Meaning |
 |---|---|---|
-| `check` | `yes` | Set to `no` to stop it asking on its own. |
-| `interval_hours` | `24` | How long to wait between checks. |
-| `keep_versions` | `1` | Versions kept besides the one in use. Zero keeps none, and leaves nothing to roll back to. |
+| `check` | `yes` | Set to `no` to disable automatic checks. |
+| `interval_hours` | `24` | Hours between checks. |
+| `keep_versions` | `1` | Installed versions kept beside the active version. |
 
-A value that does not parse leaves the default in place. Nothing is guessed
-at.
+Example:
 
-## Turning it off
+```ini
+check = no
+```
 
-Any one of these stops the automatic check. They are not a precedence chain,
-so one is enough and a `yes` in the config does not overrule the others:
+Turning off automatic checks does not disable **Check now**, **Update** or the
+matching commands. Those actions start only when you request them.
 
-- `check = no` in `update.conf`;
-- the `CROSSGLYPH_NO_UPDATE_CHECK` environment variable, set to anything;
-- `--no-update-check` on any command, for that run only;
-- the `CI` environment variable, which is set for you on build machines.
+Environment variables and the one-command option are listed in
+[Command line](cli.md#global-options).
 
-None of them touches `crossglyph update --check`, `crossglyph update` or the
-two buttons. Those are you asking, and the tool asking is a different
-thing. Nothing installs itself either way.
+## Network requests
 
-## What it writes
+An automatic check sends one HTTPS request for `latest.json`. The file contains
+the newest release number and download information.
 
-Native installs keep `.update-state.json` beside the launcher: when CrossGlyph
-last looked, what it found, and the version a rollback rejected. A container
-keeps the same state in its private temporary filesystem because the
-application image is read-only. Restarting it costs one more check. Deleting
-the native file does the same and un-rejects a version you rolled back from.
+The request does not include an installation ID, the installed CrossGlyph
+version or a usage count. Installing an update adds one request for the release
+archive.
 
-## What it sends
-
-A plain HTTPS GET for `latest.json`, and, when you ask for an update, a GET
-for the release zip. No identifier, no version, no count. The server learns
-what any web server learns from a request, and CrossGlyph tells it nothing
-further.
+CrossGlyph stores the last check result in `.update-state.json` beside the
+launcher. Deleting that file resets the recorded check time and rollback choice.
