@@ -7,8 +7,8 @@
 # Uncomment a line and change its value to set a shared default. A
 # <family>.conf beside all.conf overrides it for that family.
 #
-# This file cannot set name, family, or the explicit style and fallback file
-# keys: each of those names one specific family or file.
+# This file cannot set name, family, the explicit style keys, or the two
+# fallback family keys. Each of those identifies one family or source file.
 #
 # Every key, and what the tuning ones actually do, is in docs/fonts.md.
 
