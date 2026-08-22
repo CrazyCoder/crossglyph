@@ -857,10 +857,9 @@ def _docs():
 
 
 def test_a_setting_the_panel_renames_is_mapped_in_the_docs():
-    """A reader who works in the preview has never seen `fallback_regular`.
-    The panel calls it fallback 1, `intervals` is the coverage ticks, and
-    `fallbacks` is a box called bundled fallback faces -- so a config
-    reference that names only the keys answers a question nobody asked.
+    """The panel calls `intervals` coverage and `fallbacks` bundled fallback
+    faces. A config reference that names only the keys would answer a question
+    a browser user did not ask.
 
     Anything whose control carries the key's own words needs no row. This is
     for the rest, and it fails when a control is renamed or a key gains one.

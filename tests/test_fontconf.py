@@ -660,6 +660,40 @@ def test_an_unknown_key_is_still_rejected(tmp_path):
     with pytest.raises(fontconf.FontConfigError, match="unknown key"):
         _cfg(tmp_path, "gamma_correction = 2\n")
 
+def test_legacy_fallback_keys_are_migrated_in_place(tmp_path):
+    conf = tmp_path / "alto.conf"
+    conf.write_text(
+        "# Family fallbacks.\n"
+        "fallback_regular = One-Regular.ttf\n"
+        "fallback2_regular = Two-Regular.ttf\n",
+        encoding="utf-8")
+
+    values = fontconf.read_values(conf)
+
+    assert values["fallback_1"] == "One-Regular.ttf"
+    assert values["fallback_2"] == "Two-Regular.ttf"
+    assert "fallback_regular" not in values
+    assert "fallback2_regular" not in values
+    assert conf.read_text(encoding="utf-8") == (
+        "# Family fallbacks.\n"
+        "fallback_1 = One-Regular.ttf\n"
+        "fallback_2 = Two-Regular.ttf\n")
+
+
+def test_a_new_fallback_key_wins_while_the_legacy_key_is_removed(tmp_path):
+    conf = tmp_path / "alto.conf"
+    conf.write_text(
+        "fallback_1 = New-Regular.ttf\n"
+        "fallback_regular = Old-Regular.ttf\n",
+        encoding="utf-8")
+
+    values = fontconf.read_values(conf)
+
+    assert values["fallback_1"] == "New-Regular.ttf"
+    assert "fallback_regular" not in values
+    assert conf.read_text(encoding="utf-8") == \
+        "fallback_1 = New-Regular.ttf\n"
+
 
 def test_the_metric_keys_are_parsed(tmp_path):
     cfg = _cfg(tmp_path, "line_height = 1.15\nletter_spacing = 0.25\n"

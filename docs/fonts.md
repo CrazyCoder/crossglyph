@@ -30,8 +30,6 @@ The exceptions are listed here.
 | **coverage** | `intervals` |
 | **extra ranges** | `ranges` |
 | **bundled fallback faces** | `fallbacks` |
-| **fallback 1** | `fallback_regular` |
-| **fallback 2** | `fallback2_regular` |
 | **mono rasterizing** | `mono` |
 | **output** | `out` in `all.conf` |
 | **use the font's own** beside line height | leave `line_height` unset |
@@ -60,8 +58,8 @@ A family config inherits from `all.conf` and overrides the keys it names. A
 discovered family with no config also uses the shared defaults.
 
 Keep keys that identify one family or file in family configs. This includes
-`name`, `family`, `regular`, `bold`, `italic`, `bolditalic`,
-`fallback_regular` and `fallback2_regular`.
+`name`, `family`, `regular`, `bold`, `italic`, `bolditalic`, `fallback_1` and
+`fallback_2`.
 
 ## Source files and styles
 
@@ -154,14 +152,18 @@ the main family, the two user fallbacks and then the enabled bundled faces.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `fallback_regular` | Empty | First user fallback family. |
-| `fallback2_regular` | Empty | Second user fallback family. |
+| `fallback_1` | Empty | First user fallback family. |
+| `fallback_2` | Empty | Second user fallback family. |
 | `fallbacks` | `no` | Add the downloaded bundled Noto faces. |
 | `fallback_order` | Built-in order | Comma-separated order used while `fallbacks` is `yes`. Use `bundled` for the bundled set. |
 | `fallback_dir` | `fallbacks` | Folder holding bundled faces. This key belongs in `all.conf`. |
 
-The user fallback keys name files relative to `dir`. A fallback lends its bold
-or italic face when that style exists. Its regular face supplies other styles.
+`fallback_1` and `fallback_2` name the regular source file that identifies each
+family. CrossGlyph discovers that family's bold and italic faces and uses them
+for matching styles. The regular face supplies any missing styles.
+
+CrossGlyph rewrites `fallback_regular` and `fallback2_regular` to the new keys
+when it reads an existing family config.
 
 In the browser, use **Fetch** beside **bundled fallback faces**. The command-line
 method is in [Command line](cli.md#download-bundled-fallbacks).

@@ -1718,7 +1718,7 @@ def test_the_panel_is_told_what_a_family_builds_as(scratch):
 
     (_conf(scratch) / "alto.conf").write_text(
         "sizes = 12 13\nintervals = cyrillic\nfallbacks = no\n"
-        "fallback_regular = Ledger.ttf\n", encoding="utf-8")
+        "fallback_1 = Ledger.ttf\n", encoding="utf-8")
     entry = next(f for f in server.families() if f["name"] == "Alto")
 
     assert entry["export"]["name"] == "Alto", "the name box would open blank"
@@ -1891,11 +1891,11 @@ def test_a_fallback_family_is_stored_as_its_regular_file(scratch):
     the only sane way to pick one. The trip in has to land on the face."""
     response = _save_export("Alto", fallback1="Ledger")
     assert response.status_code == 200, response.text
-    assert "fallback_regular = Ledger.ttf" in \
+    assert "fallback_1 = Ledger.ttf" in \
         (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
 
     _save_export("Alto", fallback1="")
-    assert "fallback_regular" not in \
+    assert "fallback_1" not in \
         (_conf(scratch) / "alto.conf").read_text(encoding="utf-8"), \
         "clearing the picker left the file behind"
 
@@ -3586,7 +3586,7 @@ def test_a_picked_fallback_resolves_its_styles_as_the_build_does(tmp_path,
     _conf(tmp_path).joinpath("icons.conf").write_text(
         "regular = Icons-Regular.ttf\nbold = Dingbats.ttf\n", encoding="utf-8")
     _conf(tmp_path).joinpath("probe.conf").write_text(
-        "fallback_regular = Icons-Regular.ttf\n", encoding="utf-8")
+        "fallback_1 = Icons-Regular.ttf\n", encoding="utf-8")
     monkeypatch.setattr(fontbuild, "SOURCE_DIR", tmp_path)
     _forget_the_last_folder()
 

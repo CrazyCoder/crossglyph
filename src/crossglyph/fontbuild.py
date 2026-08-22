@@ -551,7 +551,7 @@ def fallback_chain(config: Config) -> dict[int, list[str]]:
     on, then the space font.
     """
     entries: list[dict[str, pathlib.Path]] = []
-    for key in ("fallback_regular", "fallback2_regular"):
+    for key in fontconf.FALLBACK_KEYS:
         if key in config.user_fallbacks:
             entries.append(pinned_faces(config.user_fallbacks[key]))
     if config.fallbacks:

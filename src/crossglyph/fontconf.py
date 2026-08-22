@@ -92,8 +92,12 @@ BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "grayscale_hinting",
 TUNING_KEYS = {"gamma", "thresholds", "weight", "slant", "hinting",
                "line_height", "letter_spacing", "word_spacing", "kerning",
                "figures"}
-PATH_KEYS = {"regular", "bold", "italic", "bolditalic",
-             "fallback_regular", "fallback2_regular"}
+FALLBACK_KEYS = ("fallback_1", "fallback_2")
+LEGACY_FALLBACK_KEYS = {
+    "fallback_regular": "fallback_1",
+    "fallback2_regular": "fallback_2",
+}
+PATH_KEYS = {"regular", "bold", "italic", "bolditalic"} | set(FALLBACK_KEYS)
 # `out` is not a property of a family at all -- it is where builds go, which
 # belongs in all.conf. It is listed here so that file may carry it; parse_config
 # ignores it, and fontbuild.output_dir is what reads it.
@@ -855,6 +859,35 @@ def _space_widths(values: dict[str, str], where: str) -> dict[int, float]:
     return out
 
 
+def _migrate_legacy_fallbacks(path: pathlib.Path,
+                              values: dict[str, str]) -> dict[str, str]:
+    """Rename the two family fallback keys in place, once.
+
+    The config used to name the regular source file that identifies each
+    fallback family. The build has always resolved the rest of that family
+    from the file. Keep a new key when both spellings are present, and remove
+    the stale spelling either way.
+    """
+    migrated = dict(values)
+    changes: dict[str, str | None] = {}
+    for old, new in LEGACY_FALLBACK_KEYS.items():
+        if old not in migrated:
+            continue
+        if new not in migrated:
+            migrated[new] = migrated[old]
+            changes[new] = migrated[old]
+        migrated.pop(old)
+        changes[old] = None
+    if changes:
+        try:
+            write_values(path, changes, section="")
+        except OSError as exc:
+            raise FontConfigError(
+                f"{path.name}: could not migrate the fallback family keys: "
+                f"{exc}") from exc
+    return migrated
+
+
 def read_values(path: pathlib.Path, allowed: set[str] | None = None) -> dict[str, str]:
     """Parse one .conf into a plain key -> value dict, rejecting unknown keys."""
     parser = configparser.ConfigParser()
@@ -867,6 +900,8 @@ def read_values(path: pathlib.Path, allowed: set[str] | None = None) -> dict[str
         raise FontConfigError(f"{path.name}: {exc}") from exc
 
     values = dict(parser["font"])
+    if allowed is None:
+        values = _migrate_legacy_fallbacks(path, values)
     allowed = KNOWN_KEYS if allowed is None else allowed
     unknown = sorted(k for k in set(values) - allowed
                      if not _SPACE_WIDTH_RE.match(k))

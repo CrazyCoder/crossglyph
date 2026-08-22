@@ -126,7 +126,7 @@ def test_simplified_chinese_swaps_in_the_matching_cjk_fallbacks(config, tmp_path
 def test_user_fallback_families_are_passed(config, tmp_path):
     kw = _kwargs(
         config, tmp_path / "out",
-        "fallbacks = yes\nfallback_regular = Fallback-Regular.ttf\n")
+        "fallbacks = yes\nfallback_1 = Fallback-Regular.ttf\n")
     assert _fallback_names(kw)[0] == "Fallback-Regular.ttf", \
         "a user fallback is offered before the bundled ones"
 
@@ -512,7 +512,7 @@ def test_the_panel_picks_stay_in_front_of_the_written_order(config, tmp_path):
     (tmp_path / "MyIcons-Regular.ttf").write_bytes(b"x")
     kw = _kwargs(config, tmp_path / "out",
                  "fallbacks = yes\n"
-                 "fallback_regular = Fallback-Regular.ttf\n"
+                 "fallback_1 = Fallback-Regular.ttf\n"
                  "fallback_order = MyIcons\n")
     names = [pathlib.Path(p).name for p in kw["fallback_style_fonts"][0]]
 
@@ -1041,7 +1041,7 @@ def test_a_fallback_face_counts_towards_the_family_it_fills_for(tmp_path):
     _family(tmp_path, [0x20, 0x41])
     box_font(tmp_path / "Filler-Regular.ttf", [0x20, 0x0E01], family="Filler")
     (tmp_path / "probe.conf").write_text(
-        "intervals = thai\nfallback_regular = Filler-Regular.ttf\n",
+        "intervals = thai\nfallback_1 = Filler-Regular.ttf\n",
         encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
     assert fontbuild.coverage_counts(config)["thai"] == (128, 87, 1)
@@ -1206,7 +1206,7 @@ def test_a_block_is_wider_than_the_characters_in_it(tmp_path):
                        if unicodedata.category(chr(code)) != "Cn"],
              family="Filler")
     (tmp_path / "probe.conf").write_text(
-        "intervals = thai\nfallback_regular = Filler-Regular.ttf\n",
+        "intervals = thai\nfallback_1 = Filler-Regular.ttf\n",
         encoding="utf-8")
     config = fontconf.parse_config(tmp_path / "probe.conf", root=tmp_path)
     counted = fontbuild.coverage_counts(config)["thai"]

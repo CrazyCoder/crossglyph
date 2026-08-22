@@ -655,10 +655,10 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
                 "ranges": config.ranges,
                 "fallbacks": config.fallbacks,
                 "fallback1": _fallback_family(
-                    config.user_fallbacks.get("fallback_regular"),
+                    config.user_fallbacks.get(fontconf.FALLBACK_KEYS[0]),
                     regulars or {}),
                 "fallback2": _fallback_family(
-                    config.user_fallbacks.get("fallback2_regular"),
+                    config.user_fallbacks.get(fontconf.FALLBACK_KEYS[1]),
                     regulars or {}),
             }}
 
@@ -1126,10 +1126,11 @@ SAVED_KEYS = ("gamma", "thresholds", "weight", "slant", "letter_spacing",
 
 
 #: The export keys, which are not tuning: they decide what a build contains
-#: rather than how a glyph looks. `fallback_regular` and `fallback2_regular`
-#: name one specific file, so they can only ever live in a family's own config.
+#: rather than how a glyph looks. The two family fallbacks identify their
+#: families through regular source files, so they can only live in a family's
+#: own config.
 EXPORT_KEYS = ("name", "sizes", "sizes_mod", "mod_suffix", "intervals",
-               "ranges", "fallbacks", "fallback_regular", "fallback2_regular")
+               "ranges", "fallbacks", *fontconf.FALLBACK_KEYS)
 
 
 def axis_changes(panel: dict, config: Config) -> dict[str, str | None]:
@@ -1271,8 +1272,8 @@ def export_changes(request_export: dict, config: Config,
     wanted["ranges"] = str(request_export.get("ranges", "")).strip() or None
     wanted["fallbacks"] = "yes" if request_export.get("fallbacks") else "no"
 
-    for key, field in (("fallback_regular", "fallback1"),
-                       ("fallback2_regular", "fallback2")):
+    for key, field in zip(fontconf.FALLBACK_KEYS, ("fallback1", "fallback2"),
+                          strict=True):
         name = str(request_export.get(field, "")).strip()
         if not name:
             wanted[key] = None

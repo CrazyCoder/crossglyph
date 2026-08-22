@@ -78,8 +78,8 @@ def remedy_for(remedy: str, fallbacks: bool) -> str:
                      "and build again.")
     # Nothing in a complete set draws it, which is true whatever `fallbacks`
     # says: the folder was read for this answer and the chain was not.
-    return ("No bundled face covers it. Name a family in `fallback_regular`, "
-            "or drop the tick.")
+    return ("No bundled face covers it. Name a family in `fallback_1`, or "
+            "drop the tick.")
 
 
 def say_refused(name: str, over: dict[str, list[tuple[int, int]]],
@@ -109,9 +109,9 @@ def say_refused(name: str, over: dict[str, list[tuple[int, int]]],
         (f"    Set `fallbacks = yes` to fill those gaps. With the bundled "
          f"faces this same coverage is {bundled} pieces."
          if bundled is not None else
-         "    Name a font in `fallback_regular` that covers that range "
-         "without gaps. Dropping one preset usually changes the count too "
-         "little to help."),
+         "    Name a family in `fallback_1` that covers that range without "
+         "gaps. Dropping one preset usually changes the count too little to "
+         "help."),
         "    Not built.",
     ])
 

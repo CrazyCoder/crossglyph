@@ -44,7 +44,7 @@ def test_the_record_says_which_face_each_style_borrowed_from(tmp_path):
                  family="Fill", style=style)
     (tmp_path / "probe.conf").write_text(
         "sizes = 12\nintervals = base\nfallbacks = no\n"
-        "fallback_regular = Fill-Regular.ttf\n", encoding="utf-8")
+        "fallback_1 = Fill-Regular.ttf\n", encoding="utf-8")
     out = tmp_path / "out"
     list(fontbuild.build_families(
         [fontconf.parse_config(tmp_path / "probe.conf")], out))
@@ -232,7 +232,7 @@ def test_fallbacks_are_recorded_by_filename_not_by_path(tmp_path):
     joining_font(tmp_path / "Joins-Regular.ttf", family="Joins")
     (tmp_path / "plain.conf").write_text(
         "sizes = 12\nintervals = base, arabic\nfallbacks = no\n"
-        "fallback_regular = Joins-Regular.ttf\n", encoding="utf-8")
+        "fallback_1 = Joins-Regular.ttf\n", encoding="utf-8")
     out = tmp_path / "out"
     config = fontconf.parse_config(tmp_path / "plain.conf")
     list(fontbuild.build_families([config], out))
