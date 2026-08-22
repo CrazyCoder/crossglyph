@@ -128,9 +128,44 @@ def test_the_report_reads_what_the_build_compiles_from_the_build():
 
 
 def test_the_script_tracks_one_branch_of_one_repository():
-    assert update_engine.BRANCH == "develop"
+    assert update_engine.BRANCH == "master"
     assert update_engine.DIRECTORY.name == stamp.ENGINE_DIRS[0]
     assert update_engine.URL.endswith("crosspoint-reader.git")
+
+
+def test_a_plain_update_restores_a_clean_one_off_checkout(tmp_path, monkeypatch):
+    checkout = tmp_path / "crosspoint-reader-engine"
+    (checkout / ".git").mkdir(parents=True)
+    monkeypatch.setattr(update_engine, "DIRECTORY", checkout)
+    monkeypatch.setattr(update_engine, "built_from", lambda: "a" * 40)
+    monkeypatch.setattr(update_engine, "report", lambda *args: False)
+    calls = []
+
+    def fake_git(*args, at=None, check=True):
+        calls.append(args)
+        if args == ("status", "--porcelain"):
+            return ""
+        if args == ("rev-parse", "--abbrev-ref", "HEAD"):
+            return "HEAD"
+        if args == ("rev-parse", "origin/master"):
+            return "b" * 40
+        return ""
+
+    monkeypatch.setattr(update_engine, "git", fake_git)
+
+    assert update_engine.main([]) == 0
+    assert ("checkout", "--quiet", "master") in calls
+    assert ("merge", "--ff-only", "--quiet", "origin/master") in calls
+
+
+def test_the_report_names_the_requested_ref(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(update_engine, "compiled_paths", lambda: ["lib/Epub"])
+    monkeypatch.setattr(
+        update_engine, "git",
+        lambda *args, **kwargs: "1234567 change compiled source")
+
+    assert update_engine.report(tmp_path, "a" * 40, "b" * 40, "pr-1234")
+    assert "1 commit(s) on pr-1234" in capsys.readouterr().out
 
 
 def test_the_render_tests_gate_on_a_missing_core_not_a_stale_one():

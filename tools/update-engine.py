@@ -31,7 +31,7 @@ STAMP = ROOT / "src" / "crossglyph" / "render" / "render.built-from.json"
 #: point of a second checkout is that this one does not move for other reasons.
 DIRECTORY = ROOT.parent / "crosspoint-reader-engine"
 URL = "https://github.com/crosspoint-reader/crosspoint-reader.git"
-BRANCH = "develop"
+BRANCH = "master"
 
 #: Everything under $FW that build.sh names, sources and include directories
 #: both. Read out of the script rather than repeated here: a source added
@@ -72,7 +72,7 @@ def clone() -> None:
 
 
 def refuse_if_used(at: pathlib.Path) -> None:
-    """This checkout belongs to the build. Anything else there is a surprise."""
+    """Refuse local work or a named branch this checkout does not track."""
     dirty = git("status", "--porcelain", at=at)
     if dirty:
         raise SystemExit(
@@ -80,14 +80,15 @@ def refuse_if_used(at: pathlib.Path) -> None:
             f"nothing works in:\n{dirty}\n"
             f"Build from a working checkout with FW=<path> instead.")
     branch = git("rev-parse", "--abbrev-ref", "HEAD", at=at)
-    if branch != BRANCH:
+    # A one-off --ref is detached. The default update restores BRANCH below.
+    if branch not in (BRANCH, "HEAD"):
         raise SystemExit(
             f"{at} is on {branch}, not {BRANCH}. It tracks one branch so that "
             f"what the engine is built from is never a question. Switch it "
             f"back, or point FW at the checkout you mean.")
 
 
-def report(at: pathlib.Path, was: str | None, now: str) -> bool:
+def report(at: pathlib.Path, was: str | None, now: str, ref: str) -> bool:
     """What moved under the build's feet. True when a rebuild is warranted."""
     if was is None:
         print("the module carries no stamp, so anything it was built from is "
@@ -101,7 +102,7 @@ def report(at: pathlib.Path, was: str | None, now: str) -> bool:
                check=False)
     every = git("log", "--oneline", f"{was}..{now}", at=at, check=False)
     count = len(every.splitlines())
-    print(f"{was[:12]} -> {now[:12]}, {count} commit(s) on {BRANCH}")
+    print(f"{was[:12]} -> {now[:12]}, {count} commit(s) on {ref}")
     if not ours:
         print("none of them touch what the render core compiles, so the "
               "module on disk still draws what this firmware draws.")
@@ -146,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         git("checkout", "--quiet", "--detach", target, at=DIRECTORY)
 
     print()
-    if report(DIRECTORY, built_from(), target):
+    if report(DIRECTORY, built_from(), target, opts.ref):
         print(f"\nrebuild it with:\n  bash {BUILD}")
         print("and run the suite after, with CROSSGLYPH_TEST_FONT pointing at "
               "a real face: what draws pages is skipped without one, and a "
