@@ -72,10 +72,11 @@ chooses the preview size. The **sizes** boxes in Export choose the build sizes.
 **Save** writes font settings to the family's config file. **Build** saves them
 and creates the `.cpfont` files.
 
-**Page settings** change only the page in the browser. They mirror reading
-options from CrossPoint, such as margins, alignment, hyphenation and night
-mode. Use them to judge the font under the same conditions as a book. They do
-not change the built font.
+**Page settings** change only the page in the browser. They mirror CrossPoint
+reading options such as margin, alignment, line spacing, hyphenation and night
+mode. Use them to judge the font under the same conditions as a book.
+**line height** in Tune changes the built font. **line spacing** in Page changes
+only the preview.
 
 ## Documentation
 

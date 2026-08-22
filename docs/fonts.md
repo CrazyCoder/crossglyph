@@ -4,9 +4,10 @@ This page describes settings that affect a built font. Most users can set them
 in the browser. Config files provide shared defaults, settings without a browser
 control and automated builds.
 
-Page settings are separate. Margin, alignment, hyphenation, anti-aliasing and
-night mode change only the browser preview. They are not written to a font
-config and do not change a build.
+Page settings are separate. Margin, alignment, line spacing, hyphenation,
+anti-aliasing and night mode change only the browser preview. `line_height`
+changes a metric stored in the built font. **line spacing** under Page remains
+preview-only.
 
 For a guided build, start with [Getting started](getting-started.md). Commands
 are in [Command line](cli.md).
