@@ -49,7 +49,8 @@ card and opening a book after every change.
 1. [Download the latest release](https://github.com/CrazyCoder/crossglyph/releases/latest).
 2. Extract it to a folder you can write to.
 3. Copy your TTF or OTF files into the `fonts` folder.
-4. Open `crossglyph.cmd` on Windows or `crossglyph.sh` on macOS and Linux.
+4. On Windows, double-click `crossglyph.cmd`. On macOS or Linux, open a
+   terminal in the extracted folder and run `./crossglyph.sh`.
 5. Select your family in the browser.
 6. Adjust the font in **Tune**.
 7. Choose the point sizes and coverage in **Export**.

@@ -31,10 +31,14 @@ family and styles. If CrossGlyph groups the files incorrectly, see
 
 ## Open the preview
 
-Open the launcher in the extracted folder:
+Start CrossGlyph from the extracted folder:
 
-- On Windows, open `crossglyph.cmd`.
-- On macOS or Linux, open `crossglyph.sh`.
+- On Windows, double-click `crossglyph.cmd`.
+- On macOS or Linux, open a terminal in that folder and run:
+
+  ```sh
+  ./crossglyph.sh
+  ```
 
 The first launch downloads the runtime and dependencies into a cache. The
 browser opens after the preview server is ready.
