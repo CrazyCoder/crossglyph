@@ -122,10 +122,15 @@ default output folder.
 
 ## The preview will not start
 
-Read `preview.log` beside the launcher. It contains setup and server errors.
+Read the error in the terminal window. On Windows, the batch launcher keeps the
+window open when startup fails.
 
-A port may already be in use. Open the running preview, stop it or choose another
-port. The commands are in [Background preview](cli.md#background-preview).
+If you used the background **start** or **restart** command, read `preview.log`
+beside the launcher.
+
+A port may already be in use. Open the running preview, stop it or choose
+another port. The commands are in
+[Background preview](cli.md#background-preview).
 
 ## An update does not complete
 

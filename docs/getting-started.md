@@ -78,7 +78,8 @@ judge one point size. The sizes that CrossGlyph builds are the boxes in
 4. Adjust **weight** if thin strokes need more or less ink.
 5. Check letter spacing, word spacing and line height.
 6. Use the **?** buttons when a control name is unfamiliar.
-7. Press **untuned** to compare your changes with the starting values.
+7. Press **untuned**, or press and hold the rendered page, to compare your
+   changes with the starting values.
 
 The page redraws after each change. A curved arrow beside a control compares
 that control with its saved value. Press the arrow again to return to your
