@@ -6,7 +6,8 @@ TypeScript twin rather than the layer that gets ported.
 
 Every pixel is the device's. The .cpfont is built by the same converter that
 builds the ones on the card, and the page is laid out and drawn by the
-firmware's own engine through crossglyph.render. See docs/preview.md.
+firmware's own engine through crossglyph.render. See
+docs/internals.md#preview-architecture.
 """
 from __future__ import annotations
 

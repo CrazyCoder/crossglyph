@@ -4,9 +4,10 @@ The browser is the normal way to tune and build a font. Use commands for batch
 builds, scripts, custom workspaces or a preview server that runs in the
 background.
 
-Examples on this page use `crossglyph`. In an unpacked release, replace it with:
+Examples on this page use `crossglyph`. In an unpacked release, use:
 
-- `crossglyph.cmd` on Windows;
+- `.\crossglyph.cmd` in Windows PowerShell;
+- `crossglyph.cmd` in Windows Command Prompt;
 - `./crossglyph.sh` on macOS and Linux.
 
 Run `crossglyph <command> --help` for the options in your installed version.

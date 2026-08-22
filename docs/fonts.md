@@ -157,7 +157,7 @@ the main family, the two user fallbacks and then the enabled bundled faces.
 | `fallback_regular` | Empty | First user fallback family. |
 | `fallback2_regular` | Empty | Second user fallback family. |
 | `fallbacks` | `no` | Add the downloaded bundled Noto faces. |
-| `fallback_order` | Built-in order | Comma-separated order. Use `bundled` for the bundled set. |
+| `fallback_order` | Built-in order | Comma-separated order used while `fallbacks` is `yes`. Use `bundled` for the bundled set. |
 | `fallback_dir` | `fallbacks` | Folder holding bundled faces. This key belongs in `all.conf`. |
 
 The user fallback keys name files relative to `dir`. A fallback lends its bold

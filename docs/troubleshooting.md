@@ -68,8 +68,9 @@ character that you expect to see.
 Enable the **Arabic** coverage preset. CrossGlyph prepares the joined forms that
 CrossPoint requests.
 
-The main family or a fallback must contain Arabic letters and shaping rules.
-Enable bundled fallback faces when your main family has no Arabic face.
+The main family or a fallback must contain Arabic letters. It must also contain
+the joined forms or the shaping rules needed to create them. Enable bundled
+fallback faces when your main family has no Arabic face.
 
 ## The build warns that a coverage range is empty
 
@@ -103,10 +104,11 @@ the sizes that were built.
 Rebuild the family with the current CrossGlyph release and replace the folder on
 the card. Current builds check the format limits before writing.
 
-## Build finishes immediately after a source change
+## Rebuild every point size
 
 A normal build compares source contents and settings with the previous build.
-Hold Shift while pressing **Build** or **Build all** to rebuild every size.
+Hold Shift while pressing **Build** or **Build all** when you need to rebuild
+every size.
 
 On the command line, use the force option described in
 [Build fonts](cli.md#build-fonts).

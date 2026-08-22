@@ -12,7 +12,7 @@ dependencies = ["pillow>=10", "fonttools>=4.50",
                 # the shaping has to happen before the font ships.
                 "uharfbuzz>=0.56",
                 # Runs the render core, the firmware's own drawing code built
-                # to wasm. See docs/preview.md.
+                # to wasm. See docs/internals.md#preview-architecture.
                 "wasmtime>=47",
                 # The preview is the product, not an extra.
                 "fastapi>=0.115", "uvicorn>=0.30"]

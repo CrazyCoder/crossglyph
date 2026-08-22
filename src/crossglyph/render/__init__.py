@@ -8,7 +8,7 @@ only this wrapper replaced.
 
 The module ships with the package and records the firmware commit it was built
 from, so a release runs with no toolchain and no firmware clone. See
-docs/preview.md.
+docs/internals.md#preview-architecture.
 """
 from __future__ import annotations
 

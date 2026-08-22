@@ -2,7 +2,8 @@
 
 A shim over the preview package and nothing more. All the behaviour is a layer
 down, so this file is the one to delete when the static web version can call
-the wasm module directly from the browser. See docs/preview.md.
+the wasm module directly from the browser. See
+docs/internals.md#preview-architecture.
 """
 from __future__ import annotations
 
