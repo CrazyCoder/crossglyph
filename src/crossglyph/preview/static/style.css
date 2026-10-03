@@ -1046,7 +1046,11 @@
   .fit-gain { color: var(--muted); }
   .fit-row input[type=checkbox] { margin: 0; }
   .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
-  .fit-foot { display: flex; gap: .4rem; justify-content: flex-end; }
+  .fit-foot { display: flex; gap: .4rem; justify-content: flex-end;
+              align-items: center; }
+  /* At the left of the foot, pushing the buttons to the right, and present
+     even when empty so they stay there. */
+  .fit-panel #fit-builds { display: block; margin: 0 auto 0 0; min-width: 0; }
 
   /* Its label above rather than beside it: twenty-one checkboxes in three
      columns need the whole panel, and the 8.2rem label column of a normal row
