@@ -6307,6 +6307,34 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         els.size1.value === "12", els.size1.value);
   check("and keeps a box edited since",
         els.size3.value === "15", els.size3.value);
+  check("Undo leaves Apply ready to put them in again",
+        env.fit.apply.disabled === false);
+  for (const tick of offers()) tick.checked = false;
+  one.on.change();
+  check("with nothing ticked Apply has nothing to do", env.fit.apply.disabled === true);
+  rows[0].children.at(-1).checked = true;
+  one.on.change();
+  check("and ticking a row offers it again", env.fit.apply.disabled === false);
+  env.fit.apply.on.click();
+  check("Apply after Undo writes the ticked row",
+        els.size1.value === "11.75" && els.size3.value === "15",
+        FIRST_ROW.map(n => els[n].value).join(" "));
+  rows[2].children.at(-1).checked = true;
+  // Back to what was scored, so the row has something to apply.
+  els.size3.value = "16";
+  env.exportForm.edit("size3");
+  one.on.change();
+  env.fit.apply.on.click();
+  check("a second Apply says nothing about boxes the first one filled",
+        env.fit.note.textContent === "1 size changed. Save or Build to keep them.",
+        env.fit.note.textContent);
+  one.on.change();
+  check("and a box it already filled is not offered twice",
+        env.fit.apply.disabled === true);
+  env.fit.undo.on.click();
+  check("Undo puts back what both Applies wrote",
+        els.size1.value === "12" && els.size3.value === "16",
+        FIRST_ROW.map(n => els[n].value).join(" "));
 }
 
 // 99c. Apply writes only into boxes that still hold what was scored, and a

@@ -159,6 +159,11 @@ function syncAll() {
   allBox.disabled = !offers.length;
   allBox.checked = offers.length > 0 && ticked === offers.length;
   allBox.indeterminate = ticked > 0 && ticked < offers.length;
+  // Apply has work while a ticked row's box still holds what was scored: one
+  // Apply has filled holds the suggestion, and Undo puts it back to scoring.
+  // Not during a search, whose rows are still arriving.
+  applyButton.disabled = controller !== null || !offers.some(row =>
+    row.tick.checked && exportForm.elements[row.box].value === row.held);
 }
 
 function fillRow(entry, now, pick, fits, ranged) {
@@ -241,7 +246,6 @@ function clearFit() {
   table.replaceChildren();
   note.textContent = "";
   builds.textContent = "";
-  applyButton.disabled = true;
   undoButton.hidden = true;
   applied = null;
   syncAll();
@@ -317,12 +321,11 @@ async function runFit() {
       const complete = index === boxes.length;
       rows = rows.filter(row => (row.removed ? complete : row.filled));
       table.replaceChildren(...rows.map(entry => entry.now.parentElement));
-      applyButton.disabled = !rows.some(offered);
+      controller = null;
       syncAll();
       if (rows.length) showBuilds(); else builds.textContent = "";
       syncFitMarks();
       ready();
-      controller = null;
     }
   }
 }
@@ -333,11 +336,15 @@ function applyFit() {
     note.textContent = "The family has changed. Press Find sizes again.";
     return;
   }
-  applied = new Map();
-  let skipped = 0;
+  // Added to rather than replaced, so Undo after a second Apply puts back
+  // everything the two of them wrote.
+  applied ??= new Map();
+  let skipped = 0, changed = 0;
   for (const row of rows) {
     if (!offered(row) || !row.tick.checked) continue;
     const field = exportForm.elements[row.box];
+    // Already holding the suggestion, from an Apply before this one.
+    if (field.value === String(row.value)) continue;
     // A box edited since it was scored is the user's newer word.
     if (field.value !== row.held) {
       skipped++;
@@ -346,11 +353,11 @@ function applyFit() {
     applied.set(row.box, {was: field.value, wrote: String(row.value)});
     field.value = String(row.value);
     exportEdited(field);
+    changed++;
   }
-  applyButton.disabled = true;
+  syncAll();
   undoButton.hidden = !applied.size;
   showBuilds();
-  const changed = applied.size;
   note.textContent = (changed ? `${changed} size${changed === 1 ? "" : "s"} changed. `
     + "Save or Build to keep them." : "Nothing was changed.")
     + (skipped ? ` ${skipped} box${skipped === 1 ? " was" : "es were"} changed since `
@@ -367,6 +374,7 @@ function undoFit() {
   }
   applied = null;
   undoButton.hidden = true;
+  syncAll();
   note.textContent = "The sizes are back as they were.";
   showBuilds();
 }
