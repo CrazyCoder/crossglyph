@@ -6339,7 +6339,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("the range fields show for a range", env.fit.range.hidden === false);
   check("eight sizes are eight rows", env.fit.table.children.length === 8);
   check("a range that changes the count says what Apply leaves, not that it builds",
-        env.fit.builds.textContent === "Apply leaves one family of 8 sizes.",
+        env.fit.builds.textContent === "After Apply: one family of 8 sizes.",
         env.fit.builds.textContent);
   env.fit.apply.on.click();
   check("Apply fills both rows of boxes",
@@ -6380,7 +6380,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         rows.map(r => r.children[1].textContent).join(" "));
   await settle();
   check("and the footer counts what is left",
-        env.fit.builds.textContent === "Apply leaves one family of 6 sizes.",
+        env.fit.builds.textContent === "After Apply: one family of 6 sizes.",
         env.fit.builds.textContent);
   env.fit.apply.on.click();
   check("Apply writes the range and empties the rest",

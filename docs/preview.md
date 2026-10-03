@@ -299,7 +299,7 @@ second.
 A range is the family's new list of sizes. Boxes past the count are listed as
 **removed**, and **Apply** empties them. **Undo** brings them back. When a
 range changes how many sizes the family has, the section says what Apply would
-leave, such as "Apply leaves one family of 6 sizes". Apply only changes the
+leave, such as "After Apply: one family of 6 sizes". Apply only changes the
 boxes: nothing is built until you press **Build**. With the **suffix** filled
 in, the second row is a second family instead.
 

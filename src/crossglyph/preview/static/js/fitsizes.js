@@ -72,7 +72,7 @@ function showBuilds() {
   const second = SECOND_ROW.filter(kept).length + spilled(SPILL.second);
   const [nowFirst, nowSecond] = rowCounts();
   builds.textContent = first === nowFirst && second === nowSecond ? ""
-    : `Apply leaves ${familiesPhrase(first, second)}.`;
+    : `After Apply: ${familiesPhrase(first, second)}.`;
 }
 
 //: Marks whichever offered value the page is showing. The page can move off
