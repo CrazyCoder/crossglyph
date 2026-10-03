@@ -948,11 +948,15 @@
             knob steps in, and rounds anything between them.
           </span>
         </span></span>
-      <!-- No titles: the reader lists a family's sizes by number, so a name
-           over each box would be one the device never shows. Selecting a box
-           moves the size knob to what it holds, which is the distance between
-           "14 is in the list" and "14 is what 14 looks like", and the box the
-           page is showing is marked. -->
+      <!-- Two rows of four. No titles: the reader lists a family's sizes by
+           number, so a name over each box would be one the device never
+           shows. Selecting a box moves the size knob to what it holds, which
+           is the distance between "14 is in the list" and "14 is what 14
+           looks like", and the box the page is showing is marked. The second
+           row is the config's sizes_mod: the reader lists every size a family
+           carries (ReaderFontSizes.cpp), so with the suffix empty these are
+           more of this family's sizes, and with one they build a second
+           family beside it. -->
       <div class="sizes">
         <input class="mono" id="size1" name="size1" type="text" inputmode="decimal"
                aria-label="Size 1" title="Select to see the page at this size">
@@ -962,61 +966,6 @@
                aria-label="Size 3" title="Select to see the page at this size">
         <input class="mono" id="size4" name="size4" type="text" inputmode="decimal"
                aria-label="Size 4" title="Select to see the page at this size">
-      </div>
-      <!-- What a fractional size will be called on the card, which the boxes
-           above cannot say for themselves: the filename carries the whole
-           number it rounds to. Shown only when one of them is fractional, and
-           marked as a warning when two land on the same name. -->
-      <div class="hint" id="ships-as" hidden></div>
-      <!-- What all the sizes build, both rows and the extra ones: one family
-           or two, and how many sizes each. Outside the folds, because More
-           sizes folds away and this is what says it holds sizes. -->
-      <div class="hint" id="sizes-builds" hidden></div>
-    </div>
-    <!-- Only for a family that carries more than the four boxes above, which a
-         CJK one does: the reader borrows it at 8, 10 and 12 for the interface.
-         Hidden otherwise rather than dropped, since a save would then write a
-         shorter list than the file had. -->
-    <div class="row wide" id="more-row" hidden>
-      <label class="name" for="size-more">extra sizes</label>
-      <input class="mono" id="size-more" name="size_more" type="text"
-             inputmode="decimal">
-    </div>
-
-    <!-- A second row of sizes from the same faces. The reader lists every
-         size a family carries (ReaderFontSizes.cpp), so with the suffix
-         empty these are more of this family's sizes; with one they build a
-         second family beside it. Most people want four sizes, so this folds
-         and starts folded. The dot says the fold is hiding sizes that are
-         set, which is the one thing somebody could otherwise lose track of
-         behind it. -->
-    <div class="section">
-      <h2><button type="button" id="mod-toggle" data-fold="mod"
-                  aria-expanded="false" aria-controls="mod-settings"><svg
-        class="twist" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M6 3.2 11.2 8 6 12.8"/></svg>More sizes</button><span
-        class="explain">
-        <button type="button" class="info" aria-label="What more sizes are"
-                aria-describedby="mod-tip">?</button>
-        <span class="tip" id="mod-tip" role="tooltip">
-          Four more sizes, built from the same faces. With the suffix empty
-          they join this family, and the reader lists them among its sizes:
-          nothing limits how many one family carries. Fill in the suffix and
-          they build <strong id="mod-name">a second family</strong> instead,
-          listed beside the first under that name, which is worth having when
-          two entries suit you better than one long list of sizes.
-          <br><br>
-          Leave these sizes empty and the family builds the four above alone.
-        </span>
-      </span></h2>
-      <span id="mod-dot" aria-hidden="true" hidden
-            title="Sizes are set here">&#8226;</span>
-    </div>
-
-    <div id="mod-settings">
-    <div class="stacked">
-      <span class="name">sizes <span class="unit">pt</span></span>
-      <div class="sizes">
         <input class="mono" id="mod1" name="mod1" type="text" inputmode="decimal"
                aria-label="Size 5" title="Select to see the page at this size">
         <input class="mono" id="mod2" name="mod2" type="text" inputmode="decimal"
@@ -1026,27 +975,51 @@
         <input class="mono" id="mod4" name="mod4" type="text" inputmode="decimal"
                aria-label="Size 8" title="Select to see the page at this size">
       </div>
+      <!-- Two sizes that would ship under one name: the filename carries the
+           whole number a size rounds to, which each box says in its own
+           tooltip. Shown only for that clash, one note per family, since the
+           second row can build one of its own. -->
+      <div class="hint" id="ships-as" hidden></div>
       <div class="hint" id="mod-ships-as" hidden></div>
     </div>
-    <!-- The same carry the first family has, for the same reason: four boxes
-         and a config with five sizes in it means a save writing a shorter list
-         than the file had. -->
+    <!-- Only for a family that carries more than its boxes, which a CJK one
+         does: the reader borrows it at 8, 10 and 12 for the interface. Hidden
+         otherwise rather than dropped, since a save would then write a
+         shorter list than the file had. One per row of boxes. -->
+    <div class="row wide" id="more-row" hidden>
+      <label class="name" for="size-more">extra sizes</label>
+      <input class="mono" id="size-more" name="size_more" type="text"
+             inputmode="decimal">
+    </div>
     <div class="row wide" id="mod-more-row" hidden>
-      <label class="name" for="mod-more">extra sizes</label>
+      <label class="name" for="mod-more">extra second-row sizes</label>
       <input class="mono" id="mod-more" name="mod_more" type="text"
              inputmode="decimal">
     </div>
-    <div class="row wide">
-      <label class="name" for="mod-suffix">suffix</label>
+    <div class="row wide" id="suffix-row">
+      <span class="name"><label for="mod-suffix">suffix</label><span
+        class="explain">
+          <button type="button" class="info" aria-label="What the suffix does"
+                  aria-describedby="suffix-tip">?</button>
+          <span class="tip" id="suffix-tip" role="tooltip">
+            Empty, sizes 5 to 8 join this family, and the reader lists them
+            among its sizes: nothing limits how many one family carries. Fill
+            it in and they build <strong id="mod-name">a second family</strong>
+            instead, listed beside the first under that name, which suits you
+            when two entries read better than one long list of sizes.
+          </span>
+        </span></span>
       <input class="mono" id="mod-suffix" name="mod_suffix" type="text"
-             placeholder="add sizes above to name a second family" disabled>
+             placeholder="add sizes 5 to 8 to name a second family" disabled>
     </div>
-    </div>
+    <!-- What all the sizes build, both rows and the extra ones: one family
+         or two, and how many sizes each. -->
+    <div class="hint" id="sizes-builds" hidden></div>
 
     <!-- Fit to grid. Each size keeps its number in the reader's list and
          moves by up to half a point to where its strokes land on whole
          pixels. Scored on the page's text, as Grid Fit under the page is.
-         After More sizes because it fits both rows. The fields here have no
+         After the sizes because it fits both rows. The fields here have no
          name, so a save never reads them. -->
     <div class="section">
       <h2><button type="button" id="fit-toggle" data-fold="fit"

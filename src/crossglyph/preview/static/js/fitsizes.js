@@ -10,7 +10,6 @@ import {form} from "./dom.js";
 import {SIZE_MAX, SIZE_MIN, buildsPhrase, exportEdited, exportForm, readSteps,
         rowCounts, showSize, snapSize} from "./export.js";
 import {familyPicker} from "./family.js";
-import {openFold} from "./fold.js";
 import {body} from "./render.js";
 
 const toggle = document.getElementById("fit-toggle");
@@ -331,7 +330,6 @@ function applyFit() {
     field.value = String(row.value);
     exportEdited(field);
   }
-  if ([...applied.keys()].some(box => SECOND_ROW.includes(box))) openFold("mod");
   applyButton.disabled = true;
   undoButton.hidden = !applied.size;
   showBuilds();

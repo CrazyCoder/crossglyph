@@ -24,8 +24,9 @@ The exceptions are listed here.
 |---|---|
 | **name** | `name` |
 | **sizes** | `sizes` |
-| **extra sizes** under the first four boxes | additional values in `sizes` |
-| **More sizes** boxes | `sizes_mod` |
+| **extra sizes** under the boxes | additional values in `sizes` |
+| **sizes** boxes 5 to 8 | `sizes_mod` |
+| **extra second-row sizes** | additional values in `sizes_mod` |
 | **suffix** | `mod_suffix` |
 | **coverage** | `intervals` |
 | **extra ranges** | `ranges` |

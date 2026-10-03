@@ -225,8 +225,8 @@ family.
 **Export** controls what Build writes:
 
 - **name** is the family name shown by the reader;
-- **sizes** lists the point sizes to build;
-- **More sizes** adds four more, to this family or to a second family entry;
+- **sizes** lists up to eight point sizes to build;
+- **suffix** makes sizes 5 to 8 a second family entry;
 - **Fit to grid** suggests sizes that look sharper on the device;
 - **coverage** chooses character ranges;
 - **extra ranges** adds raw Unicode ranges;
@@ -239,16 +239,20 @@ family.
 Select a size box to see the page at the size it holds. The box the page is
 showing is marked. This changes only the preview, not the font.
 
-**More sizes** is optional, and folded until you open it. With its **suffix**
-empty, its sizes join this family and the reader lists all of them. Fill in the
-suffix and they build a second family entry, named with the suffix, which is
-clearer when you want two entries in the reader's font list instead of one long
-size list. The suffix stays greyed out until at least one of its size boxes holds
-a size, since there is nothing for it to name before then.
+A size can be a fraction, such as 13.25. The reader's list shows whole sizes,
+so it ships under the whole number it rounds to. Hold the pointer over a box to
+see that name. If two sizes round to the same number, a warning under the
+boxes says so, since they cannot both be built.
 
-A line under the first row of boxes says what all the sizes build, such as
-"Builds one family of 8 sizes", so you can see that More sizes holds sizes
-while it is folded.
+The boxes are two rows of four. With the **suffix** empty, all of them belong
+to this family and the reader lists every size. Fill in the suffix and sizes 5
+to 8 build a second family entry, named with the suffix, which is clearer when
+you want two entries in the reader's font list instead of one long size list.
+The suffix stays greyed out until one of sizes 5 to 8 holds a size, since there
+is nothing for it to name before then.
+
+A line under the suffix says what all the sizes build, such as "Builds one
+family of 8 sizes".
 
 Coverage controls which characters are placed in the files. More coverage
 creates larger files and takes longer to build. Fallback faces fill characters
@@ -291,15 +295,14 @@ To choose new sizes instead, select **Range** and set where it **starts**, the
 **step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
 The sizes it will try are listed under the fields, such as "Tries 12, 14, 16,
 18". The fields start from the sizes you have, with the step those use most.
-Press **Find sizes**. The sizes fill the first row of boxes, then **More sizes**,
-which opens so you can see them.
+Press **Find sizes**. The sizes fill the boxes in order, the first row then the
+second.
 
 A range is the family's new list of sizes. Boxes past the count are listed as
 **removed**, and **Apply** empties them. **Undo** brings them back. When a
 range changes how many sizes the family has, the section says what Apply would
 build, such as "After Apply, it builds one family of 6 sizes". With the
-**suffix** under **More sizes** filled in, the second row builds a second family
-instead.
+**suffix** filled in, the second row builds a second family instead.
 
 Fit to grid does not change the suffix. Choosing another family drops the
 suggestions, since they were found for the last one.

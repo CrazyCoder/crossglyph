@@ -154,9 +154,6 @@ export const MOD_FIELDS = ["mod1", "mod2", "mod3", "mod4"];
 export const moreRow = document.getElementById("more-row");
 export const modMoreRow = document.getElementById("mod-more-row");
 export const modName = document.getElementById("mod-name");
-// What the fold says about itself: sizes are set in there. The panel works
-// that out for the suffix field anyway, so it is the one that says so.
-export const modDot = document.getElementById("mod-dot");
 export const sizeNumbers = (text) => String(text).split(/[,\s]+/).filter(Boolean);
 
 //: The step the size knob moves in, and the range it covers. These boxes hold
@@ -256,25 +253,24 @@ export function showModState() {
   const suffix = exportForm.elements.mod_suffix;
   suffix.disabled = !sizes;
   suffix.placeholder = sizes ? "none, so one family"
-    : "add sizes above to name a second family";
-  // They are one build, and the second family is named after the first.
-  modName.textContent = sizes ? modFamilyLabel() : "a second family";
-  modDot.hidden = !sizes;
+    : "add sizes 5 to 8 to name a second family";
+  // The suffix's tooltip names the family it builds, so with no sizes to
+  // build or an empty suffix it names none: the second would only repeat
+  // this family's name.
+  modName.textContent = sizes && exportForm.elements.mod_suffix.value.trim()
+    ? modFamilyLabel() : "a second family";
 }
 
 export const shipsAs = document.getElementById("ships-as");
 export const modShipsAs = document.getElementById("mod-ships-as");
 
-// What a fractional size will be called on the card. The boxes cannot say it
-// for themselves: 13.25 is rasterized at 13.25 and shipped as `Family_13`,
-// because the device parses the size out of the filename and cannot hold a
-// fraction there. Without this the first time anybody learns which entry in the
-// Font Size list is which is on the device.
-//
-// It also puts the collision in front of the person while they are typing.
-// Quarter points make one easy -- 13.5 and 13.75 are both 14 -- and the save
-// refuses it, so the only other place to find out is a press of Save that does
-// nothing.
+// A fractional size ships under the whole number it rounds to: 13.25 is
+// rasterized at 13.25 and shipped as `Family_13`, because the device parses
+// the size out of the filename and cannot hold a fraction there. Each box says
+// its own name in its tooltip (titleBoxes); the panel speaks only when two
+// sizes land on one name, while the person is still typing. Quarter points
+// make that easy -- 13.5 and 13.75 are both 14 -- and the save refuses it, so
+// the only other place to find out is a press of Save that does nothing.
 export function spellShipsAs(note, text, family) {
   const sizes = sizeNumbers(text).map(Number).filter(Number.isFinite);
   const bunched = new Map();
@@ -283,23 +279,28 @@ export function spellShipsAs(note, text, family) {
     bunched.set(label, [...(bunched.get(label) || []), size]);
   }
   const clash = [...bunched.entries()].find(([, group]) => group.length > 1);
-  const fractional = sizes.filter(size => sizeLabel(size) !== size);
-  note.classList.toggle("warn", Boolean(clash));
-  note.hidden = !clash && fractional.length === 0;
-  if (note.hidden) return;
-  if (clash) {
-    const [label, group] = clash;
-    const all = group.length === 2 ? `${group[0]} and ${group[1]} both ship`
-                                   : `${group.join(", ")} all ship`;
-    note.textContent = `${all} as ${family}_${label}, so they cannot both be `
-      + `built. Saving will refuse this.`;
-    return;
+  note.classList.add("warn");
+  note.hidden = !clash;
+  if (!clash) return;
+  const [label, group] = clash;
+  const all = group.length === 2 ? `${group[0]} and ${group[1]} both ship`
+                                 : `${group.join(", ")} all ship`;
+  note.textContent = `${all} as ${family}_${label}, so they cannot both be `
+    + `built. Saving will refuse this.`;
+}
+
+//: What a size box says when pointed at. A fractional size also says the
+//: name it ships under, which is the one fact about it the box cannot show.
+const SELECT_TITLE = "Select to see the page at this size";
+
+function titleBoxes(fields, family) {
+  for (const name of fields) {
+    const box = exportForm.elements[name];
+    const size = Number(snapSize(box.value));
+    box.title = size > 0 && sizeLabel(size) !== size
+      ? `Ships as ${family}_${sizeLabel(size)}, the size the device lists. ${SELECT_TITLE}.`
+      : SELECT_TITLE;
   }
-  const said = fractional.map(
-    (size, at) => `${size}${at === 0 ? " ships" : ""} as `
-                  + `${family}_${sizeLabel(size)}`);
-  note.textContent = `${said.join(", ")}, which is what the device lists `
-    + `${fractional.length === 1 ? "it" : "them"} as.`;
 }
 
 const confErrors = document.getElementById("conf-errors");
@@ -348,15 +349,15 @@ export function rowCounts() {
     .map(text => sizeNumbers(text).length);
 }
 
-// Under the first row of boxes and outside every fold, since it is about all
-// the sizes: the second row folds away, and this is what says it is there.
+// Under the suffix, since it is about all the sizes and what the suffix
+// makes of them.
 export function showSizesBuild() {
   const [first, second] = rowCounts();
   sizesBuild.hidden = !first && !second;
   if (sizesBuild.hidden) return;
   sizesBuild.textContent = `Builds ${buildsPhrase(first, second)}.`
     + (second && !exportForm.elements.mod_suffix.value.trim()
-      ? " Fill in the suffix under More sizes to make them two families." : "");
+      ? " Fill in the suffix to make sizes 5 to 8 a second family." : "");
 }
 
 export function showShipsAs() {
@@ -365,6 +366,8 @@ export function showShipsAs() {
   spellShipsAs(modShipsAs,
                joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more),
                modFamilyLabel());
+  titleBoxes(SIZE_FIELDS, familyLabel());
+  titleBoxes(MOD_FIELDS, modFamilyLabel());
 }
 
 // The config spells coverage as one comma-separated string, because that is

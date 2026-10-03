@@ -850,9 +850,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "tab-export": pressStub("export"),
     // The headings that fold the section or card under them.
     "page-toggle": Object.assign(pressStub("page"), {dataset: {fold: "page"}}),
-    "mod-toggle": Object.assign(pressStub("mod"), {dataset: {fold: "mod"}}),
     "text-toggle": Object.assign(pressStub("text"), {dataset: {fold: "text"}}),
-    "mod-dot": { hidden: true },
     // What a build leaves on the tab it ran behind.
     "tab-busy": { hidden: true },
     // What each tab says about work in the panel behind it that the .conf has
@@ -1030,7 +1028,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       // The folds and device reset are the two document-wide queries.
       querySelectorAll: (selector) => {
         if (selector === "[data-fold]") {
-          return [stubs["page-toggle"], stubs["mod-toggle"],
+          return [stubs["page-toggle"],
                   stubs["device-toggle"], stubs["text-toggle"],
                   stubs["fit-toggle"]];
         }
@@ -1381,9 +1379,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                    tuneUnsaved: stubs["tune-unsaved"],
                    exportUnsaved: stubs["export-unsaved"],
                    press },
-           fold: { page: stubs["page-toggle"], mod: stubs["mod-toggle"],
+           fold: { page: stubs["page-toggle"], fit: stubs["fit-toggle"],
                    device: stubs["device-toggle"], text: stubs["text-toggle"],
-                   dot: stubs["mod-dot"], press },
+                   press },
            progress: stubs.buildbar, bar: stubs.buildbar.bar,
            barFill: stubs.buildbar.fill,
            progressWhat: stubs.buildbar.what,
@@ -2565,33 +2563,34 @@ for (const { name, text } of sources) {
 //       at 13.25 and shipped as `Family_13`, because the device parses the
 //       size out of the filename and cannot hold a fraction there -- so
 //       without this the first place anyone learns which Font Size entry is
-//       which is the device.
+//       which is the device. Said in the box's own tooltip, so it costs no
+//       room; only two sizes landing on one name is said on the panel.
 {
   const env = await loaded(fakeStorage());
   const fields = env.exportForm.elements;
   const note = env.sandbox.document.getElementById("ships-as");
   const modNote = env.sandbox.document.getElementById("mod-ships-as");
+  const SELECT = "Select to see the page at this size";
   // Alto opens at 12 and 13, which are their own labels.
-  check("a list of whole sizes says nothing", note.hidden === true);
+  check("a whole size's box only offers to show it",
+        fields.size1.title === SELECT && note.hidden === true, fields.size1.title);
 
   fields.size3.value = "15.5";
   env.exportForm.edit("size3");
-  check("a fractional size says what the device will list it as",
-        note.hidden === false && note.textContent
-          === "15.5 ships as Alto_16, which is what the device lists it as.",
-        note.textContent);
-  check("and it is not a warning", note.classes.has("warn") === false);
+  check("a fractional size's box says what the device will list it as",
+        fields.size3.title === `Ships as Alto_16, the size the device lists. ${SELECT}.`,
+        fields.size3.title);
+  check("without a note on the panel", note.hidden === true, note.textContent);
 
   fields.size4.value = "17.25";
   env.exportForm.edit("size4");
-  check("two of them are both named", note.textContent
-        === "15.5 ships as Alto_16, 17.25 as Alto_17, which is what the "
-          + "device lists them as.", note.textContent);
+  check("each box names its own", fields.size4.title.startsWith("Ships as Alto_17,"),
+        fields.size4.title);
 
   fields.name.value = "Alt";
   env.exportForm.edit("name");
   check("the file follows the name being typed, saved or not",
-        note.textContent.includes("Alt_16"), note.textContent);
+        fields.size3.title.includes("Alt_16"), fields.size3.title);
   fields.name.value = "Alto";
   env.exportForm.edit("name");
 
@@ -2607,30 +2606,27 @@ for (const { name, text } of sources) {
   fields.size4.value = "";
   env.exportForm.edit("size4");
   check("and clearing one of them takes the warning down",
-        note.classes.has("warn") === false && note.hidden === false,
-        note.textContent);
+        note.hidden === true, note.textContent);
 
-  // The second family is named after the first, so its note has to be.
+  // The second family is named after the first, so its boxes have to be.
   fields.mod1.value = "13.5";
   env.exportForm.edit("mod1");
-  check("the second family gets its own note, under its own name",
-        modNote.textContent
-          === "13.5 ships as AltoMod_14, which is what the device lists it "
-            + "as.", modNote.textContent);
+  check("a second-row box names the file under its own family",
+        fields.mod1.title.startsWith("Ships as AltoMod_14,"), fields.mod1.title);
+  check("still without a note", modNote.hidden === true, modNote.textContent);
   fields.mod_suffix.value = "Alt";
   env.exportForm.edit("mod_suffix");
   check("and a suffix names a second family instead",
-        modNote.textContent.includes("AltoAlt_14"), modNote.textContent);
+        fields.mod1.title.includes("AltoAlt_14"), fields.mod1.title);
 
-  // The heading and this note name the same family or the panel is saying two
-  // things at once, and a save posts the suffix trimmed.
+  // The suffix's tooltip and the boxes name the same family or the panel is
+  // saying two things at once, and a save posts the suffix trimmed.
   const heading = env.sandbox.document.getElementById("mod-name");
   fields.mod_suffix.value = " ";
   env.exportForm.edit("mod_suffix");
   check("and a suffix of nothing but space is no suffix in both places",
-        heading.textContent === "Alto"
-        && modNote.textContent.includes("Alto_14"),
-        `${heading.textContent} | ${modNote.textContent}`);
+        heading.textContent === "a second family" && fields.mod1.title.includes("Alto_14"),
+        `${heading.textContent} | ${fields.mod1.title}`);
   fields.mod_suffix.value = "";
   env.exportForm.edit("mod_suffix");
 
@@ -2638,8 +2634,8 @@ for (const { name, text } of sources) {
   // it rather than leaving the last one's answer standing.
   env.family.choose("Sample");
   check("and a family whose sizes are whole clears it",
-        note.hidden === true && modNote.hidden === true,
-        `${note.textContent} | ${modNote.textContent}`);
+        fields.size3.title === SELECT && fields.mod1.title === SELECT,
+        `${fields.size3.title} | ${fields.mod1.title}`);
 }
 
 // 30b5. A size box says what will ship and the knob on the left says what you
@@ -2704,7 +2700,7 @@ for (const { name, text } of sources) {
         ["mod1", "mod2", "mod3", "mod4"]
           .every(name => env.exportForm.elements[name].value === ""));
   check("and its suffix is out of reach", suffix.disabled === true);
-  check("saying what turns it on", /add sizes above/.test(suffix.placeholder ?? ""),
+  check("saying what turns it on", /add sizes 5 to 8/.test(suffix.placeholder ?? ""),
         suffix.placeholder);
   check("with nothing named yet", modName.textContent === "a second family",
         modName.textContent);
@@ -4980,10 +4976,10 @@ for (const deferred of [
   const env = await loaded(storage);
   check("all headings say what the root says",
         env.fold.page.attrs["aria-expanded"] === "false" &&
-        env.fold.mod.attrs["aria-expanded"] === "false" &&
+        env.fold.fit.attrs["aria-expanded"] === "false" &&
         env.fold.device.attrs["aria-expanded"] === "false" &&
         env.fold.text.attrs["aria-expanded"] === "false",
-        JSON.stringify([env.fold.page.attrs, env.fold.mod.attrs,
+        JSON.stringify([env.fold.page.attrs, env.fold.fit.attrs,
                         env.fold.device.attrs, env.fold.text.attrs]));
 
   env.fold.press("text");
@@ -5006,15 +5002,15 @@ for (const deferred of [
   check("and says so in storage", storage.data["crossglyph.folds"] === "page",
         storage.data["crossglyph.folds"]);
 
-  env.fold.press("mod");
+  env.fold.press("fit");
   check("the other opens beside it rather than instead of it",
-        env.root.dataset.folds === "page mod", env.root.dataset.folds);
+        env.root.dataset.folds === "page fit", env.root.dataset.folds);
 
   env.fold.press("page");
-  check("and closes on its own", env.root.dataset.folds === "mod",
+  check("and closes on its own", env.root.dataset.folds === "fit",
         env.root.dataset.folds);
   check("with that written down too, rather than left to the default",
-        storage.data["crossglyph.folds"] === "mod",
+        storage.data["crossglyph.folds"] === "fit",
         storage.data["crossglyph.folds"]);
 }
 
@@ -6337,21 +6333,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a range that changes the count says what Apply builds",
         env.fit.builds.textContent === "After Apply, it builds one family of 8 sizes.",
         env.fit.builds.textContent);
-  const modOpen = () => (env.root.dataset.folds || "").split(" ").includes("mod");
-  check("More sizes starts folded", !modOpen(), env.root.dataset.folds);
   env.fit.apply.on.click();
-  check("Apply into the second row opens More sizes, so they are seen",
-        modOpen(), env.root.dataset.folds);
   check("Apply fills both rows of boxes",
         [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" ")
           === "12.25 13.25 14.25 15.25 16.25 17.25 18.25 19.25",
         [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" "));
   check("and leaves the suffix as it was", els.mod_suffix.value === "");
-  // Under the boxes, outside every fold: what the sizes build now.
+  // Under the boxes: what the sizes build now.
   const summary = env.fit.sizesBuild;
   check("the sizes say they build one family of eight",
         summary.textContent === "Builds one family of 8 sizes. Fill in the suffix "
-          + "under More sizes to make them two families.", summary.textContent);
+          + "to make sizes 5 to 8 a second family.", summary.textContent);
 
   els.mod_suffix.value = "Large";
   els.name.value = "Lit";

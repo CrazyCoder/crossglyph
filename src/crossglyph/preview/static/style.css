@@ -361,7 +361,6 @@
   button[aria-expanded="true"] .twist { transform: rotate(90deg); }
   @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
   :root:not([data-folds~="page"]) #page-settings { display: none; }
-  :root:not([data-folds~="mod"]) #mod-settings { display: none; }
   :root:not([data-folds~="fit"]) #fit-panel { display: none; }
   :root:not([data-folds~="device"]) #device-settings { display: none; }
   :root:not([data-folds~="text"]) #text-settings { display: none; }
@@ -370,17 +369,12 @@
      dot the rows carry, in the same column, said for the whole section because
      the rows that would say it are out of sight. Nothing sets it: it is the
      rows' own marks, read through the fold. */
-  #page-dot, #mod-dot { width: 1.5rem; height: 1.5rem; display: none;
-                        place-items: center; color: var(--muted);
-                        font-size: 14px; }
+  #page-dot { width: 1.5rem; height: 1.5rem; display: none;
+              place-items: center; color: var(--muted); font-size: 14px; }
   :root:not([data-folds~="page"])
     .section:has(+ #page-settings .mark:not([hidden])) #page-dot {
     display: grid;
   }
-  /* The same, for a second family that is set while the fold is hiding it.
-     What is set is a value in a box rather than a mark, so this one is put
-     there by the panel that already works that out for the suffix field. */
-  :root:not([data-folds~="mod"]) #mod-dot:not([hidden]) { display: grid; }
 
   .revert, .clear {
     width: 1.5rem; height: 1.5rem; padding: 0; border: 0; background: none;
@@ -906,10 +900,13 @@
      with the two columns beside it. */
   #export .head { margin: 1.35rem 0 .5rem; }
   /* The first row under the panel's own heading draws no rule: there is
-     nothing above it to be divided from. The rows inside a fold draw none
-     either -- the sizes and the suffix they are named with are one thing, and
-     a rule through them says they are two. */
-  #export .head + .row, #mod-settings .row { border-top: 0; }
+     nothing above it to be divided from, the config errors included when
+     they show. The rows under the sizes draw none either -- the sizes and
+     the suffix they are named with are one thing, and a rule through them
+     says they are two. */
+  #export .head + .row, #conf-errors + .row,
+  #more-row, #mod-more-row, #suffix-row { border-top: 0; }
+  #sizes-builds { margin: 0 0 .35rem; }
 
   /* What the card gives up to the tabs, and it has to be said after the two
      rules above rather than beside the layout: a media query adds no
