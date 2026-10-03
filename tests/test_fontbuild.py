@@ -310,12 +310,14 @@ def test_style_metrics_reads_the_style_toc(tmp_path):
     assert fontbuild.glyph_count(path) == 123
 
 
-def test_max_ink_top_is_the_tallest_glyph_top(tmp_path):
+@pytest.mark.parametrize("enabled", [False, True])
+def test_max_ink_top_is_the_tallest_glyph_top_when_asked(tmp_path, enabled):
     """Bytes 28 and 29 of each style entry hold the tallest ink above the
-    baseline. CrossPoint skips them; a firmware that reads them places the
-    first line of a page from the number, and takes a 0 to mean "unknown".
-    A zero left there is what the format used to write, so it is checked
-    against the glyph records the file itself carries rather than a constant."""
+    baseline when `max_ink_top` asks for it, and 0 otherwise. CrossPoint skips
+    them; a firmware that reads them places the first line of a page from the
+    number, and takes a 0 to mean "unknown". Off, the file has to match
+    upstream's, so the value is checked against the glyph records the file
+    itself carries rather than a constant."""
     import struct
 
     from fontsmith import box_font
@@ -327,7 +329,7 @@ def test_max_ink_top_is_the_tallest_glyph_top(tmp_path):
     out = tmp_path / "probe.cpfont"
     cpfont.generate_cpfont_multistyle(
         {0: str(face), 1: str(face)}, 12, cpfont.resolve_intervals("base"),
-        str(out))
+        str(out), max_ink_top=enabled)
     blob = out.read_bytes()
     for entry in (32, 64):
         interval_count, glyph_count = struct.unpack_from("<II", blob, entry + 4)
@@ -337,7 +339,29 @@ def test_max_ink_top_is_the_tallest_glyph_top(tmp_path):
                 for n in range(glyph_count)
                 if struct.unpack_from("<BB", blob, glyphs + n * 16) != (0, 0)]
         assert max(tops) > 0
-        assert struct.unpack_from("<h", blob, entry + 28)[0] == max(tops)
+        written = struct.unpack_from("<h", blob, entry + 28)[0]
+        assert written == (max(tops) if enabled else 0)
+
+
+def test_max_ink_top_is_off_unless_the_config_asks(config, tmp_path):
+    assert _kwargs(config, tmp_path / "out")["max_ink_top"] is False
+    assert _kwargs(config, tmp_path / "out",
+                   "max_ink_top = yes\n")["max_ink_top"] is True
+
+
+def test_all_conf_turns_max_ink_top_on_for_every_family(tmp_path):
+    conf = fontbuild.conf_dir(tmp_path)
+    conf.mkdir()
+    (conf / fontbuild.DEFAULTS_NAME).write_text("max_ink_top = yes\n",
+                                               encoding="utf-8")
+    for family in ("Alto", "Probe"):
+        (tmp_path / f"{family}-Regular.ttf").write_bytes(b"x")
+        (conf / f"{family.lower()}.conf").write_text("", encoding="utf-8")
+    configs, errors = fontbuild.load(fontbuild.discover_configs(tmp_path),
+                                     fontbuild.load_defaults(tmp_path),
+                                     root=tmp_path)
+    assert errors == []
+    assert [c.max_ink_top for c in configs] == [True, True]
 
 
 def test_style_metrics_of_a_non_cpfont_is_zeroed(tmp_path):

@@ -959,6 +959,7 @@ def build_kwargs(variant: Variant, size: float, out_dir: pathlib.Path) -> dict:
         # converter says "nothing here" once rather than four empty lists.
         "fallback_style_fonts": chain if any(chain.values()) else None,
         "tuning": config.tuning,
+        "max_ink_top": config.max_ink_top,
     }
 
 

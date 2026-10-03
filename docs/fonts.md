@@ -36,7 +36,7 @@ The exceptions are listed here.
 | **text** and **bold** for a variable family | style keys with `@wght=` coordinates |
 
 The config-only keys are `family`, `dir`, `fallback_order`, `fallback_dir`,
-`space_glyphs` and `space_width_XXXX`.
+`space_glyphs`, `space_width_XXXX` and `max_ink_top`.
 
 ## Config files
 
@@ -104,6 +104,12 @@ sizes carried by the selected family.
 | `sizes_mod` | Empty | A second list of point sizes from the same faces. |
 | `mod_suffix` | `Mod` | Suffix for the second family. Leave it empty to merge both lists. |
 | `out` | `cpfonts` | Output folder. This key belongs in `all.conf`. |
+| `max_ink_top` | `no` | Store the height of each style's tallest character in the file. |
+
+`max_ink_top` is for firmware that reads this height to place the first line
+of a page, so tall accents, such as stacked Vietnamese marks, are not cut off
+at the top of the screen. CrossPoint does not read it. Leave it off unless your
+firmware asks for it. Set it in `all.conf` to turn it on for every family.
 
 A fractional point size is rasterized at its exact value. Its filename uses the
 nearest whole-number label. CrossGlyph refuses two sizes that would write the

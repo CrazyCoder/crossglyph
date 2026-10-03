@@ -1566,13 +1566,16 @@ def chain_for_style(fallback_style_fonts, style_id):
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                force_autohint=False, fallback_style_fonts=None,
-                               darken_aa=False, tuning=None, style_axes=None):
+                               darken_aa=False, tuning=None, style_axes=None,
+                               max_ink_top=False):
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
     tuning: a cpfont.tuning.Tuning, or None for upstream's defaults (FORK).
     style_axes: {style_id: {axis_tag: value}} design coordinates (FORK). One
         variable file can fill several slots this way, each at its own weight.
+    max_ink_top: write each style's maxInkTop into its TOC entry (FORK). Off,
+        those bytes stay 0 and the file matches upstream's byte for byte.
     """
     MAGIC = b"CPFONT\x00\x00"
     HEADER_SIZE = 32
@@ -1619,7 +1622,8 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     #
     # maxInkTop takes the first half of what upstream leaves reserved, so the
     # entry stays 32 bytes and the version stays 4. CrossPoint never reads
-    # those bytes. A firmware that does read it treats 0 as "unknown".
+    # those bytes. A firmware that does read it treats 0 as "unknown", which
+    # is what is written unless `max_ink_top` asks for the value.
     STYLE_TOC_FORMAT = "<B3xIIBhhHHBBBIh2x"
     assert struct.calcsize(STYLE_TOC_FORMAT) == STYLE_TOC_ENTRY_SIZE
 
@@ -1653,7 +1657,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                 sd.kern_left_class_count, sd.kern_right_class_count,
                                 len(sd.ligature_pairs),
                                 style_offsets[style_id],
-                                sd.max_ink_top)
+                                sd.max_ink_top if max_ink_top else 0)
 
     # Write output
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)

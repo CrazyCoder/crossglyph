@@ -100,6 +100,7 @@ def digest(variant: Variant, size: float,
         # its bytes differ run to run while the font does not.
         "space_glyphs": (spacefont.spec_digest(config.space_widths)
                          if config.space_glyphs else False),
+        "max_ink_top": config.max_ink_top,
         "cpfont_version": cpfont.CPFONT_VERSION,
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)

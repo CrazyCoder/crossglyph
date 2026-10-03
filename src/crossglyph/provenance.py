@@ -157,6 +157,7 @@ def _settings(variant: Variant) -> dict:
         "ranges": config.ranges,
         "fallbacks": config.fallbacks,
         "space_glyphs": config.space_glyphs,
+        "max_ink_top": config.max_ink_top,
         "sizes": list(variant.sizes),
     })
     if config.space_widths:

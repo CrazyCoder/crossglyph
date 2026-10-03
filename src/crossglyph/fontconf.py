@@ -88,7 +88,7 @@ DEFAULT_SIZES = [12, 14, 16, 18]
 DEFAULT_MOD_SUFFIX = "Mod"
 
 BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "grayscale_hinting",
-             "mono", "ligatures"}
+             "mono", "ligatures", "max_ink_top"}
 TUNING_KEYS = {"gamma", "thresholds", "weight", "slant", "hinting",
                "line_height", "letter_spacing", "word_spacing", "kerning",
                "figures"}
@@ -620,6 +620,10 @@ class Config:
     #: The workspace this config belongs to, which is where its fallbacks and
     #: its builds live. `dir` may point somewhere else for the font files.
     root: pathlib.Path = pathlib.Path()
+    #: Write each style's tallest ink above the baseline into the reserved
+    #: bytes of its .cpfont entry. CrossPoint ignores them, so this is off
+    #: unless a firmware that reads them is the target.
+    max_ink_top: bool = False
 
     def coords(self, style: str, size: float | None = None) -> dict[str, float]:
         """The design coordinates one slot is rasterized at, for one size.
@@ -1107,4 +1111,5 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
         user_fallbacks=fallbacks,
         axis_overrides=overrides,
         root=root,
+        max_ink_top=_bool(values.get("max_ink_top", "no"), "max_ink_top", where),
     )
