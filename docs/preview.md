@@ -265,8 +265,8 @@ scores the text on the page with the current Tune settings, as
 [Grid Fit](#check-how-sharp-the-strokes-are) does.
 
 1. Put a few lines of the kind of text you read on the page.
-2. Open **Fit to grid** and press **Find sizes**. It scores the sizes in your
-   boxes, in both rows.
+2. Open **Fit to grid**. With **My sizes** selected, the line under the
+   button lists the sizes in your boxes, in both rows. Press **Find sizes**.
 3. Press a value in the **size** or **suggested** column to show the page at
    that size. Press the other one to compare.
 4. Untick any suggestion you do not want.
@@ -284,11 +284,11 @@ already the best has nothing to tick. **Apply** leaves alone any box you have
 changed since the search. **Undo** puts back what Apply wrote, and keeps any
 box you have edited since.
 
-To choose new sizes instead, select **a range** and set where it starts, the
+To choose new sizes instead, select **Range** and set where it **starts**, the
 **step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
-The sizes it will try are listed under the fields, such as "Sizes 12, 14, 16,
-18". They start from the sizes you have, with the step those use most. Press
-**Find sizes**. The sizes fill the first row of boxes, then **More sizes**,
+The sizes it will try are listed under the fields, such as "Tries 12, 14, 16,
+18". The fields start from the sizes you have, with the step those use most.
+Press **Find sizes**. The sizes fill the first row of boxes, then **More sizes**,
 which opens so you can see them.
 
 A range is the family's new list of sizes. Boxes past the count are listed as

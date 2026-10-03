@@ -15,7 +15,9 @@ import {body} from "./render.js";
 
 const toggle = document.getElementById("fit-toggle");
 const panel = document.getElementById("fit-panel");
-const mode = document.getElementById("fit-mode");
+const toMine = document.getElementById("fit-mode-mine");
+const toRange = document.getElementById("fit-mode-range");
+const mineSays = document.getElementById("fit-mine-says");
 const rangeFields = document.getElementById("fit-range");
 const low = document.getElementById("fit-low");
 const stepField = document.getElementById("fit-step");
@@ -205,11 +207,19 @@ function rangeSizes() {
   return {sizes: Array.from({length: many}, (_, i) => start + i * step)};
 }
 
-// Listed as the fields change, so the range is read as sizes before it runs.
-function showRange() {
-  const {sizes, problem} = rangeSizes();
-  targets.textContent = problem ?? `Sizes ${sizes.join(", ")}`;
+// What Find sizes will try, listed in both modes on the same line: a range's
+// sizes as its fields change, or the sizes in the boxes as they are edited.
+export function showFitTargets() {
   stepField.disabled = count.value === "1";
+  if (toRange.getAttribute("aria-pressed") !== "true") {
+    const mine = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
+      .map(box => snapSize(exportForm.elements[box].value));
+    targets.textContent = mine.length ? `Tries ${mine.join(", ")}`
+      : "There are no sizes in the boxes yet. Choose Range instead.";
+    return;
+  }
+  const {sizes, problem} = rangeSizes();
+  targets.textContent = problem ?? `Tries ${sizes.join(", ")}`;
 }
 
 function clearFit() {
@@ -224,7 +234,7 @@ function clearFit() {
 }
 
 async function runFit() {
-  const ranged = mode.value === "range";
+  const ranged = toRange.getAttribute("aria-pressed") === "true";
   const boxes = ranged
     ? [...FIRST_ROW, ...SECOND_ROW].slice(0, Number(count.value))
     : [...FIRST_ROW, ...SECOND_ROW].filter(filled);
@@ -385,18 +395,30 @@ function prefillRange() {
   low.value = String(labels[0] ?? 12);
   stepField.value = String(usual);
   count.value = String(Math.min(8, labels.length) || 4);
-  showRange();
+  showFitTargets();
 }
 
-mode.addEventListener("change", () => {
-  rangeFields.hidden = mode.value !== "range";
-  if (mode.value === "range") prefillRange();
-});
-low.addEventListener("input", showRange);
-stepField.addEventListener("change", showRange);
-count.addEventListener("change", showRange);
+// Two halves of one toggle. Range swaps its fields in where My sizes says
+// what it does, so the row keeps its height and Find sizes stays put.
+function setMode(ranged) {
+  toMine.setAttribute("aria-pressed", String(!ranged));
+  toRange.setAttribute("aria-pressed", String(ranged));
+  mineSays.hidden = ranged;
+  rangeFields.hidden = !ranged;
+  if (ranged) prefillRange();
+  showFitTargets();
+}
+
+toMine.setAttribute("aria-pressed", "true");
+toRange.setAttribute("aria-pressed", "false");
+toMine.addEventListener("click", () => setMode(false));
+toRange.addEventListener("click", () => setMode(true));
+low.addEventListener("input", showFitTargets);
+stepField.addEventListener("change", showFitTargets);
+count.addEventListener("change", showFitTargets);
 toggle.addEventListener("click", () => {
   if (!low.value) prefillRange();
+  showFitTargets();
 });
 runButton.addEventListener("click", runFit);
 applyButton.addEventListener("click", applyFit);

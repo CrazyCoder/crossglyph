@@ -1085,30 +1085,34 @@
     </div>
 
     <div id="fit-panel" class="fit-panel">
-      <div class="fit-controls">
-        <select id="fit-mode" aria-label="Which sizes to fit">
-          <option value="mine">my sizes</option>
-          <option value="range">a range</option>
-        </select>
-        <button type="button" id="fit-run">Find sizes</button>
+      <div class="fit-mode" role="group" aria-label="Which sizes to fit">
+        <button type="button" id="fit-mode-mine">My sizes</button>
+        <button type="button" id="fit-mode-range">Range</button>
       </div>
-      <!-- A range is where it starts, how far apart its sizes are, and how
-           many there are. The sizes it will try are listed under the fields
-           as they change, so nobody has to work them out. -->
-      <div id="fit-range" class="fit-range" hidden>
-        <div class="fit-fields">
-          <label>start <input class="mono" id="fit-low" type="text"
-                              inputmode="numeric" aria-label="First size, 6 to 40"></label>
-          <label>step <select id="fit-step" aria-label="Points between sizes">
+      <!-- On the same four columns as the size boxes above, so the fields sit
+           under them and Find sizes keeps the last column in both modes. A
+           range is where it starts, how far apart its sizes are and how many
+           there are; the sizes it will try are listed as the fields change. -->
+      <div class="fit-grid">
+        <div id="fit-mine-says" class="fit-span hint">Looks within half a
+          point of each of your sizes.</div>
+        <div id="fit-range" class="fit-span fit-range" hidden>
+          <label class="fit-field"><span>Start</span><input class="mono"
+              id="fit-low" type="text" inputmode="numeric"
+              aria-label="First size, 6 to 40"></label>
+          <label class="fit-field"><span>Step</span><select id="fit-step"
+              aria-label="Points between sizes">
               <option>1</option><option>2</option><option>3</option>
             </select></label>
-          <label>sizes <select id="fit-count" aria-label="How many sizes">
+          <label class="fit-field"><span>Sizes</span><select id="fit-count"
+              aria-label="How many sizes">
               <option>1</option><option>2</option><option>3</option>
               <option selected>4</option><option>5</option><option>6</option>
               <option>7</option><option>8</option>
             </select></label>
         </div>
-        <div id="fit-targets" class="hint mono"></div>
+        <button type="button" id="fit-run">Find sizes</button>
+        <div id="fit-targets" class="fit-span hint"></div>
       </div>
       <div id="fit-sample" class="hint"></div>
       <div class="fit-row fit-head" aria-hidden="true">

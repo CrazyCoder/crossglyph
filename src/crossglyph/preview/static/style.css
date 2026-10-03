@@ -987,21 +987,42 @@
   /* Fit to grid, a folded section of its own under the sizes. */
   .fit-panel { padding: .2rem 0 .6rem; display: grid; gap: .45rem; }
   .fit-panel .hint:empty { display: none; }
-  /* The mode and the button that runs it on one line, the range's fields on
-     the next, each with a short label, and the sizes they make under them. */
-  .fit-controls { display: flex; align-items: center; gap: .35rem; font-size: 12px; }
-  .fit-controls select, .fit-fields select { width: auto; }
-  /* One height for the menus, fields and buttons, which the browser
-     otherwise draws at three. */
-  .fit-panel select, .fit-panel input[type=text], .fit-panel button:not(.fit-value) {
-    height: 26px; padding-top: 0; padding-bottom: 0;
+  /* My sizes or a range: two halves of one control, drawn the way the
+     appearance toggle at the top of the page is. */
+  .fit-mode { display: flex; justify-self: start; }
+  .fit-mode button { font-size: 12px; padding: 0 .75rem; border-radius: 0;
+                     margin-left: -1px; }
+  .fit-mode button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+  .fit-mode button:last-child { border-radius: 0 6px 6px 0; }
+  .fit-mode button[aria-pressed="true"] {
+    background: var(--knob); color: var(--panel); border-color: var(--knob);
+    position: relative;
   }
-  .fit-range { display: grid; gap: .3rem; }
+  /* The size boxes' own four columns and gap, so a range's fields stand under
+     Small, Medium and Large and Find sizes under Extra Large, in both modes. */
+  .fit-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: .4rem; align-items: end; }
+  .fit-span { grid-column: 1 / 4; }
+  .fit-range { display: grid; grid-template-columns: subgrid; gap: .4rem; }
   .fit-range[hidden] { display: none; }
-  .fit-fields { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1.1rem;
-                font-size: 12px; color: var(--muted); }
-  .fit-fields label { display: inline-flex; align-items: center; gap: .4rem; }
-  #export .fit-fields input { width: 3.4rem; text-align: center; color: var(--text); }
+  /* As tall as a labelled field, so switching modes moves nothing, with its
+     words on the line Find sizes sits on. */
+  #fit-mine-says { align-self: stretch; margin: 0; display: flex;
+                   align-items: flex-end; padding-bottom: .25rem;
+                   min-height: calc(24px + .15rem + 11px * 1.45); }
+  #fit-targets { grid-column: 1 / -1; }
+  /* Labelled the way the boxes above are: a small title over the field. */
+  .fit-field { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+  .fit-field span { font-size: 11px; color: var(--muted); }
+  #export .fit-field input, #export .fit-field select { width: 100%; }
+  /* Numbers centred, as the size boxes set theirs. */
+  #export .fit-field input { text-align: center; }
+  #export .fit-field select { text-align-last: center; }
+  /* One height for every field and button here, the size boxes' own. */
+  .fit-panel select, .fit-panel input[type=text], #fit-run, .fit-foot button,
+  .fit-mode button {
+    height: 24px; padding-top: 0; padding-bottom: 0;
+  }
   .fit-head { color: var(--muted); font-size: 11px; }
   .fit-head:has(+ .fit-table:empty) { display: none; }
   /* One row a size: its box, the size now, the suggestion, what each scores,

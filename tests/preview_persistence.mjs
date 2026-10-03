@@ -878,7 +878,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Every sentence the status line said, since the running count is gone
     // by the time a test can look.
     "fit-sample": recording(),
-    "fit-mode": Object.assign(makeElement(), {value: "mine"}),
+    // The two halves of the mode toggle, and what My sizes says it does.
+    "fit-mode-mine": makeElement(),
+    "fit-mode-range": makeElement(),
+    "fit-mine-says": makeElement(),
     "fit-range": Object.assign(makeElement(), {hidden: true}),
     "fit-low": makeElement(),
     "fit-step": Object.assign(makeElement(), {value: "1"}),
@@ -1387,7 +1390,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"],
                       parts: stubs["grid-fit-parts"] },
            fit: { toggle: stubs["fit-toggle"], sample: stubs["fit-sample"],
-                  mode: stubs["fit-mode"], range: stubs["fit-range"],
+                  toMine: stubs["fit-mode-mine"], toRange: stubs["fit-mode-range"],
+                  mineSays: stubs["fit-mine-says"], range: stubs["fit-range"],
                   low: stubs["fit-low"], step: stubs["fit-step"],
                   targets: stubs["fit-targets"],
                   count: stubs["fit-count"], run: stubs["fit-run"],
@@ -6114,6 +6118,14 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("and opens like the other sections",
         env.root.dataset.folds.split(" ").includes("fit"), env.root.dataset.folds);
   check("with nothing searched until asked", env.fetches.fits.length === 0);
+  check("My sizes lists the sizes it will try, as a range does",
+        env.fit.targets.textContent === "Tries 12, 14, 16, 18", env.fit.targets.textContent);
+  els.size4.value = "17.5";
+  env.exportForm.edit("size4");
+  check("and follows the boxes as they are edited",
+        env.fit.targets.textContent === "Tries 12, 14, 16, 17.5", env.fit.targets.textContent);
+  els.size4.value = "18";
+  env.exportForm.edit("size4");
   env.fit.run.on.click();
   // Before any answer: every row is already there, so the section does not
   // grow as results arrive.
@@ -6208,11 +6220,18 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.fit.note.textContent);
 
   const asked = env.fetches.fits.length;
-  env.fit.mode.value = "range";
-  env.fit.mode.on.change();
+  check("My sizes starts pressed, and says what it does",
+        env.fit.toMine.attrs["aria-pressed"] === "true"
+        && env.fit.toRange.attrs["aria-pressed"] === "false"
+        && env.fit.mineSays.hidden === false && env.fit.range.hidden === true);
+  env.fit.toRange.on.click();
+  check("Range swaps its fields in for the sentence",
+        env.fit.toRange.attrs["aria-pressed"] === "true"
+        && env.fit.toMine.attrs["aria-pressed"] === "false"
+        && env.fit.mineSays.hidden === true && env.fit.range.hidden === false);
   check("a range starts from the step the sizes already have",
         env.fit.low.value === "12" && env.fit.step.value === "3"
-        && env.fit.targets.textContent === "Sizes 12, 15", env.fit.targets.textContent);
+        && env.fit.targets.textContent === "Tries 12, 15", env.fit.targets.textContent);
   env.fit.low.value = "12.5";
   env.fit.low.on.input();
   check("a start that is not a whole size lists nothing",
@@ -6248,14 +6267,13 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const labels = [12, 13, 14, 15, 16, 17, 18, 19];
   opts.fitSteps = fitSteps(labels.map(l => [l, l, l + 0.25, [50, 50, 50, 90]]));
   env.fold.press("fit");
-  env.fit.mode.value = "range";
-  env.fit.mode.on.change();
+  env.fit.toRange.on.click();
   env.fit.low.value = "12";
   env.fit.step.value = "1";
   env.fit.count.value = "8";
   env.fit.count.on.change();
   check("the sizes a range will try are listed before it runs",
-        env.fit.targets.textContent === "Sizes 12, 13, 14, 15, 16, 17, 18, 19",
+        env.fit.targets.textContent === "Tries 12, 13, 14, 15, 16, 17, 18, 19",
         env.fit.targets.textContent);
   env.fit.run.on.click();
   await settle();
@@ -6308,8 +6326,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   els.mod_suffix.value = "";
   opts.fitSteps = fitSteps([12, 13, 14, 15, 16, 17].map(l => [l, l, l, [90, 90, 90, 90]]));
   env.fold.press("fit");
-  env.fit.mode.value = "range";
-  env.fit.mode.on.change();
+  env.fit.toRange.on.click();
   check("a range starts from as many sizes as the boxes hold",
         env.fit.count.value === "8", env.fit.count.value);
   check("and the step the sizes have most often", env.fit.step.value === "1",
@@ -6342,7 +6359,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.fit.count.value = "1";
   env.fit.count.on.change();
   check("one size turns off the step", env.fit.step.disabled === true);
-  check("and lists the one size", env.fit.targets.textContent === "Sizes 14",
+  check("and lists the one size", env.fit.targets.textContent === "Tries 14",
         env.fit.targets.textContent);
   env.fit.run.on.click();
   await settle();

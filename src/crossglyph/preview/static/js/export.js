@@ -1,5 +1,6 @@
 import {form} from "./dom.js";
 import {familyEntries, familyPicker} from "./family.js";
+import {showFitTargets} from "./fitsizes.js";
 import {setField} from "./knobs.js";
 import {scheduleRender, undrawnCount} from "./render.js";
 import {progressBar, spellBytes} from "./progress.js";
@@ -229,6 +230,7 @@ export function showSizes(settings) {
   showModState();
   showShipsAs();
   showSizesBuild();
+  showFitTargets();
 }
 
 // What this family is called once it is built. The name in the box rather than
@@ -736,6 +738,7 @@ export function exportEdited(field) {
   // suffix is in the second one's.
   showShipsAs();
   showSizesBuild();
+  showFitTargets();
   showSaveState();
   // Everything here reaches the page and not only the build. The fallbacks
   // decide which face fills for the family; the coverage decides what the page
