@@ -251,9 +251,6 @@ you want two entries in the reader's font list instead of one long size list.
 The suffix stays greyed out until one of sizes 5 to 8 holds a size, since there
 is nothing for it to name before then.
 
-A line under the suffix says what all the sizes build, such as "Builds one
-family of 8 sizes".
-
 Coverage controls which characters are placed in the files. More coverage
 creates larger files and takes longer to build. Fallback faces fill characters
 that the main family lacks.

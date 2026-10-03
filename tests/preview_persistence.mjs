@@ -898,7 +898,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-note": recording(),
     "fit-builds": makeElement(),
     // What the sizes build, under the first row of boxes.
-    "sizes-builds": makeElement(),
     "fit-apply": makeElement(),
     "fit-undo": Object.assign(makeElement(), {hidden: true}),
     // The variable-font block, and the row per axis it builds inside it.
@@ -1400,7 +1399,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
-                  sizesBuild: stubs["sizes-builds"],
                   apply: stubs["fit-apply"], undo: stubs["fit-undo"] },
            sheet,
            device: {
@@ -6339,22 +6337,6 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
           === "12.25 13.25 14.25 15.25 16.25 17.25 18.25 19.25",
         [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" "));
   check("and leaves the suffix as it was", els.mod_suffix.value === "");
-  // Under the boxes: what the sizes build now.
-  const summary = env.fit.sizesBuild;
-  check("the sizes say they build one family of eight",
-        summary.textContent === "Builds one family of 8 sizes. Fill in the suffix "
-          + "to make sizes 5 to 8 a second family.", summary.textContent);
-
-  els.mod_suffix.value = "Large";
-  els.name.value = "Lit";
-  env.exportForm.edit("mod_suffix");
-  check("a suffix makes them two families, named",
-        summary.textContent === "Builds Lit (4 sizes) and LitLarge (4 sizes).",
-        summary.textContent);
-  for (const name of SECOND_ROW) els[name].value = "";
-  env.exportForm.edit("mod1");
-  check("and an empty second row is one family again",
-        summary.textContent === "Builds Lit with 4 sizes.", summary.textContent);
 }
 
 // 99d. A range is the family's new size list. Boxes past its count are

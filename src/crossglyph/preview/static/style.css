@@ -906,8 +906,6 @@
      says they are two. */
   #export .head + .row, #conf-errors + .row,
   #more-row, #mod-more-row, #suffix-row { border-top: 0; }
-  #sizes-builds { margin: 0 0 .35rem; }
-
   /* What the card gives up to the tabs, and it has to be said after the two
      rules above rather than beside the layout: a media query adds no
      specificity, so #knobs stated later wins wherever it says the same thing.
