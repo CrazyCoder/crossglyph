@@ -546,13 +546,13 @@
      Nothing sits below a foot. That is what lets both of them say something
      without moving anything above them, and it is the rule anything added
      later has to keep: below the bar, never inside it. */
-  #savebar, #buildbar {
+  #savebar, #buildbar, #page-facts {
     padding: .6rem .8rem;
     background: var(--rule); border: 1px solid var(--line);
     border-radius: 0 0 10px 10px;
   }
+  #savebar, #page-facts { margin-top: calc(-.55rem - 1px); }
   #savebar {
-    margin-top: calc(-.55rem - 1px);
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .5rem;
   }
@@ -646,14 +646,9 @@
     display: grid;
   }
 
-  /* The foot of the page's card: the stage's bottom border is its divider,
-     and the shading sets it apart as a reading of the page above. */
-  #stage { border-radius: 10px 10px 0 0; }
-  #page-facts {
-    width: 100%; margin-top: -.55rem; padding: .45rem .8rem;
-    background: color-mix(in srgb, var(--text) 5%, var(--panel));
-    border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px;
-  }
+  /* The foot of the page's card, drawn as the other feet are: what it says
+     is a reading of the page above. */
+  #page-facts { width: 100%; padding-top: .45rem; padding-bottom: .45rem; }
   #grid-fit-detail { margin-top: .3rem; }
   .status-row { display: flex; gap: .9rem; align-items: center; min-height: 22px; }
   #status { color: var(--muted); font-size: 11.5px; margin-left: auto; }
@@ -925,10 +920,10 @@
      the heading's margin was for standing level with columns that are not
      there. */
   /* The card and its foot are one shape. Said here rather than beside the
-     layout for the same reason as the block below: #knobs and #export state
-     border-radius further up, and a media query adds no specificity to beat
+     layout for the same reason as the block below: #knobs, #export and
+     #stage state border-radius further up, and a media query adds no specificity to beat
      it with. */
-  #knobs, #export {
+  #knobs, #export, #stage {
     border-bottom-left-radius: 0; border-bottom-right-radius: 0;
   }
 
