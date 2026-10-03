@@ -267,9 +267,9 @@ scores the text on the page with the current Tune settings, as
 1. Put a few lines of the kind of text you read on the page.
 2. Open **Fit to grid**. With **My sizes** selected, the line under the
    button lists the sizes in your boxes, in both rows. Press **Find sizes**.
-3. Press a value in the **size** or **suggested** column to show the page at
+3. Press a value in the **Size** or **Suggested** column to show the page at
    that size. Press the other one to compare.
-4. Untick any suggestion you do not want.
+4. Untick any suggestion you do not want in the **Use** column.
 5. Press **Apply**. The suggestions go into the size boxes.
 6. Press **Save** or **Build** to keep them.
 
