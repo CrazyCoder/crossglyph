@@ -27,6 +27,15 @@ export function showFolds(names) {
   attempt(() => localStorage.setItem(FOLDS, said));
 }
 
+//: Open one section, for something that has just put what it holds in front
+//: of you.
+export function openFold(name) {
+  const names = open();
+  if (names.has(name)) return;
+  names.add(name);
+  showFolds(names);
+}
+
 for (const toggle of toggles) {
   toggle.addEventListener("click", () => {
     const names = open();

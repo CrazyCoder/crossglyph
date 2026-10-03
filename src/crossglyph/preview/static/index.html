@@ -849,17 +849,19 @@
       <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
         <code>*_both_*</code>. A face the font does not carry falls back to
         regular, as it would on the device.</div>
-      <!-- How cleanly the straight strokes of this text sit on the pixels,
-           from the font the page was drawn with. Pressing it opens the score
-           per style and how many letters it rests on. -->
-      <div class="status-row">
-        <button type="button" id="grid-fit" class="mono" hidden
-                aria-expanded="false" aria-controls="grid-fit-detail"
-                title="How cleanly the straight strokes of this text sit on the device's pixels, from 0 to 100. X is upright strokes, Y is flat ones. It measures sharpness, not whether the font looks good. Press for the score of each style."></button>
-        <div id="status" class="mono">—</div>
-      </div>
-      <div id="grid-fit-detail" class="hint" hidden></div>
     </div>
+    <!-- How cleanly the straight strokes of this text sit on the pixels,
+         from the font the page was drawn with, beside how long the page took.
+         Outside the fold, because it is what Fit to grid is checked against
+         and a folded Text section must not hide it. Pressing it opens the
+         score per style and how many letters it rests on. -->
+    <div class="status-row">
+      <button type="button" id="grid-fit" class="mono" hidden
+              aria-expanded="false" aria-controls="grid-fit-detail"
+              title="How cleanly the straight strokes of this text sit on the device's pixels, from 0 to 100. X is upright strokes, Y is flat ones. It measures sharpness, not whether the font looks good. Press for the score of each style."></button>
+      <div id="status" class="mono">—</div>
+    </div>
+    <div id="grid-fit-detail" class="hint" hidden></div>
   </div>
 
   <!-- What this install is, at the foot of the middle column. This is the one
@@ -938,9 +940,7 @@
             what you are tuning at. A box takes a fraction, in the quarter points that
             knob steps in, and rounds anything between them.
           </span>
-        </span><button type="button" id="fit-open" class="fit-open"
-                aria-expanded="false" aria-controls="fit-panel"
-                title="Find nearby sizes whose strokes land more cleanly on the device's pixels">Fit to grid</button></span>
+        </span></span>
       <!-- Each title is a button rather than a label: pressing it moves the
            size knob to what its box holds, which is the distance between "14
            is in the list" and "14 is what 14 looks like". The box keeps its
@@ -972,77 +972,45 @@
            number it rounds to. Shown only when one of them is fractional, and
            marked as a warning when two land on the same name. -->
       <div class="hint" id="ships-as" hidden></div>
-      <!-- Fit to grid. Each size keeps its number in the reader's list and
-           moves by up to half a point to where its strokes land on whole
-           pixels. Scored on the page's text, as the Grid Fit under it is.
-           The fields here have no name, so a save never reads them. -->
-      <div id="fit-panel" class="fit-panel" hidden>
-        <div class="fit-controls">
-          <select id="fit-mode" aria-label="Which sizes to fit">
-            <option value="mine">my sizes</option>
-            <option value="range">a range</option>
-          </select>
-          <span id="fit-range" hidden>from
-            <input class="mono" id="fit-low" type="text" inputmode="numeric"
-                   aria-label="Smallest size, 6 to 40">
-            to <input class="mono" id="fit-high" type="text" inputmode="numeric"
-                      aria-label="Largest size, 6 to 40">,
-            <select id="fit-count" aria-label="How many sizes">
-              <option value="4">4</option><option value="8">8</option>
-            </select> sizes</span>
-          <button type="button" id="fit-run">Find sizes</button>
-        </div>
-        <div class="fit-row fit-head" aria-hidden="true">
-          <span></span><span>size</span><span>suggested</span><span>Grid Fit</span>
-          <span></span>
-        </div>
-        <div id="fit-table" class="fit-table"></div>
-        <div id="fit-builds" class="hint"></div>
-        <div id="fit-note" class="hint" aria-live="polite"></div>
-        <div class="fit-foot">
-          <button type="button" id="fit-apply" disabled>Apply</button>
-          <button type="button" id="fit-undo" hidden>Undo</button>
-          <button type="button" id="fit-close">Close</button>
-        </div>
-      </div>
     </div>
     <!-- Only for a family that carries more than the four boxes above, which a
          CJK one does: the reader borrows it at 8, 10 and 12 for the interface.
          Hidden otherwise rather than dropped, since a save would then write a
          shorter list than the file had. -->
     <div class="row wide" id="more-row" hidden>
-      <label class="name" for="size-more">more sizes</label>
+      <label class="name" for="size-more">extra sizes</label>
       <input class="mono" id="size-more" name="size_more" type="text"
              inputmode="decimal">
     </div>
 
-    <!-- A second entry in the reader's font list, not a way past a size
-         limit: `sizes` above takes as many as you give it, and the reader
-         lists every size a family carries (ReaderFontSizes.cpp). Most people
-         want one entry, so this folds and starts folded. The dot says the
-         fold is hiding sizes that are set, which is the one thing somebody
-         could otherwise lose track of behind it. -->
+    <!-- A second row of sizes from the same faces. The reader lists every
+         size a family carries (ReaderFontSizes.cpp), so with the suffix
+         empty these are more of this family's sizes; with one they build a
+         second family beside it. Most people want four sizes, so this folds
+         and starts folded. The dot says the fold is hiding sizes that are
+         set, which is the one thing somebody could otherwise lose track of
+         behind it. -->
     <div class="section">
       <h2><button type="button" id="mod-toggle" data-fold="mod"
                   aria-expanded="false" aria-controls="mod-settings"><svg
         class="twist" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M6 3.2 11.2 8 6 12.8"/></svg>Second family</button><span
+        <path d="M6 3.2 11.2 8 6 12.8"/></svg>More sizes</button><span
         class="explain">
-        <button type="button" class="info" aria-label="What a second family is"
+        <button type="button" class="info" aria-label="What more sizes are"
                 aria-describedby="mod-tip">?</button>
         <span class="tip" id="mod-tip" role="tooltip">
-          More sizes, built from the same faces. With the suffix empty they
-          join this family, and the reader lists them among its sizes:
-          nothing limits how many one family carries. Fill the suffix in and
+          Four more sizes, built from the same faces. With the suffix empty
+          they join this family, and the reader lists them among its sizes:
+          nothing limits how many one family carries. Fill in the suffix and
           they build <strong id="mod-name">a second family</strong> instead,
           listed beside the first under that name, which is worth having when
           two entries suit you better than one long list of sizes.
           <br><br>
-          Leave these sizes empty and the family builds its four boxes alone.
+          Leave these sizes empty and the family builds the four above alone.
         </span>
       </span></h2>
       <span id="mod-dot" aria-hidden="true" hidden
-            title="This family builds a second one">&#8226;</span>
+            title="Sizes are set here">&#8226;</span>
     </div>
 
     <div id="mod-settings">
@@ -1076,7 +1044,7 @@
          and a config with five sizes in it means a save writing a shorter list
          than the file had. -->
     <div class="row wide" id="mod-more-row" hidden>
-      <label class="name" for="mod-more">more sizes</label>
+      <label class="name" for="mod-more">extra sizes</label>
       <input class="mono" id="mod-more" name="mod_more" type="text"
              inputmode="decimal">
     </div>
@@ -1085,6 +1053,59 @@
       <input class="mono" id="mod-suffix" name="mod_suffix" type="text"
              placeholder="none, so one family">
     </div>
+    </div>
+
+    <!-- Fit to grid. Each size keeps its number in the reader's list and
+         moves by up to half a point to where its strokes land on whole
+         pixels. Scored on the page's text, as the Grid Fit under it is.
+         After More sizes because it fits both rows. The fields here have no
+         name, so a save never reads them. -->
+    <div class="section">
+      <h2><button type="button" id="fit-toggle" data-fold="fit"
+                  aria-expanded="false" aria-controls="fit-panel"><svg
+        class="twist" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M6 3.2 11.2 8 6 12.8"/></svg>Fit to grid</button><span
+        class="explain">
+        <button type="button" class="info" aria-label="What Fit to grid does"
+                aria-describedby="fit-tip">?</button>
+        <span class="tip" id="fit-tip" role="tooltip">
+          Suggests sizes whose straight strokes land on whole pixels, so they
+          look sharper on the device. Each suggestion keeps the number the
+          reader shows for its size and moves it by a quarter or half a point.
+          Sizes are scored on the text on the page, with the Tune settings, as
+          the Grid Fit under the text box is.
+        </span>
+      </span></h2>
+    </div>
+
+    <div id="fit-panel" class="fit-panel">
+      <div class="fit-controls">
+        <select id="fit-mode" aria-label="Which sizes to fit">
+          <option value="mine">my sizes</option>
+          <option value="range">a range</option>
+        </select>
+        <span id="fit-range" hidden>from
+          <input class="mono" id="fit-low" type="text" inputmode="numeric"
+                 aria-label="Smallest size, 6 to 40">
+          to <input class="mono" id="fit-high" type="text" inputmode="numeric"
+                    aria-label="Largest size, 6 to 40">,
+          <select id="fit-count" aria-label="How many sizes">
+            <option value="4">4</option><option value="8">8</option>
+          </select> sizes</span>
+        <button type="button" id="fit-run">Find sizes</button>
+      </div>
+      <div id="fit-sample" class="hint"></div>
+      <div class="fit-row fit-head" aria-hidden="true">
+        <span></span><span>size</span><span>suggested</span><span>Grid Fit</span>
+        <span></span>
+      </div>
+      <div id="fit-table" class="fit-table"></div>
+      <div id="fit-builds" class="hint"></div>
+      <div id="fit-note" class="hint" aria-live="polite"></div>
+      <div class="fit-foot">
+        <button type="button" id="fit-undo" hidden>Undo</button>
+        <button type="button" id="fit-apply" disabled>Apply</button>
+      </div>
     </div>
 
     <div class="stacked">

@@ -106,8 +106,8 @@ Open **Export**.
 
 1. Check **name**. This is the family name shown by the reader.
 2. Enter the point sizes under **sizes**.
-3. Leave **Second family** empty unless you want another family entry with a
-   different size list.
+3. Leave **More sizes** empty unless you want more than four sizes, or a
+   second family entry with a different size list.
 4. Choose the **coverage** needed by your books.
 5. Turn on **bundled fallback faces** when the main family lacks characters you
    need.

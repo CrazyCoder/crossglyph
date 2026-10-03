@@ -362,6 +362,7 @@
   @media (prefers-reduced-motion: reduce) { .twist { transition: none; } }
   :root:not([data-folds~="page"]) #page-settings { display: none; }
   :root:not([data-folds~="mod"]) #mod-settings { display: none; }
+  :root:not([data-folds~="fit"]) #fit-panel { display: none; }
   :root:not([data-folds~="device"]) #device-settings { display: none; }
   :root:not([data-folds~="text"]) #text-settings { display: none; }
 
@@ -958,13 +959,9 @@
   .sizes .size-title:hover { color: var(--text); text-decoration: underline; }
   #export .sizes input[type=text] { text-align: center; }
 
-  /* Fit to grid. The button sits at the end of the sizes heading, as small as
-     the titles over the boxes, since it is an action on them. */
-  .fit-open { margin-left: .6rem; font-size: 11px; padding: .05rem .45rem; }
-  .fit-panel { margin-top: .5rem; padding: .5rem .6rem;
-               border: 1px solid var(--line); border-radius: 4px;
-               background: var(--field); display: grid; gap: .45rem; }
-  .fit-panel[hidden] { display: none; }
+  /* Fit to grid, a folded section of its own under the sizes. */
+  .fit-panel { padding: .2rem 0 .6rem; display: grid; gap: .45rem; }
+  .fit-panel .hint:empty { display: none; }
   .fit-controls { display: flex; flex-wrap: wrap; gap: .35rem;
                   align-items: center; font-size: 12px; }
   .fit-controls select { width: auto; }

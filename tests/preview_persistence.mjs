@@ -871,9 +871,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // The page's Grid Fit under the text box, and the line it opens.
     "grid-fit": Object.assign(makeElement(), {hidden: true}),
     "grid-fit-detail": Object.assign(makeElement(), {hidden: true}),
-    // Fit to grid, under the size boxes.
-    "fit-open": makeElement(),
-    "fit-panel": Object.assign(makeElement(), {hidden: true}),
+    // Fit to grid, a fold of its own under the sizes.
+    "fit-toggle": Object.assign(pressStub("fit"), {dataset: {fold: "fit"}}),
+    "fit-panel": makeElement(),
+    "fit-sample": makeElement(),
     "fit-mode": Object.assign(makeElement(), {value: "mine"}),
     "fit-range": Object.assign(makeElement(), {hidden: true}),
     "fit-low": makeElement(),
@@ -887,7 +888,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-builds": makeElement(),
     "fit-apply": makeElement(),
     "fit-undo": Object.assign(makeElement(), {hidden: true}),
-    "fit-close": makeElement(),
     // The variable-font block, and the row per axis it builds inside it.
     variable: { hidden: false },
     "axis-text-row": { hidden: false },
@@ -1016,7 +1016,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       querySelectorAll: (selector) => {
         if (selector === "[data-fold]") {
           return [stubs["page-toggle"], stubs["mod-toggle"],
-                  stubs["device-toggle"], stubs["text-toggle"]];
+                  stubs["device-toggle"], stubs["text-toggle"],
+                  stubs["fit-toggle"]];
         }
         if (selector === "[data-device-setting]") return deviceSettings;
         const deviceFor = selector.match(/^\[data-for="([^"]+)"\]$/)?.[1];
@@ -1377,14 +1378,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"] },
-           fit: { open: stubs["fit-open"], panel: stubs["fit-panel"],
+           fit: { toggle: stubs["fit-toggle"], sample: stubs["fit-sample"],
                   mode: stubs["fit-mode"], range: stubs["fit-range"],
                   low: stubs["fit-low"], high: stubs["fit-high"],
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
-                  apply: stubs["fit-apply"], undo: stubs["fit-undo"],
-                  close: stubs["fit-close"] },
+                  apply: stubs["fit-apply"], undo: stubs["fit-undo"] },
            sheet,
            device: {
              ratio(value) { sandbox.devicePixelRatio = value; },
@@ -6058,7 +6058,7 @@ for (const deferred of [
 //     from being looked at, and nothing written until Apply puts the ticked
 //     ones in the boxes as an unsaved edit.
 const fitSteps = (rows) => [
-  {event: "plan", total: rows.length * 4},
+  {event: "plan", total: rows.length * 4, letters: 742},
   ...rows.flatMap(([label, now, pick, fits], i) => [
     ...[-0.5, -0.25, 0, 0.25].map((offset, j) => ({
       event: "candidate", label, size: label + offset, fit: fits[j],
@@ -6082,11 +6082,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
     [18, 18, 18, [90, 90, 90, 90]],
   ]);
   const saves = env.fetches.saves.length;
-  env.fit.open.on.click();
+  check("Fit to grid starts folded",
+        !(env.root.dataset.folds || "").split(" ").includes("fit")
+        && env.fit.toggle.attrs["aria-expanded"] === "false",
+        env.root.dataset.folds);
+  env.fold.press("fit");
+  check("and opens like the other sections",
+        env.root.dataset.folds.split(" ").includes("fit"), env.root.dataset.folds);
+  check("with nothing searched until asked", env.fetches.fits.length === 0);
+  env.fit.run.on.click();
   await settle();
-  check("Fit to grid opens under the boxes",
-        env.fit.panel.hidden === false, String(env.fit.panel.hidden));
-  check("and scores the family's own sizes on this page",
+  check("Find sizes scores the family's own sizes on this page",
         JSON.stringify(env.fetches.fits[0]?.sizes) === "[12,14,16,18]"
         && typeof env.fetches.fits[0].text === "string",
         JSON.stringify(env.fetches.fits[0]));
@@ -6108,6 +6114,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("having said how far it got on the way",
         env.fit.note.steps.includes("Scoring 16 of 16"),
         JSON.stringify(env.fit.note.steps));
+  check("and says what the scores rest on",
+        env.fit.sample.textContent.includes("742 letters"), env.fit.sample.textContent);
 
   pick.on.click();
   await settle();
@@ -6131,13 +6139,50 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("as an edit to save, not a save",
         env.save.disabled === false && env.fetches.saves.length === saves);
   check("and offers to undo it", env.fit.undo.hidden === false);
+  els.size3.value = "15";
   env.fit.undo.on.click();
-  check("Undo puts the boxes back exactly",
-        FIRST_ROW.map(n => els[n].value).join(" ") === "12 14 16 18",
-        FIRST_ROW.map(n => els[n].value).join(" "));
+  check("Undo puts back what Apply wrote",
+        els.size1.value === "12", els.size1.value);
+  check("and keeps a box edited since",
+        els.size3.value === "15", els.size3.value);
+}
 
-  env.fit.close.on.click();
-  check("Close hides the panel", env.fit.panel.hidden === true);
+// 99c. Apply writes only into boxes that still hold what was scored, and a
+//      range has to be whole sizes before anything is asked.
+{
+  const opts = {renderOk: true};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  const els = env.exportForm.elements;
+  for (const [name, value] of FIRST_ROW.map((n, i) => [n, ["12", "14", "", ""][i]])) {
+    els[name].value = value;
+  }
+  opts.fitSteps = fitSteps([[12, 12, 11.75, [60, 100, 62, 61]],
+                            [14, 14, 13.75, [60, 100, 62, 61]]]);
+  env.fold.press("fit");
+  env.fit.run.on.click();
+  await settle();
+  els.size2.value = "15";
+  env.fit.apply.on.click();
+  check("a box changed since the search is left alone",
+        els.size1.value === "11.75" && els.size2.value === "15",
+        `${els.size1.value} ${els.size2.value}`);
+  check("and the note says so", env.fit.note.textContent.includes("changed since"),
+        env.fit.note.textContent);
+
+  const asked = env.fetches.fits.length;
+  env.fit.mode.value = "range";
+  env.fit.mode.on.change();
+  env.fit.low.value = "12.5";
+  env.fit.high.value = "19";
+  env.fit.run.on.click();
+  await settle();
+  check("a fractional range is refused before asking",
+        env.fetches.fits.length === asked
+        && env.fit.note.textContent.includes("whole sizes"), env.fit.note.textContent);
+  env.fit.low.value = "abc";
+  env.fit.run.on.click();
+  await settle();
+  check("and so is one that is not a number", env.fetches.fits.length === asked);
 }
 
 // 99a. A range of whole sizes. Eight fill both rows of boxes, and the suffix
@@ -6150,8 +6195,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   els.mod_suffix.value = "";
   const labels = [12, 13, 14, 15, 16, 17, 18, 19];
   opts.fitSteps = fitSteps(labels.map(l => [l, l, l + 0.25, [50, 50, 50, 90]]));
-  env.fit.open.on.click();
-  await settle();
+  env.fold.press("fit");
   env.fit.mode.value = "range";
   env.fit.mode.on.change();
   env.fit.low.value = "12";
@@ -6168,7 +6212,13 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("an empty suffix makes them one family",
         env.fit.builds.textContent.includes("one family of 8 sizes"),
         env.fit.builds.textContent);
+  check("and says where to make it two",
+        env.fit.builds.textContent.includes("suffix"), env.fit.builds.textContent);
+  const modOpen = () => (env.root.dataset.folds || "").split(" ").includes("mod");
+  check("More sizes starts folded", !modOpen(), env.root.dataset.folds);
   env.fit.apply.on.click();
+  check("Apply into the second row opens More sizes, so they are seen",
+        modOpen(), env.root.dataset.folds);
   check("Apply fills both rows of boxes",
         [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" ")
           === "12.25 13.25 14.25 15.25 16.25 17.25 18.25 19.25",
@@ -6184,14 +6234,15 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.fit.builds.textContent);
 }
 
-// 99b. What the server refuses is said in the panel, and a run that is
-//      closed early is stopped.
+// 99b. What the server refuses is said in the panel, and a new family stops
+//      a run and drops suggestions made for the last one.
 {
   const opts = {renderOk: true,
                 fitFails: "Put at least a few lines of text on the page to score sizes."};
   const env = await loaded(fakeStorage(), undefined, opts);
   env.exportForm.elements.size1.value = "12";
-  env.fit.open.on.click();
+  env.fold.press("fit");
+  env.fit.run.on.click();
   await settle();
   check("a refusal is said in the panel",
         env.fit.note.textContent.startsWith("Put at least a few lines"),
@@ -6199,12 +6250,23 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("and leaves no suggestions", env.fit.table.children.length === 0);
   check("with nothing to apply", env.fit.apply.disabled === true);
 
-  delete opts.fitFails;
-  opts.fitSteps = fitSteps([[12, 12, 12, [1, 1, 1, 1]]]);
+  opts.fitFails = [{loc: ["body", "low"], msg: "Input should be a valid integer"}];
   env.fit.run.on.click();
-  env.fit.close.on.click();
-  check("closing the panel stops the search", env.fetches.fitAborts === 1,
+  await settle();
+  check("a refusal in parts is said in words",
+        env.fit.note.textContent.includes("valid integer"), env.fit.note.textContent);
+
+  delete opts.fitFails;
+  opts.fitSteps = fitSteps([[12, 12, 11.75, [1, 9, 1, 1]]]);
+  env.fit.run.on.click();
+  await settle();
+  check("a run leaves suggestions", env.fit.table.children.length === 1);
+  env.fit.run.on.click();
+  env.family.choose(env.family.value === "Sample" ? "Alto" : "Sample");
+  await settle();
+  check("a new family stops the search", env.fetches.fitAborts === 1,
         String(env.fetches.fitAborts));
+  check("and drops the suggestions", env.fit.table.children.length === 0);
 }
 
 process.exit(failures ? 1 : 0);

@@ -226,7 +226,8 @@ family.
 
 - **name** is the family name shown by the reader;
 - **sizes** lists the point sizes to build;
-- **Second family** can create another family entry from the same source faces;
+- **More sizes** adds four more, to this family or to a second family entry;
+- **Fit to grid** suggests sizes that look sharper on the device;
 - **coverage** chooses character ranges;
 - **extra ranges** adds raw Unicode ranges;
 - **bundled fallback faces** adds the downloaded Noto families after your own
@@ -238,9 +239,11 @@ family.
 The **Small**, **Medium**, **Large** and **Extra Large** labels are buttons. Press
 one to preview the point size in its box.
 
-A second family is optional. Leave its size boxes empty for one family entry.
-Use it when two separate entries in the reader's font list are clearer than one
-entry with a long size list.
+**More sizes** is optional, and folded until you open it. With its **suffix**
+empty, its sizes join this family and the reader lists all of them. Fill in the
+suffix and they build a second family entry, named with the suffix, which is
+clearer when you want two entries in the reader's font list instead of one long
+size list.
 
 Coverage controls which characters are placed in the files. More coverage
 creates larger files and takes longer to build. Fallback faces fill characters
@@ -253,36 +256,39 @@ that the main family lacks.
 
 ## Fit sizes to the pixel grid
 
-**Fit to grid**, beside **sizes** in **Export**, suggests point sizes whose
-straight strokes land more cleanly on the screen's pixels. It scores the text
-on the page with the current Tune settings, as [Grid Fit](#check-how-sharp-the-strokes-are)
-does.
+**Fit to grid**, a folded section under the sizes in **Export**, suggests point
+sizes whose straight strokes land more cleanly on the screen's pixels. It
+scores the text on the page with the current Tune settings, as
+[Grid Fit](#check-how-sharp-the-strokes-are) does.
 
 1. Put a few lines of the kind of text you read on the page.
-2. Press **Fit to grid**. It scores the sizes in your boxes.
+2. Open **Fit to grid** and press **Find sizes**. It scores the sizes in your
+   boxes, in both rows.
 3. Press a value in the **size** or **suggested** column to show the page at
    that size. Press the other one to compare.
 4. Untick any suggestion you do not want.
 5. Press **Apply**. The suggestions go into the size boxes.
 6. Press **Save** or **Build** to keep them.
 
-Each suggestion stays within half a point of its size and keeps the number
-the reader shows in its Font Size list. A box that holds 13.75 ships as 14, as
-any fractional size does.
+Each suggestion keeps the number the reader shows in its Font Size list, and
+stays within half a point of that number. A box that holds 13.75 ships as 14,
+as any fractional size does.
 
 A suggestion is ticked when it gains at least a few points. A size that is
-already the best has nothing to tick. **Undo** puts the boxes back as they
-were before **Apply**. **Close** discards the suggestions.
+already the best has nothing to tick. **Apply** leaves alone any box you have
+changed since the search. **Undo** puts back what Apply wrote, and keeps any
+box you have edited since.
 
 To choose new sizes instead, select **a range**, enter the smallest and largest
-size and choose **4** or **8** sizes, then press **Find sizes**. Four fill the
-first row of boxes. Eight fill both rows, and the panel says what that builds:
+whole size and choose **4** or **8** sizes, then press **Find sizes**. Four fill
+the first row of boxes. Eight fill both rows, open **More sizes** so you can
+see them, and the section says what that builds:
 
-- with the **suffix** under **Second family** empty, one family with eight
-  sizes;
+- with the **suffix** under **More sizes** empty, one family with eight sizes;
 - with a suffix, two families, the second named with the suffix.
 
-Fit to grid does not change the suffix.
+Fit to grid does not change the suffix. Choosing another family drops the
+suggestions, since they were found for the last one.
 
 ## Build
 
