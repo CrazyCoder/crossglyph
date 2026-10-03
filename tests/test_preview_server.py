@@ -1904,21 +1904,25 @@ def test_a_second_family_saves_with_the_suffix_that_names_it(scratch):
     assert entry["export"]["sizes_mod"] == "13 15"
     assert entry["export"]["mod_suffix"] == "Alt", "the panel would open blank"
 
-    # The default suffix is not worth a line, and neither is a suffix with no
-    # second family to name.
+    # Any name is written, and a suffix with no second family to name is not.
     _save_export("Alto", sizes_mod="13 15", mod_suffix="Mod")
-    assert "mod_suffix" not in (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
+    assert _alto_says(scratch, "mod_suffix") == "Mod"
     _save_export("Alto", sizes_mod="", mod_suffix="Alt")
     text = (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
     assert "sizes_mod" not in text and "mod_suffix" not in text
 
-    # An empty box is a choice and is written as one: those sizes join the
-    # family above, so the key has to say so. Dropped, it would hand the
-    # family the default suffix back and build the second one after all.
+    # An empty box is what a family is with no key at all: those sizes join
+    # the family above, so it is not worth a line.
     _save_export("Alto", sizes_mod="13 15", mod_suffix="")
-    assert _alto_says(scratch, "mod_suffix") == ""
+    assert "mod_suffix" not in (_conf(scratch) / "alto.conf").read_text(encoding="utf-8")
     entry = next(f for f in server.families() if f["name"] == "Alto")
     assert entry["export"]["mod_suffix"] == ""
+
+    # Unless all.conf names a suffix: then the empty box is written, or the
+    # family would inherit that name and build a second family after all.
+    (_conf(scratch) / "all.conf").write_text("mod_suffix = Large\n", encoding="utf-8")
+    _save_export("Alto", sizes_mod="13 15", mod_suffix="")
+    assert _alto_says(scratch, "mod_suffix") == ""
     # claimed_names is what orphan cleanup keeps, so it is where a second
     # family exists or does not. `families()` lists configs and would answer
     # the same either way.

@@ -14,7 +14,7 @@ def variant(tmp_path):
                  "Alto Bold Italic.otf"):
         (fonts / name).write_bytes(b"font-" + name.encode())
     (fonts / "alto.conf").write_text(
-        "sizes = 12 14\nsizes_mod = 13\n", encoding="utf-8")
+        "sizes = 12 14\nsizes_mod = 13\nmod_suffix = Mod\n", encoding="utf-8")
     return fontconf.parse_config(fonts / "alto.conf").variants()[0]
 
 

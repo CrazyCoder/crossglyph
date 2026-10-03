@@ -533,10 +533,11 @@ def test_family_without_a_regular_face_is_an_error(tmp_path):
 
 # --- variants -------------------------------------------------------------
 
-def test_sizes_mod_produces_a_second_family(tmp_path):
+def test_sizes_mod_with_a_suffix_produces_a_second_family(tmp_path):
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text(
-        "sizes = 12 14 16 18\nsizes_mod = 13 15 17 19\n", encoding="utf-8")
+        "sizes = 12 14 16 18\nsizes_mod = 13 15 17 19\nmod_suffix = Mod\n",
+        encoding="utf-8")
     variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
     assert [(v.name, v.sizes) for v in variants] == [
         ("Alto", [12, 14, 16, 18]),
@@ -562,14 +563,14 @@ def test_an_empty_suffix_puts_the_second_list_in_the_first_family(tmp_path):
     assert [(v.name, v.sizes) for v in variants] == [("Alto", [12, 13, 14, 15])]
 
 
-def test_an_absent_suffix_still_names_a_second_family(tmp_path):
-    """Only a key set to nothing is the choice. A config that never mentioned
-    the suffix keeps building what it built."""
+def test_an_absent_suffix_puts_the_second_list_in_the_first_family(tmp_path):
+    """The reader lists a family's sizes by number and nothing limits how many
+    it carries, so more sizes are one family unless a suffix names another."""
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text(
         "sizes = 12 14\nsizes_mod = 13 15\n", encoding="utf-8")
     variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
-    assert [v.name for v in variants] == ["Alto", "AltoMod"]
+    assert [(v.name, v.sizes) for v in variants] == [("Alto", [12, 13, 14, 15])]
 
 
 def test_one_family_cannot_hold_two_sizes_that_share_a_label(tmp_path):
@@ -586,7 +587,7 @@ def test_two_lists_under_two_names_may_share_a_label(tmp_path):
     """They write into directories of their own, so nothing collides."""
     _touch(tmp_path, *ALTO)
     (tmp_path / "alto.conf").write_text(
-        "sizes = 13.5\nsizes_mod = 14\n", encoding="utf-8")
+        "sizes = 13.5\nsizes_mod = 14\nmod_suffix = Mod\n", encoding="utf-8")
     variants = fontconf.parse_config(tmp_path / "alto.conf").variants()
     assert [v.name for v in variants] == ["Alto", "AltoMod"]
 

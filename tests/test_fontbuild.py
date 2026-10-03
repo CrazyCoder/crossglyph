@@ -62,7 +62,8 @@ def test_missing_styles_are_not_passed(config, tmp_path):
 
 def test_the_output_path_carries_the_variant_name_and_size(config, tmp_path):
     kw = _kwargs(config, tmp_path / "out",
-                 "sizes = 12 14 16 18\nsizes_mod = 13 15 17 19\n", size_index=1)
+                 "sizes = 12 14 16 18\nsizes_mod = 13 15 17 19\nmod_suffix = Mod\n",
+                 size_index=1)
     assert kw["output_path"].endswith("AltoMod_13.cpfont")
     assert kw["size"] == 13
 
@@ -160,7 +161,7 @@ def test_the_worker_count_leaves_a_core_for_whoever_asked(monkeypatch):
 
 def _plans(tmp_path, sizes="12 14", mod=""):
     """Two families' worth of jobs, without building anything."""
-    text = f"sizes = {sizes}\n" + (f"sizes_mod = {mod}\n" if mod else "")
+    text = f"sizes = {sizes}\n" + (f"sizes_mod = {mod}\nmod_suffix = Mod\n" if mod else "")
     (tmp_path / "alto.conf").write_text(text, encoding="utf-8")
     parsed = fontconf.parse_config(tmp_path / "alto.conf")
     return [job for variant in parsed.variants()
@@ -225,7 +226,8 @@ def test_a_second_family_declared_in_all_conf_is_still_claimed(tmp_path):
                        family="Probe", style="Regular")
     conf = fontbuild.conf_dir(tmp_path)
     conf.mkdir(parents=True, exist_ok=True)
-    (conf / "all.conf").write_text("sizes_mod = 9 10\n", encoding="utf-8")
+    (conf / "all.conf").write_text("sizes_mod = 9 10\nmod_suffix = Mod\n",
+                                   encoding="utf-8")
     (conf / "probe.conf").write_text("sizes = 12\n", encoding="utf-8")
 
     # Spelled as the config spells it, which is why orphan_dirs compares

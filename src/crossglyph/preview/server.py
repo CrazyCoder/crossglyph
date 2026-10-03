@@ -1375,10 +1375,10 @@ def export_changes(request_export: dict, config: Config,
     if not sizes_mod:
         wanted["mod_suffix"] = None
     elif not suffix:
-        # Written as an empty key rather than dropped. Dropping it would hand
-        # the family the default suffix back and build the second one after
-        # all, which is the opposite of what an empty box asks for.
-        wanted["mod_suffix"] = ""
+        # An empty box is what no key means, so it is written only against an
+        # all.conf that names a suffix. Dropped there, it would hand the family
+        # that name and build a second family after all.
+        wanted["mod_suffix"] = "" if inherited_suffix else None
     else:
         wanted["mod_suffix"] = suffix if suffix != inherited_suffix else None
     # One family carries both lists, so they share a set of .cpfont names and

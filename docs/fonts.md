@@ -102,7 +102,7 @@ sizes carried by the selected family.
 |---|---|---|
 | `sizes` | `12 14 16 18` | Point sizes in the main family. Fractions are allowed. |
 | `sizes_mod` | Empty | A second list of point sizes from the same faces. |
-| `mod_suffix` | `Mod` | Suffix for the second family. Leave it empty to merge both lists. |
+| `mod_suffix` | Empty | Name ending for a second family. Empty puts both lists in one family. |
 | `out` | `cpfonts` | Output folder. This key belongs in `all.conf`. |
 | `max_ink_top` | `no` | Store how far each style's tallest character reaches above the line. |
 
@@ -123,7 +123,8 @@ sizes_mod = 14 16 18
 mod_suffix = Large
 ```
 
-Leave `mod_suffix` empty to put both size lists under one family name.
+Without `mod_suffix`, both size lists build one family, and the reader lists all
+of its sizes.
 
 ## Character coverage
 

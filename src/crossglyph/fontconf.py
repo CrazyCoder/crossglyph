@@ -85,7 +85,6 @@ KEYWORD_RANK = {
 #: not draw. Listing them made the panel look as though five ticks were needed.
 DEFAULT_INTERVALS = "reading"
 DEFAULT_SIZES = [12, 14, 16, 18]
-DEFAULT_MOD_SUFFIX = "Mod"
 
 BOOL_KEYS = {"fallbacks", "space_glyphs", "stem_darkening", "grayscale_hinting",
              "mono", "ligatures", "max_ink_top"}
@@ -755,15 +754,12 @@ def check_labels(sizes: list[float], where: str) -> None:
 def mod_suffix_from(values: dict[str, str]) -> str:
     """What a second list of sizes builds under, or "" for the family itself.
 
-    An absent key is the default suffix, so a workspace written before this
-    was a choice keeps building the two families it built. A key set to
-    nothing is the choice: those sizes join the family above, which the
-    reader then lists among its own, since nothing on the device limits how
-    many sizes one family carries.
+    Absent or empty, those sizes join the family above, which the reader then
+    lists among its own: it names sizes by number, and nothing on the device
+    limits how many one family carries. A suffix makes them a second family,
+    named with it, beside the first in the reader's font list.
     """
-    raw = values.get("mod_suffix")
-    if raw is None:
-        return DEFAULT_MOD_SUFFIX
+    raw = values.get("mod_suffix") or ""
     return sanitize_name(raw) if raw.strip() else ""
 
 
