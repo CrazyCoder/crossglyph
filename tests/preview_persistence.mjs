@@ -6552,4 +6552,93 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.fit.table.children.length === 0, String(env.fit.table.children.length));
 }
 
+// Pixel zoom: the arithmetic, asked directly. Every view of a zoomed page
+// rests on these, so they are checked on numbers small enough to work out.
+{
+  const env = await loaded(fakeStorage());
+  const z = env.modules.get("zoom.js");
+
+  const ratios = [1, 1.25, 1.5, 2];
+  check("every zoom level is a whole number of screen pixels at every ratio",
+        ratios.every(r => z.LEVELS.every(l => Number.isInteger(z.blockSize(l, r)))));
+  check("1000% is 10 screen pixels at 1x and 13 at 1.25x",
+        z.blockSize(1000, 1) === 10 && z.blockSize(1000, 1.25) === 13,
+        `${z.blockSize(1000, 1)} ${z.blockSize(1000, 1.25)}`);
+
+  check("stepping up from off starts at the first level", z.stepLevel(0, 1) === 200);
+  check("stepping down from the first level turns zoom off", z.stepLevel(200, -1) === 0);
+  check("stepping stops at the top", z.stepLevel(3200, 1) === 3200);
+  check("stepping moves one level", z.stepLevel(1000, 1) === 1600
+        && z.stepLevel(1000, -1) === 800);
+
+  const panel = {width: 480, height: 800}, view = {width: 480, height: 800};
+  const at = (x, y) => z.origin({level: 1000, x, y}, view, panel, 10);
+  check("a view centred past the top left stops at the corner",
+        JSON.stringify(at(-50, -50)) === JSON.stringify({x: 0, y: 0}),
+        JSON.stringify(at(-50, -50)));
+  check("and past the bottom right stops at that corner",
+        JSON.stringify(at(9999, 9999)) === JSON.stringify({x: 4320, y: 7200}),
+        JSON.stringify(at(9999, 9999)));
+  check("a view in the middle is centred on its centre",
+        JSON.stringify(at(240, 400)) === JSON.stringify({x: 2160, y: 3600}),
+        JSON.stringify(at(240, 400)));
+  const tiny = z.origin({level: 200, x: 0, y: 0}, view, {width: 10, height: 10}, 2);
+  check("a page smaller than the view is centred in it",
+        tiny.x === -230 && tiny.y === -390, JSON.stringify(tiny));
+
+  const held = z.clampCentre({level: 1000, x: -50, y: 9999}, view, panel, 10);
+  check("clamping stores the centre the view really has",
+        held.x === 24 && held.y === 760 && held.level === 1000, JSON.stringify(held));
+  const kept = z.inside({level: 0, x: 600, y: -3}, {width: 528, height: 792});
+  check("a centre is kept on the panel", kept.x === 528 && kept.y === 0,
+        JSON.stringify(kept));
+  const panned = z.panBy({level: 1000, x: 100, y: 100}, 20, -30, 10);
+  check("panning moves the centre against the drag, in reader pixels",
+        panned.x === 98 && panned.y === 103, JSON.stringify(panned));
+
+  const reader = {x: 100.5, y: 200.5}, point = {x: 30, y: 70};
+  const zoomed = z.zoomAt(1000, reader, point, view, 1);
+  const back = z.readerAt(zoomed, point, view, panel, 1);
+  check("zooming keeps the reader pixel under the pointer",
+        Math.abs(back.x - reader.x) < 1e-9 && Math.abs(back.y - reader.y) < 1e-9,
+        `${JSON.stringify(back)} against ${JSON.stringify(reader)}`);
+  const whole = z.readerAt({level: 0, x: 0, y: 0}, {x: 240, y: 400},
+                           {width: 960, height: 1600}, panel, 2);
+  check("unzoomed, a point maps across the whole page",
+        whole.x === 120 && whole.y === 200, JSON.stringify(whole));
+
+  const crop = z.visibleCrop({x: 2165, y: 3600}, view, panel, 10);
+  check("the crop is the whole reader pixels the view touches",
+        JSON.stringify(crop) === JSON.stringify({left: 216, top: 360, width: 49, height: 80}),
+        JSON.stringify(crop));
+
+  // Six greys none of which is the grid's, so a grid pixel cannot pass for one.
+  const greys = [10, 20, 30, 40, 50, 60];
+  const source = new Uint8ClampedArray(greys.flatMap(g => [g, g, g, 255]));
+  const small = {width: 3, height: 2};
+  const out = (grid, offset = {x: 0, y: 0}) => z.paint(
+    source, small, offset, 4, grid, {width: 12, height: 8}, [1, 2, 3],
+    new Uint8ClampedArray(12 * 8 * 4));
+  const plain = out(false);
+  let exact = true;
+  for (let y = 0; y < 8; ++y) for (let x = 0; x < 12; ++x) {
+    const want = greys[Math.floor(y / 4) * 3 + Math.floor(x / 4)];
+    if (plain[(y * 12 + x) * 4] !== want || plain[(y * 12 + x) * 4 + 3] !== 255) exact = false;
+  }
+  check("every block is exactly its source pixel", exact);
+  const lined = out(true);
+  let lines = true;
+  for (let y = 0; y < 8; ++y) for (let x = 0; x < 12; ++x) {
+    const edge = x % 4 === 3 || y % 4 === 3;
+    const want = edge ? z.GRID_RGB[0] : greys[Math.floor(y / 4) * 3 + Math.floor(x / 4)];
+    if (lined[(y * 12 + x) * 4] !== want) lines = false;
+  }
+  check("grid lines take the last row and column of each block, and nothing else",
+        lines && !greys.includes(z.GRID_RGB[0]));
+  const shifted = out(false, {x: -4, y: 0});
+  check("past the edge of the page is the colour asked for",
+        shifted.slice(0, 3).join() === "1,2,3" && shifted[16] === 10,
+        shifted.slice(0, 20).join());
+}
+
 process.exit(failures ? 1 : 0);
