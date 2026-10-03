@@ -981,7 +981,10 @@
   .fit-panel .hint:empty { display: none; }
   /* My sizes or a range: two halves of one control, drawn the way the
      appearance toggle at the top of the page is. */
-  .fit-mode { display: flex; justify-self: start; }
+  /* Both halves as wide as the wider one, so the toggle reads as one control
+     split in two. */
+  .fit-mode { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+              justify-self: start; }
   .fit-mode button { font-size: 12px; padding: 0 .75rem; border-radius: 0;
                      margin-left: -1px; }
   .fit-mode button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
@@ -1048,6 +1051,8 @@
   .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
   .fit-foot { display: flex; gap: .4rem; justify-content: flex-end;
               align-items: center; }
+  /* A column of the four the fields sit on, as wide as Find sizes above. */
+  .fit-foot button { flex: 0 0 calc((100% - 3 * .4rem) / 4); }
   /* At the left of the foot, pushing the buttons to the right, and present
      even when empty so they stay there. */
   .fit-panel #fit-builds { display: block; margin: 0 auto 0 0; min-width: 0; }
