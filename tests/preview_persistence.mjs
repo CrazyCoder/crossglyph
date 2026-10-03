@@ -2702,12 +2702,16 @@ for (const { name, text } of sources) {
         ["mod1", "mod2", "mod3", "mod4"]
           .every(name => env.exportForm.elements[name].value === ""));
   check("and its suffix is out of reach", suffix.disabled === true);
+  check("saying what turns it on", /add sizes above/.test(suffix.placeholder ?? ""),
+        suffix.placeholder);
   check("with nothing named yet", modName.textContent === "a second family",
         modName.textContent);
 
   env.exportForm.elements.mod1.value = "13";
   env.exportForm.edit("mod1");
   check("a size turns the suffix on", suffix.disabled === false);
+  check("and it then says what leaving it empty does",
+        suffix.placeholder === "none, so one family", suffix.placeholder);
   suffix.value = "Alt";
   env.exportForm.edit("mod_suffix");
   check("and the panel says what the second family will be called",

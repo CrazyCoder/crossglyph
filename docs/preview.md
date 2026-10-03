@@ -242,7 +242,8 @@ showing is marked. This changes only the preview, not the font.
 empty, its sizes join this family and the reader lists all of them. Fill in the
 suffix and they build a second family entry, named with the suffix, which is
 clearer when you want two entries in the reader's font list instead of one long
-size list.
+size list. The suffix stays greyed out until at least one of its size boxes holds
+a size, since there is nothing for it to name before then.
 
 A line under the first row of boxes says what all the sizes build, such as
 "Builds one family of 8 sizes", so you can see that More sizes holds sizes

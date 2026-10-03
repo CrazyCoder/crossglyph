@@ -249,11 +249,14 @@ export const modFamilyLabel = () =>
   familyLabel() + exportForm.elements.mod_suffix.value.trim();
 
 // The suffix only names something when there is a second family to name, and a
-// field that cannot matter yet should not invite typing into it.
+// field that cannot matter yet should not invite typing into it. Its
+// placeholder says what unlocks it, since a blank grey field reads as broken.
 export function showModState() {
   const sizes = joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more);
   const suffix = exportForm.elements.mod_suffix;
   suffix.disabled = !sizes;
+  suffix.placeholder = sizes ? "none, so one family"
+    : "add sizes above to name a second family";
   // They are one build, and the second family is named after the first.
   modName.textContent = sizes ? modFamilyLabel() : "a second family";
   modDot.hidden = !sizes;
