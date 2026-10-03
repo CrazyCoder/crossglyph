@@ -699,6 +699,29 @@ def test_the_stylesheet_has_no_stray_comment_or_brace():
     assert depth == 0, f"{depth} unclosed block(s)"
 
 
+def test_fit_to_grid_offers_what_the_server_accepts():
+    """The page checks a range before asking, and the server checks it again.
+    Read off the page's own files, so a limit or a menu changed on one side
+    fails here rather than as a refusal nobody saw coming."""
+    import re
+
+    from crossglyph.preview import gridfit, server
+
+    js = (server.STATIC / "js" / "export.js").read_text(encoding="utf-8")
+    page = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    limits = re.search(r"SIZE_MIN = (\d+), SIZE_MAX = (\d+);", js)
+    assert limits, "export.js no longer declares the size limits"
+    assert tuple(map(int, limits.groups())) == (gridfit.SIZE_MIN, gridfit.SIZE_MAX)
+
+    def options(field):
+        menu = re.search(rf'<select id="{field}"[^>]*>(.*?)</select>', page, re.S)
+        assert menu, f"{field} is not on the page"
+        return [int(n) for n in re.findall(r"<option[^>]*>(\d+)</option>", menu.group(1))]
+
+    assert options("fit-step") == list(gridfit.STEPS)
+    assert options("fit-count") == list(range(1, gridfit.MAX_COUNT + 1))
+
+
 def test_every_numeric_knob_declares_what_a_coarse_press_moves_it_by():
     """Shift on a stepper moves by the knob's `data-coarse` and lands on the
     multiples of it. A knob without one falls back to a number derived from its

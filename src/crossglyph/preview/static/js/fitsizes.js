@@ -7,8 +7,8 @@
 // unsaved edit, which Save and Build then treat like typing.
 
 import {form} from "./dom.js";
-import {buildsPhrase, exportEdited, exportForm, readSteps, rowCounts, showSize,
-        snapSize} from "./export.js";
+import {SIZE_MAX, SIZE_MIN, buildsPhrase, exportEdited, exportForm, readSteps,
+        rowCounts, showSize, snapSize} from "./export.js";
 import {familyPicker} from "./family.js";
 import {openFold} from "./fold.js";
 import {body} from "./render.js";
@@ -37,8 +37,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 const SPILL = {first: "size_more", second: "mod_more"};
 //: A suggestion is ticked for you when it gains at least this much.
 const WORTH = 3;
-//: The size knob's range, which a range of sizes has to stay inside.
-const SIZE_MIN = 6, SIZE_MAX = 40;
+//: What My sizes says when the boxes hold none.
+const NO_SIZES = "There are no sizes in the boxes yet. Choose Range instead.";
 
 //: One per suggestion: the box it would fill, what the box held when it was
 //: scored, and the two values offered.
@@ -204,8 +204,7 @@ export function showFitTargets() {
   if (toRange.getAttribute("aria-pressed") !== "true") {
     const mine = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
       .map(box => snapSize(exportForm.elements[box].value));
-    targets.textContent = mine.length ? `Tries ${mine.join(", ")}`
-      : "There are no sizes in the boxes yet. Choose Range instead.";
+    targets.textContent = mine.length ? `Tries ${mine.join(", ")}` : NO_SIZES;
     return;
   }
   const {sizes, problem} = rangeSizes();
@@ -235,7 +234,7 @@ async function runFit() {
     return;
   }
   if (!boxes.length) {
-    note.textContent = "There are no sizes in the boxes yet. Choose a range instead.";
+    note.textContent = NO_SIZES;
     return;
   }
   const request = {...body(), ...(ranged
