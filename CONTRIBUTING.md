@@ -327,7 +327,7 @@ editing anything under `src/render/`.
 ### Where it is built from
 
 The engine has a firmware checkout of its own, `crosspoint-reader-engine`
-beside this repository, tracking `develop`. Nothing works in it. A checkout
+beside this repository, tracking `master`. Nothing works in it. A checkout
 you build firmware and run the emulator from moves between branches for
 reasons that have nothing to do with the preview, and every one of those moves
 would otherwise change what the core is built from and make the staleness
@@ -343,6 +343,14 @@ It reports which commits since the stamp touch anything the build compiles,
 sources and include directories both, so "has the renderer moved" is one
 command rather than a reading of the firmware log. It never builds: that needs
 emsdk, and on Windows a shell this is not.
+
+If upstream rewrites `master`, the fast-forward fails because the checkout's
+commit is no longer on the branch. Since nothing works in the checkout, move it
+to the branch and run the script again:
+
+```sh
+git -C ../crosspoint-reader-engine reset --hard origin/master
+```
 
 The build resolves the firmware in one order, and `render/stamp.py` resolves
 the same one so that what the module is built from and what it is judged
@@ -380,10 +388,20 @@ framebuffer in a function local static because as a member of an `inline`
 variable it came out null in one translation unit and valid in another, so
 every drawn pixel vanished in silence.
 
-The stubs under `src/render/hal/` stand in for the firmware's own HAL, so
-their signatures have to track it. When the firmware changes one, the build
-says so as a compile error naming both, which is the good case: an argument
-added to `displayGrayBuffer` upstream stops the build rather than the page.
+The stubs under `src/render/hal/` stand in for the firmware's own HAL, and for
+the few headers the drawing code takes from the FreeInk SDK, which the engine
+checkout does not fetch: the PSRAM font allocator and the memory manager. Their
+signatures have to track the originals. When the firmware changes one, the
+build says so as a compile error naming both, which is the good case: an
+argument added to `displayGrayBuffer` upstream stops the build rather than the
+page. A header the firmware starts including from the SDK fails the build the
+same way, as a file not found, and gets a stub of its own.
+
+The module is a WASI reactor, so the host calls its `_initialize` export once
+before anything else. That is what runs the C++ static constructors. Skip it
+and every global keeps the zeros of fresh memory instead of its initializers,
+which looks like a working module until a member's default is not zero: a clip
+rectangle of no size, and a page with nothing on it.
 
 The build writes a stamp beside the module: the commit, the repository it came
 from and the branch it was on. A checkout whose firmware has moved past that

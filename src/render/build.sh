@@ -41,8 +41,8 @@ EMXX="${EMXX:-$EMSDK/upstream/emscripten/em++.exe}"
 [ -f "$EMXX" ] || { echo "em++ not found at $EMXX" >&2; exit 1; }
 mkdir -p "$OBJ"
 
-# The stub HAL comes first, so our HalDisplay/HalStorage/HalGPIO/Logging/
-# Arduino/BoardConfig headers shadow the firmware's.
+# The stub HAL comes first, so its headers shadow the firmware's, and stand in
+# for the SDK headers the engine checkout does not fetch.
 INCS="-I$ROOT/src/render/hal \
   -I$FW/lib/EpdFont -I$FW/lib/GfxRenderer -I$FW/lib/Utf8 \
   -I$FW/lib/Memory -I$FW/lib/MiniBidi -I$FW/lib/Logging \

@@ -89,8 +89,9 @@ The render core is CrossPoint drawing code compiled to WebAssembly. Releases
 carry the built module under `src/crossglyph/render/`. The source checkout and
 build tools are not required at runtime.
 
-`tools/update-engine.py` updates the module from the pinned engine checkout.
-`render.built-from.json` records the source revision.
+`tools/update-engine.py` updates the engine checkout the module is built from,
+and `src/render/build.sh` builds it. `render.built-from.json` records the
+source revision.
 
 ## Browser state and font state
 
