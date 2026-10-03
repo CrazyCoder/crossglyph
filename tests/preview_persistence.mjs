@@ -6086,8 +6086,12 @@ for (const deferred of [
     kid => kid.className.split(" ").includes(name));
   check("a page shows its Grid Fit",
         line.hidden === false && said() === "Grid Fit 80. X 90, Y 70.", said());
+  // No change keeps the pill's place, empty, so X and Y do not move sideways
+  // when one appears.
+  const idle = () => part("gf-gain")?.className.includes("gf-idle")
+                     && part("gf-gain").textContent === "";
   check("with the score as a part of its own",
-        part("gf-score")?.textContent === "80" && !part("gf-gain"));
+        part("gf-score")?.textContent === "80" && idle());
 
   const turn = async (name, value) => {
     env.byName[name].value = value;
@@ -6109,7 +6113,7 @@ for (const deferred of [
   opts.gridFit = fit("83");
   await turn("gamma", "1.3");
   check("and a knob that did not move it says nothing extra",
-        said() === "Grid Fit 83. X 90, Y 70." && !part("gf-gain"), said());
+        said() === "Grid Fit 83. X 90, Y 70." && idle(), said());
 
   opts.gridFit = fit("60");
   await turn("text", "A different page altogether.");

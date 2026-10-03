@@ -68,10 +68,12 @@ export function showGridFit(get, key) {
   const sure = get("x-grid-fit-sure") === "1";
   const x = axis(get("x-grid-fit-x")), y = axis(get("x-grid-fit-y"));
   const kids = [span("gf-score", String(score))];
-  if (change) {
-    kids.push(span(`gf-gain ${change > 0 ? "gf-up" : "gf-down"}`,
-                   `${change > 0 ? "+" : ""}${change}`));
-  }
+  // With no change the pill keeps its place, empty and unseen, so X and Y
+  // stay where they are when one appears.
+  kids.push(change
+    ? span(`gf-gain ${change > 0 ? "gf-up" : "gf-down"}`,
+           `${change > 0 ? "+" : ""}${change}`)
+    : span("gf-gain gf-idle", ""));
   const axes = span("gf-axes", "");
   axes.append(span("gf-axis", "X"), span("gf-value", x),
               span("gf-axis", "Y"), span("gf-value", y));

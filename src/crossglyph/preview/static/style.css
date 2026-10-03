@@ -664,14 +664,21 @@
                                       align-items: center; }
   .gf-label { font-size: 10.5px; text-transform: uppercase;
               letter-spacing: .11em; color: var(--muted); }
+  /* Every number holds room for three digits, and the pill for a sign and
+     three, so a score crossing 10 or 100 does not slide what follows it. The
+     readout is monospaced, so 1ch is one digit. */
   .gf-score { font-size: 17px; font-weight: 650; line-height: 1;
-              font-variant-numeric: tabular-nums; }
+              font-variant-numeric: tabular-nums; min-width: 3ch; }
+  .gf-value { min-width: 3ch; }
   /* More padding above than below: the face's ascent is taller than its
      descent, so evenly padded digits ride high in the pill. */
   .gf-gain { font-size: 11px; font-weight: 600; line-height: 1;
              padding: calc(.12rem + .5px) .35rem calc(.12rem - .5px);
-             border-radius: 999px;
+             border-radius: 999px; justify-content: center;
+             /* border-box: the four characters plus the padding and border */
+             min-width: calc(4ch + .7rem + 2px);
              border: 1px solid currentColor; font-variant-numeric: tabular-nums; }
+  .gf-idle { visibility: hidden; }
   /* A rise is filled so it reads at a glance; a fall is the same pill drawn
      dashed, since the page has no colour to say it with. */
   .gf-up { background: var(--text); color: var(--panel); border-color: var(--text); }
