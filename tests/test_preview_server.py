@@ -99,7 +99,8 @@ def test_fitting_sizes_scores_every_candidate_and_picks_per_label(client):
     response = client.post("/fit-sizes", json={"text": FIT_TEXT, "sizes": [13, 13.75]})
     assert response.status_code == 200, response.text
     events = _events(response)
-    assert events[0] == {"event": "plan", "total": 8}
+    letters = sum(c.isalpha() for c in FIT_TEXT)
+    assert events[0] == {"event": "plan", "total": 8, "letters": letters}
     scored = [e for e in events if e["event"] == "candidate"]
     assert [e["done"] for e in scored] == list(range(1, 9))
     labels = [e for e in events if e["event"] == "label"]
@@ -130,6 +131,18 @@ def test_fitting_refuses_what_it_cannot_judge(client, body, said):
     response = client.post("/fit-sizes", json=body)
     assert response.status_code == 422
     assert said in response.json()["detail"]
+
+
+@needs
+def test_a_build_that_exits_ends_the_search_with_its_reason(client):
+    """The converter calls sys.exit on some bad input, and SystemExit escapes
+    a stream's worker thread and stops the whole server. It has to arrive as
+    an error line instead, with the server still answering."""
+    response = client.post("/fit-sizes", json={"text": FIT_TEXT, "sizes": [13],
+                                               "intervals": "nosuchpreset"})
+    events = _events(response)
+    assert events[-1]["event"] == "error" and events[-1]["error"], events
+    assert client.post("/render", json={"size": 13}).status_code == 200
 
 
 @needs

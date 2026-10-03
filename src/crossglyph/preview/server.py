@@ -969,7 +969,7 @@ def resolved_fallbacks(sources: tuple, coverage: tuple,
     return fallback_split(dict(sources), coverage, fallbacks)
 
 
-@functools.lru_cache(maxsize=32)
+@functools.lru_cache(maxsize=40)
 def build_font_cached(sources: tuple, size: float, coverage: tuple,
                       tuning_items: tuple, fallbacks: tuple = (),
                       axes: tuple = ()) -> bytes:
@@ -981,7 +981,8 @@ def build_font_cached(sources: tuple, size: float, coverage: tuple,
     lru_cache key has to hash, which is why the chains arrive as pairs.
 
     The size has to hold a whole Fit to grid search, eight sizes of four
-    candidates, so that pressing any of them afterwards draws without a build."""
+    candidates, so that pressing any of them afterwards draws without a build,
+    with room left for the pages drawn while it runs."""
     return build_font(dict(sources), size, tuning=_tuning(tuning_items),
                       coverage=coverage, fallbacks=dict(fallbacks),
                       axes={style: dict(coords) for style, coords in axes})
@@ -1094,8 +1095,9 @@ def fit_sizes(request: FitRequest) -> StreamingResponse:
                                  "page to score sizes.")
 
     def lines():
-        total = len(wanted) * len(gridfit.OFFSETS)
-        yield json.dumps({"event": "plan", "total": total}) + "\n"
+        total = sum(len(gridfit.candidates(label)) for _, label in wanted)
+        yield json.dumps({"event": "plan", "total": total,
+                          "letters": letters}) + "\n"
         done = 0
         try:
             for now, label in wanted:
@@ -1111,8 +1113,12 @@ def fit_sizes(request: FitRequest) -> StreamingResponse:
                         "done": done}) + "\n"
                 yield json.dumps({"event": "label", "label": label, "now": now,
                                   "pick": gridfit.pick(label, fits)}) + "\n"
-        except (*CLIENT_ERRORS, FontBuildError, freetype.FT_Exception) as exc:
-            yield json.dumps({"event": "error", "error": str(exc)}) + "\n"
+        # Everything, SystemExit included, ends the run with a line saying
+        # why. The converter exits on some bad input, as /render explains, and
+        # out of a stream's worker thread a SystemExit stops the whole server.
+        except (SystemExit, Exception) as exc:
+            _, why = _fault(exc, None)
+            yield json.dumps({"event": "error", "error": why}) + "\n"
             return
         yield json.dumps({"event": "done"}) + "\n"
 

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import collections
 import dataclasses
+import re
 import struct
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
@@ -174,20 +175,28 @@ def read_glyphs(font: bytes) -> dict[int, dict[int, Glyph]]:
     return out
 
 
+#: The faces the device tries for each style, in order (EpdFontFamily.cpp,
+#: getFont). Regular is always there.
+_FALLBACK = {0: (0,), 1: (1, 0), 2: (2, 0), 3: (3, 1, 2, 0)}
+
+
 def letter_weights(text: str, styles: Iterable[int]) -> dict[int, collections.Counter]:
     """How often each letter appears in each style on the page.
 
     `styles` are the ones the font carries. A word in a style it lacks is
-    drawn with the regular face on the device, so it counts there.
+    drawn with the face the device falls back to, so it counts there.
     """
-    have = set(styles)
+    have = set(styles) | {0}
     plain, word_styles = markup.parse(text)
+    # Words end where markup.parse ends them, at a space or a newline. Any
+    # other whitespace, such as a non-breaking space, is inside a word.
+    words = [word for word in re.split("[ \n]", plain) if word]
     out: dict[int, collections.Counter] = {}
-    for word, style in zip(plain.split(), word_styles):
+    for word, style in zip(words, word_styles):
         letters = [ord(c) for c in word if unicodedata.category(c)[0] == "L"]
         if letters:
-            out.setdefault(style if style in have else 0,
-                           collections.Counter()).update(letters)
+            drawn = next(face for face in _FALLBACK[style] if face in have)
+            out.setdefault(drawn, collections.Counter()).update(letters)
     return out
 
 
@@ -251,7 +260,10 @@ COUNTS = (4, 8)
 
 
 def candidates(label: int) -> list[float]:
-    return [label + offset for offset in OFFSETS]
+    """The sizes tried for a label, inside the size knob's range: the boxes
+    snap anything outside it back, so it could not be kept."""
+    return [label + offset for offset in OFFSETS
+            if SIZE_MIN <= label + offset <= SIZE_MAX]
 
 
 def targets(*, sizes: Sequence[float] = (), low: int | None = None,

@@ -84,6 +84,25 @@ def test_a_style_the_font_lacks_is_counted_as_regular():
     assert weights == {0: {ord("a"): 1, ord("b"): 1}}
 
 
+def test_only_a_space_or_a_newline_ends_a_word():
+    """markup.parse gives one style per word and ends words where the device
+    does. A non-breaking space before a dash, usual in Russian text, is inside
+    a word there, so splitting on it would hand later words the wrong style."""
+    weights = gridfit.letter_weights("plain word — next *bold here* end",
+                                     styles={0, 1})
+    assert weights[1] == {ord(c): n for c, n in
+                          {"b": 1, "o": 1, "l": 1, "d": 1, "h": 1, "e": 2, "r": 1}.items()}
+    assert weights[0][ord("x")] == 1 and weights[0][ord("d")] == 2
+
+
+@pytest.mark.parametrize("styles, drawn", [({0, 1, 2, 3}, 3), ({0, 1, 2}, 1),
+                                           ({0, 2}, 2), ({0}, 0)])
+def test_bold_italic_falls_back_as_the_device_does(styles, drawn):
+    """EpdFontFamily::getFont: bold italic, then bold, then italic, then
+    regular."""
+    assert gridfit.letter_weights("*_x_*", styles=styles) == {drawn: {ord("x"): 1}}
+
+
 def _build(tmp_path, codepoints, styles=(0, 1)):
     from fontsmith import box_font
 
@@ -157,6 +176,13 @@ def test_every_candidate_keeps_its_label():
 
     for label in range(6, 41):
         assert {size_label(size) for size in gridfit.candidates(label)} == {label}
+
+
+def test_candidates_stay_inside_the_size_knobs_range():
+    """A size outside it is snapped back by the boxes, so offering one would
+    suggest a size that cannot be kept."""
+    assert gridfit.candidates(6) == [6.0, 6.25]
+    assert gridfit.candidates(40) == [39.5, 39.75, 40.0]
 
 
 def test_my_sizes_are_targeted_by_their_labels():
