@@ -114,6 +114,37 @@ value. Press it again to return to the value you were testing.
 **Reset font knobs** restores all Tune controls to their default values. It does
 not change Page, Text or Device preview settings.
 
+## Check how sharp the strokes are
+
+Under the text box, beside the render time, the page shows its **Grid Fit**:
+
+```text
+Grid Fit 90 (+22) | X 95 Y 75
+```
+
+The screen is a grid of pixels, and each pixel shows one of four levels of
+grey. A straight stroke that lands exactly on whole pixels is black to its
+edges. One that lands between pixels gets a column of grey beside it, and on an
+e-ink screen that grey reads as blur. Grid Fit counts that grey along the
+straight strokes of the text on the page, from 0 to 100. **X** is the upright
+strokes, such as the stems of `n` and `l`. **Y** is the flat ones, such as the
+bar of `e` or the top of `T`.
+
+It measures sharpness, not whether the font looks good. Curves need their grey
+to look smooth, so they are not counted.
+
+- The number in brackets is how much the last change moved it. It compares two
+  pages of the same text, so changing the text starts again.
+- The score is for the text on the page, weighted by how often each letter
+  appears. A few lines of ordinary prose give a steady score. With too few
+  letters the line ends in **few letters**.
+- Press the score to see it for each style on the page.
+- With **mono rasterizing** there is no grey, so there is no score.
+
+Point size changes Grid Fit more than most controls do: a quarter of a point
+can move a stem onto whole pixels or off them. **Fit to grid** under
+[Export](#fit-sizes-to-the-pixel-grid) searches for those sizes for you.
+
 ## Match the reading page
 
 Open **Page** near the bottom of **Tune**. These controls reproduce page choices
@@ -219,6 +250,39 @@ that the main family lacks.
   <a href="images/export.png"><img src="images/export.png" width="55%"
      alt="The complete Export panel with sizes, coverage, fallbacks and build controls"></a>
 </p>
+
+## Fit sizes to the pixel grid
+
+**Fit to grid**, beside **sizes** in **Export**, suggests point sizes whose
+straight strokes land more cleanly on the screen's pixels. It scores the text
+on the page with the current Tune settings, as [Grid Fit](#check-how-sharp-the-strokes-are)
+does.
+
+1. Put a few lines of the kind of text you read on the page.
+2. Press **Fit to grid**. It scores the sizes in your boxes.
+3. Press a value in the **size** or **suggested** column to show the page at
+   that size. Press the other one to compare.
+4. Untick any suggestion you do not want.
+5. Press **Apply**. The suggestions go into the size boxes.
+6. Press **Save** or **Build** to keep them.
+
+Each suggestion stays within half a point of its size and keeps the number
+the reader shows in its Font Size list. A box that holds 13.75 ships as 14, as
+any fractional size does.
+
+A suggestion is ticked when it gains at least a few points. A size that is
+already the best has nothing to tick. **Undo** puts the boxes back as they
+were before **Apply**. **Close** discards the suggestions.
+
+To choose new sizes instead, select **a range**, enter the smallest and largest
+size and choose **4** or **8** sizes, then press **Find sizes**. Four fill the
+first row of boxes. Eight fill both rows, and the panel says what that builds:
+
+- with the **suffix** under **Second family** empty, one family with eight
+  sizes;
+- with a suffix, two families, the second named with the suffix.
+
+Fit to grid does not change the suffix.
 
 ## Build
 

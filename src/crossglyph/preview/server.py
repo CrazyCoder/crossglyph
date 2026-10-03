@@ -1032,7 +1032,7 @@ def page_font(request: RenderRequest, size: float) -> PageFont:
     # Only the styles the text is actually set in. Every style in the build
     # is a full rasterization of the coverage, so a plain paragraph would
     # otherwise pay four times over for three faces nothing on the page
-    # wears -- and with a fallback in the list, four GPOS reads of it.
+    # wears, and with a fallback in the list, four GPOS reads of it.
     sources = faces_for(request.text, sources)
     keyed = tuple(sorted((style, str(path))
                          for style, path in sources.items()))
