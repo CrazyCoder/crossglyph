@@ -646,9 +646,16 @@
     display: grid;
   }
 
-  .status-row {
-    display: flex; gap: .9rem; align-items: center; margin-top: .7rem;
+  /* The foot of the page's card: the stage's bottom border is its divider,
+     and the shading sets it apart as a reading of the page above. */
+  #stage { border-radius: 10px 10px 0 0; }
+  #page-facts {
+    width: 100%; margin-top: -.55rem; padding: .45rem .8rem;
+    background: color-mix(in srgb, var(--text) 5%, var(--panel));
+    border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px;
   }
+  #grid-fit-detail { margin-top: .3rem; }
+  .status-row { display: flex; gap: .9rem; align-items: center; min-height: 22px; }
   #status { color: var(--muted); font-size: 11.5px; margin-left: auto; }
   /* Grid Fit: a label set like the section headings, the score as the one
      large number, its change in a small pill, and the two axes quieter

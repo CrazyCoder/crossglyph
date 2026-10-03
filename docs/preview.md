@@ -116,7 +116,8 @@ not change Page, Text or Device preview settings.
 
 ## Check how sharp the strokes are
 
-Under the text box, beside the render time, the page shows its **Grid Fit**:
+In the strip at the foot of the page, beside the render time, the page shows
+its **Grid Fit**:
 the score in large type, how much the last change moved it in a small pill
 such as **+22**, and the score for each direction, **X** and **Y**.
 

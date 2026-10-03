@@ -615,6 +615,21 @@
       <button type="button" class="reset" id="retry">Try again</button>
     </div>
   </div>
+  <!-- Facts about the page above, set as the foot of its card: how cleanly
+       the straight strokes of this text sit on the pixels, from the font the
+       page was drawn with, and how long the page took. Pressing Grid Fit
+       opens the score per style and how many letters it rests on. -->
+  <div id="page-facts">
+    <div class="status-row">
+      <button type="button" id="grid-fit" class="mono" hidden
+              aria-expanded="false" aria-controls="grid-fit-detail"
+              title="How cleanly the straight strokes of this text sit on the device's pixels, from 0 to 100. X is upright strokes, Y is flat ones. It measures sharpness, not whether the font looks good. Press for the score of each style."><span
+        id="grid-fit-parts"></span><svg class="twist" viewBox="0 0 16 16"
+        aria-hidden="true"><path d="M6 3.2 11.2 8 6 12.8"/></svg></button>
+      <div id="status" class="mono">—</div>
+    </div>
+    <div id="grid-fit-detail" class="hint" hidden></div>
+  </div>
 
   <div id="device-preview" class="fold-card">
     <div class="section">
@@ -850,20 +865,6 @@
         <code>*_both_*</code>. A face the font does not carry falls back to
         regular, as it would on the device.</div>
     </div>
-    <!-- How cleanly the straight strokes of this text sit on the pixels,
-         from the font the page was drawn with, beside how long the page took.
-         Outside the fold, because it is what Fit to grid is checked against
-         and a folded Text section must not hide it. Pressing it opens the
-         score per style and how many letters it rests on. -->
-    <div class="status-row">
-      <button type="button" id="grid-fit" class="mono" hidden
-              aria-expanded="false" aria-controls="grid-fit-detail"
-              title="How cleanly the straight strokes of this text sit on the device's pixels, from 0 to 100. X is upright strokes, Y is flat ones. It measures sharpness, not whether the font looks good. Press for the score of each style."><span
-        id="grid-fit-parts"></span><svg class="twist" viewBox="0 0 16 16"
-        aria-hidden="true"><path d="M6 3.2 11.2 8 6 12.8"/></svg></button>
-      <div id="status" class="mono">—</div>
-    </div>
-    <div id="grid-fit-detail" class="hint" hidden></div>
   </div>
 
   <!-- What this install is, at the foot of the middle column. This is the one
@@ -1040,7 +1041,7 @@
 
     <!-- Fit to grid. Each size keeps its number in the reader's list and
          moves by up to half a point to where its strokes land on whole
-         pixels. Scored on the page's text, as Grid Fit under the text box is.
+         pixels. Scored on the page's text, as Grid Fit under the page is.
          After More sizes because it fits both rows. The fields here have no
          name, so a save never reads them. -->
     <div class="section">
@@ -1056,7 +1057,7 @@
           look sharper on the device. Each suggestion keeps the number the
           reader shows for its size and moves it by a quarter or half a point.
           Sizes are scored on the text on the page, with the Tune settings, as
-          the Grid Fit under the text box is.
+          the Grid Fit under the page is.
         </span>
       </span></h2>
     </div>

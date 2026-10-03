@@ -870,7 +870,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // its classes are read as well as its text.
     "ships-as": makeElement(),
     "mod-ships-as": makeElement(),
-    // The page's Grid Fit under the text box, and the line it opens.
+    // The page's Grid Fit under the page, and the line it opens.
     "grid-fit": Object.assign(makeElement(), {hidden: true}),
     "grid-fit-detail": Object.assign(makeElement(), {hidden: true}),
     "grid-fit-parts": makeElement(),
@@ -6021,7 +6021,7 @@ for (const deferred of [
         && !none.includes("almost nothing"), none);
 }
 
-// 98. Grid Fit under the text box. The change in brackets compares with the
+// 98. Grid Fit under the page. The gain beside it compares with the
 //     previous page of the same text, so a knob shows what it did; a new text
 //     is a different sample and starts over.
 {
