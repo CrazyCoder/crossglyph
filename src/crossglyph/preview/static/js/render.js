@@ -3,7 +3,7 @@ import {showRenderedPage} from "./device.js";
 import {exportForm, exportSettings, fetchButton, presetBoxes,
         showFallbacksLeft, showIntervalLoad} from "./export.js";
 import {familyPicker} from "./family.js";
-import {syncFitMarks} from "./fitsizes.js";
+import {familyMoved, syncFitMarks} from "./fitsizes.js";
 import {hideGridFit, showGridFit} from "./gridfit.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
@@ -252,6 +252,7 @@ export async function renderNow() {
   pageError.hidden = true;
   showGridFit((name) => response.headers.get(name),
               `${request.family}\n${request.text ?? ""}`);
+  familyMoved();
   syncFitMarks();
   status.textContent = `${Math.round(performance.now() - started)} ms`;
 }

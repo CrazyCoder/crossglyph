@@ -93,52 +93,74 @@ export function syncFitMarks() {
   }
 }
 
+//: What a cell shows until its result arrives.
+const WAITING = "…";
+
+// A size the page can be shown at, once there is one. Until its row is
+// filled it holds the place, so the row is its final width from the start.
 function valueButton(size) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "fit-value mono";
-  button.dataset.size = String(size);
-  button.textContent = String(size);
   button.title = "Show the page at this size";
+  setValue(button, size);
   button.addEventListener("click", () => {
-    showSize(String(size));
+    if (!button.dataset.size) return;
+    showSize(button.dataset.size);
     syncFitMarks();
   });
   return button;
 }
 
-function addRow(box, now, pick, fits, ranged) {
+function setValue(button, size) {
+  const known = size !== null && size !== undefined;
+  button.dataset.size = known ? String(size) : "";
+  button.textContent = known ? String(size) : WAITING;
+  button.disabled = !known;
+}
+
+// Every row at once, before any result: the section takes its full height
+// when the search starts rather than growing as sizes arrive. A range's
+// sizes are the server's to choose, so they wait too.
+function addRow(box, now) {
   const row = document.createElement("div");
   row.className = "fit-row";
   const name = document.createElement("span");
   name.className = "fit-name";
   name.textContent = titleOf(box);
-  const nowButton = valueButton(now);
-  const pickButton = valueButton(pick ?? now);
   const score = document.createElement("span");
   score.className = "fit-score mono";
+  score.textContent = WAITING;
+  const tick = document.createElement("input");
+  tick.type = "checkbox";
+  tick.hidden = true;
+  const entry = {box, held: exportForm.elements[box].value, now: valueButton(now),
+                 pick: valueButton(null), score, value: null, tick};
+  row.append(name, entry.now, entry.pick, score, tick);
+  table.append(row);
+  rows.push(entry);
+}
+
+function fillRow(entry, now, pick, fits, ranged) {
+  setValue(entry.now, now);
+  setValue(entry.pick, pick ?? now);
+  entry.value = pick;
   const nowFit = fits.get(now), pickFit = fits.get(pick ?? now);
   // The score the suggestion would have, and what it gains, the way the
   // Grid Fit under the page says it. The score now is a hover away.
   const gain = Number(round(pickFit)) - Number(round(nowFit));
-  score.textContent = pick === null || pick === now || !(gain > 0) ? round(pickFit)
-    : `${round(pickFit)} (+${gain})`;
+  entry.score.textContent = pick === null || pick === now || !(gain > 0)
+    ? round(pickFit) : `${round(pickFit)} (+${gain})`;
   if (pick !== null && pick !== now) {
-    score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
+    entry.score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
   }
-  const tick = document.createElement("input");
-  tick.type = "checkbox";
-  tick.setAttribute("aria-label", `Use ${pick} for ${titleOf(box)}`);
+  entry.tick.setAttribute("aria-label", `Use ${pick} for ${titleOf(entry.box)}`);
   // Something to change is a suggestion the box does not already hold. A
   // range starts from labels the boxes may not hold at all, so all of it is
   // the user's to take; for their own sizes only a real gain is ticked.
-  const held = exportForm.elements[box].value;
-  const changes = pick !== null && String(pick) !== snapSize(held);
-  tick.hidden = !changes;
-  tick.checked = changes && (ranged || pickFit - nowFit >= WORTH);
-  row.append(name, nowButton, pickButton, score, tick);
-  table.append(row);
-  rows.push({box, held, now: nowButton, pick: pickButton, value: pick, tick});
+  const changes = pick !== null && String(pick) !== snapSize(entry.held);
+  entry.tick.hidden = !changes;
+  entry.tick.checked = changes && (ranged || pickFit - nowFit >= WORTH);
 }
 
 // The server's refusal as a sentence. A malformed request comes back as a
@@ -198,18 +220,24 @@ async function runFit() {
   const mine = ++runs;
   controller = new AbortController();
   foundFor = familyPicker.value;
-  // A count in the note rather than a bar: the export panel's one bar is the
-  // build's, in its foot, where a change of height cannot move the boxes.
-  note.textContent = "Scoring sizes";
+  for (const box of boxes) {
+    addRow(box, ranged ? null : Number(snapSize(exportForm.elements[box].value)));
+  }
+  showBuilds();
+  // A count in the status line rather than a bar: the export panel's one bar
+  // is the build's, in its foot. The same line then says what the scores
+  // rest on, so nothing appears or goes as the run ends.
+  sample.textContent = "Scoring sizes";
   runButton.disabled = true;
   const fits = new Map();
-  let index = 0, total = 0;
+  let index = 0, total = 0, letters = 0;
   try {
     const response = await fetch("/fit-sizes", {
       method: "POST", headers: {"content-type": "application/json"},
       body: JSON.stringify(request), signal: controller.signal});
     if (mine !== runs) return;
     if (!response.ok) {
+      clearFit();
       note.textContent = failure(await response.text());
       return;
     }
@@ -217,25 +245,29 @@ async function runFit() {
       if (mine !== runs) return;
       if (step.event === "plan") {
         total = step.total;
-        sample.textContent = `Scored on the ${step.letters} letters on the page.`;
+        letters = step.letters;
       } else if (step.event === "candidate") {
         fits.set(step.size, step.fit);
-        note.textContent = `Scoring ${step.done} of ${total}`;
+        sample.textContent = `Scoring ${step.done} of ${total}`;
       } else if (step.event === "label") {
-        addRow(boxes[index++], step.now, step.pick, fits, ranged);
+        fillRow(rows[index++], step.now, step.pick, fits, ranged);
       } else if (step.event === "error") {
         note.textContent = step.error;
       }
     });
     if (mine !== runs) return;
-    if (note.textContent.startsWith("Scoring")) note.textContent = "";
-    applyButton.disabled = !rows.some(row => !row.tick.hidden);
-    showBuilds();
-    syncFitMarks();
+    sample.textContent = `Scored on the ${letters} letters on the page.`;
   } catch (error) {
     if (error.name !== "AbortError" && mine === runs) note.textContent = String(error);
   } finally {
     if (mine === runs) {
+      // A run that ended early leaves rows it never reached. They go, rather
+      // than sit there waiting for an answer that is not coming.
+      rows = rows.slice(0, index);
+      table.replaceChildren(...rows.map(entry => entry.now.parentElement));
+      applyButton.disabled = !rows.some(row => !row.tick.hidden);
+      if (rows.length) showBuilds(); else builds.textContent = "";
+      syncFitMarks();
       runButton.disabled = false;
       controller = null;
     }
@@ -293,10 +325,11 @@ function stopFit() {
 }
 
 //: A new family has sizes of its own, so suggestions found for the last one
-//: go. Called after the change has gone through: a refused change leaves the
-//: family, and its suggestions, where they were.
+//: go. Called after the change has gone through, since a refused change
+//: leaves the family and its suggestions where they were, and after every
+//: page, since a family can also change when the folder is read again.
 export function familyMoved() {
-  if (familyPicker.value === foundFor) return;
+  if (foundFor === null || familyPicker.value === foundFor) return;
   stopFit();
   clearFit();
   foundFor = null;

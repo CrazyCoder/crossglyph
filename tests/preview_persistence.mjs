@@ -875,7 +875,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Fit to grid, a fold of its own under the sizes.
     "fit-toggle": Object.assign(pressStub("fit"), {dataset: {fold: "fit"}}),
     "fit-panel": makeElement(),
-    "fit-sample": makeElement(),
+    // Every sentence the status line said, since the running count is gone
+    // by the time a test can look.
+    "fit-sample": recording(),
     "fit-mode": Object.assign(makeElement(), {value: "mine"}),
     "fit-range": Object.assign(makeElement(), {hidden: true}),
     "fit-low": makeElement(),
@@ -6107,7 +6109,21 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.root.dataset.folds.split(" ").includes("fit"), env.root.dataset.folds);
   check("with nothing searched until asked", env.fetches.fits.length === 0);
   env.fit.run.on.click();
+  // Before any answer: every row is already there, so the section does not
+  // grow as results arrive.
+  const early = env.fit.table.children;
+  check("Find sizes lays out a row per size at once",
+        early.length === 4 && early.every(row => row.children[2].textContent === "…"
+                                          && row.children[3].textContent === "…"),
+        early.map(row => row.children[2]?.textContent).join(" "));
+  check("with the size each row starts from",
+        early.map(row => row.children[1].textContent).join(" ") === "12 14 16 18");
+  check("and the footer already says what it builds",
+        env.fit.builds.textContent === "Builds Sample with 4 sizes."
+        || env.fit.builds.textContent.startsWith("Builds "), env.fit.builds.textContent);
   await settle();
+  check("the same rows are filled in, not added",
+        env.fit.table.children.length === 4 && env.fit.table.children[0] === early[0]);
   check("Find sizes scores the family's own sizes on this page",
         JSON.stringify(env.fetches.fits[0]?.sizes) === "[12,14,16,18]"
         && typeof env.fetches.fits[0].text === "string",
@@ -6126,13 +6142,13 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         rows[1].children[4].hidden === true && rows[1].children[2].textContent === "14");
   check("a gain under 3 points is offered but not ticked",
         rows[2].children[4].hidden === false && rows[2].children[4].checked === false);
-  check("the running count is gone when the search ends",
-        env.fit.note.textContent === "", env.fit.note.textContent);
-  check("having said how far it got on the way",
-        env.fit.note.steps.includes("Scoring 16 of 16"),
-        JSON.stringify(env.fit.note.steps));
-  check("and says what the scores rest on",
+  check("one status line counts the search",
+        env.fit.sample.steps.includes("Scoring 16 of 16"),
+        JSON.stringify(env.fit.sample.steps));
+  check("and then says what the scores rest on",
         env.fit.sample.textContent.includes("742 letters"), env.fit.sample.textContent);
+  check("leaving the note for what needs saying",
+        env.fit.note.textContent === "", env.fit.note.textContent);
 
   pick.on.click();
   await settle();
@@ -6284,6 +6300,19 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a new family stops the search", env.fetches.fitAborts === 1,
         String(env.fetches.fitAborts));
   check("and drops the suggestions", env.fit.table.children.length === 0);
+
+  // A family can also change with no change event, when the folder is read
+  // again. The page it draws next is for that family, and the suggestions go
+  // with the old one.
+  env.fit.run.on.click();
+  await settle();
+  check("a fresh run leaves suggestions", env.fit.table.children.length === 1);
+  env.family.value = env.family.value === "Sample" ? "Alto" : "Sample";
+  env.byName.gamma.value = "1.25";
+  env.listeners.input({ target: env.byName.gamma });
+  await settle();
+  check("a page of another family drops them too",
+        env.fit.table.children.length === 0, String(env.fit.table.children.length));
 }
 
 process.exit(failures ? 1 : 0);
