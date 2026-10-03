@@ -653,7 +653,7 @@
      it rather than like a button. */
   #grid-fit {
     padding: 0; border: 0; background: none; cursor: pointer;
-    color: var(--text); font-size: 11.5px; text-align: left;
+    color: var(--text); font-size: 11.5px; font-weight: inherit; text-align: left;
   }
   #grid-fit[hidden] { display: none; }
   #grid-fit:hover { text-decoration: underline; }
@@ -957,6 +957,37 @@
                        cursor: pointer; }
   .sizes .size-title:hover { color: var(--text); text-decoration: underline; }
   #export .sizes input[type=text] { text-align: center; }
+
+  /* Fit to grid. The button sits at the end of the sizes heading, as small as
+     the titles over the boxes, since it is an action on them. */
+  .fit-open { margin-left: .6rem; font-size: 11px; padding: .05rem .45rem; }
+  .fit-panel { margin-top: .5rem; padding: .5rem .6rem;
+               border: 1px solid var(--line); border-radius: 4px;
+               background: var(--field); display: grid; gap: .45rem; }
+  .fit-panel[hidden] { display: none; }
+  .fit-controls { display: flex; flex-wrap: wrap; gap: .35rem;
+                  align-items: center; font-size: 12px; }
+  .fit-controls select { width: auto; }
+  #export #fit-range input { width: 3.4rem; text-align: center; }
+  .fit-head { color: var(--muted); font-size: 11px; }
+  .fit-head:has(+ .fit-table:empty) { display: none; }
+  #fit-range[hidden] { display: none; }
+  /* One row a size: its box, the size now, the suggestion, what each scores,
+     and whether Apply takes it. */
+  .fit-table { display: grid; gap: .1rem; }
+  .fit-row { display: grid; align-items: center; gap: .4rem; font-size: 12px;
+             grid-template-columns: minmax(0, 1fr) 3.4rem 3.4rem 5.6rem 1.2rem; }
+  .fit-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+              white-space: nowrap; }
+  .fit-value { font: inherit; background: none; border: 1px solid transparent;
+               border-radius: 3px; padding: .05rem .2rem; cursor: pointer;
+               color: var(--text); }
+  .fit-value:hover { border-color: var(--line); }
+  /* The size the page is showing now. */
+  .fit-value.showing { border-color: var(--focus); }
+  .fit-score { color: var(--muted); }
+  .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
+  .fit-foot { display: flex; gap: .4rem; justify-content: flex-end; }
 
   /* Its label above rather than beside it: twenty-one checkboxes in three
      columns need the whole panel, and the 8.2rem label column of a normal row

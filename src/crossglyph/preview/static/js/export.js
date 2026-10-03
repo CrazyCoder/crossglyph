@@ -748,7 +748,13 @@ exportForm.addEventListener("change", (event) => sizeLeft(event.target));
 // The knob is a view setting, so this writes nothing into the config and
 // leaves the Save button where it was.
 function previewSize(name) {
-  const size = Number(snapSize(exportForm.elements[name].value));
+  showSize(exportForm.elements[name].value);
+}
+
+//: Move the size knob to a size, which is all "show me this size" is. Fit to
+//: grid's values press through here too.
+export function showSize(value) {
+  const size = Number(snapSize(value));
   // An empty box, or one still being typed into, has no size to show yet.
   if (!(size > 0)) return;
   setField(form.elements.size, size);

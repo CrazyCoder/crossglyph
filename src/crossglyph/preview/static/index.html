@@ -938,7 +938,9 @@
             what you are tuning at. A box takes a fraction, in the quarter points that
             knob steps in, and rounds anything between them.
           </span>
-        </span></span>
+        </span><button type="button" id="fit-open" class="fit-open"
+                aria-expanded="false" aria-controls="fit-panel"
+                title="Find nearby sizes whose strokes land more cleanly on the device's pixels">Fit to grid</button></span>
       <!-- Each title is a button rather than a label: pressing it moves the
            size knob to what its box holds, which is the distance between "14
            is in the list" and "14 is what 14 looks like". The box keeps its
@@ -970,6 +972,39 @@
            number it rounds to. Shown only when one of them is fractional, and
            marked as a warning when two land on the same name. -->
       <div class="hint" id="ships-as" hidden></div>
+      <!-- Fit to grid. Each size keeps its number in the reader's list and
+           moves by up to half a point to where its strokes land on whole
+           pixels. Scored on the page's text, as the Grid Fit under it is.
+           The fields here have no name, so a save never reads them. -->
+      <div id="fit-panel" class="fit-panel" hidden>
+        <div class="fit-controls">
+          <select id="fit-mode" aria-label="Which sizes to fit">
+            <option value="mine">my sizes</option>
+            <option value="range">a range</option>
+          </select>
+          <span id="fit-range" hidden>from
+            <input class="mono" id="fit-low" type="text" inputmode="numeric"
+                   aria-label="Smallest size, 6 to 40">
+            to <input class="mono" id="fit-high" type="text" inputmode="numeric"
+                      aria-label="Largest size, 6 to 40">,
+            <select id="fit-count" aria-label="How many sizes">
+              <option value="4">4</option><option value="8">8</option>
+            </select> sizes</span>
+          <button type="button" id="fit-run">Find sizes</button>
+        </div>
+        <div class="fit-row fit-head" aria-hidden="true">
+          <span></span><span>size</span><span>suggested</span><span>Grid Fit</span>
+          <span></span>
+        </div>
+        <div id="fit-table" class="fit-table"></div>
+        <div id="fit-builds" class="hint"></div>
+        <div id="fit-note" class="hint" aria-live="polite"></div>
+        <div class="fit-foot">
+          <button type="button" id="fit-apply" disabled>Apply</button>
+          <button type="button" id="fit-undo" hidden>Undo</button>
+          <button type="button" id="fit-close">Close</button>
+        </div>
+      </div>
     </div>
     <!-- Only for a family that carries more than the four boxes above, which a
          CJK one does: the reader borrows it at 8, 10 and 12 for the interface.

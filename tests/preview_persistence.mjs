@@ -871,6 +871,23 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // The page's Grid Fit under the text box, and the line it opens.
     "grid-fit": Object.assign(makeElement(), {hidden: true}),
     "grid-fit-detail": Object.assign(makeElement(), {hidden: true}),
+    // Fit to grid, under the size boxes.
+    "fit-open": makeElement(),
+    "fit-panel": Object.assign(makeElement(), {hidden: true}),
+    "fit-mode": Object.assign(makeElement(), {value: "mine"}),
+    "fit-range": Object.assign(makeElement(), {hidden: true}),
+    "fit-low": makeElement(),
+    "fit-high": makeElement(),
+    "fit-count": makeElement(),
+    "fit-run": makeElement(),
+    "fit-table": makeElement(),
+    // Every sentence the note said, since the running count is gone by the
+    // time a test can look.
+    "fit-note": recording(),
+    "fit-builds": makeElement(),
+    "fit-apply": makeElement(),
+    "fit-undo": Object.assign(makeElement(), {hidden: true}),
+    "fit-close": makeElement(),
     // The variable-font block, and the row per axis it builds inside it.
     variable: { hidden: false },
     "axis-text-row": { hidden: false },
@@ -956,7 +973,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   };
   const fetches = { render: 0, checks: 0, applies: 0, defaults: 0,
                     updateReads: 0, bodies: [], saves: [], builds: [],
-                    fallbacks: [], bodyReads: [], bitmaps: [] };
+                    fallbacks: [], bodyReads: [], bitmaps: [], fits: [],
+                    fitAborts: 0 };
   let lastTimer = 0;
   const cancelled = new Set();
   const prompts = [];
@@ -1136,6 +1154,27 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         ];
         const text = steps.map(step => JSON.stringify(step)).join("\n") + "\n";
         const chunks = [text.slice(0, 40), text.slice(40)];
+        let at = 0;
+        return Promise.resolve({ ok: true, body: { getReader: () => ({
+          read: () => Promise.resolve(at < chunks.length
+            ? { value: chunks[at++], done: false }
+            : { value: undefined, done: true }),
+        }) } });
+      }
+      // The size search answers a line at a time too. `fitSteps` is read when
+      // the request is made, so a test sets it after the page has loaded and
+      // its boxes are known.
+      if (String(url).includes("/fit-sizes")) {
+        fetches.fits.push(JSON.parse(options.body));
+        options.signal?.addEventListener?.("abort", () => fetches.fitAborts++);
+        if (opts.fitFails) {
+          return Promise.resolve({
+            ok: false, status: 422,
+            text: () => Promise.resolve(JSON.stringify({detail: opts.fitFails})) });
+        }
+        const text = (opts.fitSteps ?? []).map(step => JSON.stringify(step))
+          .join("\n") + "\n";
+        const chunks = [text.slice(0, 50), text.slice(50)];
         let at = 0;
         return Promise.resolve({ ok: true, body: { getReader: () => ({
           read: () => Promise.resolve(at < chunks.length
@@ -1338,6 +1377,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
            gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"] },
+           fit: { open: stubs["fit-open"], panel: stubs["fit-panel"],
+                  mode: stubs["fit-mode"], range: stubs["fit-range"],
+                  low: stubs["fit-low"], high: stubs["fit-high"],
+                  count: stubs["fit-count"], run: stubs["fit-run"],
+                  table: stubs["fit-table"],
+                  note: stubs["fit-note"], builds: stubs["fit-builds"],
+                  apply: stubs["fit-apply"], undo: stubs["fit-undo"],
+                  close: stubs["fit-close"] },
            sheet,
            device: {
              ratio(value) { sandbox.devicePixelRatio = value; },
@@ -6005,6 +6052,159 @@ for (const deferred of [
                            {renderFails: {status: 503, body: "no faces yet"}});
   check("a failed page shows no Grid Fit",
         env.gridFit.line.hidden === true, String(env.gridFit.line.hidden));
+}
+
+// 99. Fit to grid: suggestions for the family's own sizes, each a press away
+//     from being looked at, and nothing written until Apply puts the ticked
+//     ones in the boxes as an unsaved edit.
+const fitSteps = (rows) => [
+  {event: "plan", total: rows.length * 4},
+  ...rows.flatMap(([label, now, pick, fits], i) => [
+    ...[-0.5, -0.25, 0, 0.25].map((offset, j) => ({
+      event: "candidate", label, size: label + offset, fit: fits[j],
+      x: fits[j], y: fits[j], done: i * 4 + j + 1})),
+    {event: "label", label, now, pick}]),
+  {event: "done"},
+];
+const FIRST_ROW = ["size1", "size2", "size3", "size4"];
+const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
+{
+  const opts = {renderOk: true};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  const els = env.exportForm.elements;
+  for (const [name, value] of FIRST_ROW.map((n, i) => [n, ["12", "14", "16", "18"][i]])) {
+    els[name].value = value;
+  }
+  opts.fitSteps = fitSteps([
+    [12, 12, 11.75, [60, 100, 62, 61]],
+    [14, 14, 14, [80, 90, 97, 85]],
+    [16, 16, 16.25, [70, 80, 82, 84]],
+    [18, 18, 18, [90, 90, 90, 90]],
+  ]);
+  const saves = env.fetches.saves.length;
+  env.fit.open.on.click();
+  await settle();
+  check("Fit to grid opens under the boxes",
+        env.fit.panel.hidden === false, String(env.fit.panel.hidden));
+  check("and scores the family's own sizes on this page",
+        JSON.stringify(env.fetches.fits[0]?.sizes) === "[12,14,16,18]"
+        && typeof env.fetches.fits[0].text === "string",
+        JSON.stringify(env.fetches.fits[0]));
+  const rows = env.fit.table.children;
+  check("a row for each size", rows.length === 4, String(rows.length));
+  const [name, now, pick, score, tick] = rows[0].children;
+  check("each row says the box, the size now and the suggestion",
+        name.textContent === "Small" && now.textContent === "12"
+        && pick.textContent === "11.75", [name, now, pick].map(c => c.textContent).join("|"));
+  check("with the score each would have",
+        score.textContent === "62 → 100", score.textContent);
+  check("a change worth making is ticked", tick.checked === true);
+  check("a size that is already best has nothing to tick",
+        rows[1].children[4].hidden === true && rows[1].children[2].textContent === "14");
+  check("a gain under 3 points is offered but not ticked",
+        rows[2].children[4].hidden === false && rows[2].children[4].checked === false);
+  check("the running count is gone when the search ends",
+        env.fit.note.textContent === "", env.fit.note.textContent);
+  check("having said how far it got on the way",
+        env.fit.note.steps.includes("Scoring 16 of 16"),
+        JSON.stringify(env.fit.note.steps));
+
+  pick.on.click();
+  await settle();
+  check("pressing a suggestion shows the page at that size",
+        env.byName.size.value === "11.75", env.byName.size.value);
+  check("and marks it as the one on screen",
+        pick.classes.has("showing") && !now.classes.has("showing"));
+  now.on.click();
+  await settle();
+  check("pressing the size now goes back to it",
+        env.byName.size.value === "12" && now.classes.has("showing")
+        && !pick.classes.has("showing"));
+  check("looking at sizes writes nothing",
+        els.size1.value === "12" && env.fetches.saves.length === saves);
+
+  rows[2].children[4].checked = true;
+  env.fit.apply.on.click();
+  check("Apply puts the ticked suggestions in the boxes",
+        FIRST_ROW.map(n => els[n].value).join(" ") === "11.75 14 16.25 18",
+        FIRST_ROW.map(n => els[n].value).join(" "));
+  check("as an edit to save, not a save",
+        env.save.disabled === false && env.fetches.saves.length === saves);
+  check("and offers to undo it", env.fit.undo.hidden === false);
+  env.fit.undo.on.click();
+  check("Undo puts the boxes back exactly",
+        FIRST_ROW.map(n => els[n].value).join(" ") === "12 14 16 18",
+        FIRST_ROW.map(n => els[n].value).join(" "));
+
+  env.fit.close.on.click();
+  check("Close hides the panel", env.fit.panel.hidden === true);
+}
+
+// 99a. A range of whole sizes. Eight fill both rows of boxes, and the suffix
+//      decides whether that is one family or two: the panel says which and
+//      leaves the suffix alone.
+{
+  const opts = {renderOk: true};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  const els = env.exportForm.elements;
+  els.mod_suffix.value = "";
+  const labels = [12, 13, 14, 15, 16, 17, 18, 19];
+  opts.fitSteps = fitSteps(labels.map(l => [l, l, l + 0.25, [50, 50, 50, 90]]));
+  env.fit.open.on.click();
+  await settle();
+  env.fit.mode.value = "range";
+  env.fit.mode.on.change();
+  env.fit.low.value = "12";
+  env.fit.high.value = "19";
+  env.fit.count.value = "8";
+  env.fit.run.on.click();
+  await settle();
+  const sent = env.fetches.fits.at(-1);
+  check("a range asks for whole sizes from low to high",
+        sent.low === 12 && sent.high === 19 && sent.count === 8 && !sent.sizes,
+        JSON.stringify(sent));
+  check("the range fields show for a range", env.fit.range.hidden === false);
+  check("eight sizes are eight rows", env.fit.table.children.length === 8);
+  check("an empty suffix makes them one family",
+        env.fit.builds.textContent.includes("one family of 8 sizes"),
+        env.fit.builds.textContent);
+  env.fit.apply.on.click();
+  check("Apply fills both rows of boxes",
+        [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" ")
+          === "12.25 13.25 14.25 15.25 16.25 17.25 18.25 19.25",
+        [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" "));
+  check("and leaves the suffix as it was", els.mod_suffix.value === "");
+
+  els.mod_suffix.value = "Large";
+  els.name.value = "Lit";
+  env.fit.run.on.click();
+  await settle();
+  check("a suffix makes them two families, named",
+        env.fit.builds.textContent.includes("Lit (4 sizes) and LitLarge (4 sizes)"),
+        env.fit.builds.textContent);
+}
+
+// 99b. What the server refuses is said in the panel, and a run that is
+//      closed early is stopped.
+{
+  const opts = {renderOk: true,
+                fitFails: "Put at least a few lines of text on the page to score sizes."};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  env.exportForm.elements.size1.value = "12";
+  env.fit.open.on.click();
+  await settle();
+  check("a refusal is said in the panel",
+        env.fit.note.textContent.startsWith("Put at least a few lines"),
+        env.fit.note.textContent);
+  check("and leaves no suggestions", env.fit.table.children.length === 0);
+  check("with nothing to apply", env.fit.apply.disabled === true);
+
+  delete opts.fitFails;
+  opts.fitSteps = fitSteps([[12, 12, 12, [1, 1, 1, 1]]]);
+  env.fit.run.on.click();
+  env.fit.close.on.click();
+  check("closing the panel stops the search", env.fetches.fitAborts === 1,
+        String(env.fetches.fitAborts));
 }
 
 process.exit(failures ? 1 : 0);

@@ -1,5 +1,6 @@
 import {showAbout} from "./about.js";
 import {familyPicker} from "./family.js";
+import {closeFit} from "./fitsizes.js";
 import {loadDevice, syncDeviceColor, wireDevice} from "./device.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
 import {fillPresets, outField, showFallbackState,
@@ -37,7 +38,11 @@ wireSizeTitles();
 // attribute this reads, and both listeners are on the same press, so the
 // attribute is already the new one by the time this runs.
 for (const tab of tabButtons) tab.addEventListener("click", showTabMarks);
-familyPicker.addEventListener("change", onFamilyChange);
+// A new family has sizes of its own, so suggestions for the last one go.
+familyPicker.addEventListener("change", (event) => {
+  closeFit();
+  return onFamilyChange(event);
+});
 samplePicker.addEventListener("change", () => { sampleChosen(); scheduleRender(); });
 
 // The font folder can change while the page is open -- a font dropped in, a
