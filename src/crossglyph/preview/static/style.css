@@ -1025,8 +1025,11 @@
   .fit-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
              gap: .4rem; align-items: center; justify-items: center;
              padding: .1rem 0; font-size: 12px; }
+  /* Shaded a step darker than the stripes, so it reads as the heading and
+     the plain first row under it keeps the bands alternating. */
   .fit-head { color: var(--muted); font-size: 11px; font-weight: 600;
-              padding: 0 0 .25rem; border-bottom: 1px solid var(--line); }
+              padding: .25rem 0; border-bottom: 1px solid var(--line);
+              background: color-mix(in srgb, var(--text) 10%, transparent); }
   .fit-head:has(+ .fit-table:empty) { display: none; }
   .fit-table { display: grid; margin-top: -.45rem; }
   /* Faint stripes, so a size's score is read on its own line. */
