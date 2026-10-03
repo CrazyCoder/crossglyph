@@ -1000,11 +1000,9 @@
   .fit-span { grid-column: 1 / 4; }
   .fit-range { display: grid; grid-template-columns: subgrid; gap: .4rem; }
   .fit-range[hidden] { display: none; }
-  /* As tall as a labelled field, so switching modes moves nothing, with its
-     words on the line Find sizes sits on. */
-  #fit-mine-says { align-self: stretch; margin: 0; display: flex;
-                   align-items: flex-end; padding-bottom: .25rem;
-                   min-height: calc(24px + .15rem + 11px * 1.45); }
+  /* As tall as the button beside it and no taller: the range's labelled
+     fields take more room, and only while Range is chosen. */
+  #fit-mine-says { align-self: center; margin: 0; }
   /* The toggle at the left of its row and the sizes it will try at the
      right, cut short rather than wrapped onto a line of their own. */
   .fit-top { display: flex; align-items: center; gap: .75rem; }

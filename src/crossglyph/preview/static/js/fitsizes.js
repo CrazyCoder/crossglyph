@@ -381,8 +381,8 @@ export function familyMoved() {
 }
 
 // Two halves of one toggle. Range swaps its fields in where My sizes says
-// what it does, so the row keeps its height and Find sizes stays put. The
-// fields keep what was typed in them across switches.
+// what it does, so Find sizes keeps its column. The fields keep what was
+// typed in them across switches.
 function setMode(ranged) {
   toMine.setAttribute("aria-pressed", String(!ranged));
   toRange.setAttribute("aria-pressed", String(ranged));
