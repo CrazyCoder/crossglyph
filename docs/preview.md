@@ -117,10 +117,8 @@ not change Page, Text or Device preview settings.
 ## Check how sharp the strokes are
 
 Under the text box, beside the render time, the page shows its **Grid Fit**:
-
-```text
-Grid Fit 90 (+22) | X 95 Y 75
-```
+the score in large type, how much the last change moved it in a small pill
+such as **+22**, and the score for each direction, **X** and **Y**.
 
 The screen is a grid of pixels, and each pixel shows one of four levels of
 grey. A straight stroke that lands exactly on whole pixels is black to its
@@ -133,11 +131,12 @@ bar of `e` or the top of `T`.
 It measures sharpness, not whether the font looks good. Curves need their grey
 to look smooth, so they are not counted.
 
-- The number in brackets is how much the last change moved it. It compares two
-  pages of the same text, so changing the text starts again.
+- The pill is how much the last change moved the score: filled for a rise,
+  dashed for a fall. It compares two pages of the same text, so changing the
+  text starts again.
 - The score is for the text on the page, weighted by how often each letter
   appears. A few lines of ordinary prose give a steady score. With too few
-  letters the line ends in **few letters**.
+  letters it is marked **few letters**.
 - Press the score to see it for each style on the page.
 - With **mono rasterizing** there is no grey, so there is no score.
 

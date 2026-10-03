@@ -647,17 +647,38 @@
   }
 
   .status-row {
-    display: flex; gap: .9rem; align-items: baseline; margin-top: .7rem;
+    display: flex; gap: .9rem; align-items: center; margin-top: .7rem;
   }
-  #status { color: var(--muted); font-size: 11.5px; }
-  /* A line of text that opens its detail, so it looks like the status beside
-     it rather than like a button. */
+  #status { color: var(--muted); font-size: 11.5px; margin-left: auto; }
+  /* Grid Fit: a label set like the section headings, the score as the one
+     large number, its change in a small pill, and the two axes quieter
+     beside it. It opens its detail, which the chevron says. */
   #grid-fit {
-    padding: 0; border: 0; background: none; cursor: pointer;
-    color: var(--text); font-size: 11.5px; font-weight: inherit; text-align: left;
+    display: inline-flex; align-items: center; gap: .45rem;
+    padding: .1rem .35rem .1rem 0; border: 0; border-radius: 4px;
+    background: none; cursor: pointer; color: var(--text); text-align: left;
   }
   #grid-fit[hidden] { display: none; }
-  #grid-fit:hover { text-decoration: underline; }
+  #grid-fit:hover .twist { color: var(--text); }
+  #grid-fit .twist { color: var(--muted); width: 9px; height: 9px; }
+  #grid-fit-parts { display: inline-flex; align-items: baseline; gap: .5rem; }
+  .gf-label { font-size: 10.5px; text-transform: uppercase;
+              letter-spacing: .11em; color: var(--muted); }
+  .gf-score { font-size: 17px; font-weight: 650; line-height: 1;
+              font-variant-numeric: tabular-nums; }
+  .gf-gain { font-size: 11px; font-weight: 600; line-height: 1;
+             padding: .12rem .35rem; border-radius: 999px;
+             border: 1px solid currentColor; font-variant-numeric: tabular-nums; }
+  /* A rise is filled so it reads at a glance; a fall is the same pill drawn
+     dashed, since the page has no colour to say it with. */
+  .gf-up { background: var(--text); color: var(--panel); border-color: var(--text); }
+  .gf-down { border-style: dashed; color: var(--text); }
+  .gf-axes { display: inline-flex; align-items: baseline; gap: .25rem;
+             font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .gf-axis { color: var(--muted); }
+  .gf-axis + .gf-value + .gf-axis { margin-left: .3rem; }
+  .gf-tag, .gf-none { font-size: 11px; color: var(--muted); }
+  .gf-tag { padding: .05rem .35rem; border: 1px solid var(--line); border-radius: 3px; }
 
   /* The rendered PNG remains at its native dimensions in the canvas. The
      default scale maps those pixels to physical monitor pixels through DPR;

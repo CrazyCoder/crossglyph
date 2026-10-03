@@ -871,6 +871,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // The page's Grid Fit under the text box, and the line it opens.
     "grid-fit": Object.assign(makeElement(), {hidden: true}),
     "grid-fit-detail": Object.assign(makeElement(), {hidden: true}),
+    "grid-fit-parts": makeElement(),
     // Fit to grid, a fold of its own under the sizes.
     "fit-toggle": Object.assign(pressStub("fit"), {dataset: {fold: "fit"}}),
     "fit-panel": makeElement(),
@@ -1377,7 +1378,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
-           gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"] },
+           gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"],
+                      parts: stubs["grid-fit-parts"] },
            fit: { toggle: stubs["fit-toggle"], sample: stubs["fit-sample"],
                   mode: stubs["fit-mode"], range: stubs["fit-range"],
                   low: stubs["fit-low"], high: stubs["fit-high"],
@@ -6003,9 +6005,15 @@ for (const deferred of [
   const opts = {renderOk: true, gridFit: fit("80")};
   const env = await loaded(fakeStorage(), undefined, opts);
   const line = env.gridFit.line;
+  // The readout is parts, each styled for what it is, and one sentence for
+  // a screen reader, which is what these checks read.
+  const said = () => line.attrs["aria-label"];
+  const part = (name) => env.gridFit.parts.children.find(
+    kid => kid.className.split(" ").includes(name));
   check("a page shows its Grid Fit",
-        line.hidden === false && line.textContent === "Grid Fit 80 | X 90 Y 70",
-        line.textContent);
+        line.hidden === false && said() === "Grid Fit 80. X 90, Y 70.", said());
+  check("with the score as a part of its own",
+        part("gf-score")?.textContent === "80" && !part("gf-gain"));
 
   const turn = async (name, value) => {
     env.byName[name].value = value;
@@ -6015,17 +6023,24 @@ for (const deferred of [
   opts.gridFit = fit("88");
   await turn("gamma", "1.4");
   check("a knob that moved the score says by how much",
-        line.textContent === "Grid Fit 88 (+8) | X 90 Y 70", line.textContent);
+        said() === "Grid Fit 88, up 8. X 90, Y 70." && part("gf-gain")?.textContent === "+8"
+        && part("gf-gain").className.includes("gf-up"), said());
 
-  opts.gridFit = fit("88");
+  opts.gridFit = fit("83");
+  await turn("gamma", "1.35");
+  check("and a fall is marked as one",
+        said() === "Grid Fit 83, down 5. X 90, Y 70." && part("gf-gain")?.textContent === "-5"
+        && part("gf-gain").className.includes("gf-down"), said());
+
+  opts.gridFit = fit("83");
   await turn("gamma", "1.3");
   check("and a knob that did not move it says nothing extra",
-        line.textContent === "Grid Fit 88 | X 90 Y 70", line.textContent);
+        said() === "Grid Fit 83. X 90, Y 70." && !part("gf-gain"), said());
 
   opts.gridFit = fit("60");
   await turn("text", "A different page altogether.");
   check("a different text starts the comparison over",
-        line.textContent === "Grid Fit 60 | X 90 Y 70", line.textContent);
+        said() === "Grid Fit 60. X 90, Y 70.", said());
 
   line.on.click();
   check("pressing the score opens the detail by style",
@@ -6038,12 +6053,13 @@ for (const deferred of [
   opts.gridFit = fit("60", {"x-grid-fit-sure": "0", "x-grid-fit-letters": "40"});
   await turn("gamma", "1.2");
   check("a short page says its score is rough",
-        line.textContent.endsWith("| few letters"), line.textContent);
+        said().endsWith("Few letters, so the score is rough.")
+        && part("gf-tag")?.textContent === "few letters", said());
 
   opts.gridFit = fit("", {"x-grid-fit-mono": "1"});
   await turn("gamma", "1.1");
   check("mono has no score to show",
-        line.textContent === "Grid Fit: not available in mono", line.textContent);
+        said() === "Grid Fit is not available in mono." && !part("gf-score"), said());
 }
 
 // 98a. A failed render leaves no score from the page before it.
