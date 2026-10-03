@@ -400,7 +400,9 @@ def test_a_single_pixel_reaches_the_framebuffer():
     """Separates the pixel path from the text path. This caught the bug where
     an `inline HalDisplay display;` member array gave GfxRenderer a null
     framebuffer while api.cpp saw a valid one -- silently, since the assert
-    guarding it is compiled out at -O2."""
+    guarding it is compiled out at -O2. It fails the same way when the host
+    skips `_initialize`: no static constructor runs, and the renderer's clip
+    rectangle is left with no size."""
     module = render.load_module()
     assert module.call("rc_probe_write_target") == \
         module.call("rc_probe_framebuffer_ptr"), \

@@ -155,7 +155,7 @@ SAMPLES: dict[str, Sample] = {
 
     # The firmware's Brazilian pangram, since "pt" is one set of hyphenation
     # patterns for both and most readers asking for Portuguese are in Brazil.
-    # Article 1 reads the same on both sides of the Atlantic.
+    # Article 1 is the UN's own Portuguese text, which follows European usage.
     "pt": Sample("Português", _preset(
         "Um pequeno jabuti xereta viu dez cegonhas felizes.",
         "Todos os seres humanos nascem livres e iguais em dignidade e em "

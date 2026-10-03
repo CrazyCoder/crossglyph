@@ -439,8 +439,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       options: [{ value: "en" }, { value: "fi" }, { value: "fr" },
                 { value: "de" }, { value: "it" }, { value: "pl" },
                 { value: "pt" }, { value: "ru" }, { value: "es" },
-                { value: "sv" },
-                { value: "uk" }, { value: "" }],
+                { value: "sv" }, { value: "uk" }, { value: "" }],
     }),
     // A font-side select, so the baseline machinery is exercised on the kind
     // of control that has no `checked` to compare.
