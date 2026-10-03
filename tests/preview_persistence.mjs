@@ -6200,8 +6200,12 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         score.textContent === "100 (+38)" && score.title === "62 now, 100 suggested",
         `${score.textContent} | ${score.title}`);
   check("a change worth making is ticked", tick.checked === true);
-  check("a size that is already best has nothing to tick",
-        rows[1].children[3].hidden === true && rows[1].children[1].textContent === "14");
+  const kept = rows[1].children[3];
+  check("a size the box already holds shows as in use rather than as a gap",
+        kept.hidden === false && kept.disabled === true && kept.checked === true
+        && rows[1].children[1].textContent === "14",
+        JSON.stringify({hidden: kept.hidden, disabled: kept.disabled, checked: kept.checked}));
+  check("and says so", /already/i.test(kept.title ?? ""), kept.title);
   check("a gain under 3 points is offered but not ticked",
         rows[2].children[3].hidden === false && rows[2].children[3].checked === false);
   check("one status line counts the search",
@@ -6233,6 +6237,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         FIRST_ROW.map(n => els[n].value).join(" "));
   check("as an edit to save, not a save",
         env.save.disabled === false && env.fetches.saves.length === saves);
+  check("counting only the boxes it changed, not the ones in use already",
+        env.fit.note.textContent.startsWith("2 sizes changed"), env.fit.note.textContent);
   check("and offers to undo it", env.fit.undo.hidden === false);
   els.size3.value = "15";
   env.fit.undo.on.click();

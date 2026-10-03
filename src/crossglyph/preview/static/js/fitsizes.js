@@ -146,6 +146,9 @@ function addRemovedRow(box) {
   entry.tick.setAttribute("aria-label", `Remove size ${entry.now.dataset.size}`);
 }
 
+//: Whether a row is Apply's to take: a change it can make, not one in use.
+const offered = (row) => !row.tick.hidden && !row.tick.disabled;
+
 function fillRow(entry, now, pick, fits, ranged) {
   entry.filled = true;
   setValue(entry.now, now);
@@ -164,9 +167,13 @@ function fillRow(entry, now, pick, fits, ranged) {
   // Something to change is a suggestion the box does not already hold. A
   // range starts from labels the boxes may not hold at all, so all of it is
   // the user's to take; for their own sizes only a real gain is ticked.
+  // A suggestion the box already holds is shown ticked and greyed: in use,
+  // with nothing for Apply to do, which a blank cell does not say.
   const changes = pick !== null && String(pick) !== snapSize(entry.held);
-  entry.tick.hidden = !changes;
-  entry.tick.checked = changes && (ranged || pickFit - nowFit >= WORTH);
+  entry.tick.hidden = pick === null;
+  entry.tick.disabled = !changes;
+  entry.tick.checked = !changes || ranged || pickFit - nowFit >= WORTH;
+  entry.tick.title = changes ? "" : "Already in the boxes";
 }
 
 // The server's refusal as a sentence. A malformed request comes back as a
@@ -295,7 +302,7 @@ async function runFit() {
       const complete = index === boxes.length;
       rows = rows.filter(row => (row.removed ? complete : row.filled));
       table.replaceChildren(...rows.map(entry => entry.now.parentElement));
-      applyButton.disabled = !rows.some(row => !row.tick.hidden);
+      applyButton.disabled = !rows.some(offered);
       if (rows.length) showBuilds(); else builds.textContent = "";
       syncFitMarks();
       runButton.disabled = false;
@@ -313,7 +320,7 @@ function applyFit() {
   applied = new Map();
   let skipped = 0;
   for (const row of rows) {
-    if (row.tick.hidden || !row.tick.checked) continue;
+    if (!offered(row) || !row.tick.checked) continue;
     const field = exportForm.elements[row.box];
     // A box edited since it was scored is the user's newer word.
     if (field.value !== row.held) {

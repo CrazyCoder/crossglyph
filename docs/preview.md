@@ -281,8 +281,9 @@ as any fractional size does.
 
 The **Grid Fit** column shows the score a suggestion would have, with what it
 gains in brackets, as in `79 (+11)`. Hold the pointer over it to see the score
-now. A suggestion is ticked when it gains at least a few points. A size that is
-already the best has nothing to tick. **Apply** leaves alone any box you have
+now. A suggestion is ticked when it gains at least a few points. A suggestion
+your box already holds is ticked and greyed out, since there is nothing to
+change. **Apply** leaves alone any box you have
 changed since the search. **Undo** puts back what Apply wrote, and keeps any
 box you have edited since.
 
