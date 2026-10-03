@@ -1575,7 +1575,7 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     style_axes: {style_id: {axis_tag: value}} design coordinates (FORK). One
         variable file can fill several slots this way, each at its own weight.
     max_ink_top: write each style's maxInkTop into its TOC entry (FORK). Off,
-        those bytes stay 0 and the file matches upstream's byte for byte.
+        those bytes stay 0, as upstream writes them.
     """
     MAGIC = b"CPFONT\x00\x00"
     HEADER_SIZE = 32

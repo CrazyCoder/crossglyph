@@ -96,6 +96,12 @@ def test_digest_tracks_space_width_overrides(variant):
     assert fontstamp.digest(variant, 12) != before
 
 
+def test_digest_tracks_max_ink_top(variant):
+    before = fontstamp.digest(variant, 12)
+    variant.config.max_ink_top = True
+    assert fontstamp.digest(variant, 12) != before
+
+
 def test_digest_tracks_the_converter_source(variant, monkeypatch, tmp_path):
     """The converter is our own module now, so its source is what is hashed."""
     before = fontstamp.digest(variant, 12)

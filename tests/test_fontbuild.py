@@ -315,9 +315,9 @@ def test_max_ink_top_is_the_tallest_glyph_top_when_asked(tmp_path, enabled):
     """Bytes 28 and 29 of each style entry hold the tallest ink above the
     baseline when `max_ink_top` asks for it, and 0 otherwise. CrossPoint skips
     them; a firmware that reads them places the first line of a page from the
-    number, and takes a 0 to mean "unknown". Off, the file has to match
-    upstream's, so the value is checked against the glyph records the file
-    itself carries rather than a constant."""
+    number, and takes a 0 to mean "unknown". The expected value comes from
+    the glyph records the file itself carries, so a 0 written by mistake
+    cannot pass as the right answer."""
     import struct
 
     from fontsmith import box_font
