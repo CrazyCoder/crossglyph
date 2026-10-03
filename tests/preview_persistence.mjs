@@ -6162,6 +6162,12 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("each row says the size now and the suggestion, and nothing else names it",
         rows[0].children.length === 4 && now.textContent === "12"
         && pick.textContent === "11.75", [now, pick].map(c => c.textContent).join("|"));
+  // The headings are a row of the same grid, so a cell in one and not the
+  // other puts every value under the wrong heading.
+  const headings = /class="fit-row fit-head"[^>]*>([\s\S]*?)<\/div>/.exec(INDEX)[1]
+    .match(/<span>/g).length;
+  check("the headings have a cell for each cell of a row",
+        headings === rows[0].children.length, `${headings} headings`);
   check("with the score each would have",
         score.textContent === "100 (+38)" && score.title === "62 now, 100 suggested",
         `${score.textContent} | ${score.title}`);

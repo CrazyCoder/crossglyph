@@ -1020,13 +1020,11 @@
   }
   .fit-head { color: var(--muted); font-size: 11px; }
   .fit-head:has(+ .fit-table:empty) { display: none; }
-  /* One row a size: its box, the size now, the suggestion, what each scores,
-     and whether Apply takes it. */
+  /* One row a size: the size now, the suggestion, what it scores, and
+     whether Apply takes it. */
   .fit-table { display: grid; gap: .1rem; }
   .fit-row { display: grid; align-items: center; gap: .4rem; font-size: 12px;
-             grid-template-columns: minmax(0, 1fr) 3.4rem 3.4rem 5.6rem 1.2rem; }
-  .fit-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis;
-              white-space: nowrap; }
+             grid-template-columns: 3.4rem 3.4rem 5.6rem 1.2rem; }
   .fit-value { font: inherit; background: none; border: 1px solid transparent;
                border-radius: 3px; padding: .05rem .2rem; cursor: pointer;
                color: var(--text); }
