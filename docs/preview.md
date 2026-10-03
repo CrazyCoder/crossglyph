@@ -153,6 +153,10 @@ that CrossPoint applies while reading:
 - **margin** changes the space around the text;
 - **alignment** chooses justified, left, centered or right-aligned text;
 - **line spacing** applies the reader's tight, normal or wide spacing;
+- **word spacing** sets each space as a share of the font's own, from 50 to
+  200%, as the reader's own Word spacing setting does;
+- **character spacing** adds or removes up to 2 pixels between letters, as the
+  reader's Character spacing setting does;
 - **hyphenate as** chooses patterns for the sample text;
 - **hyphenation** turns those patterns on or off;
 - **paragraph spacing** adds space between paragraphs;
@@ -162,6 +166,11 @@ that CrossPoint applies while reading:
 Page settings affect only the browser preview. Save and Build leave them out of
 the font config. The browser remembers them so you can keep testing fonts with
 the same reading setup.
+
+Tune has a **word spacing** and a **letter spacing** of its own. Those are
+built into the font, so every reader of it gets them. The two in Page are a
+reader's own settings, applied on top of the font, and only that reader sees
+them.
 
 A real book supplies its own language metadata. Set **hyphenate as** to the
 language of the sample text you pasted into the preview.

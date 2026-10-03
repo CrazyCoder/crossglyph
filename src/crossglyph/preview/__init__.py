@@ -47,6 +47,14 @@ ALIGNMENTS = {"justify": 0, "left": 1, "center": 2, "right": 3}
 #: (CrossPointSettings.cpp:268-280).
 LINE_SPACINGS = {"tight": 95, "normal": 100, "wide": 110}
 
+#: The reader's Word spacing setting: each space as a percentage of the font's
+#: own, in the steps its menu offers (CrossPointSettings.h, WORD_SPACING_*).
+WORD_SPACINGS = range(50, 201, 25)
+
+#: The reader's Character spacing setting, in extra pixels between glyphs
+#: (CrossPointSettings.h, CHARACTER_SPACING_OFFSET).
+CHARACTER_SPACINGS = range(-2, 3)
+
 #: Reader ids as the render core numbers them.
 DEVICES = {"x4": 0, "x3": 1}
 
@@ -68,6 +76,12 @@ class PageSpec:
     hyphenation: bool = False
     extra_paragraph_spacing: bool = True
     line_spacing: str = "normal"
+    #: Settings > Reader > Word spacing and Character spacing. Named apart from
+    #: the font's own `word_spacing` and `letter_spacing`, which are built into
+    #: the .cpfont: these are the reader's, applied on top of whatever the font
+    #: carries.
+    reader_word_spacing: int = 100      # percent of the font's space
+    character_spacing: int = 0          # extra pixels between glyphs
     #: Which language's hyphenation patterns to use. The reader takes this from
     #: the book's own metadata; here the text is whatever you paste, so it is a
     #: knob. Empty means no hyphenation patterns at all. It matches the sample
@@ -96,8 +110,8 @@ class PageSpec:
                 f"unknown device {self.device!r}; "
                 f"expected one of {', '.join(sorted(DEVICES))}") from None
 
-    def to_call_args(self) -> tuple[int, int, int, int, int]:
-        """The five ints rc_page_set_spec takes, validated."""
+    def to_call_args(self) -> tuple[int, int, int, int, int, int, int]:
+        """The seven ints rc_page_set_spec takes, validated."""
         self.device_id()
         if self.alignment not in ALIGNMENTS:
             raise ValueError(
@@ -110,9 +124,18 @@ class PageSpec:
         if not 5 <= self.margin <= 40:
             raise ValueError(
                 f"margin {self.margin} is outside the device's 5..40")
+        if self.reader_word_spacing not in WORD_SPACINGS:
+            raise ValueError(
+                f"word spacing {self.reader_word_spacing} is not one the "
+                f"device offers; expected 50 to 200 in steps of 25")
+        if self.character_spacing not in CHARACTER_SPACINGS:
+            raise ValueError(
+                f"character spacing {self.character_spacing} is outside the "
+                f"device's -2..2")
         return (self.margin, ALIGNMENTS[self.alignment], int(self.hyphenation),
                 int(self.extra_paragraph_spacing),
-                LINE_SPACINGS[self.line_spacing])
+                LINE_SPACINGS[self.line_spacing], self.character_spacing,
+                self.reader_word_spacing)
 
 
 def coverage_for(text: str,

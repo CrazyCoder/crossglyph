@@ -362,6 +362,35 @@ def test_an_unknown_line_spacing_is_refused():
         preview.PageSpec(line_spacing="airy").to_call_args()
 
 
+@pytest.mark.parametrize("value", [25, 75, 225, 110])
+def test_a_word_spacing_the_device_cannot_set_is_refused(value):
+    """The reader steps it by 25 from 50 to 200, so 110 is refused as surely
+    as 225: a preview at a value no reader can show is a page nobody reads."""
+    from crossglyph import preview
+
+    if value == 75:
+        preview.PageSpec(reader_word_spacing=value).to_call_args()
+        return
+    with pytest.raises(ValueError, match="word spacing"):
+        preview.PageSpec(reader_word_spacing=value).to_call_args()
+
+
+@pytest.mark.parametrize("value", [-3, 3])
+def test_a_character_spacing_outside_the_devices_range_is_refused(value):
+    from crossglyph import preview
+
+    with pytest.raises(ValueError, match="character spacing"):
+        preview.PageSpec(character_spacing=value).to_call_args()
+
+
+def test_the_spacing_reaches_the_core_in_order():
+    from crossglyph import preview
+
+    args = preview.PageSpec(character_spacing=-1,
+                            reader_word_spacing=150).to_call_args()
+    assert args[-2:] == (-1, 150)
+
+
 def test_a_margin_outside_the_devices_range_is_refused():
     from crossglyph import preview
 

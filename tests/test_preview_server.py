@@ -278,6 +278,16 @@ def test_the_page_spec_reaches_the_render(client):
 
 
 @needs
+@pytest.mark.parametrize("knob, low, high", [
+    ("reader_word_spacing", 50, 200), ("character_spacing", -2, 2)])
+def test_the_reader_spacing_reaches_the_render(client, knob, low, high):
+    narrow = client.post("/render", json={"size": 13, "page": {knob: low}})
+    wide = client.post("/render", json={"size": 13, "page": {knob: high}})
+    assert narrow.status_code == wide.status_code == 200
+    assert narrow.content != wide.content
+
+
+@needs
 def test_the_device_selects_native_page_geometry(client):
     from PIL import Image, ImageChops
 
@@ -1678,6 +1688,8 @@ def test_the_defaults_served_are_the_devices(client):
     assert knobs.extra_paragraph_spacing is True
     assert knobs.alignment == "justify"
     assert knobs.line_spacing == "normal"
+    assert knobs.reader_word_spacing == 100
+    assert knobs.character_spacing == 0
 
 
 @needs

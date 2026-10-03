@@ -693,6 +693,19 @@ PAGE = "\n".join([PARAGRAPH, PARAGRAPH, PARAGRAPH])
 NO_STYLES = 0
 
 
+def _ink_box(module):
+    """The page's ink as (left, top, right, bottom), read back the way
+    _row_ink_left reads it."""
+    from PIL import Image, ImageChops
+
+    panel = Image.frombytes("1", (module.call("rc_panel_width"),
+                                  module.call("rc_panel_height")),
+                            module.read(module.call("rc_framebuffer"),
+                                        module.call("rc_framebuffer_size")))
+    return ImageChops.invert(panel).transpose(
+        Image.Transpose.ROTATE_270).getbbox()
+
+
 def _row_ink_left(module, lines=2):
     """The x of the leftmost ink on each of the first `lines` lines of text.
 
@@ -804,9 +817,11 @@ JUSTIFY, LEFT, CENTER, RIGHT = 0, 1, 2, 3
 
 
 def _spec(module, margin=5, alignment=JUSTIFY, hyphenation=1,
-          extra_paragraph_spacing=0, compression=100):
+          extra_paragraph_spacing=0, compression=100, character_spacing=0,
+          word_spacing_percent=100):
     module.call("rc_page_set_spec", margin, alignment, hyphenation,
-                extra_paragraph_spacing, compression)
+                extra_paragraph_spacing, compression, character_spacing,
+                word_spacing_percent)
 
 
 #: More text than any page can hold, so the line count measures what *fits*
@@ -861,6 +876,36 @@ def test_tighter_line_spacing_fits_more_lines(tmp_path):
     wide = _drawn(module)
     _spec(module, compression=95)
     assert _drawn(module) > wide
+
+
+@needs_wasm
+@needs_font
+def test_wider_word_spacing_puts_fewer_words_on_a_line(tmp_path):
+    module = _loaded(tmp_path, intervals="cyrillic")
+    _spec(module, word_spacing_percent=50)
+    narrow = _lines(module, PARAGRAPH, 400)
+    _spec(module, word_spacing_percent=200)
+    assert len(_lines(module, PARAGRAPH, 400)) > len(narrow)
+
+
+@needs_wasm
+@needs_font
+def test_character_spacing_moves_the_breaks_and_the_ink(tmp_path):
+    """The layout measures with it and the line draws with it. A page that
+    broke wider but drew at the old spacing would set ragged lines that the
+    device never shows."""
+    module = _loaded(tmp_path, intervals="cyrillic")
+    _spec(module, character_spacing=0)
+    plain = _lines(module, PARAGRAPH, 400)
+    _spec(module, character_spacing=2)
+    assert len(_lines(module, PARAGRAPH, 400)) > len(plain)
+
+    def ink_width(spacing):
+        _spec(module, alignment=LEFT, character_spacing=spacing)
+        _drawn(module, "электрификация")
+        return _ink_box(module)[2] - _ink_box(module)[0]
+
+    assert ink_width(-2) < ink_width(0) < ink_width(2)
 
 
 @needs_wasm

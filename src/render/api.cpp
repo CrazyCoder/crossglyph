@@ -57,6 +57,12 @@ CssTextAlign g_alignment = CssTextAlign::Justify;
 bool g_hyphenation = false;
 bool g_extraParagraphSpacing = true;
 
+/// The reader's Word spacing and Character spacing settings
+/// (CrossPointSettings.h, wordSpacing and getCharacterSpacing), at the values
+/// it ships with: the font's own space, and no extra pixels between glyphs.
+int8_t g_characterSpacing = 0;
+uint8_t g_wordSpacingPercent = 100;
+
 /// One style byte per word, or nullptr for all-regular. The host splits words
 /// exactly as addWords does -- on ' ', empties dropped, newlines separating
 /// paragraphs without consuming a byte -- so this cursor stays in step across
@@ -133,7 +139,8 @@ void layoutInto(std::vector<std::shared_ptr<TextBlock>>& into,
       g_renderer, kFontId, static_cast<uint16_t>(width),
       [&into](std::shared_ptr<TextBlock> line, uint32_t) {
         into.push_back(std::move(line));
-      });
+      },
+      true, g_characterSpacing, g_wordSpacingPercent);
 }
 
 }  // namespace
@@ -450,11 +457,15 @@ int rc_layout_line(int index, char* out, int cap) {
 ///             hyphens": it changes where every line breaks.
 /// line_compression_x100  95 tight / 100 normal / 110 wide, the device's own
 ///             values for SD card fonts (CrossPointSettings.cpp:268-280)
+/// character_spacing     extra pixels between glyphs, -2..2. The line keeps
+///             it and draws with it, so it moves the ink as well as the breaks.
+/// word_spacing_percent  each space as a share of the font's own, 50..200
 ///
 /// Anti-aliasing is deliberately not here. It decides how many passes the
 /// *host* runs, not how the module lays a page out -- see rc_page_render.
 int rc_page_set_spec(int margin, int alignment, int hyphenation,
-                     int extra_paragraph_spacing, int line_compression_x100) {
+                     int extra_paragraph_spacing, int line_compression_x100,
+                     int character_spacing, int word_spacing_percent) {
   rc_init();
   g_screenMargin = margin;
   applyMargins();
@@ -462,15 +473,18 @@ int rc_page_set_spec(int margin, int alignment, int hyphenation,
   g_hyphenation = hyphenation != 0;
   g_extraParagraphSpacing = extra_paragraph_spacing != 0;
   g_lineCompression = static_cast<float>(line_compression_x100) / 100.0f;
+  g_characterSpacing = static_cast<int8_t>(character_spacing);
+  g_wordSpacingPercent = static_cast<uint8_t>(word_spacing_percent);
   return 1;
 }
 
 /// Back to what the device ships with (CrossPointSettings.h:217, 239-246):
 /// SCREEN_MARGIN_MIN, justified, hyphenation off, extra paragraph spacing on,
-/// normal line spacing.
+/// normal line spacing, the font's own spacing.
 int rc_page_reset_spec() {
   return rc_page_set_spec(kScreenMargin,
-                          static_cast<int>(CssTextAlign::Justify), 0, 1, 100);
+                          static_cast<int>(CssTextAlign::Justify), 0, 1, 100,
+                          0, 100);
 }
 
 /// Which language's Liang patterns to hyphenate with -- "ru", "en", "de" and

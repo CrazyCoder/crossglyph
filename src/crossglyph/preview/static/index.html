@@ -533,6 +533,30 @@
     <button type="button" class="revert" data-reset="line_spacing" title="Compare with the value the config has" aria-label="compare line spacing" hidden>&#8634;</button>
   </div>
 
+  <!-- The reader's own Word spacing and Character spacing settings, in the
+       steps its menu offers. They apply on top of the font: Tune's word
+       spacing and letter spacing are built into the file. -->
+  <div class="row">
+    <label class="name" for="reader_word_spacing"
+           title="The reader's Word spacing setting: each space as a share of the font's own. Tune's word spacing is built into the font; this is applied on top of it.">word spacing</label>
+    <select id="reader_word_spacing" name="reader_word_spacing" data-group="page">
+      <option value="50">50%</option><option value="75">75%</option>
+      <option value="100" selected>100%</option><option value="125">125%</option>
+      <option value="150">150%</option><option value="175">175%</option>
+      <option value="200">200%</option></select>
+    <button type="button" class="revert" data-reset="reader_word_spacing" title="Compare with the value the config has" aria-label="compare word spacing" hidden>&#8634;</button>
+  </div>
+
+  <div class="row">
+    <label class="name" for="character_spacing"
+           title="The reader's Character spacing setting: extra pixels between letters. Tune's letter spacing is built into the font; this is applied on top of it.">character spacing</label>
+    <select id="character_spacing" name="character_spacing" data-group="page">
+      <option value="-2">−2 px</option><option value="-1">−1 px</option>
+      <option value="0" selected>0 px</option><option value="1">+1 px</option>
+      <option value="2">+2 px</option></select>
+    <button type="button" class="revert" data-reset="character_spacing" title="Compare with the value the config has" aria-label="compare character spacing" hidden>&#8634;</button>
+  </div>
+
   <div class="row">
     <label class="name" for="language">hyphenate as</label>
     <!-- Every language the firmware carries Liang patterns for, which is what

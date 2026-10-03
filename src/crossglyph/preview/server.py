@@ -688,6 +688,8 @@ class PageKnobs(BaseModel):
     hyphenation: bool = False
     extra_paragraph_spacing: bool = True
     line_spacing: str = "normal"
+    reader_word_spacing: int = 100
+    character_spacing: int = 0
     language: str = "en"
     antialiased: bool = True
     inverted: bool = False
