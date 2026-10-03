@@ -903,7 +903,8 @@ def test_character_spacing_moves_the_breaks_and_the_ink(tmp_path):
     def ink_width(spacing):
         _spec(module, alignment=LEFT, character_spacing=spacing)
         _drawn(module, "электрификация")
-        return _ink_box(module)[2] - _ink_box(module)[0]
+        left, _, right, _ = _ink_box(module)
+        return right - left
 
     assert ink_width(-2) < ink_width(0) < ink_width(2)
 

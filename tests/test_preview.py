@@ -362,17 +362,32 @@ def test_an_unknown_line_spacing_is_refused():
         preview.PageSpec(line_spacing="airy").to_call_args()
 
 
-@pytest.mark.parametrize("value", [25, 75, 225, 110])
+@pytest.mark.parametrize("value", [25, 110, 225])
 def test_a_word_spacing_the_device_cannot_set_is_refused(value):
     """The reader steps it by 25 from 50 to 200, so 110 is refused as surely
     as 225: a preview at a value no reader can show is a page nobody reads."""
     from crossglyph import preview
 
-    if value == 75:
-        preview.PageSpec(reader_word_spacing=value).to_call_args()
-        return
     with pytest.raises(ValueError, match="word spacing"):
         preview.PageSpec(reader_word_spacing=value).to_call_args()
+
+
+def test_every_step_the_page_offers_is_one_the_core_accepts():
+    """The two selects in Page and the ranges here say the same thing in two
+    languages. Read the options out of the page, so neither can gain a step
+    the other refuses."""
+    import re
+
+    from crossglyph import preview
+    from crossglyph.preview import server
+
+    html = (server.STATIC / "index.html").read_text(encoding="utf-8")
+    for name, steps in [("reader_word_spacing", preview.WORD_SPACINGS),
+                        ("character_spacing", preview.CHARACTER_SPACINGS)]:
+        select = re.search(rf'<select id="{name}".*?</select>', html, re.S)
+        offered = [int(v) for v in
+                   re.findall(r'<option value="(-?\d+)"', select.group(0))]
+        assert offered == list(steps), name
 
 
 @pytest.mark.parametrize("value", [-3, 3])

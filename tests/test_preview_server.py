@@ -639,11 +639,14 @@ def test_a_tuning_knob_reaches_the_render(client):
 
 
 @needs
-def test_a_bad_knob_is_a_client_error_not_a_crash(client):
-    response = client.post("/render",
-                           json={"size": 13, "page": {"alignment": "diagonal"}})
+@pytest.mark.parametrize("page, named", [
+    ({"alignment": "diagonal"}, "alignment"),
+    ({"reader_word_spacing": 110}, "word spacing"),
+    ({"character_spacing": 3}, "character spacing")])
+def test_a_bad_knob_is_a_client_error_not_a_crash(client, page, named):
+    response = client.post("/render", json={"size": 13, "page": page})
     assert response.status_code == 422
-    assert "alignment" in response.text
+    assert named in response.text
 
 
 @needs
