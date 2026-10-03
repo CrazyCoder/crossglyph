@@ -71,11 +71,11 @@ function round(fit) {
 function showBuilds() {
   const name = exportForm.elements.name.value || familyPicker.value || "This family";
   const suffix = exportForm.elements.mod_suffix.value.trim();
-  const boxes = new Set(rows.map(row => row.box));
-  const first = FIRST_ROW.filter(b => boxes.has(b) || filled(b)).length
-    + spilled(SPILL.first);
-  const second = SECOND_ROW.filter(b => boxes.has(b) || filled(b)).length
-    + spilled(SPILL.second);
+  const listed = new Map(rows.map(row => [row.box, row]));
+  // A box with a row ends up holding a size unless the row removes it.
+  const kept = (box) => (listed.has(box) ? !listed.get(box).removed : filled(box));
+  const first = FIRST_ROW.filter(kept).length + spilled(SPILL.first);
+  const second = SECOND_ROW.filter(kept).length + spilled(SPILL.second);
   builds.textContent = !second ? `Builds ${name} with ${first} sizes.`
     : !suffix ? `Builds one family of ${first + second} sizes. `
       + "Fill in the suffix under More sizes to make them two families."
@@ -141,7 +141,22 @@ function addRow(box, now) {
   rows.push(entry);
 }
 
+// A box past a range's count. A range is the family's new size list, so
+// Apply empties it; the row says so before anything is written.
+function addRemovedRow(box) {
+  addRow(box, Number(snapSize(exportForm.elements[box].value)));
+  const entry = rows.at(-1);
+  entry.removed = true;
+  entry.value = "";
+  entry.pick.textContent = "removed";
+  entry.score.textContent = "";
+  entry.tick.hidden = false;
+  entry.tick.checked = true;
+  entry.tick.setAttribute("aria-label", `Remove ${titleOf(box)}`);
+}
+
 function fillRow(entry, now, pick, fits, ranged) {
+  entry.filled = true;
   setValue(entry.now, now);
   setValue(entry.pick, pick ?? now);
   entry.value = pick;
@@ -176,9 +191,14 @@ function failure(text) {
   return detail ?? text;
 }
 
-// A range is whole sizes inside the size knob's range, smaller first.
+// A range is whole sizes inside the size knob's range, smaller first. One
+// size is where it starts, and nothing else.
 function rangeProblem() {
   const from = Number(low.value), to = Number(high.value);
+  if (count.value === "1") {
+    return Number.isInteger(from) && low.value.trim() && from >= SIZE_MIN && from <= SIZE_MAX
+      ? null : `One size is a whole size between ${SIZE_MIN} and ${SIZE_MAX}.`;
+  }
   if (![from, to].every(Number.isInteger) || !low.value.trim() || !high.value.trim()) {
     return "A range is two whole sizes, such as 12 and 19.";
   }
@@ -223,6 +243,11 @@ async function runFit() {
   for (const box of boxes) {
     addRow(box, ranged ? null : Number(snapSize(exportForm.elements[box].value)));
   }
+  if (ranged) {
+    for (const box of [...FIRST_ROW, ...SECOND_ROW].slice(boxes.length).filter(filled)) {
+      addRemovedRow(box);
+    }
+  }
   showBuilds();
   // A count in the status line rather than a bar: the export panel's one bar
   // is the build's, in its foot. The same line then says what the scores
@@ -262,8 +287,10 @@ async function runFit() {
   } finally {
     if (mine === runs) {
       // A run that ended early leaves rows it never reached. They go, rather
-      // than sit there waiting for an answer that is not coming.
-      rows = rows.slice(0, index);
+      // than sit there waiting for an answer that is not coming, and so do
+      // the removals, which only stand with the whole range beside them.
+      const complete = index === boxes.length;
+      rows = rows.filter(row => (row.removed ? complete : row.filled));
       table.replaceChildren(...rows.map(entry => entry.now.parentElement));
       applyButton.disabled = !rows.some(row => !row.tick.hidden);
       if (rows.length) showBuilds(); else builds.textContent = "";
@@ -341,14 +368,21 @@ function prefillRange() {
   const labels = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
     .map(box => Math.floor(Number(snapSize(exportForm.elements[box].value)) + 0.5));
   low.value = String(labels.length ? Math.min(...labels) : 12);
-  high.value = String(labels.length ? Math.max(...labels) : 19);
-  count.value = labels.length > 4 ? "8" : "4";
+  high.value = String(labels.length ? Math.max(...labels) : 15);
+  count.value = String(labels.length || 4);
+}
+
+// One size is where the range starts, so the other end has nothing to say.
+function syncHigh() {
+  high.disabled = count.value === "1";
 }
 
 mode.addEventListener("change", () => {
   rangeFields.hidden = mode.value !== "range";
   if (mode.value === "range") prefillRange();
+  syncHigh();
 });
+count.addEventListener("change", syncHigh);
 toggle.addEventListener("click", () => {
   if (!low.value) prefillRange();
 });

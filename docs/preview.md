@@ -281,9 +281,13 @@ changed since the search. **Undo** puts back what Apply wrote, and keeps any
 box you have edited since.
 
 To choose new sizes instead, select **a range**, enter the smallest and largest
-whole size and choose **4** or **8** sizes, then press **Find sizes**. Four fill
-the first row of boxes. Eight fill both rows, open **More sizes** so you can
-see them, and the section says what that builds:
+whole size and choose how many sizes, from 1 to 8, then press **Find sizes**.
+One size needs only the smallest. The sizes fill the first row of boxes, then
+**More sizes**, which opens so you can see them.
+
+A range is the family's new list of sizes. Boxes past the count are listed as
+**removed**, and **Apply** empties them. **Undo** brings them back. The section
+says what the result builds:
 
 - with the **suffix** under **More sizes** empty, one family with eight sizes;
 - with a suffix, two families, the second named with the suffix.

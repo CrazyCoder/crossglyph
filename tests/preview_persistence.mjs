@@ -6267,6 +6267,59 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.fit.builds.textContent);
 }
 
+// 99d. A range is the family's new size list. Boxes past its count are
+//      emptied, shown as removed before Apply, and Undo brings them back.
+{
+  const opts = {renderOk: true};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  const els = env.exportForm.elements;
+  const all = [...FIRST_ROW, ...SECOND_ROW];
+  const before = ["12", "14", "16", "18", "19", "20", "21", "22"];
+  all.forEach((name, i) => { els[name].value = before[i]; });
+  els.mod_suffix.value = "";
+  opts.fitSteps = fitSteps([12, 13, 14, 15, 16, 17].map(l => [l, l, l, [90, 90, 90, 90]]));
+  env.fold.press("fit");
+  env.fit.mode.value = "range";
+  env.fit.mode.on.change();
+  check("a range starts from as many sizes as the boxes hold",
+        env.fit.count.value === "8", env.fit.count.value);
+  env.fit.low.value = "12";
+  env.fit.high.value = "17";
+  env.fit.count.value = "6";
+  env.fit.run.on.click();
+  check("any count up to the boxes is asked for", env.fetches.fits.at(-1).count === 6,
+        JSON.stringify(env.fetches.fits.at(-1)));
+  const rows = env.fit.table.children;
+  check("boxes past the count are listed as removed from the start",
+        rows.length === 8 && rows[6].children[2].textContent === "removed"
+        && rows[7].children[1].textContent === "22" && rows[7].children[4].checked === true,
+        rows.map(r => r.children[2].textContent).join(" "));
+  await settle();
+  check("and the footer counts what is left",
+        env.fit.builds.textContent.startsWith("Builds one family of 6 sizes"),
+        env.fit.builds.textContent);
+  env.fit.apply.on.click();
+  check("Apply writes the range and empties the rest",
+        all.map(n => els[n].value).join(" ") === "12 13 14 15 16 17  ",
+        all.map(n => els[n].value).join(" "));
+  env.fit.undo.on.click();
+  check("Undo brings every box back", all.map(n => els[n].value).join(" ") === before.join(" "),
+        all.map(n => els[n].value).join(" "));
+
+  opts.fitSteps = fitSteps([[14, 14, 13.75, [50, 90, 50, 50]]]);
+  env.fit.low.value = "14";
+  env.fit.high.value = "";
+  env.fit.count.value = "1";
+  env.fit.count.on.change();
+  check("one size turns off the other end", env.fit.high.disabled === true);
+  env.fit.run.on.click();
+  await settle();
+  const one = env.fetches.fits.at(-1);
+  check("one size needs only where it starts",
+        one.count === 1 && one.low === 14 && env.fit.note.textContent === "",
+        JSON.stringify(one) + " " + env.fit.note.textContent);
+}
+
 // 99b. What the server refuses is said in the panel, and a new family stops
 //      a run and drops suggestions made for the last one.
 {

@@ -202,10 +202,23 @@ def test_a_range_too_narrow_for_its_count_is_refused():
 
 
 @pytest.mark.parametrize("low, high, count", [(5, 12, 4), (12, 41, 4), (14, 12, 4),
-                                              (12, 18, 5)])
-def test_a_range_outside_the_knob_or_an_odd_count_is_refused(low, high, count):
+                                              (12, 18, 0), (12, 20, 9)])
+def test_a_range_outside_the_knob_or_the_boxes_is_refused(low, high, count):
+    """Eight is the number of size boxes, two rows of four."""
     with pytest.raises(ValueError):
         gridfit.targets(low=low, high=high, count=count)
+
+
+def test_any_count_the_boxes_hold_spreads_evenly():
+    assert [label for _, label in gridfit.targets(low=12, high=17, count=6)] == \
+        [12, 13, 14, 15, 16, 17]
+    assert [label for _, label in gridfit.targets(low=12, high=18, count=3)] == \
+        [12, 15, 18]
+
+
+def test_one_size_is_the_low_end_alone():
+    assert gridfit.targets(low=14, high=None, count=1) == [(14, 14)]
+    assert gridfit.targets(low=14, high=20, count=1) == [(14, 14)]
 
 
 def test_the_pick_is_the_best_fit():

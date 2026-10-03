@@ -255,8 +255,8 @@ OFFSETS = (-0.5, -0.25, 0.0, 0.25)
 TIE = 1.0
 #: The size knob's range, which a range of sizes has to stay inside.
 SIZE_MIN, SIZE_MAX = 6, 40
-#: Four fills the first row of size boxes, eight fills both.
-COUNTS = (4, 8)
+#: The size boxes, two rows of four, which is as many sizes as a range fills.
+MAX_COUNT = 8
 
 
 def candidates(label: int) -> list[float]:
@@ -277,8 +277,12 @@ def targets(*, sizes: Sequence[float] = (), low: int | None = None,
     """
     if low is None:
         return [(size, size_label(size)) for size in sizes]
-    if count not in COUNTS:
-        raise ValueError(f"the count is {' or '.join(map(str, COUNTS))} sizes")
+    if count is None or not 1 <= count <= MAX_COUNT:
+        raise ValueError(f"a range is 1 to {MAX_COUNT} sizes, as many as the boxes hold")
+    if count == 1:
+        if not SIZE_MIN <= low <= SIZE_MAX:
+            raise ValueError(f"a size is between {SIZE_MIN} and {SIZE_MAX}")
+        return [(low, low)]
     if high is None or not SIZE_MIN <= low < high <= SIZE_MAX:
         raise ValueError(f"a range runs from a smaller size to a larger one, "
                          f"between {SIZE_MIN} and {SIZE_MAX}")
