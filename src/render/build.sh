@@ -60,6 +60,7 @@ CXX_SRCS="$ROOT/src/render/api.cpp \
   $FW/lib/MiniBidi/BidiUtils.cpp \
   $FW/lib/InflateReader/InflateReader.cpp \
   $FW/lib/Epub/Epub/ParsedText.cpp \
+  $FW/lib/Epub/Epub/WordStore.cpp \
   $FW/lib/Epub/Epub/blocks/TextBlock.cpp \
   $FW/lib/Epub/Epub/hyphenation/Hyphenator.cpp \
   $FW/lib/Epub/Epub/hyphenation/HyphenationCommon.cpp \

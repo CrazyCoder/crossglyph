@@ -104,8 +104,37 @@ class HalDisplay {
                             uint16_t, bool = false) {}
 
   // --- grayscale: captured by re-rendering instead, see the header note ----
+  // The firmware takes these types from the SDK's GrayscaleCapabilities.h
+  // (freeink-sdk/libs/display/FreeInkDisplay/include). Only the names and the
+  // fields GfxRenderer reads have to match. With no panel, every capability
+  // stays at its default, and the planes stay in Overlay mode, which is what
+  // GfxRenderer draws when no absolute base has been displayed.
+  enum class GrayscaleMode : uint8_t { Overlay, Absolute, Direct };
+  enum class GrayscaleEncoding : uint8_t { Unsupported, OverlayMasks,
+                                           AbsolutePlanes };
+  enum class GrayscaleBase : uint8_t { Separate, Combined };
+  struct GrayscaleCapabilities {
+    GrayscaleEncoding encoding = GrayscaleEncoding::Unsupported;
+    GrayscaleBase base = GrayscaleBase::Separate;
+    bool stripUploads = false;
+    bool asyncBase = false;
+    bool stagingWhileBusy = false;
+    constexpr bool supported() const {
+      return encoding != GrayscaleEncoding::Unsupported;
+    }
+  };
+  GrayscaleCapabilities grayscaleCapabilities(
+      GrayscaleMode = GrayscaleMode::Overlay) const {
+    return {};
+  }
+  bool supportsAsyncGrayscaleBase() const { return false; }
+
   bool combinesGrayscaleBase() const { return false; }
   void displayGrayscaleBase(RefreshMode = HALF_REFRESH, bool = false) {}
+  bool displayGrayscaleBase(GrayscaleMode, RefreshMode = HALF_REFRESH,
+                            bool = false) {
+    return false;
+  }
   void preconditionGrayscale() {}
   void preconditionGrayscale(uint16_t, uint16_t, uint16_t, uint16_t) {}
   void copyGrayscaleBuffers(const uint8_t*, const uint8_t*) {}

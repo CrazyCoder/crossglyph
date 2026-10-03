@@ -84,6 +84,11 @@ class RenderModule:
         module = wasmtime.Module.from_file(engine, str(path))
         self._instance = linker.instantiate(self._store, module)
         self._exports = self._instance.exports(self._store)
+        # A WASI reactor runs its C++ static constructors here, once, before
+        # anything else is called. Without it the renderer's members keep the
+        # zeros of linear memory rather than their initializers, and a clip
+        # rectangle of zero size drops every pixel without a word.
+        self._exports["_initialize"](self._store)
         self._memory = self._exports["memory"]
         #: Pointers handed out by write()/alloc(), freed by release().
         self._owned: list[int] = []

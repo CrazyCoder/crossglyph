@@ -438,7 +438,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       name: "language", value: "en", group: "page",
       options: [{ value: "en" }, { value: "fi" }, { value: "fr" },
                 { value: "de" }, { value: "it" }, { value: "pl" },
-                { value: "ru" }, { value: "es" }, { value: "sv" },
+                { value: "pt" }, { value: "ru" }, { value: "es" },
+                { value: "sv" },
                 { value: "uk" }, { value: "" }],
     }),
     // A font-side select, so the baseline machinery is exercised on the kind
@@ -3592,11 +3593,21 @@ for (const deferred of [
 
 // 52. Nothing on the list matches, so English rather than an empty box.
 {
-  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["pt-BR", "pt"] });
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["nl-NL", "nl"] });
   check("an unknown language opens on English",
         env.sample.value === "en", env.sample.value);
   check("and hyphenates as English too",
         env.byName.language.value === "en", env.byName.language.value);
+}
+
+// 52b. The other way round: patterns and no preset. The patterns are the
+//      reader's own and the specimen falls back to English.
+{
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["pt-BR", "pt"] });
+  check("Portuguese opens on English, having no specimen of its own",
+        env.sample.value === "en", env.sample.value);
+  check("and hyphenates as Portuguese",
+        env.byName.language.value === "pt", env.byName.language.value);
 }
 
 // 53. Detection happens once. What you last chose is what you get, however
