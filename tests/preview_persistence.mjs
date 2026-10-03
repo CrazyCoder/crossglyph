@@ -4406,6 +4406,14 @@ for (const deferred of [
         storage.data["crossglyph.language"]);
 
   const arrow = env.revertList.find(r => r.dataset.reset === "language");
+  // A page setting has no config, so its arrow names what the reader starts
+  // on rather than a stock value of the font.
+  check("its arrow offers the reader's default",
+        /show the reader's default/.test(arrow.title), arrow.title);
+  arrow.click();
+  check("and says so while it shows it",
+        /Showing the reader's default/.test(arrow.title), arrow.title);
+  arrow.click();
   arrow.click();
   check("setting it aside does not rewrite that",
         storage.data["crossglyph.language"] === "de",

@@ -142,6 +142,12 @@ export function knobModified(name, base) {
   return !sameState(currentState(name), base ?? baseState(name));
 }
 
+// A page setting is the reader's, not the font's: it has no config, and its
+// declared value is what the device starts on rather than a stock font value.
+function isPageKnob(name) {
+  return form.elements[name]?.dataset.group === "page";
+}
+
 export function showRevertState(button, held, target) {
   const off = Boolean(held);
   button.hidden = !(off || target);
@@ -150,7 +156,9 @@ export function showRevertState(button, held, target) {
   // stock even though the older stash still points at the config.
   const source = off ? (held.untuned ? "stock" : held.source)
                      : target && target.source;
-  const what = source === "stock" ? "the stock value" : "what the config has";
+  const what = source === "config" ? "what the config has"
+             : isPageKnob(button.dataset.reset) ? "the reader's default"
+             : "the stock value";
   button.title = off
     ? `Showing ${what}. Click to put your value back.`
     : `Set your value aside and show ${what}. Click again to bring it back.`;
@@ -168,6 +176,8 @@ export function refreshReverts() {
     const was = target.state.checked ? "on" : "off";
     mark.title = target.source === "config"
       ? `Changed. The config has this ${was}.`
+      : isPageKnob(mark.dataset.mark)
+      ? `Changed from the reader's default, which is ${was}.`
       : `Changed from stock, which is ${was}.`;
   }
   showSaveState();
