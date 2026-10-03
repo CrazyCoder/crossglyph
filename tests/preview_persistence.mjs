@@ -902,6 +902,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // What the sizes build, under the first row of boxes.
     "fit-apply": makeElement(),
     "fit-undo": Object.assign(makeElement(), {hidden: true}),
+    // The Use heading's own box, which ticks or clears every suggestion.
+    "fit-all": Object.assign(makeControl({name: "fit-all", type: "checkbox"}),
+                             {indeterminate: false, disabled: true}),
     // The variable-font block, and the row per axis it builds inside it.
     variable: { hidden: false },
     "axis-text-row": { hidden: false },
@@ -1401,7 +1404,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
-                  apply: stubs["fit-apply"], undo: stubs["fit-undo"] },
+                  apply: stubs["fit-apply"], undo: stubs["fit-undo"],
+                  all: stubs["fit-all"] },
            sheet,
            device: {
              ratio(value) { sandbox.devicePixelRatio = value; },
@@ -6193,7 +6197,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   // The headings are a row of the same grid, so a cell in one and not the
   // other puts every value under the wrong heading.
   const headings = /class="fit-row fit-head"[^>]*>([\s\S]*?)<\/div>/.exec(INDEX)[1]
-    .match(/<span>/g).length;
+    .match(/<span\b/g).length;
   check("the headings have a cell for each cell of a row",
         headings === rows[0].children.length, `${headings} headings`);
   check("with the score each would have",
@@ -6212,6 +6216,33 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("and says so", /already/i.test(kept.title ?? ""), kept.title);
   check("a gain under 3 points is offered but not ticked",
         rows[2].children.at(-1).hidden === false && rows[2].children.at(-1).checked === false);
+
+  // The heading's box: ticked when every offer is, a dash when some are.
+  const all = env.fit.all;
+  const offers = () => rows.map(r => r.children.at(-1)).filter(t => !t.hidden && !t.disabled);
+  const state = () => JSON.stringify({checked: all.checked, dash: all.indeterminate,
+                                      off: all.disabled, rows: offers().map(t => t.checked)});
+  check("some offers ticked shows the heading's box as a dash",
+        all.indeterminate === true && all.disabled === false, state());
+  all.checked = true;
+  all.on.change();
+  check("ticking it ticks every offer",
+        offers().every(t => t.checked) && all.indeterminate === false, state());
+  check("and leaves a size already in use as it was",
+        kept.checked === true && kept.disabled === true);
+  all.checked = false;
+  all.on.change();
+  check("clearing it clears every offer", offers().every(t => !t.checked), state());
+  const one = offers()[0];
+  one.checked = true;
+  one.on.change();
+  check("ticking one row by hand brings the dash back",
+        all.indeterminate === true, state());
+  for (const tick of offers()) tick.checked = true;
+  one.on.change();
+  check("and ticking every row by hand ticks the heading's box",
+        all.checked === true && all.indeterminate === false, state());
+  rows[0].children.at(-1).checked = true;
   // On the button rather than a line of its own, which would appear and go
   // and move everything under it. How many letters the scores rest on is in
   // Grid Fit under the page.

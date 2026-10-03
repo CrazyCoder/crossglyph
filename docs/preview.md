@@ -273,7 +273,8 @@ scores the text on the page with the current Tune settings, as
    sizes as it scores them.
 3. Press a value in the **Size** or **Suggested** column to show the page at
    that size. Press the other one to compare.
-4. Untick any suggestion you do not want in the **Use** column.
+4. Untick any suggestion you do not want in the **Use** column. The box at
+   the top of the column ticks or clears all of them at once.
 5. Press **Apply**. The suggestions go into the size boxes.
 6. Press **Save** or **Build** to keep them.
 

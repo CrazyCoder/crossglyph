@@ -1072,8 +1072,13 @@
         </div>
         <button type="button" id="fit-run">Find sizes</button>
       </div>
-      <div class="fit-row fit-head" aria-hidden="true">
-        <span>Size</span><span>Suggested</span><span>Grid Fit</span><span>Gain</span><span>Use</span>
+      <!-- The headings, read as part of each row, and in the Use column a box
+           that ticks or clears every suggestion Apply can take. -->
+      <div class="fit-row fit-head">
+        <span aria-hidden="true">Size</span><span aria-hidden="true">Suggested</span><span
+          aria-hidden="true">Grid Fit</span><span aria-hidden="true">Gain</span><span><input
+          type="checkbox" id="fit-all" disabled aria-label="Use every suggestion"
+          title="Tick or clear every suggestion"></span>
       </div>
       <div id="fit-table" class="fit-table"></div>
       <div id="fit-note" class="hint" aria-live="polite"></div>

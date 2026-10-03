@@ -28,6 +28,7 @@ const note = document.getElementById("fit-note");
 const builds = document.getElementById("fit-builds");
 const applyButton = document.getElementById("fit-apply");
 const undoButton = document.getElementById("fit-undo");
+const allBox = document.getElementById("fit-all");
 
 const FIRST_ROW = ["size1", "size2", "size3", "size4"];
 const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
@@ -125,6 +126,7 @@ function addRow(box, now) {
   const tick = document.createElement("input");
   tick.type = "checkbox";
   tick.hidden = true;
+  tick.addEventListener("change", syncAll);
   const entry = {box, held: exportForm.elements[box].value, now: valueButton(now),
                  pick: valueButton(null), score, gain, value: null, tick};
   row.append(entry.now, entry.pick, score, gain, tick);
@@ -148,6 +150,16 @@ function addRemovedRow(box) {
 
 //: Whether a row is Apply's to take: a change it can make, not one in use.
 const offered = (row) => !row.tick.hidden && !row.tick.disabled;
+
+//: The Use heading's box says what the rows' boxes say: ticked when every
+//: offer is, a dash when some are, and off when there is nothing to offer.
+function syncAll() {
+  const offers = rows.filter(offered);
+  const ticked = offers.filter(row => row.tick.checked).length;
+  allBox.disabled = !offers.length;
+  allBox.checked = offers.length > 0 && ticked === offers.length;
+  allBox.indeterminate = ticked > 0 && ticked < offers.length;
+}
 
 function fillRow(entry, now, pick, fits, ranged) {
   entry.filled = true;
@@ -175,6 +187,7 @@ function fillRow(entry, now, pick, fits, ranged) {
   entry.tick.disabled = !changes;
   entry.tick.checked = !changes || ranged || pickFit - nowFit >= WORTH;
   entry.tick.title = changes ? "" : "Already in the boxes";
+  syncAll();
 }
 
 // The server's refusal as a sentence. A malformed request comes back as a
@@ -231,6 +244,7 @@ function clearFit() {
   applyButton.disabled = true;
   undoButton.hidden = true;
   applied = null;
+  syncAll();
 }
 
 async function runFit() {
@@ -304,6 +318,7 @@ async function runFit() {
       rows = rows.filter(row => (row.removed ? complete : row.filled));
       table.replaceChildren(...rows.map(entry => entry.now.parentElement));
       applyButton.disabled = !rows.some(offered);
+      syncAll();
       if (rows.length) showBuilds(); else builds.textContent = "";
       syncFitMarks();
       ready();
@@ -407,6 +422,10 @@ toggle.addEventListener("click", showFitTargets);
 runButton.addEventListener("click", runFit);
 applyButton.addEventListener("click", applyFit);
 undoButton.addEventListener("click", undoFit);
+allBox.addEventListener("change", () => {
+  for (const row of rows.filter(offered)) row.tick.checked = allBox.checked;
+  syncAll();
+});
 // The section sits inside the export form, whose listeners would take its
 // fields for settings and offer to save them.
 for (const kind of ["input", "change"]) {
