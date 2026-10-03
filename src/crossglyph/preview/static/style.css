@@ -965,7 +965,13 @@
   .fit-controls { display: flex; flex-wrap: wrap; gap: .35rem;
                   align-items: center; font-size: 12px; }
   .fit-controls select { width: auto; }
+  /* One height for the menus, fields and buttons that share a line, which
+     the browser otherwise draws at three. */
+  .fit-controls select, .fit-controls input, .fit-panel button:not(.fit-value) {
+    height: 26px; padding-top: 0; padding-bottom: 0;
+  }
   #export #fit-range input { width: 3.4rem; text-align: center; }
+  #fit-range:not([hidden]) { display: inline-flex; align-items: center; gap: .35rem; }
   .fit-head { color: var(--muted); font-size: 11px; }
   .fit-head:has(+ .fit-table:empty) { display: none; }
   #fit-range[hidden] { display: none; }
