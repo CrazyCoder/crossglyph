@@ -578,23 +578,24 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     field.dataset = field.dataset || {};
     field.name = field.name || name;
   }
-  // The title above each size box. A press rather than a label: it moves the
-  // size knob to what its box holds.
-  const sizeTitles = ["size1", "size2", "size3", "size4",
-                      "mod1", "mod2", "mod3", "mod4"].map(name => ({
-    dataset: { previewSize: name },
-    on: {},
-    addEventListener(kind, fn) { this.on[kind] = fn; },
-  }));
+  // A size box marks itself while the page shows its size, so the eight carry
+  // a class list as real inputs do.
+  for (const name of ["size1", "size2", "size3", "size4",
+                      "mod1", "mod2", "mod3", "mod4"]) {
+    const box = exportFields[name];
+    box.classes = new Set();
+    box.classList = {
+      add: (c) => box.classes.add(c), remove: (c) => box.classes.delete(c),
+      contains: (c) => box.classes.has(c),
+      toggle: (c, on) => (on ? box.classes.add(c) : box.classes.delete(c)),
+    };
+  }
   const exportForm = {
     hidden: false, elements: exportFields, on: {},
     addEventListener(kind, fn) { this.on[kind] = fn; },
-    querySelectorAll: (selector) =>
-      selector === "[data-preview-size]" ? sizeTitles : [],
-    //: Pressing a box's title, which shows the page at the size it holds.
-    preview(name) {
-      sizeTitles.find(title => title.dataset.previewSize === name).on.click();
-    },
+    querySelectorAll: () => [],
+    //: Selecting a size box, which shows the page at the size it holds.
+    preview(name) { this.on.focusin({ target: exportFields[name] }); },
     // What the page listens for: a change to any control in here offers a save.
     edit(field) { this.on.input({ target: exportFields[field] }); },
     // And leaving one, which is when a size box snaps to the quarter point.
@@ -2638,12 +2639,11 @@ for (const { name, text } of sources) {
 }
 
 // 30b5. A size box says what will ship and the knob on the left says what you
-//       are looking at, which used to mean typing each shipped size into the
-//       knob by hand to judge it. A box's title moves the knob to what the box
-//       holds. The knob is a view setting, so nothing about the config moves
-//       with it.
+//       are looking at. Selecting a box moves the knob to what the box holds,
+//       and the box shown is marked. The knob is a view setting, so nothing
+//       about the config moves with it.
 {
-  const env = await loaded(fakeStorage());
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
   check("the family opens with its own sizes in the boxes",
         env.exportForm.elements.size1.value === "12", env.exportForm.elements.size1.value);
   check("and the knob at the size the page is drawn at",
@@ -2651,10 +2651,13 @@ for (const { name, text } of sources) {
 
   env.exportForm.preview("size1");
   await settle();
-  check("pressing a box's title shows the page at that size",
+  check("selecting a box shows the page at its size",
         env.byName.size.value === "12", env.byName.size.value);
   check("and draws it", env.fetches.bodies.at(-1).size === 12,
         JSON.stringify(env.fetches.bodies.at(-1).size));
+  check("and marks that box as the one on screen",
+        env.exportForm.elements.size1.classes.has("showing")
+        && !env.exportForm.elements.size2.classes.has("showing"));
   check("without touching what the config says",
         env.save.disabled === true && env.fetches.saves.length === 0,
         `${env.save.disabled}/${env.fetches.saves.length}`);
@@ -2679,6 +2682,12 @@ for (const { name, text } of sources) {
   env.exportForm.preview("mod4");
   check("and an empty box leaves the knob where it was",
         env.byName.size.value === "9", env.byName.size.value);
+
+  env.byName.size.value = "20";
+  env.listeners.input({ target: env.byName.size });
+  await settle();
+  check("a size no box holds leaves no box marked",
+        ["size1", "size2", "mod1"].every(n => !env.exportForm.elements[n].classes.has("showing")));
 }
 
 // 30c. The second family: the same faces at other sizes, listed beside this one
@@ -6131,11 +6140,11 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   // grow as results arrive.
   const early = env.fit.table.children;
   check("Find sizes lays out a row per size at once",
-        early.length === 4 && early.every(row => row.children[2].textContent === "…"
-                                          && row.children[3].textContent === "…"),
-        early.map(row => row.children[2]?.textContent).join(" "));
+        early.length === 4 && early.every(row => row.children[1].textContent === "…"
+                                          && row.children[2].textContent === "…"),
+        early.map(row => row.children[1]?.textContent).join(" "));
   check("with the size each row starts from",
-        early.map(row => row.children[1].textContent).join(" ") === "12 14 16 18");
+        early.map(row => row.children[0].textContent).join(" ") === "12 14 16 18");
   check("a search that changes no count says nothing about the build",
         env.fit.builds.textContent === "", env.fit.builds.textContent);
   await settle();
@@ -6147,18 +6156,18 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         JSON.stringify(env.fetches.fits[0]));
   const rows = env.fit.table.children;
   check("a row for each size", rows.length === 4, String(rows.length));
-  const [name, now, pick, score, tick] = rows[0].children;
-  check("each row says the box, the size now and the suggestion",
-        name.textContent === "Small" && now.textContent === "12"
-        && pick.textContent === "11.75", [name, now, pick].map(c => c.textContent).join("|"));
+  const [now, pick, score, tick] = rows[0].children;
+  check("each row says the size now and the suggestion, and nothing else names it",
+        rows[0].children.length === 4 && now.textContent === "12"
+        && pick.textContent === "11.75", [now, pick].map(c => c.textContent).join("|"));
   check("with the score each would have",
         score.textContent === "100 (+38)" && score.title === "62 now, 100 suggested",
         `${score.textContent} | ${score.title}`);
   check("a change worth making is ticked", tick.checked === true);
   check("a size that is already best has nothing to tick",
-        rows[1].children[4].hidden === true && rows[1].children[2].textContent === "14");
+        rows[1].children[3].hidden === true && rows[1].children[1].textContent === "14");
   check("a gain under 3 points is offered but not ticked",
-        rows[2].children[4].hidden === false && rows[2].children[4].checked === false);
+        rows[2].children[3].hidden === false && rows[2].children[3].checked === false);
   check("one status line counts the search",
         env.fit.sample.steps.includes("Scoring 16 of 16"),
         JSON.stringify(env.fit.sample.steps));
@@ -6181,7 +6190,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("looking at sizes writes nothing",
         els.size1.value === "12" && env.fetches.saves.length === saves);
 
-  rows[2].children[4].checked = true;
+  rows[2].children[3].checked = true;
   env.fit.apply.on.click();
   check("Apply puts the ticked suggestions in the boxes",
         FIRST_ROW.map(n => els[n].value).join(" ") === "11.75 14 16.25 18",
@@ -6339,9 +6348,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         JSON.stringify(env.fetches.fits.at(-1)));
   const rows = env.fit.table.children;
   check("boxes past the count are listed as removed from the start",
-        rows.length === 8 && rows[6].children[2].textContent === "removed"
-        && rows[7].children[1].textContent === "22" && rows[7].children[4].checked === true,
-        rows.map(r => r.children[2].textContent).join(" "));
+        rows.length === 8 && rows[6].children[1].textContent === "removed"
+        && rows[7].children[0].textContent === "22" && rows[7].children[3].checked === true,
+        rows.map(r => r.children[1].textContent).join(" "));
   await settle();
   check("and the footer counts what is left",
         env.fit.builds.textContent === "After Apply, it builds one family of 6 sizes.",

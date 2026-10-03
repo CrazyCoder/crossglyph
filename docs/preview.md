@@ -235,8 +235,8 @@ family.
   characters first;
 - **output** shows where the built family is written.
 
-The **Small**, **Medium**, **Large** and **Extra Large** labels are buttons. Press
-one to preview the point size in its box.
+Select a size box to see the page at the size it holds. The box the page is
+showing is marked. This changes only the preview, not the font.
 
 **More sizes** is optional, and folded until you open it. With its **suffix**
 empty, its sizes join this family and the reader lists all of them. Fill in the

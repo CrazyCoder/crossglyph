@@ -1,6 +1,6 @@
 import {form, lineHeightAuto, status} from "./dom.js";
 import {showRenderedPage} from "./device.js";
-import {exportForm, exportSettings, fetchButton, presetBoxes,
+import {exportForm, exportSettings, fetchButton, markShownSize, presetBoxes,
         showFallbacksLeft, showIntervalLoad} from "./export.js";
 import {familyPicker} from "./family.js";
 import {familyMoved, syncFitMarks} from "./fitsizes.js";
@@ -254,6 +254,7 @@ export async function renderNow() {
               `${request.family}\n${request.text ?? ""}`);
   familyMoved();
   syncFitMarks();
+  markShownSize();
   status.textContent = `${Math.round(performance.now() - started)} ms`;
 }
 

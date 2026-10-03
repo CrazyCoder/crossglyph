@@ -968,21 +968,16 @@
      name the second family would take if there were one. */
   #export input:disabled { color: var(--muted); background: transparent;
                            border-style: dashed; }
-  /* A box per size with its step named above it, the way the font builder's
-     own page puts them: one field holding "12 14 16 18" says nothing about
-     which number is which step, and editing the third of four means counting
-     along a line of digits. */
+  /* A box per size rather than one field holding "12 14 16 18": editing the
+     third of four should not mean counting along a line of digits. */
   .sizes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
            gap: .4rem; padding: .35rem 0 .15rem; }
-  .sizes .size-box { display: flex; flex-direction: column; gap: .15rem; }
-  /* Set as the label it stands in for, since what it says about the box under
-     it has not changed. It underlines on hover because it is also a press, and
-     a title that does something has to look unlike the ones that do not. */
-  .sizes .size-title { font: inherit; font-size: 11px; color: var(--muted);
-                       background: none; border: 0; padding: 0; text-align: left;
-                       cursor: pointer; }
-  .sizes .size-title:hover { color: var(--text); text-decoration: underline; }
-  #export .sizes input[type=text] { text-align: center; }
+  #export .sizes input[type=text] { text-align: center; cursor: pointer; }
+  #export .sizes input[type=text]:focus { cursor: text; }
+  /* The box whose size the page is showing, marked the way Fit to grid
+     marks the size on screen. */
+  #export .sizes input.showing { border-color: var(--focus);
+                                 box-shadow: inset 0 0 0 1px var(--focus); }
 
   /* Fit to grid, a folded section of its own under the sizes. */
   .fit-panel { padding: .2rem 0 .6rem; display: grid; gap: .45rem; }
@@ -999,7 +994,7 @@
     position: relative;
   }
   /* The size boxes' own four columns and gap, so a range's fields stand under
-     Small, Medium and Large and Find sizes under Extra Large, in both modes. */
+     the first three boxes and Find sizes under the last, in both modes. */
   .fit-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
               gap: .4rem; align-items: end; }
   .fit-span { grid-column: 1 / 4; }

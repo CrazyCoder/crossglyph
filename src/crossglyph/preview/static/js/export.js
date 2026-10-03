@@ -778,13 +778,27 @@ exportForm.addEventListener("change", (event) => sizeLeft(event.target));
 // The boxes say what will ship and the knob on the left says what you are
 // looking at, and the two are easy to set apart and tedious to keep together:
 // judging four shipped sizes meant typing each of them into the knob by hand.
-// A box's title moves the knob to what that box holds, which is the whole
-// distance between a size being in the list and having been looked at.
+// Selecting a box moves the knob to what that box holds, which is the whole
+// distance between a size being in the list and having been looked at, and
+// the box the page is showing is marked.
 //
 // The knob is a view setting, so this writes nothing into the config and
 // leaves the Save button where it was.
+const SIZE_BOXES = new Set([...SIZE_FIELDS, ...MOD_FIELDS]);
+
 function previewSize(name) {
   showSize(exportForm.elements[name].value);
+  markShownSize();
+}
+
+//: Marks the boxes holding the size the page is drawn at. The page moves by
+//: other means too, so render.js calls this after every page.
+export function markShownSize() {
+  const showing = Number(form.elements.size.value);
+  for (const name of SIZE_BOXES) {
+    const box = exportForm.elements[name];
+    box.classList.toggle("showing", Number(snapSize(box.value)) === showing);
+  }
 }
 
 //: Move the size knob to a size, which is all "show me this size" is. Fit to
@@ -796,14 +810,14 @@ export function showSize(value) {
   setField(form.elements.size, size);
 }
 
-//: Wired by the entry point rather than on import: the press reaches across to
-//: the knob form, and a module body runs while its imports may still be on
-//: their way up.
-export function wireSizeTitles() {
-  for (const title of exportForm.querySelectorAll("[data-preview-size]")) {
-    title.addEventListener(
-      "click", () => previewSize(title.dataset.previewSize));
-  }
+//: Wired by the entry point rather than on import: selecting a box reaches
+//: across to the knob form, and a module body runs while its imports may
+//: still be on their way up. One listener on the form, since focus bubbles
+//: from any of the eight boxes as focusin.
+export function wireSizeBoxes() {
+  exportForm.addEventListener("focusin", (event) => {
+    if (SIZE_BOXES.has(event.target.name)) previewSize(event.target.name);
+  });
 }
 
 // The faces are not vendored: they are large, unmodified and OFL, so they are

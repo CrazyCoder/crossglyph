@@ -35,7 +35,6 @@ const FIRST_ROW = ["size1", "size2", "size3", "size4"];
 const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 //: The fields past the four boxes in each row, which take a list.
 const SPILL = {first: "size_more", second: "mod_more"};
-const TITLES = ["Small", "Medium", "Large", "Extra Large"];
 //: A suggestion is ticked for you when it gains at least this much.
 const WORTH = 3;
 //: The size knob's range, which a range of sizes has to stay inside.
@@ -50,12 +49,6 @@ let applied = null;
 let foundFor = null;
 let controller = null;
 let runs = 0;
-
-function titleOf(box) {
-  const first = FIRST_ROW.indexOf(box);
-  return first >= 0 ? TITLES[first]
-    : `${TITLES[SECOND_ROW.indexOf(box)]}, more sizes`;
-}
 
 function filled(box) {
   return Number(snapSize(exportForm.elements[box].value)) > 0;
@@ -126,9 +119,6 @@ function setValue(button, size) {
 function addRow(box, now) {
   const row = document.createElement("div");
   row.className = "fit-row";
-  const name = document.createElement("span");
-  name.className = "fit-name";
-  name.textContent = titleOf(box);
   const score = document.createElement("span");
   score.className = "fit-score mono";
   score.textContent = WAITING;
@@ -137,7 +127,7 @@ function addRow(box, now) {
   tick.hidden = true;
   const entry = {box, held: exportForm.elements[box].value, now: valueButton(now),
                  pick: valueButton(null), score, value: null, tick};
-  row.append(name, entry.now, entry.pick, score, tick);
+  row.append(entry.now, entry.pick, score, tick);
   table.append(row);
   rows.push(entry);
 }
@@ -153,7 +143,7 @@ function addRemovedRow(box) {
   entry.score.textContent = "";
   entry.tick.hidden = false;
   entry.tick.checked = true;
-  entry.tick.setAttribute("aria-label", `Remove ${titleOf(box)}`);
+  entry.tick.setAttribute("aria-label", `Remove size ${entry.now.dataset.size}`);
 }
 
 function fillRow(entry, now, pick, fits, ranged) {
@@ -170,7 +160,7 @@ function fillRow(entry, now, pick, fits, ranged) {
   if (pick !== null && pick !== now) {
     entry.score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
   }
-  entry.tick.setAttribute("aria-label", `Use ${pick} for ${titleOf(entry.box)}`);
+  entry.tick.setAttribute("aria-label", `Use ${pick} instead of ${now}`);
   // Something to change is a suggestion the box does not already hold. A
   // range starts from labels the boxes may not hold at all, so all of it is
   // the user's to take; for their own sizes only a real gain is ticked.
