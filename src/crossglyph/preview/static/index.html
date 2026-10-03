@@ -628,7 +628,7 @@
 
 <div id="middle">
   <div id="stage">
-    <div id="device-surface">
+    <div id="device-surface" tabindex="0">
       <canvas id="device-page" width="480" height="800"
               aria-label="the page as the selected device draws it"></canvas>
       <img id="device-frame" alt="" draggable="false">
@@ -729,6 +729,28 @@
             <option value="fit">fit</option>
             <option value="custom">custom</option>
           </select>
+          <label for="device-zoom">zoom</label>
+          <span class="device-zoom">
+            <button type="button" class="step mono" data-zoom-step="-1"
+                    aria-label="zoom out">−</button>
+            <select id="device-zoom" data-device-setting>
+              <option value="0" selected>off</option>
+              <option value="200">200%</option>
+              <option value="400">400%</option>
+              <option value="800">800%</option>
+              <option value="1000">1000%</option>
+              <option value="1600">1600%</option>
+              <option value="2400">2400%</option>
+              <option value="3200">3200%</option>
+            </select>
+            <button type="button" class="step mono" data-zoom-step="1"
+                    aria-label="zoom in">+</button>
+          </span>
+          <label for="device-grid">grid</label>
+          <span class="device-zoom">
+            <input id="device-grid" type="checkbox" data-device-setting checked>
+            <span id="device-zoom-readout" class="mono"></span>
+          </span>
         </div>
       </div>
       <div id="device-calibration" hidden>

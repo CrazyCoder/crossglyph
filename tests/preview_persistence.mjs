@@ -737,6 +737,21 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     name: "device-tint", type: "number", value: "2.5",
     min: "-8", max: "8", step: ".5", coarse: "2",
   }));
+  // The zoom: its levels as the markup declares them, the grid switch, and
+  // the line that names the pixel under the pointer.
+  const deviceZoom = deviceControl(makeControl({
+    name: "device-zoom", value: "0", options: optionsOf("device-zoom"),
+  }));
+  const deviceGrid = deviceControl(makeControl({
+    name: "device-grid", type: "checkbox", checked: true,
+  }));
+  const deviceZoomReadout = makeElement();
+  const zoomSteps = [-1, 1].map(direction => ({
+    dataset: {zoomStep: String(direction)},
+    on: {},
+    addEventListener(kind, fn) { this.on[kind] = fn; },
+    press() { this.on.click(); },
+  }));
   const deviceSlider = (id, field) => ({
     id, dataset: {sliderFor: field.id}, value: field.value,
     min: field.min, max: field.max, step: field.step,
@@ -781,6 +796,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       press(shiftKey = false) { this.on.pointerdown({shiftKey}); },
     })));
   const deviceSurface = makeElement();
+  // Two modules listen to the same presses on the page, so every listener
+  // for a kind is kept and called in the order it was added.
+  deviceSurface.addEventListener = function (kind, fn) {
+    const before = this.on[kind];
+    this.on[kind] = before ? (event) => { before(event); fn(event); } : fn;
+  };
   //: The sheet gesture: press and hold on the device surface shows the page
   //: untuned.
   const sheet = {
@@ -828,6 +849,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const deviceSettings = [
     deviceModel, deviceColor, deviceFrame, deviceScale,
     devicePaper, deviceInk, deviceCalibration, deviceWarm, deviceTint,
+    deviceZoom, deviceGrid,
   ];
   const stubs = {
     save: saveButton,
@@ -959,6 +981,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-warm-slider": deviceWarmSlider,
     "device-tint": deviceTint,
     "device-tint-slider": deviceTintSlider,
+    "device-zoom": deviceZoom,
+    "device-grid": deviceGrid,
+    "device-zoom-readout": deviceZoomReadout,
     ...tintFuncs,
     "device-ruler": makeElement(),
     "reset-device": deviceReset,
@@ -1041,6 +1066,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
         if (deviceFor) {
           return deviceStepList.filter(button => button.dataset.for === deviceFor);
         }
+        if (selector === "[data-zoom-step]") return zoomSteps;
         // Both spellings the page uses: one row's arrow while it is being
         // wired, and every arrow at once when their visibility is refreshed.
         if (selector === "[data-device-reset]") {
@@ -1419,6 +1445,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              warmSlider: deviceWarmSlider, tintSlider: deviceTintSlider,
              tintFuncs,
              copy: deviceCopy, copyIcons, resets: deviceResets,
+             zoom: deviceZoom, grid: deviceGrid, readout: deviceZoomReadout,
+             zoomSteps,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -6639,6 +6667,108 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("past the edge of the page is the colour asked for",
         shifted.slice(0, 3).join() === "1,2,3" && shifted[16] === 10,
         shifted.slice(0, 20).join());
+}
+
+// Pixel zoom on the page: the canvas becomes whole blocks of the render,
+// the spot is remembered, and a new page keeps it.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  const z = env.modules.get("zoom.js");
+  check("the zoom levels in the markup are the ones zoom.js steps through",
+        JSON.stringify(optionsOf("device-zoom").map(o => o.value))
+          === JSON.stringify(["0", ...z.LEVELS.map(String)]),
+        JSON.stringify(optionsOf("device-zoom")));
+  check("zoom starts off", env.device.zoom.value === "0"
+        && env.modules.get("device.js").zoomed() === false);
+
+  env.device.zoom.value = "1000";
+  env.device.change(env.device.zoom);
+  const canvas = env.device.canvas;
+  check("zooming hides the frame", env.device.frameImage.hidden === true);
+  check("and keeps the view the size of the page at this scale",
+        canvas.width === 480 && canvas.height === 800,
+        `${canvas.width}x${canvas.height}`);
+  const pixels = canvas.pixels;
+  const red = (x, y) => pixels[(y * 480 + x) * 4];
+  let blocks = true;
+  for (let by = 0; by < 80; by += 7) for (let bx = 0; bx < 48; bx += 5) {
+    const first = red(bx * 10, by * 10);
+    for (let y = 0; y < 9; ++y) for (let x = 0; x < 9; ++x) {
+      if (red(bx * 10 + x, by * 10 + y) !== first) blocks = false;
+    }
+    if (red(bx * 10 + 9, by * 10) !== z.GRID_RGB[0]) blocks = false;
+  }
+  check("every block is one level, edged by the grid", blocks);
+  const saved = JSON.parse(storage.data["crossglyph.device"]);
+  check("the zoom is saved with the device settings",
+        saved.zoom === 1000 && saved.x === 240 && saved.y === 400 && saved.grid === true,
+        storage.data["crossglyph.device"]);
+
+  env.device.grid.checked = false;
+  env.device.edit(env.device.grid);
+  check("the grid can be turned off",
+        canvas.pixels[9 * 4] === canvas.pixels[0],
+        canvas.pixels.slice(0, 48).join());
+
+  const renders = env.fetches.render;
+  env.byName.gamma.value = "1.5";
+  env.listeners.input({ target: env.byName.gamma });
+  await settle();
+  await settle();
+  check("a new page keeps the zoom and the spot",
+        env.fetches.render > renders && env.device.zoom.value === "1000"
+        && JSON.parse(storage.data["crossglyph.device"]).x === 240,
+        `${env.fetches.render} renders, ${storage.data["crossglyph.device"]}`);
+
+  env.device.scale.value = "device";
+  env.device.change(env.device.scale);
+  check("a smaller view at another scale still holds whole blocks",
+        canvas.width < 480 && Number.isInteger(canvas.width)
+        && env.device.zoom.value === "1000", `${canvas.width}x${canvas.height}`);
+  env.device.scale.value = "pixels";
+  env.device.change(env.device.scale);
+
+  const before = canvas.pixels;
+  env.device.ink.value = "60";
+  env.device.edit(env.device.ink);
+  check("a tone change repaints the zoomed view",
+        canvas.pixels !== before && canvas.pixels[0] !== before[0] && canvas.width === 480,
+        `${before[0]} then ${canvas.pixels[0]}`);
+
+  env.device.zoomSteps[1].press();
+  check("the plus button steps the level up", env.device.zoom.value === "1600");
+  env.device.zoomSteps[0].press();
+  env.device.zoomSteps[0].press();
+  check("the minus button steps it down", env.device.zoom.value === "800");
+
+  const reloaded = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("the zoom comes back after a reload",
+        reloaded.device.zoom.value === "800" && reloaded.device.grid.checked === false
+        && reloaded.device.frameImage.hidden === true);
+
+  reloaded.device.reset();
+  await settle();
+  check("resetting the device preview turns zoom off and the grid on",
+        reloaded.device.zoom.value === "0" && reloaded.device.grid.checked === true
+        && reloaded.device.frameImage.hidden === false
+        && !("crossglyph.device" in storage.data));
+}
+
+// A centre saved for one reader is kept on the panel of another.
+{
+  const storage = fakeStorage({"crossglyph.device": JSON.stringify({
+    device: "x3", zoom: 1000, x: 9999, y: 800, last: 1000, grid: true,
+  })});
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("a saved zoom for the X3 comes back", env.device.zoom.value === "1000");
+  env.device.zoomSteps[1].press();
+  const after = JSON.parse(storage.data["crossglyph.device"]);
+  check("with its centre brought onto the X3 panel",
+        after.x <= 528 && after.y <= 792, storage.data["crossglyph.device"]);
 }
 
 process.exit(failures ? 1 : 0);

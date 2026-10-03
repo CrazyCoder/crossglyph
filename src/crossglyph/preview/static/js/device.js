@@ -1,5 +1,7 @@
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
+import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, blockSize, clampCentre, inside,
+        origin, paint, stepLevel} from "./zoom.js";
 
 export const DEVICE_STORE = "crossglyph.device";
 
@@ -26,6 +28,10 @@ const calibrationSlider = document.getElementById("device-calibration-slider");
 const ruler = document.getElementById("device-ruler");
 const reset = document.getElementById("reset-device");
 const copyButton = document.getElementById("device-copy");
+const zoomSelect = document.getElementById("device-zoom");
+const gridBox = document.getElementById("device-grid");
+const readout = document.getElementById("device-zoom-readout");
+const zoomSteps = [...document.querySelectorAll("[data-zoom-step]")];
 
 const root = document.documentElement;
 
@@ -113,6 +119,27 @@ const SUFFIX = {scaled: "", pixels: "-1to1"};
 // they cannot disagree about which one is on screen.
 function variant() {
   return scale.value === "pixels" ? "pixels" : "scaled";
+}
+
+//: The zoom: its level in percent, 0 for off, and the centre of the view in
+//: reader pixels. Kept across renders, so a knob change leaves the same
+//: letters in view.
+let zoom = {level: 0, x: 0, y: 0};
+//: What a double-click zooms back to.
+let lastLevel = FIRST_LEVEL;
+
+export function zoomed() {
+  return zoom.level > 0;
+}
+
+// The frame goes while zoomed: a body drawn around a few letters says
+// nothing about where they are.
+function frameOn() {
+  return frameShown.checked && !zoomed();
+}
+
+function gridShown(level) {
+  return gridBox.checked && level >= GRID_FROM;
 }
 
 // One device's geometry, with the panel size the two renders share. Takes the
@@ -204,7 +231,7 @@ function alignPixelGrid() {
 
 export function layoutDevice() {
   const device = profile();
-  const shown = frameShown.checked;
+  const shown = frameOn();
   const factor = sourceFactor(device, shown);
   const box = shown ? device.frame : device.aperture;
 
@@ -221,6 +248,7 @@ export function layoutDevice() {
   // page at the last size, stretched by the browser to fit the new one.
   drawDevicePage();
   frame.hidden = !shown;
+  surface.classList.toggle("zoomed", zoomed());
   frame.src = frameUrl();
   frame.style.width = `${device.frame.width * factor}px`;
   frame.style.height = `${device.frame.height * factor}px`;
@@ -287,6 +315,11 @@ function castDelta() {
 function rgb(level) {
   return cast().map(offset =>
     Math.max(0, Math.min(255, Math.round(level + offset))));
+}
+
+// What shows past the edge of a page smaller than its zoomed view.
+function paperRgb() {
+  return rgb(Math.round(Number(paper.value) * 255 / 100));
 }
 
 // The frames already carry BAKED, so only the difference is applied, and at the
@@ -374,12 +407,12 @@ function tonedPage() {
 export async function deviceImage() {
   if (!toned) throw new Error("there is no page to copy yet");
   const device = profile("pixels");
-  const framed = frameShown.checked;
+  const withFrame = frameOn();
   const sheet = document.createElement("canvas");
-  sheet.width = framed ? device.frame.width : device.native.width;
-  sheet.height = framed ? device.frame.height : device.native.height;
+  sheet.width = withFrame ? device.frame.width : device.native.width;
+  sheet.height = withFrame ? device.frame.height : device.native.height;
   const context = sheet.getContext("2d");
-  if (!framed) {
+  if (!withFrame) {
     // Rounded off the way the screen is shown, rather than a bare rectangle.
     context.beginPath();
     context.roundRect(0, 0, sheet.width, sheet.height, device.aperture.radius);
@@ -484,6 +517,10 @@ let page = null;
 //: the two tones walks every pixel, while the size on screen changes on every
 //: drag of the window edge.
 let toned = null;
+
+//: The render's own grey for each reader pixel, before paper and ink, for the
+//: readout under a zoomed page.
+let levels = null;
 
 // What each destination pixel takes from the source, as a run of weights: the
 // source pixels its own width covers, each weighted by how much of it falls
@@ -638,7 +675,9 @@ function tonePage() {
         tone(source, inkRgb[channel], paperRgb[channel]);
     }
   }
+  levels = new Uint8Array(page.width * page.height);
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
+    levels[offset / 4] = pixels.data[offset];
     const base = pixels.data[offset] * 3;
     pixels.data[offset] = palette[base];
     pixels.data[offset + 1] = palette[base + 1];
@@ -655,7 +694,7 @@ function tonePage() {
 function drawDevicePage() {
   if (!toned || typeof canvas.getContext !== "function") return;
   const device = profile();
-  const factor = sourceFactor(device, frameShown.checked) * dpr();
+  const factor = sourceFactor(device, frameOn()) * dpr();
   const to = {
     width: Math.max(1, Math.round(device.aperture.width * factor)),
     height: Math.max(1, Math.round(device.aperture.height * factor)),
@@ -665,14 +704,17 @@ function drawDevicePage() {
   // follow the frame either, so picking either would otherwise resample the
   // page to the size it is already at. Compared by identity, which holds
   // because toning always builds a new picture rather than writing into the
-  // old one.
-  if (drawn && drawn.of === toned &&
-      drawn.width === to.width && drawn.height === to.height) return;
-  drawn = {of: toned, width: to.width, height: to.height};
+  // old one. The zoom joins it: a pan changes the picture without changing
+  // the page or its size.
+  const view = zoomed() ? zoomView(to) : null;
+  const key = view ? `${view.at.x},${view.at.y},${view.block},${view.grid}` : "";
+  if (drawn && drawn.of === toned && drawn.width === to.width &&
+      drawn.height === to.height && drawn.zoom === key) return;
+  drawn = {of: toned, width: to.width, height: to.height, zoom: key};
   const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
   canvas.width = to.width;
   canvas.height = to.height;
-  if (to.width === toned.width && to.height === toned.height) {
+  if (!view && to.width === toned.width && to.height === toned.height) {
     // The page is at its own size, where resampling is an identity that costs a
     // pass over every pixel and risks not being one.
     context.putImageData(toned, 0, 0);
@@ -681,10 +723,46 @@ function drawDevicePage() {
         resampled.height !== to.height) {
       resampled = context.createImageData(to.width, to.height);
     }
-    resampleByArea(toned.data, toned, to, resampled.data);
+    if (view) {
+      paint(toned.data, toned, view.at, view.block, view.grid, to, paperRgb(),
+            resampled.data);
+    } else {
+      resampleByArea(toned.data, toned, to, resampled.data);
+    }
     context.putImageData(resampled, 0, 0);
   }
   canvas.classList.add("shown");
+}
+
+// The zoomed view's block and offset for a view of `to` screen pixels, with
+// the centre kept on the page first.
+function zoomView(to) {
+  const block = blockSize(zoom.level, dpr());
+  zoom = clampCentre(zoom, to, toned, block);
+  return {block, at: origin(zoom, to, toned, block), grid: gridShown(zoom.level)};
+}
+
+// The canvas as last drawn, in screen pixels: the view every gesture works in.
+function currentView() {
+  return {width: canvas.width, height: canvas.height};
+}
+
+// A new zoom state from a control, a key or a gesture. Turning zoom on or off
+// moves the frame, so that lays the page out again; a new level only redraws.
+function setZoom(next) {
+  const was = zoomed();
+  zoom = next;
+  if (zoom.level) lastLevel = zoom.level;
+  zoomSelect.value = String(zoom.level);
+  if (!zoomed()) readout.textContent = "";
+  if (was !== zoomed()) layoutDevice(); else drawDevicePage();
+  saveDevice();
+}
+
+// A pan: redrawn at once, saved when it settles.
+function moveZoom(next) {
+  zoom = next;
+  drawDevicePage();
 }
 
 export function paintDevicePage() {
@@ -757,6 +835,8 @@ function values() {
     device: model.value, frame: frameShown.checked, scale: scale.value,
     paper: paper.value, ink: ink.value, calibration: calibrationRange.value,
     warm: warm.value, tint: tint.value,
+    zoom: zoom.level, x: zoom.x, y: zoom.y, last: lastLevel,
+    grid: gridBox.checked,
   };
   if (fixedColor) state.color = color.value;
   return state;
@@ -797,6 +877,9 @@ function validOption(select, value) {
 
 export function loadDevice() {
   fixedColor = false;
+  const native = profile().native;
+  zoom = {level: 0, x: native.width / 2, y: native.height / 2};
+  lastLevel = FIRST_LEVEL;
   const raw = attempt(() => localStorage.getItem(DEVICE_STORE), null);
   if (raw) {
     let saved = null;
@@ -816,8 +899,17 @@ export function loadDevice() {
         if (Number.isFinite(number) && number >= Number(control.min) &&
             number <= Number(control.max)) control.value = String(number);
       }
+      if (ZOOM_LEVELS.includes(saved.zoom)) zoom.level = saved.zoom;
+      if (ZOOM_LEVELS.includes(saved.last)) lastLevel = saved.last;
+      // On the panel of the reader just restored, which may not be the one
+      // the centre was saved for.
+      if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+        zoom = inside({...zoom, x: saved.x, y: saved.y}, profile().native);
+      }
+      if (typeof saved.grid === "boolean") gridBox.checked = saved.grid;
     }
   }
+  zoomSelect.value = String(zoom.level);
   if (!fixedColor) color.value = themeColor();
   syncNumericControls();
   layoutDevice();
@@ -830,6 +922,10 @@ function resetDevice(scheduleRender) {
   }
   fixedColor = false;
   color.value = themeColor();
+  const native = profile().native;
+  zoom = {level: 0, x: native.width / 2, y: native.height / 2};
+  lastLevel = FIRST_LEVEL;
+  readout.textContent = "";
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
   toned = tonePage();
@@ -839,6 +935,7 @@ function resetDevice(scheduleRender) {
 
 export function wireDevice(scheduleRender) {
   model.addEventListener("change", () => {
+    zoom = inside(zoom, profile().native);
     saveDevice();
     layoutDevice();
     scheduleRender();
@@ -856,6 +953,18 @@ export function wireDevice(scheduleRender) {
     syncNumericControls();
     saveDevice();
     layoutDevice();
+  });
+  zoomSelect.addEventListener("change", () => {
+    setZoom({...zoom, level: Number(zoomSelect.value)});
+  });
+  for (const button of zoomSteps) {
+    button.addEventListener("click", () => {
+      setZoom({...zoom, level: stepLevel(zoom.level, Number(button.dataset.zoomStep))});
+    });
+  }
+  gridBox.addEventListener("input", () => {
+    saveDevice();
+    drawDevicePage();
   });
   const toneChanged = () => {
     saveDevice();
