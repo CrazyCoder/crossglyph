@@ -7,7 +7,8 @@
 // unsaved edit, which Save and Build then treat like typing.
 
 import {form} from "./dom.js";
-import {exportEdited, exportForm, readSteps, showSize, snapSize} from "./export.js";
+import {buildsPhrase, exportEdited, exportForm, readSteps, rowCounts, showSize,
+        snapSize} from "./export.js";
 import {familyPicker} from "./family.js";
 import {openFold} from "./fold.js";
 import {body} from "./render.js";
@@ -66,20 +67,17 @@ function round(fit) {
   return fit === null || fit === undefined ? "-" : String(Math.round(fit));
 }
 
-// What Apply would leave the family as, said before it is pressed. An empty
-// suffix makes the second row more sizes of the same family.
+// What Apply would leave the family as, said only when that is not what the
+// boxes build now. The line under the boxes says what they build already.
 function showBuilds() {
-  const name = exportForm.elements.name.value || familyPicker.value || "This family";
-  const suffix = exportForm.elements.mod_suffix.value.trim();
   const listed = new Map(rows.map(row => [row.box, row]));
   // A box with a row ends up holding a size unless the row removes it.
   const kept = (box) => (listed.has(box) ? !listed.get(box).removed : filled(box));
   const first = FIRST_ROW.filter(kept).length + spilled(SPILL.first);
   const second = SECOND_ROW.filter(kept).length + spilled(SPILL.second);
-  builds.textContent = !second ? `Builds ${name} with ${first} sizes.`
-    : !suffix ? `Builds one family of ${first + second} sizes. `
-      + "Fill in the suffix under More sizes to make them two families."
-    : `Builds ${name} (${first} sizes) and ${name}${suffix} (${second} sizes).`;
+  const [nowFirst, nowSecond] = rowCounts();
+  builds.textContent = first === nowFirst && second === nowSecond ? ""
+    : `After Apply, it builds ${buildsPhrase(first, second)}.`;
 }
 
 //: Marks whichever offered value the page is showing. The page can move off
@@ -324,6 +322,7 @@ function applyFit() {
   if ([...applied.keys()].some(box => SECOND_ROW.includes(box))) openFold("mod");
   applyButton.disabled = true;
   undoButton.hidden = !applied.size;
+  showBuilds();
   const changed = applied.size;
   note.textContent = (changed ? `${changed} size${changed === 1 ? "" : "s"} changed. `
     + "Save or Build to keep them." : "Nothing was changed.")
@@ -342,6 +341,7 @@ function undoFit() {
   applied = null;
   undoButton.hidden = true;
   note.textContent = "The sizes are back as they were.";
+  showBuilds();
 }
 
 function stopFit() {

@@ -228,6 +228,7 @@ export function showSizes(settings) {
   modMoreRow.hidden = !modMore.value;
   showModState();
   showShipsAs();
+  showSizesBuild();
 }
 
 // What this family is called once it is built. The name in the box rather than
@@ -294,6 +295,37 @@ export function spellShipsAs(note, text, family) {
                   + `${family}_${sizeLabel(size)}`);
   note.textContent = `${said.join(", ")}, which is what the device lists `
     + `${fractional.length === 1 ? "it" : "them"} as.`;
+}
+
+export const sizesBuild = document.getElementById("sizes-builds");
+
+// What sizes in the two rows build, said the one way both places that say it
+// use: the line under the boxes, and Fit to grid when Apply would change it.
+export function buildsPhrase(first, second) {
+  const name = familyLabel();
+  const suffix = exportForm.elements.mod_suffix.value.trim();
+  const sizes = (count) => `${count} size${count === 1 ? "" : "s"}`;
+  if (!second) return `${name} with ${sizes(first)}`;
+  if (!suffix) return `one family of ${sizes(first + second)}`;
+  return `${name} (${sizes(first)}) and ${name}${suffix} (${sizes(second)})`;
+}
+
+//: How many sizes each row holds, extra sizes included.
+export function rowCounts() {
+  return [joinSizeBoxes(SIZE_FIELDS, exportForm.elements.size_more),
+          joinSizeBoxes(MOD_FIELDS, exportForm.elements.mod_more)]
+    .map(text => sizeNumbers(text).length);
+}
+
+// Under the first row of boxes and outside every fold, since it is about all
+// the sizes: the second row folds away, and this is what says it is there.
+export function showSizesBuild() {
+  const [first, second] = rowCounts();
+  sizesBuild.hidden = !first && !second;
+  if (sizesBuild.hidden) return;
+  sizesBuild.textContent = `Builds ${buildsPhrase(first, second)}.`
+    + (second && !exportForm.elements.mod_suffix.value.trim()
+      ? " Fill in the suffix under More sizes to make them two families." : "");
 }
 
 export function showShipsAs() {
@@ -703,6 +735,7 @@ export function exportEdited(field) {
   // Both notes, whatever changed: the name is in the text they carry, and the
   // suffix is in the second one's.
   showShipsAs();
+  showSizesBuild();
   showSaveState();
   // Everything here reaches the page and not only the build. The fallbacks
   // decide which face fills for the family; the coverage decides what the page

@@ -244,6 +244,10 @@ suffix and they build a second family entry, named with the suffix, which is
 clearer when you want two entries in the reader's font list instead of one long
 size list.
 
+A line under the first row of boxes says what all the sizes build, such as
+"Builds one family of 8 sizes", so you can see that More sizes holds sizes
+while it is folded.
+
 Coverage controls which characters are placed in the files. More coverage
 creates larger files and takes longer to build. Fallback faces fill characters
 that the main family lacks.
@@ -286,11 +290,11 @@ One size needs only the smallest. The sizes fill the first row of boxes, then
 **More sizes**, which opens so you can see them.
 
 A range is the family's new list of sizes. Boxes past the count are listed as
-**removed**, and **Apply** empties them. **Undo** brings them back. The section
-says what the result builds:
-
-- with the **suffix** under **More sizes** empty, one family with eight sizes;
-- with a suffix, two families, the second named with the suffix.
+**removed**, and **Apply** empties them. **Undo** brings them back. When a
+range changes how many sizes the family has, the section says what Apply would
+build, such as "After Apply, it builds one family of 6 sizes". With the
+**suffix** under **More sizes** filled in, the second row builds a second family
+instead.
 
 Fit to grid does not change the suffix. Choosing another family drops the
 suggestions, since they were found for the last one.

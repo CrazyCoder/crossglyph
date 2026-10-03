@@ -889,6 +889,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // time a test can look.
     "fit-note": recording(),
     "fit-builds": makeElement(),
+    // What the sizes build, under the first row of boxes.
+    "sizes-builds": makeElement(),
     "fit-apply": makeElement(),
     "fit-undo": Object.assign(makeElement(), {hidden: true}),
     // The variable-font block, and the row per axis it builds inside it.
@@ -1388,6 +1390,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
+                  sizesBuild: stubs["sizes-builds"],
                   apply: stubs["fit-apply"], undo: stubs["fit-undo"] },
            sheet,
            device: {
@@ -6118,9 +6121,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         early.map(row => row.children[2]?.textContent).join(" "));
   check("with the size each row starts from",
         early.map(row => row.children[1].textContent).join(" ") === "12 14 16 18");
-  check("and the footer already says what it builds",
-        env.fit.builds.textContent === "Builds Sample with 4 sizes."
-        || env.fit.builds.textContent.startsWith("Builds "), env.fit.builds.textContent);
+  check("a search that changes no count says nothing about the build",
+        env.fit.builds.textContent === "", env.fit.builds.textContent);
   await settle();
   check("the same rows are filled in, not added",
         env.fit.table.children.length === 4 && env.fit.table.children[0] === early[0]);
@@ -6242,11 +6244,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         JSON.stringify(sent));
   check("the range fields show for a range", env.fit.range.hidden === false);
   check("eight sizes are eight rows", env.fit.table.children.length === 8);
-  check("an empty suffix makes them one family",
-        env.fit.builds.textContent.includes("one family of 8 sizes"),
+  check("a range that changes the count says what Apply builds",
+        env.fit.builds.textContent === "After Apply, it builds one family of 8 sizes.",
         env.fit.builds.textContent);
-  check("and says where to make it two",
-        env.fit.builds.textContent.includes("suffix"), env.fit.builds.textContent);
   const modOpen = () => (env.root.dataset.folds || "").split(" ").includes("mod");
   check("More sizes starts folded", !modOpen(), env.root.dataset.folds);
   env.fit.apply.on.click();
@@ -6257,14 +6257,22 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
           === "12.25 13.25 14.25 15.25 16.25 17.25 18.25 19.25",
         [...FIRST_ROW, ...SECOND_ROW].map(n => els[n].value).join(" "));
   check("and leaves the suffix as it was", els.mod_suffix.value === "");
+  // Under the boxes, outside every fold: what the sizes build now.
+  const summary = env.fit.sizesBuild;
+  check("the sizes say they build one family of eight",
+        summary.textContent === "Builds one family of 8 sizes. Fill in the suffix "
+          + "under More sizes to make them two families.", summary.textContent);
 
   els.mod_suffix.value = "Large";
   els.name.value = "Lit";
-  env.fit.run.on.click();
-  await settle();
+  env.exportForm.edit("mod_suffix");
   check("a suffix makes them two families, named",
-        env.fit.builds.textContent.includes("Lit (4 sizes) and LitLarge (4 sizes)"),
-        env.fit.builds.textContent);
+        summary.textContent === "Builds Lit (4 sizes) and LitLarge (4 sizes).",
+        summary.textContent);
+  for (const name of SECOND_ROW) els[name].value = "";
+  env.exportForm.edit("mod1");
+  check("and an empty second row is one family again",
+        summary.textContent === "Builds Lit with 4 sizes.", summary.textContent);
 }
 
 // 99d. A range is the family's new size list. Boxes past its count are
@@ -6296,7 +6304,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         rows.map(r => r.children[2].textContent).join(" "));
   await settle();
   check("and the footer counts what is left",
-        env.fit.builds.textContent.startsWith("Builds one family of 6 sizes"),
+        env.fit.builds.textContent === "After Apply, it builds one family of 6 sizes.",
         env.fit.builds.textContent);
   env.fit.apply.on.click();
   check("Apply writes the range and empties the rest",
