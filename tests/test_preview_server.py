@@ -85,6 +85,93 @@ def test_a_short_page_is_unsure_and_mono_has_no_grid_fit(client):
     assert mono.headers["x-grid-fit"] == ""
 
 
+FIT_TEXT = "Minimum illumination lit the hill. " * 12
+
+
+def _events(response):
+    return [json.loads(line) for line in response.text.splitlines() if line]
+
+
+@needs
+def test_fitting_sizes_scores_every_candidate_and_picks_per_label(client):
+    from crossglyph.preview import gridfit
+
+    response = client.post("/fit-sizes", json={"text": FIT_TEXT, "sizes": [13, 13.75]})
+    assert response.status_code == 200, response.text
+    events = _events(response)
+    assert events[0] == {"event": "plan", "total": 8}
+    scored = [e for e in events if e["event"] == "candidate"]
+    assert [e["done"] for e in scored] == list(range(1, 9))
+    labels = [e for e in events if e["event"] == "label"]
+    assert [(e["now"], e["label"]) for e in labels] == [(13, 13), (13.75, 14)]
+    for event in labels:
+        fits = {e["size"]: e["fit"] for e in scored if e["label"] == event["label"]}
+        assert sorted(fits) == gridfit.candidates(event["label"])
+        assert event["pick"] == gridfit.pick(event["label"], fits)
+    assert events[-1] == {"event": "done"}
+
+
+@needs
+def test_fitting_a_range_targets_whole_sizes(client):
+    response = client.post("/fit-sizes", json={"text": FIT_TEXT, "low": 12,
+                                               "high": 18, "count": 4})
+    labels = [e for e in _events(response) if e["event"] == "label"]
+    assert [(e["now"], e["label"]) for e in labels] == \
+        [(12, 12), (14, 14), (16, 16), (18, 18)]
+
+
+@needs
+@pytest.mark.parametrize("body, said", [
+    ({"text": FIT_TEXT, "low": 12, "high": 14, "count": 8}, "too narrow"),
+    ({"text": "Minimum", "sizes": [13]}, "few lines of text"),
+    ({"text": FIT_TEXT, "sizes": [13], "tuning": {"mono": True}}, "mono"),
+])
+def test_fitting_refuses_what_it_cannot_judge(client, body, said):
+    response = client.post("/fit-sizes", json=body)
+    assert response.status_code == 422
+    assert said in response.json()["detail"]
+
+
+@needs
+def test_a_render_after_fitting_reuses_the_fonts_it_built(client, monkeypatch):
+    """Pressing a suggested size in the panel draws a font the search already
+    built, so it is instant."""
+    from crossglyph.preview import server
+
+    built = []
+    real = server.build_font
+    monkeypatch.setattr(server, "build_font",
+                        lambda *a, **k: built.append(1) or real(*a, **k))
+    server.build_font_cached.cache_clear()
+    events = _events(client.post("/fit-sizes", json={"text": FIT_TEXT, "sizes": [13]}))
+    assert len(built) == 4
+    for size in (12.5, 12.75, 13, 13.25):
+        response = client.post("/render", json={"size": size, "text": FIT_TEXT})
+        assert response.status_code == 200, response.text
+    assert len(built) == 4
+    assert events[-1] == {"event": "done"}
+
+
+@needs
+def test_eight_fitted_sizes_all_stay_built(client, monkeypatch):
+    """Both rows of size boxes are 32 candidates. The page drawn before the
+    search is the one the cache lets go, and every candidate stays."""
+    from crossglyph.preview import server
+
+    server.build_font_cached.cache_clear()
+    # A page at a size the search will not try, so it is a build of its own.
+    client.post("/render", json={"size": 24, "text": FIT_TEXT})
+    _events(client.post("/fit-sizes", json={"text": FIT_TEXT, "low": 12,
+                                            "high": 19, "count": 8}))
+    built = []
+    real = server.build_font
+    monkeypatch.setattr(server, "build_font",
+                        lambda *a, **k: built.append(1) or real(*a, **k))
+    for size in (11.5, 19.25):
+        client.post("/render", json={"size": size, "text": FIT_TEXT})
+    assert built == []
+
+
 def test_the_watermark_names_the_running_version_and_respects_night_mode():
     from PIL import Image, ImageChops
 

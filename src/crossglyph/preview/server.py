@@ -18,6 +18,7 @@ import pathlib
 import sys
 import threading
 import time
+from typing import NamedTuple
 
 try:
     from fastapi import FastAPI, HTTPException, Request
@@ -977,7 +978,10 @@ def build_font_cached(sources: tuple, size: float, coverage: tuple,
     Keyed on the coverage rather than the text it came from, so editing the
     sample text only rebuilds when it brings in a character the last build did
     not have -- which most edits do not. Every key is a tuple because an
-    lru_cache key has to hash, which is why the chains arrive as pairs."""
+    lru_cache key has to hash, which is why the chains arrive as pairs.
+
+    The size has to hold a whole Fit to grid search, eight sizes of four
+    candidates, so that pressing any of them afterwards draws without a build."""
     return build_font(dict(sources), size, tuning=_tuning(tuning_items),
                       coverage=coverage, fallbacks=dict(fallbacks),
                       axes={style: dict(coords) for style, coords in axes})
@@ -1010,6 +1014,111 @@ def grid_fit_headers(result: gridfit.Score, mono: bool) -> dict[str, str]:
     }
 
 
+class PageFont(NamedTuple):
+    font: bytes
+    #: What this coverage would leave out of the build.
+    uncovered: frozenset[int]
+    #: Per style, what the faces can and cannot draw.
+    drawable: dict
+
+
+def page_font(request: RenderRequest, size: float) -> PageFont:
+    """The font a page of `request` is drawn with at `size`.
+
+    One path for the render and for the size search, so a size the search
+    scored is the same cached build a render of it asks for.
+    """
+    sources = sources_for(request.family) if request.family else _sources
+    # Only the styles the text is actually set in. Every style in the build
+    # is a full rasterization of the coverage, so a plain paragraph would
+    # otherwise pay four times over for three faces nothing on the page
+    # wears -- and with a fallback in the list, four GPOS reads of it.
+    sources = faces_for(request.text, sources)
+    keyed = tuple(sorted((style, str(path))
+                         for style, path in sources.items()))
+    # What the text needs, then what this coverage would actually build of
+    # it. Narrowed before the faces are asked, so a character the build
+    # would drop is drawn the way the device draws it: not at all.
+    wanted = coverage_for(request.text, sources)
+    built = built_coverage(request.intervals, request.ranges)
+    coverage = narrowed(wanted, built)
+    uncovered: frozenset[int] = frozenset() if built is None else (
+        frozenset(page_codepoints(request.text)) - built)
+    # Per style, because a chain can hold a bold face the regular one does
+    # not, and because what a style cannot draw is that style's own face
+    # measured against that style's own chain.
+    offered = fallbacks_for(request)
+    drawable = {style: resolved_fallbacks(((style, str(path)),), coverage,
+                                          offered.get(style, ()))
+                for style, path in sources.items()}
+    font = build_font_cached(
+        keyed, size, coverage, _cache_key(request.tuning),
+        tuple(sorted((style, tuple(str(path) for path in resolved.faces))
+                     for style, resolved in drawable.items())),
+        axes_for(request.family, size, request.axes))
+    return PageFont(font, uncovered, drawable)
+
+
+class FitRequest(RenderRequest):
+    """A page, and the sizes to fit on it: the family's own `sizes`, or
+    `count` whole sizes spread from `low` to `high`."""
+    sizes: list[float] = Field(default_factory=list)
+    low: int | None = None
+    high: int | None = None
+    count: int | None = None
+
+
+@app.post("/fit-sizes")
+def fit_sizes(request: FitRequest) -> StreamingResponse:
+    """Score the render sizes near each target on this page, and pick one.
+
+    A line of JSON at a time, the way /build answers: the plan, then every
+    candidate as it is scored, then each label's pick. A browser that stops
+    reading stops the search after the candidate it is on.
+    """
+    if not _sources and not request.family:
+        raise HTTPException(503, "no font source; start with --font")
+    try:
+        wanted = gridfit.targets(sizes=request.sizes, low=request.low,
+                                 high=request.high, count=request.count)
+        mono = _tuning(_cache_key(request.tuning)).mono
+    except CLIENT_ERRORS as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if mono:
+        raise HTTPException(422, "Grid Fit is not available in mono, so there "
+                                 "is nothing to choose sizes by.")
+    letters = sum(sum(counter.values()) for counter in
+                  gridfit.letter_weights(request.text, range(4)).values())
+    if letters < gridfit.MIN_LETTERS:
+        raise HTTPException(422, "Put at least a few lines of text on the "
+                                 "page to score sizes.")
+
+    def lines():
+        total = len(wanted) * len(gridfit.OFFSETS)
+        yield json.dumps({"event": "plan", "total": total}) + "\n"
+        done = 0
+        try:
+            for now, label in wanted:
+                fits = {}
+                for size in gridfit.candidates(label):
+                    result = grid_fit_cached(page_font(request, size).font,
+                                             request.text, False)
+                    fits[size] = result.fit
+                    done += 1
+                    yield json.dumps({
+                        "event": "candidate", "label": label, "size": size,
+                        "fit": result.fit, "x": result.x, "y": result.y,
+                        "done": done}) + "\n"
+                yield json.dumps({"event": "label", "label": label, "now": now,
+                                  "pick": gridfit.pick(label, fits)}) + "\n"
+        except (*CLIENT_ERRORS, FontBuildError, freetype.FT_Exception) as exc:
+            yield json.dumps({"event": "error", "error": str(exc)}) + "\n"
+            return
+        yield json.dumps({"event": "done"}) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
 @app.post("/render")
 def render(request: RenderRequest) -> Response:
     if not _sources and not request.family:
@@ -1020,34 +1129,9 @@ def render(request: RenderRequest) -> Response:
     try:
         spec = PageSpec(**request.page.model_dump())
         spec.to_call_args()                      # validate before rasterizing
-        sources = sources_for(request.family) if request.family else _sources
-        # Only the styles the text is actually set in. Every style in the build
-        # is a full rasterization of the coverage, so a plain paragraph would
-        # otherwise pay four times over for three faces nothing on the page
-        # wears -- and with a fallback in the list, four GPOS reads of it.
-        sources = faces_for(request.text, sources)
-        keyed = tuple(sorted((style, str(path))
-                             for style, path in sources.items()))
-        # What the text needs, then what this coverage would actually build of
-        # it. Narrowed before the faces are asked, so a character the build
-        # would drop is drawn the way the device draws it: not at all.
-        wanted = coverage_for(request.text, sources)
-        built = built_coverage(request.intervals, request.ranges)
-        coverage = narrowed(wanted, built)
-        uncovered: frozenset[int] = frozenset() if built is None else (
-            frozenset(page_codepoints(request.text)) - built)
-        # Per style, because a chain can hold a bold face the regular one does
-        # not, and because what a style cannot draw is that style's own face
-        # measured against that style's own chain.
-        offered = fallbacks_for(request)
-        drawable = {style: resolved_fallbacks(((style, str(path)),), coverage,
-                                              offered.get(style, ()))
-                    for style, path in sources.items()}
-        font = build_font_cached(
-            keyed, request.size, coverage, _cache_key(request.tuning),
-            tuple(sorted((style, tuple(str(path) for path in resolved.faces))
-                         for style, resolved in drawable.items())),
-            axes_for(request.family, request.size, request.axes))
+        sources = faces_for(request.text, sources_for(request.family)
+                            if request.family else _sources)
+        font, uncovered, drawable = page_font(request, request.size)
         # What nothing can draw, narrowed to what is actually on the page: the
         # build's coverage carries the output codepoint of every ligature the
         # faces could form, and a face whose GSUB names an `ff` it has no cmap

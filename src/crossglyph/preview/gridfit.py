@@ -31,6 +31,7 @@ import struct
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 
+from crossglyph.fontconf import size_label
 from crossglyph.preview import markup
 
 #: Bump when the measure or its constants change, so two scores from
@@ -233,6 +234,61 @@ def score(font: bytes, text: str, *, mono: bool = False) -> Score:
         x.add(sx)
         y.add(sy)
     return Score(_pooled(x, y).fit, x.fit, y.fit, styles, letters, confident)
+
+
+# --- choosing sizes -------------------------------------------------------
+
+#: Render sizes tried for a label, as offsets from it. Every one of them
+#: rounds to the label (fontconf.size_label is half up), so the number in the
+#: reader's Font Size list stays what it was.
+OFFSETS = (-0.5, -0.25, 0.0, 0.25)
+#: Fits within this many points of the best count as a tie.
+TIE = 1.0
+#: The size knob's range, which a range of sizes has to stay inside.
+SIZE_MIN, SIZE_MAX = 6, 40
+#: Four fills the first row of size boxes, eight fills both.
+COUNTS = (4, 8)
+
+
+def candidates(label: int) -> list[float]:
+    return [label + offset for offset in OFFSETS]
+
+
+def targets(*, sizes: Sequence[float] = (), low: int | None = None,
+            high: int | None = None, count: int | None = None,
+            ) -> list[tuple[float, int]]:
+    """(size now, label) for each size to fit.
+
+    Either the sizes the family has, each keeping its own label, or `count`
+    whole sizes spread evenly from `low` to `high`, which have no size of
+    their own yet and start at their label.
+    """
+    if low is None:
+        return [(size, size_label(size)) for size in sizes]
+    if count not in COUNTS:
+        raise ValueError(f"the count is {' or '.join(map(str, COUNTS))} sizes")
+    if high is None or not SIZE_MIN <= low < high <= SIZE_MAX:
+        raise ValueError(f"a range runs from a smaller size to a larger one, "
+                         f"between {SIZE_MIN} and {SIZE_MAX}")
+    labels = [int(low + i * (high - low) / (count - 1) + 0.5) for i in range(count)]
+    if len(set(labels)) < count:
+        raise ValueError(f"{low} to {high} is too narrow for {count} sizes: "
+                         f"it holds {high - low + 1}")
+    return [(label, label) for label in labels]
+
+
+def pick(label: int, fits: Mapping[float, float | None]) -> float | None:
+    """The best-fitting size, or None when no candidate could be judged.
+
+    A near tie goes to the size nearest the label, then to the smaller one: a
+    point of score is not worth moving the size for.
+    """
+    judged = {size: fit for size, fit in fits.items() if fit is not None}
+    if not judged:
+        return None
+    best = max(judged.values())
+    near = [size for size, fit in judged.items() if fit >= best - TIE]
+    return min(near, key=lambda size: (abs(size - label), size))
 
 
 def _pooled(x: Evidence, y: Evidence) -> Evidence:

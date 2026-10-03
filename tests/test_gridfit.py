@@ -151,6 +151,50 @@ def test_a_short_text_is_not_confident(tmp_path):
     assert not result.confident
 
 
+def test_every_candidate_keeps_its_label():
+    """The reader's list shows the label, so a suggestion must not move it."""
+    from crossglyph.fontconf import size_label
+
+    for label in range(6, 41):
+        assert {size_label(size) for size in gridfit.candidates(label)} == {label}
+
+
+def test_my_sizes_are_targeted_by_their_labels():
+    assert gridfit.targets(sizes=[13, 13.75, 15]) == [(13, 13), (13.75, 14), (15, 15)]
+
+
+def test_a_range_spreads_whole_sizes_evenly():
+    assert [label for _, label in gridfit.targets(low=12, high=19, count=8)] == \
+        list(range(12, 20))
+    assert [label for _, label in gridfit.targets(low=12, high=18, count=4)] == \
+        [12, 14, 16, 18]
+
+
+def test_a_range_too_narrow_for_its_count_is_refused():
+    with pytest.raises(ValueError, match="8 sizes"):
+        gridfit.targets(low=12, high=14, count=8)
+
+
+@pytest.mark.parametrize("low, high, count", [(5, 12, 4), (12, 41, 4), (14, 12, 4),
+                                              (12, 18, 5)])
+def test_a_range_outside_the_knob_or_an_odd_count_is_refused(low, high, count):
+    with pytest.raises(ValueError):
+        gridfit.targets(low=low, high=high, count=count)
+
+
+def test_the_pick_is_the_best_fit():
+    assert gridfit.pick(13, {12.5: 60, 12.75: 98, 13: 70, 13.25: 64}) == 12.75
+
+
+def test_a_near_tie_goes_to_the_label_then_the_smaller():
+    assert gridfit.pick(13, {12.5: 99.5, 12.75: 90, 13: 99, 13.25: 100}) == 13
+    assert gridfit.pick(13, {12.5: 50, 12.75: 99.5, 13: 50, 13.25: 100}) == 12.75
+
+
+def test_a_label_with_nothing_to_judge_has_no_pick():
+    assert gridfit.pick(13, {12.5: None, 12.75: None, 13: None, 13.25: None}) is None
+
+
 def test_mono_has_no_score(tmp_path):
     _, blob = _build(tmp_path, [0x20, 0x61, 0x6E])
     result = gridfit.score(blob, "an " * 200, mono=True)
