@@ -1015,11 +1015,10 @@
   .fit-mode button {
     height: 24px; padding-top: 0; padding-bottom: 0;
   }
-  /* One row a size: the size now, the suggestion, what it scores, and
-     whether Apply takes it. On the four columns of the size boxes and the
-     fields above, so the table spans the panel and Use sits under Find sizes,
-     with every cell centred the way the boxes centre their sizes. */
-  .fit-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* One row a size: the size now, the suggestion, what it scores, what that
+     gains, and whether Apply takes it. Five equal columns across the panel,
+     every cell centred the way the boxes centre their sizes. */
+  .fit-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
              gap: .4rem; align-items: center; justify-items: center;
              padding: .1rem 0; font-size: 12px; }
   /* Shaded a step darker than the stripes, so it reads as the heading and
@@ -1039,7 +1038,8 @@
   .fit-value:hover { border-color: var(--line); }
   /* The size the page is showing now. */
   .fit-value.showing { border-color: var(--focus); }
-  .fit-score { color: var(--muted); }
+  .fit-score { color: var(--text); }
+  .fit-gain { color: var(--muted); }
   .fit-row input[type=checkbox] { margin: 0; }
   .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
   .fit-foot { display: flex; gap: .4rem; justify-content: flex-end; }

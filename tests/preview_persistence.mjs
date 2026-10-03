@@ -6184,9 +6184,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         JSON.stringify(env.fetches.fits[0]));
   const rows = env.fit.table.children;
   check("a row for each size", rows.length === 4, String(rows.length));
-  const [now, pick, score, tick] = rows[0].children;
+  const [now, pick, score, gain, tick] = rows[0].children;
   check("each row says the size now and the suggestion, and nothing else names it",
-        rows[0].children.length === 4 && now.textContent === "12"
+        rows[0].children.length === 5 && now.textContent === "12"
         && pick.textContent === "11.75", [now, pick].map(c => c.textContent).join("|"));
   // The headings are a row of the same grid, so a cell in one and not the
   // other puts every value under the wrong heading.
@@ -6195,17 +6195,21 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("the headings have a cell for each cell of a row",
         headings === rows[0].children.length, `${headings} headings`);
   check("with the score each would have",
-        score.textContent === "100 (+38)" && score.title === "62 now, 100 suggested",
+        score.textContent === "100" && score.title === "62 now, 100 suggested",
         `${score.textContent} | ${score.title}`);
+  check("and what it gains in a column of its own",
+        gain.textContent === "+38", gain.textContent);
+  check("a size that is already best gains nothing, and says nothing there",
+        rows[1].children[3].textContent === "", rows[1].children[3].textContent);
   check("a change worth making is ticked", tick.checked === true);
-  const kept = rows[1].children[3];
+  const kept = rows[1].children.at(-1);
   check("a size the box already holds shows as in use rather than as a gap",
         kept.hidden === false && kept.disabled === true && kept.checked === true
         && rows[1].children[1].textContent === "14",
         JSON.stringify({hidden: kept.hidden, disabled: kept.disabled, checked: kept.checked}));
   check("and says so", /already/i.test(kept.title ?? ""), kept.title);
   check("a gain under 3 points is offered but not ticked",
-        rows[2].children[3].hidden === false && rows[2].children[3].checked === false);
+        rows[2].children.at(-1).hidden === false && rows[2].children.at(-1).checked === false);
   check("one status line counts the search",
         env.fit.sample.steps.includes("Scoring 16 of 16"),
         JSON.stringify(env.fit.sample.steps));
@@ -6228,7 +6232,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("looking at sizes writes nothing",
         els.size1.value === "12" && env.fetches.saves.length === saves);
 
-  rows[2].children[3].checked = true;
+  rows[2].children.at(-1).checked = true;
   env.fit.apply.on.click();
   check("Apply puts the ticked suggestions in the boxes",
         FIRST_ROW.map(n => els[n].value).join(" ") === "11.75 14 16.25 18",
@@ -6372,7 +6376,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const rows = env.fit.table.children;
   check("boxes past the count are listed as removed from the start",
         rows.length === 8 && rows[6].children[1].textContent === "removed"
-        && rows[7].children[0].textContent === "22" && rows[7].children[3].checked === true,
+        && rows[7].children[0].textContent === "22" && rows[7].children.at(-1).checked === true,
         rows.map(r => r.children[1].textContent).join(" "));
   await settle();
   check("and the footer counts what is left",

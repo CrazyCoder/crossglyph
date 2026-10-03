@@ -280,8 +280,9 @@ Each suggestion keeps the number the reader shows in its Font Size list, and
 stays within half a point of that number. A box that holds 13.75 ships as 14,
 as any fractional size does.
 
-The **Grid Fit** column shows the score a suggestion would have, with what it
-gains in brackets, as in `79 (+11)`. Hold the pointer over it to see the score
+The **Grid Fit** column shows the score a suggestion would have, and **Gain**
+how much higher that is than the size now, such as `+11`. Gain is empty when
+the size is already the best. Hold the pointer over a score to see the score
 now. A suggestion is ticked when it gains at least a few points. A suggestion
 your box already holds is ticked and greyed out, since there is nothing to
 change. **Apply** leaves alone any box you have

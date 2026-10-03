@@ -121,12 +121,14 @@ function addRow(box, now) {
   const score = document.createElement("span");
   score.className = "fit-score mono";
   score.textContent = WAITING;
+  const gain = document.createElement("span");
+  gain.className = "fit-gain mono";
   const tick = document.createElement("input");
   tick.type = "checkbox";
   tick.hidden = true;
   const entry = {box, held: exportForm.elements[box].value, now: valueButton(now),
-                 pick: valueButton(null), score, value: null, tick};
-  row.append(entry.now, entry.pick, score, tick);
+                 pick: valueButton(null), score, gain, value: null, tick};
+  row.append(entry.now, entry.pick, score, gain, tick);
   table.append(row);
   rows.push(entry);
 }
@@ -154,11 +156,12 @@ function fillRow(entry, now, pick, fits, ranged) {
   setValue(entry.pick, pick ?? now);
   entry.value = pick;
   const nowFit = fits.get(now), pickFit = fits.get(pick ?? now);
-  // The score the suggestion would have, and what it gains, the way the
-  // Grid Fit under the page says it. The score now is a hover away.
+  // The score the suggestion would have, and beside it what it gains, as a
+  // column of its own so the scores read down one edge. The score now is a
+  // hover away.
   const gain = Number(round(pickFit)) - Number(round(nowFit));
-  entry.score.textContent = pick === null || pick === now || !(gain > 0)
-    ? round(pickFit) : `${round(pickFit)} (+${gain})`;
+  entry.score.textContent = round(pickFit);
+  entry.gain.textContent = pick === null || pick === now || !(gain > 0) ? "" : `+${gain}`;
   if (pick !== null && pick !== now) {
     entry.score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
   }
