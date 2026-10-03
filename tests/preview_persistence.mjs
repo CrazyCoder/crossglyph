@@ -877,9 +877,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Fit to grid, a fold of its own under the sizes.
     "fit-toggle": Object.assign(pressStub("fit"), {dataset: {fold: "fit"}}),
     "fit-panel": makeElement(),
-    // Every sentence the status line said, since the running count is gone
-    // by the time a test can look.
-    "fit-sample": recording(),
     // The two halves of the mode toggle, and what My sizes says it does.
     "fit-mode-mine": makeElement(),
     "fit-mode-range": makeElement(),
@@ -891,7 +888,12 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-count": makeControl({name: "fit-count", value: "4", options: optionsOf("fit-count")}),
     // The sizes a range will try, listed as its fields change.
     "fit-targets": makeElement(),
-    "fit-run": makeElement(),
+    // Every label Find sizes wore, since the running count on it is gone by
+    // the time a test can look.
+    "fit-run": Object.defineProperties(makeElement(), {
+      ...Object.getOwnPropertyDescriptors(recording()),
+      _text: {value: "Find sizes", writable: true},
+    }),
     "fit-table": makeElement(),
     // Every sentence the note said, since the running count is gone by the
     // time a test can look.
@@ -1391,7 +1393,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            pageError: stubs["page-error"], status: stubs.status,
            gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"],
                       parts: stubs["grid-fit-parts"] },
-           fit: { toggle: stubs["fit-toggle"], sample: stubs["fit-sample"],
+           fit: { toggle: stubs["fit-toggle"],
                   toMine: stubs["fit-mode-mine"], toRange: stubs["fit-mode-range"],
                   mineSays: stubs["fit-mine-says"], range: stubs["fit-range"],
                   low: stubs["fit-low"], step: stubs["fit-step"],
@@ -6210,11 +6212,14 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("and says so", /already/i.test(kept.title ?? ""), kept.title);
   check("a gain under 3 points is offered but not ticked",
         rows[2].children.at(-1).hidden === false && rows[2].children.at(-1).checked === false);
-  check("one status line counts the search",
-        env.fit.sample.steps.includes("Scoring 16 of 16"),
-        JSON.stringify(env.fit.sample.steps));
-  check("and then says what the scores rest on",
-        env.fit.sample.textContent.includes("742 letters"), env.fit.sample.textContent);
+  // On the button rather than a line of its own, which would appear and go
+  // and move everything under it. How many letters the scores rest on is in
+  // Grid Fit under the page.
+  check("Find sizes counts the search on itself",
+        env.fit.run.steps.includes("Scoring 16/16"), JSON.stringify(env.fit.run.steps));
+  check("and goes back to its name when it is done",
+        env.fit.run.textContent === "Find sizes" && env.fit.run.disabled === false,
+        env.fit.run.textContent);
   check("leaving the note for what needs saying",
         env.fit.note.textContent === "", env.fit.note.textContent);
 

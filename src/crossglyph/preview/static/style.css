@@ -1002,7 +1002,11 @@
   #fit-mine-says { align-self: stretch; margin: 0; display: flex;
                    align-items: flex-end; padding-bottom: .25rem;
                    min-height: calc(24px + .15rem + 11px * 1.45); }
-  #fit-targets { grid-column: 1 / -1; }
+  /* The toggle at the left of its row and the sizes it will try at the
+     right, cut short rather than wrapped onto a line of their own. */
+  .fit-top { display: flex; align-items: center; gap: .75rem; }
+  #fit-targets { margin: 0 0 0 auto; min-width: 0; overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap; }
   /* Labelled the way the boxes above are: a small title over the field. */
   .fit-field { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
   .fit-field span { font-size: 11px; color: var(--muted); }

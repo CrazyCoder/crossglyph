@@ -23,7 +23,6 @@ const stepField = document.getElementById("fit-step");
 const count = document.getElementById("fit-count");
 const targets = document.getElementById("fit-targets");
 const runButton = document.getElementById("fit-run");
-const sample = document.getElementById("fit-sample");
 const table = document.getElementById("fit-table");
 const note = document.getElementById("fit-note");
 const builds = document.getElementById("fit-builds");
@@ -206,18 +205,22 @@ function rangeSizes() {
   return {sizes: Array.from({length: many}, (_, i) => start + i * step)};
 }
 
-// What Find sizes will try, listed in both modes on the same line: a range's
+// What Find sizes will try, listed in both modes beside the toggle: a range's
 // sizes as its fields change, or the sizes in the boxes as they are edited.
+// Said again on hover, since a long list is cut short there.
 export function showFitTargets() {
   stepField.disabled = count.value === "1";
+  let said;
   if (toRange.getAttribute("aria-pressed") !== "true") {
     const mine = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
       .map(box => snapSize(exportForm.elements[box].value));
-    targets.textContent = mine.length ? `Tries ${mine.join(", ")}` : NO_SIZES;
-    return;
+    said = mine.length ? `Tries ${mine.join(", ")}` : NO_SIZES;
+  } else {
+    const {sizes, problem} = rangeSizes();
+    said = problem ?? `Tries ${sizes.join(", ")}`;
   }
-  const {sizes, problem} = rangeSizes();
-  targets.textContent = problem ?? `Tries ${sizes.join(", ")}`;
+  targets.textContent = said;
+  targets.title = said;
 }
 
 function clearFit() {
@@ -225,7 +228,6 @@ function clearFit() {
   table.replaceChildren();
   note.textContent = "";
   builds.textContent = "";
-  sample.textContent = "";
   applyButton.disabled = true;
   undoButton.hidden = true;
   applied = null;
@@ -261,13 +263,13 @@ async function runFit() {
     }
   }
   showBuilds();
-  // A count in the status line rather than a bar: the export panel's one bar
-  // is the build's, in its foot. The same line then says what the scores
-  // rest on, so nothing appears or goes as the run ends.
-  sample.textContent = "Scoring sizes";
+  // A count on the button rather than a bar or a line of its own: the export
+  // panel's one bar is the build's, in its foot, and a line that comes and
+  // goes moves everything under it.
+  runButton.textContent = "Scoring";
   runButton.disabled = true;
   const fits = new Map();
-  let index = 0, total = 0, letters = 0;
+  let index = 0, total = 0;
   try {
     const response = await fetch("/fit-sizes", {
       method: "POST", headers: {"content-type": "application/json"},
@@ -282,18 +284,15 @@ async function runFit() {
       if (mine !== runs) return;
       if (step.event === "plan") {
         total = step.total;
-        letters = step.letters;
       } else if (step.event === "candidate") {
         fits.set(step.size, step.fit);
-        sample.textContent = `Scoring ${step.done} of ${total}`;
+        runButton.textContent = `Scoring ${step.done}/${total}`;
       } else if (step.event === "label") {
         fillRow(rows[index++], step.now, step.pick, fits, ranged);
       } else if (step.event === "error") {
         note.textContent = step.error;
       }
     });
-    if (mine !== runs) return;
-    sample.textContent = `Scored on the ${letters} letters on the page.`;
   } catch (error) {
     if (error.name !== "AbortError" && mine === runs) note.textContent = String(error);
   } finally {
@@ -307,7 +306,7 @@ async function runFit() {
       applyButton.disabled = !rows.some(offered);
       if (rows.length) showBuilds(); else builds.textContent = "";
       syncFitMarks();
-      runButton.disabled = false;
+      ready();
       controller = null;
     }
   }
@@ -357,11 +356,17 @@ function undoFit() {
   showBuilds();
 }
 
+//: Find sizes back to its name and pressable, once nothing is running.
+function ready() {
+  runButton.disabled = false;
+  runButton.textContent = "Find sizes";
+}
+
 function stopFit() {
   runs++;
   controller?.abort();
   controller = null;
-  runButton.disabled = false;
+  ready();
 }
 
 //: A new family has sizes of its own, so suggestions found for the last one

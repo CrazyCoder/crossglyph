@@ -268,8 +268,9 @@ scores the text on the page with the current Tune settings, as
 [Grid Fit](#check-how-sharp-the-strokes-are) does.
 
 1. Put a few lines of the kind of text you read on the page.
-2. Open **Fit to grid**. With **My sizes** selected, the line under the
-   button lists the sizes in your boxes, in both rows. Press **Find sizes**.
+2. Open **Fit to grid**. With **My sizes** selected, the sizes in your boxes
+   are listed beside it, in both rows. Press **Find sizes**, which counts the
+   sizes as it scores them.
 3. Press a value in the **Size** or **Suggested** column to show the page at
    that size. Press the other one to compare.
 4. Untick any suggestion you do not want in the **Use** column.
@@ -291,7 +292,7 @@ box you have edited since.
 
 To choose new sizes instead, select **Range** and set where it **starts**, the
 **step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
-The sizes it will try are listed under the fields, such as "Tries 12, 14, 16,
+The sizes it will try are listed beside **Range**, such as "Tries 12, 14, 16,
 18". A range starts at 10, with a step of 1 and 8 sizes.
 Press **Find sizes**. The sizes fill the boxes in order, the first row then the
 second.
