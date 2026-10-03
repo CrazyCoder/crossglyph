@@ -104,9 +104,9 @@ sizes carried by the selected family.
 | `sizes_mod` | Empty | A second list of point sizes from the same faces. |
 | `mod_suffix` | `Mod` | Suffix for the second family. Leave it empty to merge both lists. |
 | `out` | `cpfonts` | Output folder. This key belongs in `all.conf`. |
-| `max_ink_top` | `no` | Store the height of each style's tallest character in the file. |
+| `max_ink_top` | `no` | Store how far each style's tallest character reaches above the line. |
 
-`max_ink_top` is for firmware that reads this height to place the first line
+`max_ink_top` is for firmware that reads this value to place the first line
 of a page, so tall accents, such as stacked Vietnamese marks, are not cut off
 at the top of the screen. CrossPoint does not read it. Leave it off unless your
 firmware asks for it. Set it in `all.conf` to turn it on for every family.
