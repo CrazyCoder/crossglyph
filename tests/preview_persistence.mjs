@@ -861,6 +861,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "tune-unsaved": { hidden: true },
     "export-unsaved": { hidden: true },
     "source-note": { textContent: "" },
+    // The configs the server could not read, one line each.
+    "conf-errors": Object.assign(makeElement(), {hidden: true}),
     // The row of sizes past the four boxes, which most families do not have.
     "more-row": { hidden: false },
     "mod-more-row": { hidden: false },
@@ -2847,6 +2849,28 @@ for (const { name, text } of sources) {
         some.sandbox.document.getElementById("have-fallbacks").textContent
           === "from fonts\\fallbacks, 3 more to fetch",
         some.sandbox.document.getElementById("have-fallbacks").textContent);
+}
+
+// 39b. A config the server could not read. Its family is still offered, from
+//      all.conf alone, so the panel says which file was refused and why, and
+//      stops saying it once the file is fixed and the tab comes back.
+{
+  const why = "probe.conf: sizes 12 twice both land on 12. Drop the size";
+  const env = await loaded(fakeStorage(), { ...DEFAULTS, config_errors: [why] },
+                           { later: { ...DEFAULTS, config_errors: [] } });
+  const box = env.sandbox.document.getElementById("conf-errors");
+  const said = () => (box.children[0]?.children ?? []).map(line => line.textContent);
+  check("a refused config is reported", box.hidden === false, String(box.hidden));
+  check("with what is wrong and what to change, on a line of its own",
+        said().includes(why), JSON.stringify(said()));
+  env.returning();
+  await settle();
+  check("and the report goes once the file reads again",
+        box.hidden === true, JSON.stringify(said()));
+
+  const quiet = await loaded(fakeStorage());
+  check("a workspace with nothing refused says nothing",
+        quiet.sandbox.document.getElementById("conf-errors").hidden === true);
 }
 
 // 40. Variable fonts. One file is several faces, so which face each slot is

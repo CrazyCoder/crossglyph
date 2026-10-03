@@ -302,6 +302,32 @@ export function spellShipsAs(note, text, family) {
     + `${fractional.length === 1 ? "it" : "them"} as.`;
 }
 
+const confErrors = document.getElementById("conf-errors");
+
+//: The configs /defaults could not read, a line each under a sentence saying
+//: what that costs. Each line names its file and what to change in it.
+export function showConfigErrors(errors = []) {
+  confErrors.hidden = !errors.length;
+  if (!errors.length) {
+    confErrors.replaceChildren();
+    return;
+  }
+  const line = (text) => {
+    const el = document.createElement("div");
+    el.textContent = text;
+    return el;
+  };
+  // One block beside the mark, its lines stacked inside it.
+  const lines = document.createElement("div");
+  lines.className = "lines";
+  lines.append(
+    line(errors.length === 1
+      ? "This config could not be read, so its family uses the settings in all.conf until it is fixed:"
+      : "These configs could not be read, so their families use the settings in all.conf until they are fixed:"),
+    ...errors.map(line));
+  confErrors.replaceChildren(lines);
+}
+
 export const sizesBuild = document.getElementById("sizes-builds");
 
 // What sizes in the two rows build, said the one way both places that say it

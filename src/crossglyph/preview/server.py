@@ -665,13 +665,15 @@ def family_entry(config: Config, regulars: dict[str, str] | None = None) -> dict
             }}
 
 
-def families() -> list[dict]:
+def families(configs: list | None = None) -> list[dict]:
     """Every family the font source folder offers, with what each is set to.
 
     One walk of the folder answers all of it, so the picker can say what
-    changing to a family will load without a round trip per entry.
+    changing to a family will load without a round trip per entry. A caller
+    that has walked it already passes what it found.
     """
-    configs = fontbuild.offered(fontbuild.SOURCE_DIR)[0]
+    if configs is None:
+        configs = fontbuild.offered(fontbuild.SOURCE_DIR)[0]
     # Every family's regular face, so a fallback file can be reported as the
     # family it belongs to without a second walk per entry.
     regulars = {str(config.styles["regular"]): config.name
@@ -1514,6 +1516,7 @@ def defaults() -> JSONResponse:
     a font dropped into the folder, or a config edited beside it, is noticed.
     """
     rescan()
+    configs, errors = fontbuild.offered(fontbuild.SOURCE_DIR)
     payload = {"text": SAMPLE_TEXT,
             # Every preset, in picker order, so switching between them is a
             # dropdown rather than a round trip. The page picks one of these
@@ -1547,7 +1550,11 @@ def defaults() -> JSONResponse:
             "fallbacks_missing": len(fontbuild.missing_fallbacks()),
             "font": _sources[REGULAR].name if _sources else None,
             "faces": sorted(FACE_NAMES[style] for style in _sources),
-            "families": families(),
+            "families": families(configs),
+            # Every config that could not be read, each naming its file and
+            # what to change. Its family is still offered, from all.conf alone,
+            # which without this would change its settings with no word why.
+            "config_errors": errors,
             "family": _family}
     # Explicitly uncacheable, like the page and its modules: this is the
     # answer to "what is in the folder", the page asks it again precisely

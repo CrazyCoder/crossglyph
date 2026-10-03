@@ -485,6 +485,29 @@ def test_the_page_is_told_how_many_faces_are_still_to_fetch(client, tmp_path,
     assert payload["fallbacks_missing"] == len(fontbuild.NOTOSANS_STYLES)
 
 
+def test_a_config_that_cannot_be_read_is_reported(client, two_families,
+                                                  tmp_path):
+    """A family whose own config is refused is still offered, from all.conf
+    alone, so without this its settings change with nothing on screen to say
+    why. Every refusal is listed, each with the file it came from."""
+    (_conf(tmp_path) / "probe.conf").write_text(
+        "family = Probe\nsizes = 12 14\nsizes_mod = 12\n", encoding="utf-8")
+    (_conf(tmp_path) / "ghost.conf").write_text("family = Ghost\n",
+                                                encoding="utf-8")
+
+    errors = client.get("/defaults").json()["config_errors"]
+
+    assert len(errors) == 2, errors
+    assert any(e.startswith("probe.conf") and "12 twice" in e for e in errors)
+    assert any(e.startswith("ghost.conf") and "no regular face" in e
+               for e in errors)
+
+
+def test_a_workspace_whose_configs_all_read_reports_nothing(client,
+                                                            two_families):
+    assert client.get("/defaults").json()["config_errors"] == []
+
+
 def test_the_folder_listing_is_not_something_a_browser_may_keep(client,
                                                                 two_families):
     """The page asks this again precisely because the answer changes. A copy

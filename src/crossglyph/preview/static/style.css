@@ -1173,7 +1173,8 @@
   /* The row under the foot. Its lines stack rather than sitting side by side,
      since .hint.warn is a flex row and every child of one would otherwise
      share the line with the mark. */
-  #build-warn-lines { display: grid; gap: .35rem; }
+  #build-warn-lines, #conf-errors .lines { display: grid; gap: .35rem; }
+  #conf-errors { margin: .2rem 0 .5rem; overflow-wrap: anywhere; }
 
   /* One of the panel's own rules, filling. Every row here is separated by one
      of these, so progress drawn in that material belongs to the panel, where a

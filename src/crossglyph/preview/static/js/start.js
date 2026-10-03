@@ -3,7 +3,7 @@ import {familyPicker} from "./family.js";
 import {familyMoved} from "./fitsizes.js";
 import {loadDevice, syncDeviceColor, wireDevice} from "./device.js";
 import {form, samplePicker, syncHyphenation, syncLineHeight} from "./dom.js";
-import {fillPresets, outField, showFallbackState,
+import {fillPresets, outField, showConfigErrors, showFallbackState,
         wireBuildButtons, wireSizeBoxes} from "./export.js";
 import {syncSliders, wireKnobs} from "./knobs.js";
 import {declareLanguage, loadPage, loadSize, preferredLanguage} from "./remember.js";
@@ -55,7 +55,10 @@ let asking = false;
 function askAgain() {
   if (document.hidden || asking) return;
   asking = true;
-  fetch("/defaults").then(r => r.json()).then(refreshFamilies)
+  fetch("/defaults").then(r => r.json()).then(d => {
+    showConfigErrors(d.config_errors);
+    refreshFamilies(d);
+  })
     .catch((error) => console.error(error))
     .finally(() => { asking = false; });
 }
@@ -90,6 +93,7 @@ fetch("/defaults").then(r => r.json()).then(d => {
   restoreSample(navigator.languages);
   fillPresets(d.presets || [], d.base || []);
   showFallbackState(d.fallbacks, d.fallbacks_missing);
+  showConfigErrors(d.config_errors);
   outField.value = d.out || "";
   outField.placeholder = d.out_resolved || "";
   document.getElementById("source-note").textContent =

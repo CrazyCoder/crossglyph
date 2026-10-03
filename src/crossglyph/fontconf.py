@@ -1079,9 +1079,18 @@ def parse_config(path: pathlib.Path, values: dict[str, str] | None = None,
     sizes = parse_sizes(values.get("sizes", ""), where) or DEFAULT_SIZES
     sizes_mod = parse_sizes(values.get("sizes_mod", ""), where)
     mod_suffix = mod_suffix_from(values)
-    # Merged, the two lists write one set of .cpfont names between them.
+    # Merged, the two lists write one set of .cpfont names between them. Each
+    # list was checked on its own as it was parsed, so a clash here is one
+    # only the merge makes, fixed in one of three places, and the second list
+    # is often all.conf's, which this file never mentions.
     if sizes_mod and not mod_suffix:
-        check_labels(sizes + sizes_mod, where)
+        try:
+            check_labels(sizes + sizes_mod, where)
+        except FontConfigError as exc:
+            raise FontConfigError(
+                f"{exc}. Drop the size from one list, set mod_suffix to build "
+                f"sizes_mod as a second family, or write `sizes_mod =` in this "
+                f"file if it comes from all.conf.") from None
 
     return Config(
         path=path,

@@ -15,6 +15,22 @@ list when the tab receives focus.
 The browser skips `conf`, `cpfonts`, `fallbacks`, dot folders and files that are
 not TTF or OTF fonts.
 
+## A family ignores its config
+
+When a family's config cannot be read, the family stays in the list but uses
+only the settings in `all.conf`. The **Export** panel then lists each config it
+could not read, with what is wrong and what to change.
+
+A common case is one size listed twice. `all.conf` can give every family a
+second list of sizes, and with the **suffix** empty those sizes join each
+family's own. If a family's config already has one of them, that size is there
+twice. Remove it from one list, fill in the suffix to make the second list a
+family of its own, or write `sizes_mod =` in the family's config so it does not
+take the list from `all.conf`.
+
+Fix the file, then return to the browser. The list updates when the tab
+receives focus.
+
 ## The styles are grouped incorrectly
 
 CrossGlyph reads styles from filename endings such as Regular, Bold, Italic and

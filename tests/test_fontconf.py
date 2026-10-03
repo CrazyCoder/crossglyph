@@ -583,6 +583,29 @@ def test_one_family_cannot_hold_two_sizes_that_share_a_label(tmp_path):
         fontconf.parse_config(tmp_path / "alto.conf")
 
 
+def test_a_clash_across_the_two_lists_says_how_to_resolve_it(tmp_path):
+    """The second list often comes from all.conf, where the file being read
+    does not mention it, so the message names the three ways out."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text(
+        "sizes = 12 14\nsizes_mod = 12\nmod_suffix =\n", encoding="utf-8")
+    with pytest.raises(fontconf.FontConfigError) as caught:
+        fontconf.parse_config(tmp_path / "alto.conf")
+    message = str(caught.value)
+    assert "12 twice" in message
+    assert "sizes_mod =" in message and "all.conf" in message
+    assert "mod_suffix" in message
+
+
+def test_a_clash_inside_one_list_does_not_blame_the_other(tmp_path):
+    """Two sizes in `sizes` alone are fixed in `sizes`."""
+    _touch(tmp_path, *ALTO)
+    (tmp_path / "alto.conf").write_text("sizes = 13.5 14\n", encoding="utf-8")
+    with pytest.raises(fontconf.FontConfigError) as caught:
+        fontconf.parse_config(tmp_path / "alto.conf")
+    assert "sizes_mod" not in str(caught.value)
+
+
 def test_two_lists_under_two_names_may_share_a_label(tmp_path):
     """They write into directories of their own, so nothing collides."""
     _touch(tmp_path, *ALTO)
