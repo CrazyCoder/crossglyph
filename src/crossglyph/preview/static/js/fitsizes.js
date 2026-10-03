@@ -374,16 +374,17 @@ function prefillRange() {
     .map(box => Math.floor(Number(snapSize(exportForm.elements[box].value)) + 0.5)))]
     .sort((a, b) => a - b);
   // The step the sizes have most often, the smaller one on a tie, within the
-  // steps the menu offers.
+  // steps the menu offers. The menus are the limits, so read them.
+  const largest = (menu) => Math.max(...[...menu.options].map(option => Number(option.value)));
   const gaps = new Map();
   labels.slice(1).forEach((label, i) => {
-    const gap = Math.min(3, label - labels[i]);
+    const gap = Math.min(largest(stepField), label - labels[i]);
     gaps.set(gap, (gaps.get(gap) || 0) + 1);
   });
   const usual = [...gaps].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 1;
   low.value = String(labels[0] ?? 12);
   stepField.value = String(usual);
-  count.value = String(Math.min(8, labels.length) || 4);
+  count.value = String(Math.min(largest(count), labels.length) || 4);
   showFitTargets();
 }
 

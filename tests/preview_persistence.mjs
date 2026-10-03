@@ -33,8 +33,9 @@ function optionsOf(id) {
   const select = new RegExp(`<select[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</select>`)
     .exec(INDEX);
   if (!select) throw new Error(`no <select id="${id}"> in index.html`);
-  return [...select[1].matchAll(/<option[^>]*\bvalue="([^"]*)"/g)]
-    .map(([, value]) => ({ value }));
+  // An option with no value attribute has its text for one, as in a browser.
+  return [...select[1].matchAll(/<option([^>]*)>([^<]*)/g)]
+    .map(([, attrs, text]) => ({ value: /\bvalue="([^"]*)"/.exec(attrs)?.[1] ?? text.trim() }));
 }
 
 const ENTRY = "app.js";
@@ -885,8 +886,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-mine-says": makeElement(),
     "fit-range": Object.assign(makeElement(), {hidden: true}),
     "fit-low": makeElement(),
-    "fit-step": Object.assign(makeElement(), {value: "1"}),
-    "fit-count": makeElement(),
+    // The page's own menus, since a range is clamped to what they offer.
+    "fit-step": makeControl({name: "fit-step", value: "1", options: optionsOf("fit-step")}),
+    "fit-count": makeControl({name: "fit-count", value: "4", options: optionsOf("fit-count")}),
     // The sizes a range will try, listed as its fields change.
     "fit-targets": makeElement(),
     "fit-run": makeElement(),

@@ -2,7 +2,7 @@
 // How cleanly the straight strokes of the text on the page sit on the
 // device's pixels, as the server measured them from the font it drew with.
 // The score belongs to this text: a different text is a different sample,
-// so the change in brackets only compares two pages of the same text.
+// so the gain beside the score only compares two pages of the same text.
 
 const line = document.getElementById("grid-fit");
 const parts = document.getElementById("grid-fit-parts");
