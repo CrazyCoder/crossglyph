@@ -372,38 +372,22 @@ export function familyMoved() {
   foundFor = null;
 }
 
-// The range starts from the sizes the family has, so switching to it is a
-// small step from what is there rather than a blank form.
-function prefillRange() {
-  const labels = [...new Set([...FIRST_ROW, ...SECOND_ROW].filter(filled)
-    .map(box => Math.floor(Number(snapSize(exportForm.elements[box].value)) + 0.5)))]
-    .sort((a, b) => a - b);
-  // The step the sizes have most often, the smaller one on a tie, within the
-  // steps the menu offers. The menus are the limits, so read them.
-  const largest = (menu) => Math.max(...[...menu.options].map(option => Number(option.value)));
-  const gaps = new Map();
-  labels.slice(1).forEach((label, i) => {
-    const gap = Math.min(largest(stepField), label - labels[i]);
-    gaps.set(gap, (gaps.get(gap) || 0) + 1);
-  });
-  const usual = [...gaps].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 1;
-  low.value = String(labels[0] ?? 12);
-  stepField.value = String(usual);
-  count.value = String(Math.min(largest(count), labels.length) || 4);
-  showFitTargets();
-}
-
 // Two halves of one toggle. Range swaps its fields in where My sizes says
-// what it does, so the row keeps its height and Find sizes stays put.
+// what it does, so the row keeps its height and Find sizes stays put. The
+// fields keep what was typed in them across switches.
 function setMode(ranged) {
   toMine.setAttribute("aria-pressed", String(!ranged));
   toRange.setAttribute("aria-pressed", String(ranged));
   mineSays.hidden = ranged;
   rangeFields.hidden = !ranged;
-  if (ranged) prefillRange();
   showFitTargets();
 }
 
+//: Where a range starts: eight sizes a point apart from 10, which covers the
+//: sizes most books are read at.
+low.value = "10";
+stepField.value = "1";
+count.value = "8";
 toMine.setAttribute("aria-pressed", "true");
 toRange.setAttribute("aria-pressed", "false");
 toMine.addEventListener("click", () => setMode(false));
@@ -411,10 +395,7 @@ toRange.addEventListener("click", () => setMode(true));
 low.addEventListener("input", showFitTargets);
 stepField.addEventListener("change", showFitTargets);
 count.addEventListener("change", showFitTargets);
-toggle.addEventListener("click", () => {
-  if (!low.value) prefillRange();
-  showFitTargets();
-});
+toggle.addEventListener("click", showFitTargets);
 runButton.addEventListener("click", runFit);
 applyButton.addEventListener("click", applyFit);
 undoButton.addEventListener("click", undoFit);

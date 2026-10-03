@@ -291,7 +291,7 @@ box you have edited since.
 To choose new sizes instead, select **Range** and set where it **starts**, the
 **step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
 The sizes it will try are listed under the fields, such as "Tries 12, 14, 16,
-18". The fields start from the sizes you have, with the step those use most.
+18". A range starts at 10, with a step of 1 and 8 sizes.
 Press **Find sizes**. The sizes fill the boxes in order, the first row then the
 second.
 

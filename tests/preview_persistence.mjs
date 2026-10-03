@@ -6274,9 +6274,11 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.fit.toRange.attrs["aria-pressed"] === "true"
         && env.fit.toMine.attrs["aria-pressed"] === "false"
         && env.fit.mineSays.hidden === true && env.fit.range.hidden === false);
-  check("a range starts from the step the sizes already have",
-        env.fit.low.value === "12" && env.fit.step.value === "3"
-        && env.fit.targets.textContent === "Tries 12, 15", env.fit.targets.textContent);
+  check("a range starts at 10, a point apart, eight sizes",
+        env.fit.low.value === "10" && env.fit.step.value === "1"
+        && env.fit.count.value === "8"
+        && env.fit.targets.textContent === "Tries 10, 11, 12, 13, 14, 15, 16, 17",
+        env.fit.targets.textContent);
   env.fit.low.value = "12.5";
   env.fit.low.on.input();
   check("a start that is not a whole size lists nothing",
@@ -6352,10 +6354,11 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   opts.fitSteps = fitSteps([12, 13, 14, 15, 16, 17].map(l => [l, l, l, [90, 90, 90, 90]]));
   env.fold.press("fit");
   env.fit.toRange.on.click();
-  check("a range starts from as many sizes as the boxes hold",
-        env.fit.count.value === "8", env.fit.count.value);
-  check("and the step the sizes have most often", env.fit.step.value === "1",
-        env.fit.step.value);
+  env.fit.low.value = "14";
+  env.fit.toMine.on.click();
+  env.fit.toRange.on.click();
+  check("switching away and back keeps the range as it was typed",
+        env.fit.low.value === "14", env.fit.low.value);
   env.fit.low.value = "12";
   env.fit.step.value = "1";
   env.fit.count.value = "6";
