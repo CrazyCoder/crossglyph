@@ -388,6 +388,7 @@ StyleRasterData = namedtuple("StyleRasterData", [
     "all_glyphs",              # [(GlyphProps, packed_bytes), ...]
     "total_bitmap_size",       # int
     "advanceY", "ascender", "descender",
+    "max_ink_top",             # int: tallest ink above the baseline in this style
     "kern_left_classes", "kern_right_classes", "kern_matrix",
     "kern_left_class_count", "kern_right_class_count",
     "ligature_pairs",
@@ -1382,6 +1383,14 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             total_bitmap_size += len(packed)
             all_glyphs.append((glyph, packed))
 
+    # Tallest ink above the baseline, over every glyph that has ink. A reader
+    # that places a page's first line from it can keep tall marks, such as
+    # Vietnamese double accents, off the screen edge. Empty glyphs have width
+    # and height 0, so they cannot raise it; a style with no ink reports 0,
+    # which a reader takes as "unknown".
+    max_ink_top = max((g.top for g, _ in all_glyphs if g.width and g.height),
+                      default=0)
+
     # Get font metrics from the primary font. This keeps line metrics stable for
     # the selected family even when a fallback contributes some glyphs.
     load_glyph_for_face(face, ord('|'))
@@ -1473,6 +1482,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         advanceY=advanceY,
         ascender=ascender,
         descender=descender,
+        max_ink_top=max_ink_top,
         kern_left_classes=kern_left_classes,
         kern_right_classes=kern_right_classes,
         kern_matrix=kern_matrix,
@@ -1604,8 +1614,13 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     # Build style TOC entries
     # Each entry: styleId(1) + pad(3) + intervalCount(4) + glyphCount(4) +
     #   advanceY(1) + ascender(2) + descender(2) + kernL(2) + kernR(2) +
-    #   kernLCls(1) + kernRCls(1) + ligCount(1) + dataOffset(4) + reserved(4) = 32
-    STYLE_TOC_FORMAT = "<B3xIIBhhHHBBBI4x"
+    #   kernLCls(1) + kernRCls(1) + ligCount(1) + dataOffset(4) +
+    #   maxInkTop(2) + reserved(2) = 32
+    #
+    # maxInkTop takes the first half of what upstream leaves reserved, so the
+    # entry stays 32 bytes and the version stays 4. CrossPoint never reads
+    # those bytes. A firmware that does read it treats 0 as "unknown".
+    STYLE_TOC_FORMAT = "<B3xIIBhhHHBBBIh2x"
     assert struct.calcsize(STYLE_TOC_FORMAT) == STYLE_TOC_ENTRY_SIZE
 
     toc_data = bytearray()
@@ -1637,7 +1652,8 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
                                 len(sd.kern_left_classes), len(sd.kern_right_classes),
                                 sd.kern_left_class_count, sd.kern_right_class_count,
                                 len(sd.ligature_pairs),
-                                style_offsets[style_id])
+                                style_offsets[style_id],
+                                sd.max_ink_top)
 
     # Write output
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
