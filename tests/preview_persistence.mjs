@@ -2857,6 +2857,10 @@ for (const { name, text } of sources) {
   check("a refused config is reported", box.hidden === false, String(box.hidden));
   check("with what is wrong and what to change, on a line of its own",
         said().includes(why), JSON.stringify(said()));
+  // It shows whichever family is open, and the refused config's family may
+  // not be offered at all, so it speaks about the folder and nothing else.
+  check("as a fact about the font folder, not the family on screen",
+        said()[0] === "A config in the font folder could not be read:", said()[0]);
   env.returning();
   await settle();
   check("and the report goes once the file reads again",

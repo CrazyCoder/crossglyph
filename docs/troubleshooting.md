@@ -18,8 +18,10 @@ not TTF or OTF fonts.
 ## A family ignores its config
 
 When a family's config cannot be read, the family stays in the list but uses
-only the settings in `all.conf`. The **Export** panel then lists each config it
-could not read, with what is wrong and what to change.
+only the settings in `all.conf`. The top of the **Export** panel then lists
+every config in the font folder that could not be read, with what is wrong and
+what to change. The list is about the folder, so it shows whichever family is
+open, including for a config whose font files are not in the folder at all.
 
 A common case is one size listed twice. `all.conf` can give every family a
 second list of sizes, and with the **suffix** empty those sizes join each

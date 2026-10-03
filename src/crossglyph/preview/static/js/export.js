@@ -304,8 +304,10 @@ function titleBoxes(fields, family) {
 
 const confErrors = document.getElementById("conf-errors");
 
-//: The configs /defaults could not read, a line each under a sentence saying
-//: what that costs. Each line names its file and what to change in it.
+//: The configs /defaults could not read, a line each, each naming its file
+//: and what to change in it. Said about the folder rather than the family on
+//: screen: it shows whatever family is open, and a config whose faces are
+//: missing has no family in the picker at all.
 export function showConfigErrors(errors = []) {
   confErrors.hidden = !errors.length;
   if (!errors.length) {
@@ -322,8 +324,8 @@ export function showConfigErrors(errors = []) {
   lines.className = "lines";
   lines.append(
     line(errors.length === 1
-      ? "This config could not be read, so its family uses the settings in all.conf until it is fixed:"
-      : "These configs could not be read, so their families use the settings in all.conf until they are fixed:"),
+      ? "A config in the font folder could not be read:"
+      : "Some configs in the font folder could not be read:"),
     ...errors.map(line));
   confErrors.replaceChildren(lines);
 }
