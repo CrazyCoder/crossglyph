@@ -189,36 +189,31 @@ def test_my_sizes_are_targeted_by_their_labels():
     assert gridfit.targets(sizes=[13, 13.75, 15]) == [(13, 13), (13.75, 14), (15, 15)]
 
 
-def test_a_range_spreads_whole_sizes_evenly():
-    assert [label for _, label in gridfit.targets(low=12, high=19, count=8)] == \
+def test_a_range_counts_up_from_its_start_by_its_step():
+    assert [label for _, label in gridfit.targets(low=12, step=1, count=8)] == \
         list(range(12, 20))
-    assert [label for _, label in gridfit.targets(low=12, high=18, count=4)] == \
+    assert [label for _, label in gridfit.targets(low=12, step=2, count=4)] == \
         [12, 14, 16, 18]
-
-
-def test_a_range_too_narrow_for_its_count_is_refused():
-    with pytest.raises(ValueError, match="8 sizes"):
-        gridfit.targets(low=12, high=14, count=8)
-
-
-@pytest.mark.parametrize("low, high, count", [(5, 12, 4), (12, 41, 4), (14, 12, 4),
-                                              (12, 18, 0), (12, 20, 9)])
-def test_a_range_outside_the_knob_or_the_boxes_is_refused(low, high, count):
-    """Eight is the number of size boxes, two rows of four."""
-    with pytest.raises(ValueError):
-        gridfit.targets(low=low, high=high, count=count)
-
-
-def test_any_count_the_boxes_hold_spreads_evenly():
-    assert [label for _, label in gridfit.targets(low=12, high=17, count=6)] == \
-        [12, 13, 14, 15, 16, 17]
-    assert [label for _, label in gridfit.targets(low=12, high=18, count=3)] == \
+    assert [label for _, label in gridfit.targets(low=12, step=3, count=3)] == \
         [12, 15, 18]
 
 
-def test_one_size_is_the_low_end_alone():
-    assert gridfit.targets(low=14, high=None, count=1) == [(14, 14)]
-    assert gridfit.targets(low=14, high=20, count=1) == [(14, 14)]
+def test_a_range_that_runs_past_the_largest_size_is_refused():
+    with pytest.raises(ValueError, match="44"):
+        gridfit.targets(low=30, step=2, count=8)
+
+
+@pytest.mark.parametrize("low, step, count", [(5, 1, 4), (41, 1, 1), (12, 0, 4),
+                                              (12, 4, 4), (12, 1, 0), (12, 1, 9)])
+def test_a_range_outside_the_knob_the_steps_or_the_boxes_is_refused(low, step, count):
+    """Eight is the number of size boxes, two rows of four."""
+    with pytest.raises(ValueError):
+        gridfit.targets(low=low, step=step, count=count)
+
+
+def test_one_size_is_its_start_whatever_the_step():
+    assert gridfit.targets(low=14, step=1, count=1) == [(14, 14)]
+    assert gridfit.targets(low=14, step=3, count=1) == [(14, 14)]
 
 
 def test_the_pick_is_the_best_fit():

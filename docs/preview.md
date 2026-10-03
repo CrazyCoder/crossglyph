@@ -284,10 +284,12 @@ already the best has nothing to tick. **Apply** leaves alone any box you have
 changed since the search. **Undo** puts back what Apply wrote, and keeps any
 box you have edited since.
 
-To choose new sizes instead, select **a range**, enter the smallest and largest
-whole size and choose how many sizes, from 1 to 8, then press **Find sizes**.
-One size needs only the smallest. The sizes fill the first row of boxes, then
-**More sizes**, which opens so you can see them.
+To choose new sizes instead, select **a range** and set where it starts, the
+**step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
+The sizes it will try are listed under the fields, such as "Sizes 12, 14, 16,
+18". They start from the sizes you have, with the step those use most. Press
+**Find sizes**. The sizes fill the first row of boxes, then **More sizes**,
+which opens so you can see them.
 
 A range is the family's new list of sizes. Boxes past the count are listed as
 **removed**, and **Apply** empties them. **Undo** brings them back. When a

@@ -18,8 +18,9 @@ const panel = document.getElementById("fit-panel");
 const mode = document.getElementById("fit-mode");
 const rangeFields = document.getElementById("fit-range");
 const low = document.getElementById("fit-low");
-const high = document.getElementById("fit-high");
+const stepField = document.getElementById("fit-step");
 const count = document.getElementById("fit-count");
+const targets = document.getElementById("fit-targets");
 const runButton = document.getElementById("fit-run");
 const sample = document.getElementById("fit-sample");
 const table = document.getElementById("fit-table");
@@ -189,21 +190,26 @@ function failure(text) {
   return detail ?? text;
 }
 
-// A range is whole sizes inside the size knob's range, smaller first. One
-// size is where it starts, and nothing else.
-function rangeProblem() {
-  const from = Number(low.value), to = Number(high.value);
-  if (count.value === "1") {
-    return Number.isInteger(from) && low.value.trim() && from >= SIZE_MIN && from <= SIZE_MAX
-      ? null : `One size is a whole size between ${SIZE_MIN} and ${SIZE_MAX}.`;
+// The sizes a range will try: `count` whole sizes counting up from its start
+// by its step. What is wrong with it instead, when something is, in words.
+function rangeSizes() {
+  const start = Number(low.value);
+  if (!low.value.trim() || !Number.isInteger(start) || start < SIZE_MIN || start > SIZE_MAX) {
+    return {problem: `Start at a whole size between ${SIZE_MIN} and ${SIZE_MAX}.`};
   }
-  if (![from, to].every(Number.isInteger) || !low.value.trim() || !high.value.trim()) {
-    return "A range is two whole sizes, such as 12 and 19.";
+  const step = Number(stepField.value), many = Number(count.value);
+  const end = start + step * (many - 1);
+  if (end > SIZE_MAX) {
+    return {problem: `That runs to ${end}, past the largest size, ${SIZE_MAX}.`};
   }
-  if (from < SIZE_MIN || to > SIZE_MAX || from >= to) {
-    return `A range runs from a smaller size to a larger one, between ${SIZE_MIN} and ${SIZE_MAX}.`;
-  }
-  return null;
+  return {sizes: Array.from({length: many}, (_, i) => start + i * step)};
+}
+
+// Listed as the fields change, so the range is read as sizes before it runs.
+function showRange() {
+  const {sizes, problem} = rangeSizes();
+  targets.textContent = problem ?? `Sizes ${sizes.join(", ")}`;
+  stepField.disabled = count.value === "1";
 }
 
 function clearFit() {
@@ -224,8 +230,8 @@ async function runFit() {
     : [...FIRST_ROW, ...SECOND_ROW].filter(filled);
   stopFit();
   clearFit();
-  if (ranged && rangeProblem()) {
-    note.textContent = rangeProblem();
+  if (ranged && rangeSizes().problem) {
+    note.textContent = rangeSizes().problem;
     return;
   }
   if (!boxes.length) {
@@ -233,7 +239,7 @@ async function runFit() {
     return;
   }
   const request = {...body(), ...(ranged
-    ? {low: Number(low.value), high: Number(high.value), count: Number(count.value)}
+    ? {low: Number(low.value), step: Number(stepField.value), count: Number(count.value)}
     : {sizes: boxes.map(box => Number(snapSize(exportForm.elements[box].value)))})};
   const mine = ++runs;
   controller = new AbortController();
@@ -365,24 +371,30 @@ export function familyMoved() {
 // The range starts from the sizes the family has, so switching to it is a
 // small step from what is there rather than a blank form.
 function prefillRange() {
-  const labels = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
-    .map(box => Math.floor(Number(snapSize(exportForm.elements[box].value)) + 0.5));
-  low.value = String(labels.length ? Math.min(...labels) : 12);
-  high.value = String(labels.length ? Math.max(...labels) : 15);
-  count.value = String(labels.length || 4);
-}
-
-// One size is where the range starts, so the other end has nothing to say.
-function syncHigh() {
-  high.disabled = count.value === "1";
+  const labels = [...new Set([...FIRST_ROW, ...SECOND_ROW].filter(filled)
+    .map(box => Math.floor(Number(snapSize(exportForm.elements[box].value)) + 0.5)))]
+    .sort((a, b) => a - b);
+  // The step the sizes have most often, the smaller one on a tie, within the
+  // steps the menu offers.
+  const gaps = new Map();
+  labels.slice(1).forEach((label, i) => {
+    const gap = Math.min(3, label - labels[i]);
+    gaps.set(gap, (gaps.get(gap) || 0) + 1);
+  });
+  const usual = [...gaps].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 1;
+  low.value = String(labels[0] ?? 12);
+  stepField.value = String(usual);
+  count.value = String(Math.min(8, labels.length) || 4);
+  showRange();
 }
 
 mode.addEventListener("change", () => {
   rangeFields.hidden = mode.value !== "range";
   if (mode.value === "range") prefillRange();
-  syncHigh();
 });
-count.addEventListener("change", syncHigh);
+low.addEventListener("input", showRange);
+stepField.addEventListener("change", showRange);
+count.addEventListener("change", showRange);
 toggle.addEventListener("click", () => {
   if (!low.value) prefillRange();
 });

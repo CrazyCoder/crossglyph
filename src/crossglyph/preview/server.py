@@ -1062,10 +1062,10 @@ def page_font(request: RenderRequest, size: float) -> PageFont:
 
 class FitRequest(RenderRequest):
     """A page, and the sizes to fit on it: the family's own `sizes`, or
-    `count` whole sizes spread from `low` to `high`."""
+    `count` whole sizes counting up from `low` by `step`."""
     sizes: list[float] = Field(default_factory=list)
     low: int | None = None
-    high: int | None = None
+    step: int = 1
     count: int | None = None
 
 
@@ -1081,7 +1081,7 @@ def fit_sizes(request: FitRequest) -> StreamingResponse:
         raise HTTPException(503, "no font source; start with --font")
     try:
         wanted = gridfit.targets(sizes=request.sizes, low=request.low,
-                                 high=request.high, count=request.count)
+                                 step=request.step, count=request.count)
         mono = _tuning(_cache_key(request.tuning)).mono
     except CLIENT_ERRORS as exc:
         raise HTTPException(422, str(exc)) from exc

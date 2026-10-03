@@ -1090,17 +1090,25 @@
           <option value="mine">my sizes</option>
           <option value="range">a range</option>
         </select>
-        <span id="fit-range" hidden>from
-          <input class="mono" id="fit-low" type="text" inputmode="numeric"
-                 aria-label="Smallest size, 6 to 40">
-          to <input class="mono" id="fit-high" type="text" inputmode="numeric"
-                    aria-label="Largest size, 6 to 40">
-          <select id="fit-count" aria-label="How many sizes">
-            <option>1</option><option>2</option><option>3</option>
-            <option selected>4</option><option>5</option><option>6</option>
-            <option>7</option><option>8</option>
-          </select> sizes</span>
         <button type="button" id="fit-run">Find sizes</button>
+      </div>
+      <!-- A range is where it starts, how far apart its sizes are, and how
+           many there are. The sizes it will try are listed under the fields
+           as they change, so nobody has to work them out. -->
+      <div id="fit-range" class="fit-range" hidden>
+        <div class="fit-fields">
+          <label>start <input class="mono" id="fit-low" type="text"
+                              inputmode="numeric" aria-label="First size, 6 to 40"></label>
+          <label>step <select id="fit-step" aria-label="Points between sizes">
+              <option>1</option><option>2</option><option>3</option>
+            </select></label>
+          <label>sizes <select id="fit-count" aria-label="How many sizes">
+              <option>1</option><option>2</option><option>3</option>
+              <option selected>4</option><option>5</option><option>6</option>
+              <option>7</option><option>8</option>
+            </select></label>
+        </div>
+        <div id="fit-targets" class="hint mono"></div>
       </div>
       <div id="fit-sample" class="hint"></div>
       <div class="fit-row fit-head" aria-hidden="true">

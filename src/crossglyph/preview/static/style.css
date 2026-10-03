@@ -987,19 +987,23 @@
   /* Fit to grid, a folded section of its own under the sizes. */
   .fit-panel { padding: .2rem 0 .6rem; display: grid; gap: .45rem; }
   .fit-panel .hint:empty { display: none; }
-  .fit-controls { display: flex; flex-wrap: wrap; gap: .35rem;
-                  align-items: center; font-size: 12px; }
-  .fit-controls select { width: auto; }
-  /* One height for the menus, fields and buttons that share a line, which
-     the browser otherwise draws at three. */
-  .fit-controls select, .fit-controls input, .fit-panel button:not(.fit-value) {
+  /* The mode and the button that runs it on one line, the range's fields on
+     the next, each with a short label, and the sizes they make under them. */
+  .fit-controls { display: flex; align-items: center; gap: .35rem; font-size: 12px; }
+  .fit-controls select, .fit-fields select { width: auto; }
+  /* One height for the menus, fields and buttons, which the browser
+     otherwise draws at three. */
+  .fit-panel select, .fit-panel input[type=text], .fit-panel button:not(.fit-value) {
     height: 26px; padding-top: 0; padding-bottom: 0;
   }
-  #export #fit-range input { width: 3.4rem; text-align: center; }
-  #fit-range:not([hidden]) { display: inline-flex; align-items: center; gap: .35rem; }
+  .fit-range { display: grid; gap: .3rem; }
+  .fit-range[hidden] { display: none; }
+  .fit-fields { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1.1rem;
+                font-size: 12px; color: var(--muted); }
+  .fit-fields label { display: inline-flex; align-items: center; gap: .4rem; }
+  #export .fit-fields input { width: 3.4rem; text-align: center; color: var(--text); }
   .fit-head { color: var(--muted); font-size: 11px; }
   .fit-head:has(+ .fit-table:empty) { display: none; }
-  #fit-range[hidden] { display: none; }
   /* One row a size: its box, the size now, the suggestion, what each scores,
      and whether Apply takes it. */
   .fit-table { display: grid; gap: .1rem; }

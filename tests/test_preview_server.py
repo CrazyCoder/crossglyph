@@ -115,7 +115,7 @@ def test_fitting_sizes_scores_every_candidate_and_picks_per_label(client):
 @needs
 def test_fitting_a_range_targets_whole_sizes(client):
     response = client.post("/fit-sizes", json={"text": FIT_TEXT, "low": 12,
-                                               "high": 18, "count": 4})
+                                               "step": 2, "count": 4})
     labels = [e for e in _events(response) if e["event"] == "label"]
     assert [(e["now"], e["label"]) for e in labels] == \
         [(12, 12), (14, 14), (16, 16), (18, 18)]
@@ -123,7 +123,7 @@ def test_fitting_a_range_targets_whole_sizes(client):
 
 @needs
 @pytest.mark.parametrize("body, said", [
-    ({"text": FIT_TEXT, "low": 12, "high": 14, "count": 8}, "too narrow"),
+    ({"text": FIT_TEXT, "low": 30, "step": 2, "count": 8}, "past the largest"),
     ({"text": "Minimum", "sizes": [13]}, "few lines of text"),
     ({"text": FIT_TEXT, "sizes": [13], "tuning": {"mono": True}}, "mono"),
 ])
@@ -175,7 +175,7 @@ def test_eight_fitted_sizes_all_stay_built(client, monkeypatch):
     # A page at a size the search will not try, so it is a build of its own.
     client.post("/render", json={"size": 24, "text": FIT_TEXT})
     _events(client.post("/fit-sizes", json={"text": FIT_TEXT, "low": 12,
-                                            "high": 19, "count": 8}))
+                                            "step": 1, "count": 8}))
     built = []
     real = server.build_font
     monkeypatch.setattr(server, "build_font",

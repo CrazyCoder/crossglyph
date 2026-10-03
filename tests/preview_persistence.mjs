@@ -881,8 +881,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-mode": Object.assign(makeElement(), {value: "mine"}),
     "fit-range": Object.assign(makeElement(), {hidden: true}),
     "fit-low": makeElement(),
-    "fit-high": makeElement(),
+    "fit-step": Object.assign(makeElement(), {value: "1"}),
     "fit-count": makeElement(),
+    // The sizes a range will try, listed as its fields change.
+    "fit-targets": makeElement(),
     "fit-run": makeElement(),
     "fit-table": makeElement(),
     // Every sentence the note said, since the running count is gone by the
@@ -1386,7 +1388,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                       parts: stubs["grid-fit-parts"] },
            fit: { toggle: stubs["fit-toggle"], sample: stubs["fit-sample"],
                   mode: stubs["fit-mode"], range: stubs["fit-range"],
-                  low: stubs["fit-low"], high: stubs["fit-high"],
+                  low: stubs["fit-low"], step: stubs["fit-step"],
+                  targets: stubs["fit-targets"],
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
@@ -6207,17 +6210,31 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const asked = env.fetches.fits.length;
   env.fit.mode.value = "range";
   env.fit.mode.on.change();
+  check("a range starts from the step the sizes already have",
+        env.fit.low.value === "12" && env.fit.step.value === "3"
+        && env.fit.targets.textContent === "Sizes 12, 15", env.fit.targets.textContent);
   env.fit.low.value = "12.5";
-  env.fit.high.value = "19";
+  env.fit.low.on.input();
+  check("a start that is not a whole size lists nothing",
+        env.fit.targets.textContent.includes("whole size"), env.fit.targets.textContent);
   env.fit.run.on.click();
   await settle();
-  check("a fractional range is refused before asking",
+  check("and is refused before asking",
         env.fetches.fits.length === asked
-        && env.fit.note.textContent.includes("whole sizes"), env.fit.note.textContent);
+        && env.fit.note.textContent.includes("whole size"), env.fit.note.textContent);
   env.fit.low.value = "abc";
   env.fit.run.on.click();
   await settle();
   check("and so is one that is not a number", env.fetches.fits.length === asked);
+  env.fit.low.value = "38";
+  env.fit.step.value = "2";
+  env.fit.count.value = "4";
+  env.fit.count.on.change();
+  check("a range past the largest size says where it ends",
+        env.fit.targets.textContent.includes("44"), env.fit.targets.textContent);
+  env.fit.run.on.click();
+  await settle();
+  check("and is refused too", env.fetches.fits.length === asked);
 }
 
 // 99a. A range of whole sizes. Eight fill both rows of boxes, and the suffix
@@ -6234,13 +6251,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.fit.mode.value = "range";
   env.fit.mode.on.change();
   env.fit.low.value = "12";
-  env.fit.high.value = "19";
+  env.fit.step.value = "1";
   env.fit.count.value = "8";
+  env.fit.count.on.change();
+  check("the sizes a range will try are listed before it runs",
+        env.fit.targets.textContent === "Sizes 12, 13, 14, 15, 16, 17, 18, 19",
+        env.fit.targets.textContent);
   env.fit.run.on.click();
   await settle();
   const sent = env.fetches.fits.at(-1);
-  check("a range asks for whole sizes from low to high",
-        sent.low === 12 && sent.high === 19 && sent.count === 8 && !sent.sizes,
+  check("a range asks for its start, step and count",
+        sent.low === 12 && sent.step === 1 && sent.count === 8 && !sent.sizes,
         JSON.stringify(sent));
   check("the range fields show for a range", env.fit.range.hidden === false);
   check("eight sizes are eight rows", env.fit.table.children.length === 8);
@@ -6291,8 +6312,10 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.fit.mode.on.change();
   check("a range starts from as many sizes as the boxes hold",
         env.fit.count.value === "8", env.fit.count.value);
+  check("and the step the sizes have most often", env.fit.step.value === "1",
+        env.fit.step.value);
   env.fit.low.value = "12";
-  env.fit.high.value = "17";
+  env.fit.step.value = "1";
   env.fit.count.value = "6";
   env.fit.run.on.click();
   check("any count up to the boxes is asked for", env.fetches.fits.at(-1).count === 6,
@@ -6316,10 +6339,11 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 
   opts.fitSteps = fitSteps([[14, 14, 13.75, [50, 90, 50, 50]]]);
   env.fit.low.value = "14";
-  env.fit.high.value = "";
   env.fit.count.value = "1";
   env.fit.count.on.change();
-  check("one size turns off the other end", env.fit.high.disabled === true);
+  check("one size turns off the step", env.fit.step.disabled === true);
+  check("and lists the one size", env.fit.targets.textContent === "Sizes 14",
+        env.fit.targets.textContent);
   env.fit.run.on.click();
   await settle();
   const one = env.fetches.fits.at(-1);

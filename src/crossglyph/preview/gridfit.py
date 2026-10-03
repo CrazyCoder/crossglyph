@@ -257,6 +257,8 @@ TIE = 1.0
 SIZE_MIN, SIZE_MAX = 6, 40
 #: The size boxes, two rows of four, which is as many sizes as a range fills.
 MAX_COUNT = 8
+#: How far apart a range's sizes are, in points.
+STEPS = (1, 2, 3)
 
 
 def candidates(label: int) -> list[float]:
@@ -267,30 +269,26 @@ def candidates(label: int) -> list[float]:
 
 
 def targets(*, sizes: Sequence[float] = (), low: int | None = None,
-            high: int | None = None, count: int | None = None,
+            step: int = 1, count: int | None = None,
             ) -> list[tuple[float, int]]:
     """(size now, label) for each size to fit.
 
     Either the sizes the family has, each keeping its own label, or `count`
-    whole sizes spread evenly from `low` to `high`, which have no size of
-    their own yet and start at their label.
+    whole sizes counting up from `low` by `step`, which have no size of their
+    own yet and start at their label.
     """
     if low is None:
         return [(size, size_label(size)) for size in sizes]
     if count is None or not 1 <= count <= MAX_COUNT:
         raise ValueError(f"a range is 1 to {MAX_COUNT} sizes, as many as the boxes hold")
-    if count == 1:
-        if not SIZE_MIN <= low <= SIZE_MAX:
-            raise ValueError(f"a size is between {SIZE_MIN} and {SIZE_MAX}")
-        return [(low, low)]
-    if high is None or not SIZE_MIN <= low < high <= SIZE_MAX:
-        raise ValueError(f"a range runs from a smaller size to a larger one, "
-                         f"between {SIZE_MIN} and {SIZE_MAX}")
-    labels = [int(low + i * (high - low) / (count - 1) + 0.5) for i in range(count)]
-    if len(set(labels)) < count:
-        raise ValueError(f"{low} to {high} is too narrow for {count} sizes: "
-                         f"it holds {high - low + 1}")
-    return [(label, label) for label in labels]
+    if step not in STEPS:
+        raise ValueError(f"a step is {', '.join(map(str, STEPS))} points")
+    if not SIZE_MIN <= low <= SIZE_MAX:
+        raise ValueError(f"a range starts between {SIZE_MIN} and {SIZE_MAX}")
+    end = low + step * (count - 1)
+    if end > SIZE_MAX:
+        raise ValueError(f"that runs to {end}, past the largest size, {SIZE_MAX}")
+    return [(label, label) for label in range(low, end + 1, step)]
 
 
 def pick(label: int, fits: Mapping[float, float | None]) -> float | None:
