@@ -2916,7 +2916,8 @@ def test_the_presets_say_the_same_as_the_device_does():
     # The four CJK presets have no translation to read: the firmware carries
     # none, and their opening lines are named in samples.py.
     named = {"ar": "arabic", "en": "english", "fi": "finnish", "fr": "french",
-             "de": "german", "it": "italian", "pl": "polish", "ru": "russian",
+             "de": "german", "it": "italian", "pl": "polish",
+             "pt": "portuguese-BR", "ru": "russian",
              "es": "spanish", "sv": "swedish", "uk": "ukrainian"}
     for tag, stem in named.items():
         path = translations / f"{stem}.yaml"

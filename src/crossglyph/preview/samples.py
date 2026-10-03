@@ -153,6 +153,15 @@ SAMPLES: dict[str, Sample] = {
         "swych praw. Są oni obdarzeni _rozumem i sumieniem_ i powinni "
         "postępować wobec innych w *duchu braterstwa*.")),
 
+    # The firmware's Brazilian pangram, since "pt" is one set of hyphenation
+    # patterns for both and most readers asking for Portuguese are in Brazil.
+    # Article 1 reads the same on both sides of the Atlantic.
+    "pt": Sample("Português", _preset(
+        "Um pequeno jabuti xereta viu dez cegonhas felizes.",
+        "Todos os seres humanos nascem livres e iguais em dignidade e em "
+        "direitos. Dotados de _razão e de consciência_, devem agir uns para "
+        "com os outros em *espírito de fraternidade*.")),
+
     "ru": Sample("Русский", "\n".join([
         "Съешь ещё этих мягких французских булок, да выпей же чаю.",
         "Цифры в прозе: 11 января 1918 года, 101-й полк, 1710 рублей 15 "

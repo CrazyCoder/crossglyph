@@ -3600,14 +3600,15 @@ for (const deferred of [
         env.byName.language.value === "en", env.byName.language.value);
 }
 
-// 52b. The other way round: patterns and no preset. The patterns are the
-//      reader's own and the specimen falls back to English.
+// 52b. The other way round: patterns, and no preset among DEFAULTS.samples.
+//      The patterns are the reader's own and the specimen falls back to
+//      English.
 {
-  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["pt-BR", "pt"] });
-  check("Portuguese opens on English, having no specimen of its own",
+  const env = await loaded(fakeStorage(), DEFAULTS, { languages: ["pl-PL"] });
+  check("Polish with no preset opens on English",
         env.sample.value === "en", env.sample.value);
-  check("and hyphenates as Portuguese",
-        env.byName.language.value === "pt", env.byName.language.value);
+  check("and hyphenates as Polish",
+        env.byName.language.value === "pl", env.byName.language.value);
 }
 
 // 53. Detection happens once. What you last chose is what you get, however
