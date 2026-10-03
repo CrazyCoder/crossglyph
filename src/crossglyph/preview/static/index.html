@@ -849,7 +849,16 @@
       <div class="hint"><code>*bold*</code>, <code>_italic_</code>,
         <code>*_both_*</code>. A face the font does not carry falls back to
         regular, as it would on the device.</div>
-      <div id="status" class="mono">—</div>
+      <!-- How cleanly the straight strokes of this text sit on the pixels,
+           from the font the page was drawn with. Pressing it opens the score
+           per style and how many letters it rests on. -->
+      <div class="status-row">
+        <button type="button" id="grid-fit" class="mono" hidden
+                aria-expanded="false" aria-controls="grid-fit-detail"
+                title="How cleanly the straight strokes of this text sit on the device's pixels, from 0 to 100. X is upright strokes, Y is flat ones. It measures sharpness, not whether the font looks good. Press for the score of each style."></button>
+        <div id="status" class="mono">—</div>
+      </div>
+      <div id="grid-fit-detail" class="hint" hidden></div>
     </div>
   </div>
 

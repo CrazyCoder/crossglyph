@@ -53,6 +53,38 @@ def test_posting_knobs_returns_a_png(client):
         "the generated PNG has no watermark in its bottom-right corner"
 
 
+@needs
+def test_a_render_carries_the_pages_grid_fit(client):
+    """The score is the page's own: its letters, from the bytes it was drawn
+    with."""
+    from crossglyph.preview import gridfit
+
+    text = "Minimum illumination lit the hill. " * 12
+    response = client.post("/render", json={"size": 13, "text": text})
+    assert response.status_code == 200, response.text
+    headers = response.headers
+    letters = sum(c.isalpha() for c in text)
+    assert int(headers["x-grid-fit-letters"]) == letters
+    assert headers["x-grid-fit-sure"] == "1"
+    assert headers["x-grid-fit-mono"] == "0"
+    assert 0 <= int(headers["x-grid-fit"]) <= 100
+    assert headers["x-grid-fit-x"] and headers["x-grid-fit-y"]
+    assert headers["x-grid-fit-styles"].startswith("0:")
+    assert headers["x-grid-fit-version"] == str(gridfit.VERSION)
+
+
+@needs
+def test_a_short_page_is_unsure_and_mono_has_no_grid_fit(client):
+    short = client.post("/render", json={"size": 13, "text": "Minimum"})
+    assert short.headers["x-grid-fit-sure"] == "0"
+
+    mono = client.post("/render", json={"size": 13, "tuning": {"mono": True},
+                                        "text": "Minimum illumination " * 20})
+    assert mono.status_code == 200, mono.text
+    assert mono.headers["x-grid-fit-mono"] == "1"
+    assert mono.headers["x-grid-fit"] == ""
+
+
 def test_the_watermark_names_the_running_version_and_respects_night_mode():
     from PIL import Image, ImageChops
 

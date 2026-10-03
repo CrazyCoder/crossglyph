@@ -6,6 +6,7 @@ import "./remember.js";
 import "./device.js";
 import "./knobs.js";
 import "./render.js";
+import "./gridfit.js";
 import "./resets.js";
 import "./reverts.js";
 import "./save.js";

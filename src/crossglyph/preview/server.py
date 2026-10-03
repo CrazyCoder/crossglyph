@@ -75,6 +75,7 @@ from . import (
     coverage_for,
     faces_for,
     fallback_split,
+    gridfit,
     narrowed,
     page_codepoints,
     presets_covering,
@@ -982,6 +983,33 @@ def build_font_cached(sources: tuple, size: float, coverage: tuple,
                       axes={style: dict(coords) for style, coords in axes})
 
 
+@functools.lru_cache(maxsize=16)
+def grid_fit_cached(font: bytes, text: str, mono: bool) -> gridfit.Score:
+    """A knob that only moves the page, such as a margin, draws with the same
+    font and the same text, so it does not measure them again."""
+    return gridfit.score(font, text, mono=mono)
+
+
+def _number(value: float | None) -> str:
+    return "" if value is None else str(round(value))
+
+
+def grid_fit_headers(result: gridfit.Score, mono: bool) -> dict[str, str]:
+    """The score as headers, beside the page's other facts. Empty where there
+    is no score: under mono, or on a page with no straight edge."""
+    return {
+        "x-grid-fit": _number(result.fit),
+        "x-grid-fit-x": _number(result.x),
+        "x-grid-fit-y": _number(result.y),
+        "x-grid-fit-styles": ",".join(f"{style}:{_number(fit)}"
+                                      for style, fit in sorted(result.styles.items())),
+        "x-grid-fit-letters": str(result.letters),
+        "x-grid-fit-sure": "1" if result.confident else "0",
+        "x-grid-fit-mono": "1" if mono else "0",
+        "x-grid-fit-version": str(result.version),
+    }
+
+
 @app.post("/render")
 def render(request: RenderRequest) -> Response:
     if not _sources and not request.family:
@@ -1043,6 +1071,8 @@ def render(request: RenderRequest) -> Response:
         ) & page_codepoints(request.text)
         page = _watermark(preview_page(font, request.text, spec),
                           inverted=spec.inverted)
+        mono = _tuning(_cache_key(request.tuning)).mono
+        fit = grid_fit_headers(grid_fit_cached(font, request.text, mono), mono)
     # SystemExit is deliberate and not paranoia: the converter is a script at
     # heart and calls sys.exit() on bad input rather than raising -- an
     # advanceY the .cpfont format cannot hold, which generate_cpfont_multistyle
@@ -1094,7 +1124,8 @@ def render(request: RenderRequest) -> Response:
     # itself on a Japanese page and the note goes on to advise a family of
     # your own, with the face that would have drawn it a press away.
     return Response(buffer.getvalue(), media_type="image/png",
-                    headers={"x-undrawn": str(len(undrawn)),
+                    headers={**fit,
+                             "x-undrawn": str(len(undrawn)),
                              "x-uncovered": str(len(uncovered)),
                              "x-fallbacks-missing": str(len(
                                  fontbuild.missing_fallbacks(

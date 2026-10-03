@@ -3,6 +3,7 @@ import {showRenderedPage} from "./device.js";
 import {exportForm, exportSettings, fetchButton, presetBoxes,
         showFallbacksLeft, showIntervalLoad} from "./export.js";
 import {familyPicker} from "./family.js";
+import {hideGridFit, showGridFit} from "./gridfit.js";
 import {numberOf, showSlider} from "./knobs.js";
 import {savePage, saveSize} from "./remember.js";
 import {refreshReverts, stashed} from "./reverts.js";
@@ -191,10 +192,11 @@ export async function renderNow() {
   if (inFlight) inFlight.abort();
   inFlight = new AbortController();
   let response, payload;
+  const request = body();
   try {
     response = await fetch("/render", {
       method: "POST", headers: {"content-type": "application/json"},
-      body: JSON.stringify(body()), signal: inFlight.signal});
+      body: JSON.stringify(request), signal: inFlight.signal});
     if (mine !== latest) return;
     // Abort covers the body as well as the headers. A superseded response can
     // be interrupted in either read, and neither is an error worth reporting.
@@ -206,6 +208,7 @@ export async function renderNow() {
     showPageError("The preview server is not answering.",
                   "It may have stopped. Start it again, then press Try again.");
     status.textContent = "no answer";
+    hideGridFit();
     return;
   }
   // Body reads can finish after a newer response. Stop before touching the
@@ -215,6 +218,7 @@ export async function renderNow() {
     showPageError(failureHeadline(response.status,
                                   response.headers.get("x-fault")), payload);
     status.textContent = `${response.status}`;
+    hideGridFit();
     return;
   }
   // Before showUndrawn, which reads whether the button is showing to decide
@@ -236,6 +240,7 @@ export async function renderNow() {
     if (mine !== latest) return;
     showPageError("The page could not be shown.", String(error));
     status.textContent = "bad image";
+    hideGridFit();
     return;
   }
   if (mine !== latest) {
@@ -244,6 +249,8 @@ export async function renderNow() {
   }
   showRenderedPage(bitmap);
   pageError.hidden = true;
+  showGridFit((name) => response.headers.get(name),
+              `${request.family}\n${request.text ?? ""}`);
   status.textContent = `${Math.round(performance.now() - started)} ms`;
 }
 

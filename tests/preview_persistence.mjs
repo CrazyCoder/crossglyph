@@ -868,6 +868,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // its classes are read as well as its text.
     "ships-as": makeElement(),
     "mod-ships-as": makeElement(),
+    // The page's Grid Fit under the text box, and the line it opens.
+    "grid-fit": Object.assign(makeElement(), {hidden: true}),
+    "grid-fit-detail": Object.assign(makeElement(), {hidden: true}),
     // The variable-font block, and the row per axis it builds inside it.
     variable: { hidden: false },
     "axis-text-row": { hidden: false },
@@ -1094,6 +1097,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                 : name === "x-interval-cap" ? String(opts.intervalCap ?? 0)
                 : name === "x-intervals-bundled"
                   ? String(opts.intervalsBundled ?? 0)
+                // The page's Grid Fit. Read when the answer arrives rather
+                // than when the page loads, so a test can change the score
+                // between two renders.
+                : opts.gridFit && name in opts.gridFit ? opts.gridFit[name]
                 : null),
             },
           });
@@ -1330,6 +1337,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
            fetchButton: stubs.fetch, fetchNote: stubs.fetched,
            save: saveButton, note: stubs.saved, prompts, keyups,
            pageError: stubs["page-error"], status: stubs.status,
+           gridFit: { line: stubs["grid-fit"], detail: stubs["grid-fit-detail"] },
            sheet,
            device: {
              ratio(value) { sandbox.devicePixelRatio = value; },
@@ -5935,6 +5943,68 @@ for (const deferred of [
   check("and one that drew none says nothing",
         none.includes("nothing here draws")
         && !none.includes("almost nothing"), none);
+}
+
+// 98. Grid Fit under the text box. The change in brackets compares with the
+//     previous page of the same text, so a knob shows what it did; a new text
+//     is a different sample and starts over.
+{
+  const fit = (value, extra = {}) => ({
+    "x-grid-fit": value, "x-grid-fit-x": "90", "x-grid-fit-y": "70",
+    "x-grid-fit-styles": "0:80,1:60", "x-grid-fit-letters": "742",
+    "x-grid-fit-sure": "1", "x-grid-fit-mono": "0", ...extra});
+  const opts = {renderOk: true, gridFit: fit("80")};
+  const env = await loaded(fakeStorage(), undefined, opts);
+  const line = env.gridFit.line;
+  check("a page shows its Grid Fit",
+        line.hidden === false && line.textContent === "Grid Fit 80 | X 90 Y 70",
+        line.textContent);
+
+  const turn = async (name, value) => {
+    env.byName[name].value = value;
+    env.listeners.input({ target: env.byName[name] });
+    await settle();
+  };
+  opts.gridFit = fit("88");
+  await turn("gamma", "1.4");
+  check("a knob that moved the score says by how much",
+        line.textContent === "Grid Fit 88 (+8) | X 90 Y 70", line.textContent);
+
+  opts.gridFit = fit("88");
+  await turn("gamma", "1.3");
+  check("and a knob that did not move it says nothing extra",
+        line.textContent === "Grid Fit 88 | X 90 Y 70", line.textContent);
+
+  opts.gridFit = fit("60");
+  await turn("text", "A different page altogether.");
+  check("a different text starts the comparison over",
+        line.textContent === "Grid Fit 60 | X 90 Y 70", line.textContent);
+
+  line.on.click();
+  check("pressing the score opens the detail by style",
+        env.gridFit.detail.hidden === false
+        && env.gridFit.detail.textContent.includes("Regular 80")
+        && env.gridFit.detail.textContent.includes("Bold 60")
+        && env.gridFit.detail.textContent.includes("742 letters"),
+        env.gridFit.detail.textContent);
+
+  opts.gridFit = fit("60", {"x-grid-fit-sure": "0", "x-grid-fit-letters": "40"});
+  await turn("gamma", "1.2");
+  check("a short page says its score is rough",
+        line.textContent.endsWith("| few letters"), line.textContent);
+
+  opts.gridFit = fit("", {"x-grid-fit-mono": "1"});
+  await turn("gamma", "1.1");
+  check("mono has no score to show",
+        line.textContent === "Grid Fit: not available in mono", line.textContent);
+}
+
+// 98a. A failed render leaves no score from the page before it.
+{
+  const env = await loaded(fakeStorage(), undefined,
+                           {renderFails: {status: 503, body: "no faces yet"}});
+  check("a failed page shows no Grid Fit",
+        env.gridFit.line.hidden === true, String(env.gridFit.line.hidden));
 }
 
 process.exit(failures ? 1 : 0);

@@ -645,7 +645,18 @@
     display: grid;
   }
 
-  #status { margin-top: .7rem; color: var(--muted); font-size: 11.5px; }
+  .status-row {
+    display: flex; gap: .9rem; align-items: baseline; margin-top: .7rem;
+  }
+  #status { color: var(--muted); font-size: 11.5px; }
+  /* A line of text that opens its detail, so it looks like the status beside
+     it rather than like a button. */
+  #grid-fit {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--text); font-size: 11.5px; text-align: left;
+  }
+  #grid-fit[hidden] { display: none; }
+  #grid-fit:hover { text-decoration: underline; }
 
   /* The rendered PNG remains at its native dimensions in the canvas. The
      default scale maps those pixels to physical monitor pixels through DPR;
