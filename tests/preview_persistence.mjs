@@ -6331,6 +6331,18 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   one.on.change();
   check("and a box it already filled is not offered twice",
         env.fit.apply.disabled === true);
+  rows[0].children.at(-1).checked = false;
+  one.on.change();
+  check("unticking a row Apply filled offers to put it back",
+        env.fit.apply.disabled === false);
+  env.fit.apply.on.click();
+  check("and Apply puts back what the box held when it was scored",
+        els.size1.value === "12" && els.size3.value === "16.25",
+        FIRST_ROW.map(n => els[n].value).join(" "));
+  check("counting that as a change",
+        env.fit.note.textContent === "1 size changed. Save or Build to keep them.",
+        env.fit.note.textContent);
+  check("leaving nothing more to apply", env.fit.apply.disabled === true);
   env.fit.undo.on.click();
   check("Undo puts back what both Applies wrote",
         els.size1.value === "12" && els.size3.value === "16",

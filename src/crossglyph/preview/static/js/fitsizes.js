@@ -3,8 +3,9 @@
 // device's pixels, for the sizes in the boxes or for a range of whole sizes.
 // Every candidate keeps its label, so the numbers in the reader's Font Size
 // list stay the same. The section only suggests: each value is a press away
-// from being looked at, and Apply puts the ticked ones in the boxes as an
-// unsaved edit, which Save and Build then treat like typing.
+// from being looked at, and Apply makes the boxes match the ticks: a ticked
+// suggestion goes in, and an unticked one's box goes back to what it held.
+// That is an unsaved edit, which Save and Build then treat like typing.
 
 import {form} from "./dom.js";
 import {SIZE_MAX, SIZE_MIN, exportEdited, exportForm, familiesPhrase, readSteps,
@@ -151,6 +152,17 @@ function addRemovedRow(box) {
 //: Whether a row is Apply's to take: a change it can make, not one in use.
 const offered = (row) => !row.tick.hidden && !row.tick.disabled;
 
+//: What Apply leaves a row's box holding: the suggestion when it is ticked,
+//: and what the box held when it was scored when it is not.
+const wanted = (row) => (row.tick.checked ? String(row.value) : row.held);
+
+//: Whether a row's box is still Apply's to set: holding one of those two
+//: values, and not something typed into it since.
+const ours = (row) => {
+  const now = exportForm.elements[row.box].value;
+  return now === row.held || now === String(row.value);
+};
+
 //: The Use heading's box says what the rows' boxes say: ticked when every
 //: offer is, a dash when some are, and off when there is nothing to offer.
 function syncAll() {
@@ -159,11 +171,11 @@ function syncAll() {
   allBox.disabled = !offers.length;
   allBox.checked = offers.length > 0 && ticked === offers.length;
   allBox.indeterminate = ticked > 0 && ticked < offers.length;
-  // Apply has work while a ticked row's box still holds what was scored: one
-  // Apply has filled holds the suggestion, and Undo puts it back to scoring.
-  // Not during a search, whose rows are still arriving.
+  // Apply has work while a box it may set differs from its row's tick, which
+  // ticking, unticking and Undo can each bring about. Not during a search,
+  // whose rows are still arriving.
   applyButton.disabled = controller !== null || !offers.some(row =>
-    row.tick.checked && exportForm.elements[row.box].value === row.held);
+    ours(row) && exportForm.elements[row.box].value !== wanted(row));
 }
 
 function fillRow(entry, now, pick, fits, ranged) {
@@ -341,19 +353,22 @@ function applyFit() {
   applied ??= new Map();
   let skipped = 0, changed = 0;
   for (const row of rows) {
-    if (!offered(row) || !row.tick.checked) continue;
+    if (!offered(row)) continue;
     const field = exportForm.elements[row.box];
-    // Already holding the suggestion, from an Apply before this one.
-    if (field.value === String(row.value)) continue;
-    // A box edited since it was scored is the user's newer word.
-    if (field.value !== row.held) {
-      skipped++;
+    // A box edited since it was scored is the user's newer word. Said only
+    // for a ticked row: an unticked one asks Apply for nothing new.
+    if (!ours(row)) {
+      if (row.tick.checked) skipped++;
       continue;
     }
-    applied.set(row.box, {was: field.value, wrote: String(row.value)});
-    field.value = String(row.value);
+    const value = wanted(row);
+    if (field.value === value) continue;
+    field.value = value;
     exportEdited(field);
     changed++;
+    // A box back at what it held needs no undoing.
+    if (value === row.held) applied.delete(row.box);
+    else applied.set(row.box, {was: row.held, wrote: value});
   }
   syncAll();
   undoButton.hidden = !applied.size;

@@ -296,9 +296,10 @@ how much higher that is than the size now, such as `+11`. Gain is empty when
 the size is already the best. Hold the pointer over a score to see the score
 now. A suggestion is ticked when it gains at least a few points. A suggestion
 your box already holds is ticked and greyed out, since there is nothing to
-change. **Apply** leaves alone any box you have
-changed since the search. **Undo** puts back what Apply wrote, and keeps any
-box you have edited since.
+change. You can change the ticks after **Apply** and press it again: a box
+you untick goes back to the size it held at the search. **Apply** leaves
+alone any box you have changed since the search. **Undo** puts back what
+Apply wrote, and keeps any box you have edited since.
 
 To choose new sizes instead, select **Range** and set where it **starts**, the
 **step** between sizes (1, 2 or 3 points) and how many **sizes**, from 1 to 8.
