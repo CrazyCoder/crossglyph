@@ -1049,6 +1049,10 @@
   .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
   .fit-foot { display: flex; gap: .4rem; justify-content: flex-end;
               align-items: center; }
+  /* Nothing to apply and nothing to undo before a search, so no row. */
+  .fit-panel:has(#fit-table:empty) .fit-foot:has(#fit-undo[hidden]) {
+    display: none;
+  }
   /* A column of the four the fields sit on, as wide as Find sizes above. */
   .fit-foot button { flex: 0 0 calc((100% - 3 * .4rem) / 4); }
   /* At the left of the foot, pushing the buttons to the right, and present
