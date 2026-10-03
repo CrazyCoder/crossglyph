@@ -7,7 +7,7 @@
 // unsaved edit, which Save and Build then treat like typing.
 
 import {form} from "./dom.js";
-import {SIZE_MAX, SIZE_MIN, buildsPhrase, exportEdited, exportForm, readSteps,
+import {SIZE_MAX, SIZE_MIN, exportEdited, exportForm, familiesPhrase, readSteps,
         rowCounts, showSize, snapSize} from "./export.js";
 import {familyPicker} from "./family.js";
 import {body} from "./render.js";
@@ -62,8 +62,8 @@ function round(fit) {
   return fit === null || fit === undefined ? "-" : String(Math.round(fit));
 }
 
-// What Apply would leave the family as, said only when that is not what the
-// boxes build now. The line under the boxes says what they build already.
+// What Apply would leave the sizes as, said only when that changes how many
+// there are. Apply only fills the boxes; nothing is built until Build.
 function showBuilds() {
   const listed = new Map(rows.map(row => [row.box, row]));
   // A box with a row ends up holding a size unless the row removes it.
@@ -72,7 +72,7 @@ function showBuilds() {
   const second = SECOND_ROW.filter(kept).length + spilled(SPILL.second);
   const [nowFirst, nowSecond] = rowCounts();
   builds.textContent = first === nowFirst && second === nowSecond ? ""
-    : `After Apply, it builds ${buildsPhrase(first, second)}.`;
+    : `Apply leaves ${familiesPhrase(first, second)}.`;
 }
 
 //: Marks whichever offered value the page is showing. The page can move off

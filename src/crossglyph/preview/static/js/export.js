@@ -330,9 +330,9 @@ export function showConfigErrors(errors = []) {
   confErrors.replaceChildren(lines);
 }
 
-// What sizes in the two rows build, for Fit to grid to say when Apply would
-// change it.
-export function buildsPhrase(first, second) {
+// The family or families the sizes in the two rows make up, for Fit to grid
+// to say when Apply would change them.
+export function familiesPhrase(first, second) {
   const name = familyLabel();
   const suffix = exportForm.elements.mod_suffix.value.trim();
   const sizes = (count) => `${count} size${count === 1 ? "" : "s"}`;
