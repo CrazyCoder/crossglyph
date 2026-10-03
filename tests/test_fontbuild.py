@@ -310,6 +310,36 @@ def test_style_metrics_reads_the_style_toc(tmp_path):
     assert fontbuild.glyph_count(path) == 123
 
 
+def test_max_ink_top_is_the_tallest_glyph_top(tmp_path):
+    """Bytes 28 and 29 of each style entry hold the tallest ink above the
+    baseline. CrossPoint skips them; a firmware that reads them places the
+    first line of a page from the number, and takes a 0 to mean "unknown".
+    A zero left there is what the format used to write, so it is checked
+    against the glyph records the file itself carries rather than a constant."""
+    import struct
+
+    from fontsmith import box_font
+
+    from crossglyph import cpfont
+
+    face = box_font(tmp_path / "Probe-Regular.ttf", [0x20, 0x41, 0x61],
+                    family="Probe")
+    out = tmp_path / "probe.cpfont"
+    cpfont.generate_cpfont_multistyle(
+        {0: str(face), 1: str(face)}, 12, cpfont.resolve_intervals("base"),
+        str(out))
+    blob = out.read_bytes()
+    for entry in (32, 64):
+        interval_count, glyph_count = struct.unpack_from("<II", blob, entry + 4)
+        offset = struct.unpack_from("<I", blob, entry + 24)[0]
+        glyphs = offset + interval_count * 12
+        tops = [struct.unpack_from("<hh", blob, glyphs + n * 16 + 4)[1]
+                for n in range(glyph_count)
+                if struct.unpack_from("<BB", blob, glyphs + n * 16) != (0, 0)]
+        assert max(tops) > 0
+        assert struct.unpack_from("<h", blob, entry + 28)[0] == max(tops)
+
+
 def test_style_metrics_of_a_non_cpfont_is_zeroed(tmp_path):
     path = tmp_path / "nope.cpfont"
     path.write_bytes(b"not a font")
