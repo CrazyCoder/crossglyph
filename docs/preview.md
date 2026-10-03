@@ -274,7 +274,9 @@ Each suggestion keeps the number the reader shows in its Font Size list, and
 stays within half a point of that number. A box that holds 13.75 ships as 14,
 as any fractional size does.
 
-A suggestion is ticked when it gains at least a few points. A size that is
+The **Grid Fit** column shows the score a suggestion would have, with what it
+gains in brackets, as in `79 (+11)`. Hold the pointer over it to see the score
+now. A suggestion is ticked when it gains at least a few points. A size that is
 already the best has nothing to tick. **Apply** leaves alone any box you have
 changed since the search. **Undo** puts back what Apply wrote, and keeps any
 box you have edited since.

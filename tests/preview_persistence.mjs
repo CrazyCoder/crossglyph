@@ -6103,7 +6103,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         name.textContent === "Small" && now.textContent === "12"
         && pick.textContent === "11.75", [name, now, pick].map(c => c.textContent).join("|"));
   check("with the score each would have",
-        score.textContent === "62 → 100", score.textContent);
+        score.textContent === "100 (+38)" && score.title === "62 now, 100 suggested",
+        `${score.textContent} | ${score.title}`);
   check("a change worth making is ticked", tick.checked === true);
   check("a size that is already best has nothing to tick",
         rows[1].children[4].hidden === true && rows[1].children[2].textContent === "14");

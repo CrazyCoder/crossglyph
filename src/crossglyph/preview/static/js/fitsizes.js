@@ -118,8 +118,14 @@ function addRow(box, now, pick, fits, ranged) {
   const score = document.createElement("span");
   score.className = "fit-score mono";
   const nowFit = fits.get(now), pickFit = fits.get(pick ?? now);
-  score.textContent = pick === null || pick === now ? round(nowFit)
-    : `${round(nowFit)} → ${round(pickFit)}`;
+  // The score the suggestion would have, and what it gains, the way the
+  // Grid Fit under the page says it. The score now is a hover away.
+  const gain = Number(round(pickFit)) - Number(round(nowFit));
+  score.textContent = pick === null || pick === now || !(gain > 0) ? round(pickFit)
+    : `${round(pickFit)} (+${gain})`;
+  if (pick !== null && pick !== now) {
+    score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
+  }
   const tick = document.createElement("input");
   tick.type = "checkbox";
   tick.setAttribute("aria-label", `Use ${pick} for ${titleOf(box)}`);
