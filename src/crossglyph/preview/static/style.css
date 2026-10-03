@@ -1046,6 +1046,9 @@
   .fit-score { color: var(--text); }
   .fit-gain { color: var(--muted); }
   .fit-row input[type=checkbox] { margin: 0; }
+  /* A block, so it centres in its cell rather than sitting on the line the
+     headings' text would. */
+  #fit-all { display: block; }
   .fit-row input[type=checkbox][hidden] { visibility: hidden; display: block; }
   .fit-foot { display: flex; gap: .4rem; justify-content: flex-end;
               align-items: center; }
