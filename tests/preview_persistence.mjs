@@ -828,15 +828,25 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     },
     release(how = "pointerup") { deviceSurface.on[how](); },
   };
-  const deviceCanvas = makeElement();
+  // A canvas, the one on the page or one the page makes for itself. Whichever
+  // of them a decoded page is drawn into, `painted` on the page's canvas says
+  // which page that was: the one the preview last took in.
+  let lastPainted = null;
+  const pageCanvas = () => {
+    const sheet = makeElement();
+    sheet.getContext = () => canvasContext(sheet);
+    return sheet;
+  };
+  const deviceCanvas = pageCanvas();
+  Object.defineProperty(deviceCanvas, "painted", {get: () => lastPainted});
   deviceCanvas.getBoundingClientRect = () => ({left: 0, top: 0});
   // Sized to what is asked for, rather than four pixels whatever the caller
   // wanted: the page is resampled to the size the screen takes, and a fixture
   // that ignores the size cannot tell a resample that worked from one that read
   // off the end of it. The four device levels repeat across it, so the first
   // pixel is ink and the last is paper however big the page is.
-  deviceCanvas.getContext = () => ({
-    drawImage(source) { deviceCanvas.painted = source; },
+  const canvasContext = (sheet) => ({
+    drawImage(source) { lastPainted = source; },
     getImageData: (left, top, width, height) => {
       // In runs rather than one pixel each, because a page of strokes is runs:
       // neighbours mostly match, and the levels meet only at an edge. Every
@@ -857,7 +867,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // Copied, so a later paint into the same buffer cannot rewrite what an
     // earlier assertion is holding. A typed array, which is what slice and
     // join here already expect.
-    putImageData(pixels) { deviceCanvas.pixels = pixels.data.slice(); },
+    putImageData(pixels) { sheet.pixels = pixels.data.slice(); },
   });
   // The zoom's window of its own, at a ratio of 2, so its view is measured in
   // its own pixels and not the page's. It comes out a little bigger than the
@@ -1115,7 +1125,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     open: openPopup,
     document: {
       getElementById: id => stubs[id],
-      createElement: makeElement,
+      createElement: (tag) => (tag === "canvas" ? pageCanvas() : makeElement()),
       createTextNode: (text) => ({ textContent: text }),
       // The folds and device reset are the two document-wide queries.
       querySelectorAll: (selector) => {
@@ -6808,6 +6818,50 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
     if (half[(y * 12 + x) * 4] !== want) mixed = false;
   }
   check("a weaker grid mixes its grey into each pixel it crosses", mixed);
+
+  // paint against the plainest way to say what it does, one screen pixel at
+  // a time, over views that start and end part way through a block, run off
+  // every edge of the page, and carry each kind of grid. The two must agree
+  // to the byte, alpha included.
+  const reference = (src, panel, at, block, grid, view, outside) => {
+    const ref = new Uint8ClampedArray(view.width * view.height * 4);
+    const inside = (v) => ((v % block) + block) % block;
+    for (let y = 0; y < view.height; ++y) for (let x = 0; x < view.width; ++x) {
+      const row = Math.floor((at.y + y) / block), column = Math.floor((at.x + x) / block);
+      const to = (y * view.width + x) * 4;
+      ref[to + 3] = 255;
+      if (row < 0 || row >= panel.height || column < 0 || column >= panel.width) {
+        ref.set(outside, to);
+        continue;
+      }
+      const from = (row * panel.width + column) * 4;
+      const line = grid && (inside(at.y + y) === block - 1 || inside(at.x + x) === block - 1);
+      for (let c = 0; c < 3; ++c) {
+        ref[to + c] = line ? Math.round(src[from + c] + (z.GRID_RGB[c] - src[from + c]) * grid)
+                           : src[from + c];
+      }
+    }
+    return ref;
+  };
+  const page = {width: 7, height: 5};
+  const pageSource = new Uint8ClampedArray(page.width * page.height * 4)
+    .map((_, n) => (n % 4 === 3 ? 255 : (n * 37) % 256));
+  const cases = [
+    [{x: 0, y: 0}, 3, 0, {width: 21, height: 15}],
+    [{x: -5, y: -4}, 4, 1, {width: 40, height: 31}],
+    [{x: 7, y: 2}, 6, 0.35, {width: 19, height: 23}],
+    // The first block shows only its grid line, across and down.
+    [{x: 5, y: 11}, 6, 0.35, {width: 20, height: 20}],
+    [{x: 30, y: 25}, 5, 0.2, {width: 13, height: 9}],
+    [{x: -100, y: 0}, 2, 0.5, {width: 10, height: 10}],
+  ];
+  const agree = cases.every(([at, block, grid, view]) => {
+    const got = z.paint(pageSource, page, at, block, grid, view, [1, 2, 3],
+                        new Uint8ClampedArray(view.width * view.height * 4));
+    const want = reference(pageSource, page, at, block, grid, view, [1, 2, 3]);
+    return got.every((v, n) => v === want[n]);
+  });
+  check("paint matches drawing one screen pixel at a time, edges and grid included", agree);
 
   check("no grid below the level it starts at",
         z.gridStrength(z.GRID_FROM - 1) === 0 && z.gridStrength(z.LEVELS[0]) === 0);

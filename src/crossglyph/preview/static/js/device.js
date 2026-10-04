@@ -781,14 +781,20 @@ function resampleByArea(data, from, to, out) {
   return out;
 }
 
-// The rendered page with the two tones applied, at the panel's own size. The
-// canvas is the scratch it is done on, and drawDevicePage puts the result back
-// at the size the screen wants.
+//: The canvas the rendered page is decoded and read back on, which toning
+//: does once per page or change of tone. A canvas of its own rather than the
+//: one on screen: one asked for frequent reads is kept off the GPU, and the
+//: canvas on screen then took three times as long to show each step of a pan.
+let toningSheet = null;
+
+// The rendered page with the two tones applied, at the panel's own size.
+// drawDevicePage puts the result on screen at the size the screen wants.
 function tonePage() {
-  if (!page || typeof canvas.getContext !== "function") return null;
-  const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
-  canvas.width = page.width;
-  canvas.height = page.height;
+  toningSheet ??= document.createElement("canvas");
+  if (!page || typeof toningSheet.getContext !== "function") return null;
+  const context = toningSheet.getContext("2d", {alpha: false, willReadFrequently: true});
+  toningSheet.width = page.width;
+  toningSheet.height = page.height;
   context.imageSmoothingEnabled = false;
   context.drawImage(page, 0, 0);
   const pixels = context.getImageData(0, 0, page.width, page.height);
@@ -845,9 +851,12 @@ function drawView(view, to) {
   if (drawn && drawn.of === toned && drawn.width === to.width &&
       drawn.height === to.height && drawn.zoom === key) return;
   view.drawn = {of: toned, width: to.width, height: to.height, zoom: key};
-  const context = view.canvas.getContext("2d", {alpha: false, willReadFrequently: true});
-  view.canvas.width = to.width;
-  view.canvas.height = to.height;
+  const context = view.canvas.getContext("2d", {alpha: false});
+  // Only when the size moves: setting either one, even to what it already
+  // is, clears the canvas and allocates its pixels again, which is most of
+  // what a step of a pan would otherwise cost.
+  if (view.canvas.width !== to.width) view.canvas.width = to.width;
+  if (view.canvas.height !== to.height) view.canvas.height = to.height;
   if (!shown && to.width === toned.width && to.height === toned.height) {
     // The page is at its own size, where resampling is an identity that costs a
     // pass over every pixel and risks not being one.

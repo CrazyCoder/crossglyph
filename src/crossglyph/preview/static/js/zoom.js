@@ -116,42 +116,100 @@ export function visibleCrop(at, view, panel, block) {
   return {left, top, width: right - left, height: bottom - top};
 }
 
-const within = (value, block) => ((value % block) + block) % block;
-
 // Fill `out`, an RGBA array of `view` size, with the page enlarged by `block`
 // from offset `at`. Nearest neighbour and nothing else: a block is its reader
 // pixel exactly. A grid line takes the last row and column of each block, so
 // it narrows a pixel without hiding one, mixing `grid` of its grey into it: 0
 // draws no grid, 1 a line of the grey itself. Past the page is `outside`.
+//
+// It runs on every step of a pan, over a view that can be several million
+// screen pixels, so it works in blocks rather than pixels. Pixels move as
+// whole 32-bit words, which keeps the source's alpha: the toned page is
+// opaque throughout. The view is taken a band of rows at a time, the rows one
+// row of blocks covers. A band's rows are all the same up to its grid line,
+// so the first is built and copied down, and the line is built once more
+// with every block mixed.
 export function paint(source, panel, at, block, grid, view, outside, out) {
-  for (let y = 0; y < view.height; ++y) {
-    const down = at.y + y;
-    const row = Math.floor(down / block);
-    const rowLine = grid && within(down, block) === block - 1;
-    const off = row < 0 || row >= panel.height;
-    for (let x = 0; x < view.width; ++x) {
-      const across = at.x + x;
-      const column = Math.floor(across / block);
-      const to = (y * view.width + x) * 4;
-      out[to + 3] = 255;
-      if (off || column < 0 || column >= panel.width) {
-        out[to] = outside[0];
-        out[to + 1] = outside[1];
-        out[to + 2] = outside[2];
-      } else {
-        const from = (row * panel.width + column) * 4;
-        if (rowLine || (grid && within(across, block) === block - 1)) {
-          for (let c = 0; c < 3; ++c) {
-            const own = source[from + c];
-            out[to + c] = Math.round(own + (GRID_RGB[c] - own) * grid);
-          }
+  const {width, height} = view;
+  const from = new Uint32Array(source.buffer, source.byteOffset, panel.width * panel.height);
+  const to = new Uint32Array(out.buffer, out.byteOffset, width * height);
+  const word = new Uint8ClampedArray(4);
+  const asWord = new Uint32Array(word.buffer);
+  word.set([...outside.slice(0, 3), 255]);
+  const past = asWord[0];
+  // What a grid line makes of each value of each channel, worked out once
+  // rather than for every pixel a line crosses.
+  const mixed = GRID_RGB.map(grey => Uint8ClampedArray.from(
+    {length: 256}, (_, own) => Math.round(own + (grey - own) * grid)));
+  // The blocks across the view: where each run starts and ends, the column
+  // of the page it shows or -1 past the page, and whether its grid line, the
+  // block's last column, falls inside the view.
+  const across = Math.ceil(width / block) + 1;
+  const starts = new Int32Array(across), ends = new Int32Array(across);
+  const columns = new Int32Array(across), lines = new Uint8Array(across);
+  let count = 0;
+  for (let x = 0; x < width; ++count) {
+    const column = Math.floor((at.x + x) / block);
+    const blockEnd = (column + 1) * block - at.x;
+    starts[count] = x;
+    ends[count] = Math.min(width, blockEnd);
+    columns[count] = column >= 0 && column < panel.width ? column : -1;
+    lines[count] = grid && ends[count] === blockEnd ? 1 : 0;
+    x = ends[count];
+  }
+  // One band's words for each block, as it is and with the grid mixed in.
+  const plain = new Uint32Array(count), lined = new Uint32Array(count);
+  // A run of one word. Most blocks are a few pixels wide, where a loop beats
+  // the call that fill makes.
+  const run = (value, first, end) => {
+    if (end - first > 16) to.fill(value, first, end);
+    else for (let pixel = first; pixel < end; ++pixel) to[pixel] = value;
+  };
+  for (let y = 0; y < height;) {
+    const row = Math.floor((at.y + y) / block);
+    const blockEnd = (row + 1) * block - at.y;
+    const bandEnd = Math.min(height, blockEnd);
+    if (row < 0 || row >= panel.height) {
+      to.fill(past, y * width, bandEnd * width);
+      y = bandEnd;
+      continue;
+    }
+    const base = row * panel.width;
+    for (let n = 0; n < count; ++n) {
+      if (columns[n] < 0) {
+        plain[n] = lined[n] = past;
+        continue;
+      }
+      const own = base + columns[n];
+      plain[n] = from[own];
+      word[0] = mixed[0][source[own * 4]];
+      word[1] = mixed[1][source[own * 4 + 1]];
+      word[2] = mixed[2][source[own * 4 + 2]];
+      word[3] = 255;
+      lined[n] = asWord[0];
+    }
+    // The band's grid line, its last row, if it is in the view.
+    const lineAt = grid && bandEnd === blockEnd ? bandEnd - 1 : -1;
+    const plainEnd = lineAt >= 0 ? lineAt : bandEnd;
+    if (y < plainEnd) {
+      const start = y * width;
+      for (let n = 0; n < count; ++n) {
+        if (lines[n]) {
+          run(plain[n], start + starts[n], start + ends[n] - 1);
+          to[start + ends[n] - 1] = lined[n];
         } else {
-          out[to] = source[from];
-          out[to + 1] = source[from + 1];
-          out[to + 2] = source[from + 2];
+          run(plain[n], start + starts[n], start + ends[n]);
         }
       }
+      for (let next = y + 1; next < plainEnd; ++next) {
+        to.copyWithin(next * width, start, start + width);
+      }
     }
+    if (lineAt >= 0) {
+      const start = lineAt * width;
+      for (let n = 0; n < count; ++n) run(lined[n], start + starts[n], start + ends[n]);
+    }
+    y = bandEnd;
   }
   return out;
 }
