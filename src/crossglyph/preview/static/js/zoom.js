@@ -16,7 +16,7 @@
 // round to a block of 3.
 
 //: The levels on offer: one pixel apart while a pixel is a large part of a
-//: block, then growing by about a sixth a step.
+//: block, then growing by about a fifth a step.
 export const LEVELS = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
 //: Below this a block is too small for a line to leave the pixel readable.
 export const GRID_FROM = 4;
