@@ -336,6 +336,12 @@ The sizes it will try are listed beside **Range**, such as "Tries 12, 14, 16,
 Press **Find sizes**. The sizes fill the boxes in order, the first row then the
 second.
 
+To put the range's sizes in the boxes as they are, with no search, press
+**Fill boxes** beside the list. It writes them in order and empties the boxes
+after them. Use it to fill a family's sizes in one press, or to go back to
+whole sizes after you have saved suggested ones. **Undo** takes it back until
+you save.
+
 A range is the family's new list of sizes. Each ticked size is kept, including
 one the boxes already hold, so untick a size to leave it out, such as the one
 with the worst score. **Apply** writes the ticked sizes in order, with no gaps,

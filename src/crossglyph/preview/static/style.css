@@ -1039,8 +1039,9 @@
   #export .fit-field input { text-align: center; }
   #export .fit-field select { text-align-last: center; }
   /* One height for every field and button here, the size boxes' own. */
+  #fit-fill { flex: none; font-size: 12px; padding: 0 .75rem; }
   .fit-panel select, .fit-panel input[type=text], #fit-run, .fit-foot button,
-  .fit-mode button {
+  .fit-mode button, #fit-fill {
     height: 24px; padding-top: 0; padding-bottom: 0;
   }
   /* One row a size: the size now, the suggestion, what it scores, what that

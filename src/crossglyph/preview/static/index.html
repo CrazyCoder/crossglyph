@@ -1086,13 +1086,16 @@
     <div id="fit-panel" class="fit-panel">
       <!-- The toggle, and beside it the sizes Find sizes will try, listed as
            the boxes or the range fields change. On the toggle's row, which
-           has the room, rather than a line of its own. -->
+           has the room, rather than a line of its own. For a range, Fill
+           boxes at the end of it writes those sizes in as they are. -->
       <div class="fit-top">
         <div class="fit-mode" role="group" aria-label="Which sizes to fit">
           <button type="button" id="fit-mode-mine">My sizes</button>
           <button type="button" id="fit-mode-range">Range</button>
         </div>
         <div id="fit-targets" class="hint"></div>
+        <button type="button" id="fit-fill" hidden
+                title="Put these sizes in the boxes as they are, with no search">Fill boxes</button>
       </div>
       <!-- On the same four columns as the size boxes above, so the fields sit
            under them and Find sizes keeps the last column in both modes. A

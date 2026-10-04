@@ -25,6 +25,7 @@ const low = document.getElementById("fit-low");
 const stepField = document.getElementById("fit-step");
 const count = document.getElementById("fit-count");
 const targets = document.getElementById("fit-targets");
+const fillButton = document.getElementById("fit-fill");
 const runButton = document.getElementById("fit-run");
 const table = document.getElementById("fit-table");
 const note = document.getElementById("fit-note");
@@ -278,10 +279,10 @@ function rangeSizes() {
 // Said again on hover, since a long list is cut short there.
 export function showFitTargets() {
   stepField.disabled = count.value === "1";
+  const ranged = toRange.getAttribute("aria-pressed") === "true";
   let said;
-  if (toRange.getAttribute("aria-pressed") !== "true") {
-    const mine = [...FIRST_ROW, ...SECOND_ROW].filter(filled)
-      .map(box => snapSize(exportForm.elements[box].value));
+  if (!ranged) {
+    const mine = BOXES.filter(filled).map(box => snapSize(exportForm.elements[box].value));
     said = mine.length ? `Tries ${mine.join(", ")}` : NO_SIZES;
   } else {
     const {sizes, problem} = rangeSizes();
@@ -289,6 +290,52 @@ export function showFitTargets() {
   }
   targets.textContent = said;
   targets.title = said;
+  // Fill boxes has something to do while the boxes are not the range already.
+  const fill = ranged ? filledWith() : null;
+  fillButton.hidden = !ranged;
+  fillButton.disabled = !fill
+    || BOXES.every(box => exportForm.elements[box].value === fill.get(box));
+}
+
+// What Fill boxes leaves in every box: the range's sizes in order from the
+// first box, as whole numbers, and the boxes after them empty. Null for a
+// range that cannot be tried.
+function filledWith() {
+  const {sizes} = rangeSizes();
+  if (!sizes) return null;
+  return new Map(BOXES.map((box, at) => [box, at < sizes.length ? String(sizes[at]) : ""]));
+}
+
+// A range's sizes into the boxes as they are, with no search: a family's
+// sizes from scratch, or whole sizes back after suggestions were saved.
+// Suggestions found before no longer describe the boxes, so they go. Undo
+// takes it back, along with an Apply it was made on top of.
+function fillBoxes() {
+  const fill = filledWith();
+  if (!fill) return;
+  stopFit();
+  dropSuggestions();
+  applied ??= new Map();
+  let changed = 0;
+  for (const box of BOXES) {
+    const field = exportForm.elements[box];
+    const value = fill.get(box);
+    if (field.value === value) continue;
+    // What the box held before anything Fit to grid wrote there.
+    const earlier = applied.get(box);
+    const was = earlier && earlier.wrote === field.value ? earlier.was : field.value;
+    field.value = value;
+    exportEdited(field);
+    changed++;
+    if (value === was) applied.delete(box);
+    else applied.set(box, {was, wrote: value});
+  }
+  undoButton.hidden = !applied.size;
+  syncAll();
+  showFitTargets();
+  note.textContent = changed
+    ? `${changed} size box${changed === 1 ? "" : "es"} changed. Save or Build to keep them.`
+    : "Nothing was changed.";
 }
 
 //: The suggestions and what was said about them, leaving Undo alone.
@@ -462,6 +509,7 @@ function undoFit() {
   applied = null;
   undoButton.hidden = true;
   syncAll();
+  showFitTargets();
   note.textContent = "The sizes are back as they were.";
 }
 
@@ -522,6 +570,7 @@ stepField.addEventListener("change", showFitTargets);
 count.addEventListener("change", showFitTargets);
 toggle.addEventListener("click", showFitTargets);
 runButton.addEventListener("click", runFit);
+fillButton.addEventListener("click", fillBoxes);
 applyButton.addEventListener("click", applyFit);
 undoButton.addEventListener("click", undoFit);
 allBox.addEventListener("change", () => {

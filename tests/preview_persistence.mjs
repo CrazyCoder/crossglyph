@@ -920,6 +920,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "fit-count": makeControl({name: "fit-count", value: "4", options: optionsOf("fit-count")}),
     // The sizes a range will try, listed as its fields change.
     "fit-targets": makeElement(),
+    // Writes a range's sizes into the boxes as they are, with no search.
+    "fit-fill": Object.assign(makeElement(), {hidden: true}),
     // Every label Find sizes wore, since the running count on it is gone by
     // the time a test can look.
     "fit-run": Object.defineProperties(makeElement(), {
@@ -1440,7 +1442,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                   toMine: stubs["fit-mode-mine"], toRange: stubs["fit-mode-range"],
                   mineSays: stubs["fit-mine-says"], range: stubs["fit-range"],
                   low: stubs["fit-low"], step: stubs["fit-step"],
-                  targets: stubs["fit-targets"],
+                  targets: stubs["fit-targets"], fill: stubs["fit-fill"],
                   count: stubs["fit-count"], run: stubs["fit-run"],
                   table: stubs["fit-table"],
                   note: stubs["fit-note"], builds: stubs["fit-builds"],
@@ -7020,6 +7022,53 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.change(env.device.zoom);
   check("and goes back when zoom is off", !/Alt/.test(env.device.copy.title),
         env.device.copy.title);
+}
+
+// Fill boxes: a range's sizes written into the boxes as they are, with no
+// search, for a family's sizes from scratch or to put whole sizes back after
+// suggestions were saved.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  const els = env.exportForm.elements;
+  const all = [...FIRST_ROW, ...SECOND_ROW];
+  const boxes = () => all.map(n => els[n].value).join(" ");
+  const before = ["13.25", "14", "14.75", "16", "12", "", "", ""];
+  all.forEach((name, i) => { els[name].value = before[i]; });
+  els.mod_suffix.value = "";
+  env.fold.press("fit");
+  check("Fill boxes is a range's, so My sizes does not show it",
+        env.fit.fill.hidden === true);
+  env.fit.toRange.on.click();
+  check("Range shows it", env.fit.fill.hidden === false && env.fit.fill.disabled === false);
+
+  const searches = env.fetches.fits.length;
+  env.fit.fill.on.click();
+  check("it writes the range's sizes in order and empties the rest",
+        boxes() === "10 11 12 13 14 15 16 17", boxes());
+  check("without a search", env.fetches.fits.length === searches);
+  check("as an edit to save", env.save.disabled === false);
+  check("and says so", /Save or Build/.test(env.fit.note.textContent), env.fit.note.textContent);
+  check("with nothing left for it to do", env.fit.fill.disabled === true);
+  env.fit.undo.on.click();
+  check("Undo puts the boxes back", boxes() === before.join(" "), boxes());
+  check("and offers Fill boxes again", env.fit.fill.disabled === false);
+
+  env.fit.count.value = "3";
+  env.fit.low.value = "12";
+  env.fit.count.on.change();
+  env.fit.fill.on.click();
+  check("a shorter range empties the boxes after it", boxes() === "12 13 14     ", boxes());
+  els.size2.value = "13.5";
+  env.exportForm.edit("size2");
+  check("a box typed into offers to fill again", env.fit.fill.disabled === false);
+  env.fit.undo.on.click();
+  check("and Undo leaves that box as typed",
+        els.size2.value === "13.5" && els.size1.value === "13.25", boxes());
+
+  env.fit.low.value = "12.5";
+  env.fit.low.on.input();
+  check("a range that cannot be tried cannot be filled either",
+        env.fit.fill.disabled === true);
 }
 
 // The zoom's loose ends: a drag outliving the zoom, and a page drawn for the
