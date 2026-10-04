@@ -3,9 +3,11 @@
 // device's pixels, for the sizes in the boxes or for a range of whole sizes.
 // Every candidate keeps its label, so the numbers in the reader's Font Size
 // list stay the same. The section only suggests: each value is a press away
-// from being looked at, and Apply makes the boxes match the ticks: a ticked
-// suggestion goes in, and an unticked one's box goes back to what it held.
-// That is an unsaved edit, which Save and Build then treat like typing.
+// from being looked at, and Apply makes the boxes match the ticks. For My
+// sizes a ticked suggestion goes in its box and an unticked one's box goes
+// back to what it held; a range is the family's new size list, so the ticked
+// sizes go in order and the boxes after them empty. Either is an unsaved
+// edit, which Save and Build then treat like typing.
 
 import {form} from "./dom.js";
 import {SIZE_MAX, SIZE_MIN, exportEdited, exportForm, familiesPhrase, readSteps,
@@ -289,14 +291,19 @@ export function showFitTargets() {
   targets.title = said;
 }
 
-function clearFit() {
+//: The suggestions and what was said about them, leaving Undo alone.
+function dropSuggestions() {
   rows = [];
+  range = null;
   table.replaceChildren();
   note.textContent = "";
   builds.textContent = "";
+}
+
+function clearFit() {
+  dropSuggestions();
   undoButton.hidden = true;
   applied = null;
-  range = null;
   syncAll();
 }
 
@@ -410,7 +417,6 @@ function applyFit() {
   }
   syncAll();
   undoButton.hidden = !applied.size;
-  showBuilds();
   note.textContent = (changed ? `${changed} size${changed === 1 ? "" : "s"} changed. `
     + "Save or Build to keep them." : "Nothing was changed.")
     + (skipped ? ` ${skipped} box${skipped === 1 ? " was" : "es were"} changed since `
@@ -440,7 +446,6 @@ function applyRange() {
   }
   syncAll();
   undoButton.hidden = !applied.size;
-  showBuilds();
   note.textContent = changed
     ? `${changed} size box${changed === 1 ? "" : "es"} changed. Save or Build to keep them.`
     : "Nothing was changed.";
@@ -458,7 +463,6 @@ function undoFit() {
   undoButton.hidden = true;
   syncAll();
   note.textContent = "The sizes are back as they were.";
-  showBuilds();
 }
 
 //: Find sizes back to its name and pressable, once nothing is running.
@@ -494,11 +498,7 @@ function setMode(ranged) {
   // wrote.
   if (ranged !== (toRange.getAttribute("aria-pressed") === "true")) {
     stopFit();
-    rows = [];
-    range = null;
-    table.replaceChildren();
-    note.textContent = "";
-    builds.textContent = "";
+    dropSuggestions();
     syncAll();
   }
   toMine.setAttribute("aria-pressed", String(!ranged));

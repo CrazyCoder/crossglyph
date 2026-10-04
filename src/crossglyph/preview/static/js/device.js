@@ -133,6 +133,14 @@ export function zoomed() {
   return zoom.level > 0;
 }
 
+// Off, centred on the reader's page, with a double-click going to the first
+// level: how a page with nothing saved starts, and what Reset goes back to.
+function resetZoom() {
+  const native = profile().native;
+  zoom = {level: 0, x: native.width / 2, y: native.height / 2};
+  lastLevel = FIRST_LEVEL;
+}
+
 // The frame goes while zoomed: a body drawn around a few letters says
 // nothing about where they are.
 function frameOn() {
@@ -1002,9 +1010,7 @@ function validOption(select, value) {
 
 export function loadDevice() {
   fixedColor = false;
-  const native = profile().native;
-  zoom = {level: 0, x: native.width / 2, y: native.height / 2};
-  lastLevel = FIRST_LEVEL;
+  resetZoom();
   const raw = attempt(() => localStorage.getItem(DEVICE_STORE), null);
   if (raw) {
     let saved = null;
@@ -1048,9 +1054,7 @@ function resetDevice(scheduleRender) {
   }
   fixedColor = false;
   color.value = themeColor();
-  const native = profile().native;
-  zoom = {level: 0, x: native.width / 2, y: native.height / 2};
-  lastLevel = FIRST_LEVEL;
+  resetZoom();
   showCopyState();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
