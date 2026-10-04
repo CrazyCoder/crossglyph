@@ -32,7 +32,6 @@ const copyButton = document.getElementById("device-copy");
 const stage = document.getElementById("stage");
 const zoomSelect = document.getElementById("device-zoom");
 const gridBox = document.getElementById("device-grid");
-const readout = document.getElementById("device-zoom-readout");
 const zoomSteps = [...document.querySelectorAll("[data-zoom-step]")];
 
 const root = document.documentElement;
@@ -243,7 +242,6 @@ export function layoutDevice() {
   surface.style.width = `${box.width * factor}px`;
   surface.style.height = `${box.height * factor}px`;
   surface.classList.toggle("zoomed", zoomed());
-  readout.hidden = !zoomed();
   // Cleared before anything measures, so it reads the surface where layout
   // put it rather than where the last correction left it.
   surface.style.left = surface.style.top = "";
@@ -602,10 +600,6 @@ let page = null;
 //: drag of the window edge.
 let toned = null;
 
-//: The render's own grey for each reader pixel, before paper and ink, for the
-//: readout under a zoomed page.
-let levels = null;
-
 // What each destination pixel takes from the source, as a run of weights: the
 // source pixels its own width covers, each weighted by how much of it falls
 // inside. Worked out once per axis, since every row wants the same answer.
@@ -759,9 +753,7 @@ function tonePage() {
         tone(source, inkRgb[channel], paperRgb[channel]);
     }
   }
-  levels = new Uint8Array(page.width * page.height);
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
-    levels[offset / 4] = pixels.data[offset];
     const base = pixels.data[offset] * 3;
     pixels.data[offset] = palette[base];
     pixels.data[offset + 1] = palette[base + 1];
@@ -819,10 +811,15 @@ function drawDevicePage() {
 }
 
 // The zoomed view's block and offset for a view of `to` screen pixels, with
-// the centre kept on the page first.
+// the centre kept on the page first. Not while the page on screen was drawn
+// for another reader, which is the moment after switching: the centre is for
+// the page on its way, and clamping it to this one would lose it.
 function zoomView(to) {
   const block = blockSize(zoom.level, dpr());
-  zoom = clampCentre(zoom, to, toned, block);
+  const native = profile().native;
+  if (toned.width === native.width && toned.height === native.height) {
+    zoom = clampCentre(zoom, to, toned, block);
+  }
   return {block, at: origin(zoom, to, toned, block), grid: gridShown(zoom.level)};
 }
 
@@ -838,7 +835,6 @@ function setZoom(next) {
   zoom = next;
   if (zoom.level) lastLevel = zoom.level;
   zoomSelect.value = String(zoom.level);
-  if (!zoomed()) readout.textContent = "";
   if (was !== zoomed()) layoutDevice(); else drawDevicePage();
   saveDevice();
   showCopyState();
@@ -892,16 +888,6 @@ function zoomKey(event) {
   moveZoom({...zoom, x: zoom.x + move[0], y: zoom.y + move[1]});
   saveDevice();
   return true;
-}
-
-// The reader pixel under the pointer and the render's own grey for it.
-function showReadout(event) {
-  readout.textContent = "";
-  if (!event || !zoomed() || !levels || !toned) return;
-  const at = readerAt(zoom, pointOf(event), currentView(), toned, dpr());
-  const x = Math.floor(at.x), y = Math.floor(at.y);
-  if (x < 0 || y < 0 || x >= toned.width || y >= toned.height) return;
-  readout.textContent = `x ${x}  y ${y}  grey ${levels[y * toned.width + x]}`;
 }
 
 export function paintDevicePage() {
@@ -1065,7 +1051,6 @@ function resetDevice(scheduleRender) {
   const native = profile().native;
   zoom = {level: 0, x: native.width / 2, y: native.height / 2};
   lastLevel = FIRST_LEVEL;
-  readout.textContent = "";
   showCopyState();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
@@ -1122,7 +1107,6 @@ export function wireDevice(scheduleRender, untuned) {
     },
     toggle(event) { zoomAround(zoomed() ? 0 : lastLevel, pointOf(event)); },
     key: zoomKey,
-    hover: showReadout,
   });
   const toneChanged = () => {
     saveDevice();

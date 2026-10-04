@@ -238,9 +238,6 @@ fills the whole panel it sits on, and the reader frame is hidden.
 - Click the page, then use + and − to change the zoom, the arrow keys to move
   one pixel (Shift and an arrow for ten), and Esc to turn zoom off.
 
-The line beside **grid** names the pixel under the pointer and its grey, from
-0 for black to 255 for white, as the reader draws it before paper and ink.
-
 The zoom and the place you are looking at stay put when you change a setting,
 so you can watch the same letters as the page redraws.
 

@@ -167,7 +167,9 @@ export function wireZoom(surface, hooks) {
     press = started;
   });
   surface.addEventListener("pointermove", (event) => {
-    hooks.hover(event);
+    // Zoom can turn off under a press, by a key or the wheel, and the press
+    // is over then: dragging on would move a spot nobody can see.
+    if (press && !hooks.active()) end();
     if (!press || press.held) return;
     const dx = event.clientX - press.x, dy = event.clientY - press.y;
     if (!press.dragging && Math.hypot(dx, dy) < DRAG_PX) return;
@@ -181,10 +183,7 @@ export function wireZoom(surface, hooks) {
   });
   surface.addEventListener("pointerup", end);
   surface.addEventListener("pointercancel", end);
-  surface.addEventListener("pointerleave", () => {
-    hooks.hover(null);
-    end();
-  });
+  surface.addEventListener("pointerleave", end);
   surface.addEventListener("wheel", (event) => {
     if (!event.altKey) return;
     event.preventDefault();

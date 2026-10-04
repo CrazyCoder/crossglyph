@@ -737,15 +737,13 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     name: "device-tint", type: "number", value: "2.5",
     min: "-8", max: "8", step: ".5", coarse: "2",
   }));
-  // The zoom: its levels as the markup declares them, the grid switch, and
-  // the line that names the pixel under the pointer.
+  // The zoom: its levels as the markup declares them, and the grid switch.
   const deviceZoom = deviceControl(makeControl({
     name: "device-zoom", value: "0", options: optionsOf("device-zoom"),
   }));
   const deviceGrid = deviceControl(makeControl({
     name: "device-grid", type: "checkbox", checked: true,
   }));
-  const deviceZoomReadout = makeElement();
   const zoomSteps = [-1, 1].map(direction => ({
     dataset: {zoomStep: String(direction)},
     on: {},
@@ -995,7 +993,6 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-tint-slider": deviceTintSlider,
     "device-zoom": deviceZoom,
     "device-grid": deviceGrid,
-    "device-zoom-readout": deviceZoomReadout,
     stage,
     ...tintFuncs,
     "device-ruler": makeElement(),
@@ -1462,7 +1459,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              warmSlider: deviceWarmSlider, tintSlider: deviceTintSlider,
              tintFuncs,
              copy: deviceCopy, copyIcons, resets: deviceResets,
-             zoom: deviceZoom, grid: deviceGrid, readout: deviceZoomReadout,
+             zoom: deviceZoom, grid: deviceGrid,
              zoomSteps, stage,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
@@ -6907,22 +6904,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   for (const key of env.keys) key(event({key: "ArrowRight", target: {tagName: "INPUT"}}));
   check("keys anywhere else on the page do not pan", state().x === x + 11);
 
-  surface.on.pointermove(event({clientX: 5, clientY: 5}));
-  const view = {width: env.device.canvas.width, height: env.device.canvas.height};
-  const at = z.readerAt({level: 1000, x: state().x, y: state().y}, {x: 5, y: 5},
-                        view, {width: 480, height: 800}, 1);
-  const rx = Math.floor(at.x), ry = Math.floor(at.y);
-  const grey = [0, 96, 200, 255][Math.floor((ry * 480 + rx) / 4) % 4];
-  check("the readout names the pixel under the pointer and its grey",
-        env.device.readout.textContent === `x ${rx}  y ${ry}  grey ${grey}`,
-        `${env.device.readout.textContent} against x ${rx} y ${ry} grey ${grey}`);
-  surface.on.pointerleave(event());
-  check("and empties when the pointer leaves, keeping its line",
-        env.device.readout.textContent === "" && env.device.readout.hidden === false);
-
   surface.on.keydown(event({key: "Escape"}));
-  check("Escape turns zoom off, and the readout's line goes with it",
-        env.device.zoom.value === "0" && env.device.readout.hidden === true);
+  check("Escape turns zoom off", env.device.zoom.value === "0");
   surface.on.dblclick(event({clientX: 10, clientY: 10}));
   surface.on.dblclick(event({clientX: 10, clientY: 10}));
   check("a double-click while zoomed turns it off", env.device.zoom.value === "0");
@@ -6971,6 +6954,47 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.change(env.device.zoom);
   check("and goes back when zoom is off", !/Alt/.test(env.device.copy.title),
         env.device.copy.title);
+}
+
+// The zoom's loose ends: a drag outliving the zoom, and a page drawn for the
+// last reader.
+{
+  const storage = fakeStorage({"crossglyph.device": JSON.stringify({
+    device: "x4", frame: false, zoom: 1000, x: 470, y: 400, last: 1000, grid: true,
+  })});
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  const surface = env.device.surface;
+  const state = () => JSON.parse(storage.data["crossglyph.device"]);
+  const event = (extra = {}) => ({button: 0, clientX: 0, clientY: 0,
+                                  preventDefault() {}, ...extra});
+
+  // The X4's right edge holds the centre near 449 with this view. Before the
+  // X3's own page arrives, the one on screen is still the X4's, and a new
+  // level must not clamp the centre against it: the X3 is wider, and the
+  // centre is for the X3's page.
+  env.device.zoomSteps[1].press();
+  env.device.zoomSteps[0].press();
+  const atEdge = state().x;
+  env.device.model.value = "x3";
+  env.device.change(env.device.model);
+  env.device.zoomSteps[1].press();
+  check("switching reader keeps the centre for the reader's own page",
+        state().x === atEdge, `${state().x} against ${atEdge} on the X4`);
+  env.device.zoomSteps[0].press();
+  env.device.model.value = "x4";
+  env.device.change(env.device.model);
+  await settle();
+
+  surface.on.pointerdown(event({clientX: 100, clientY: 100}));
+  surface.on.pointermove(event({clientX: 80, clientY: 100}));
+  surface.on.keydown(event({key: "Escape"}));
+  const left = state().x;
+  surface.on.pointermove(event({clientX: 20, clientY: 100}));
+  surface.on.pointerup(event({clientX: 20, clientY: 100}));
+  check("a drag still held when zoom turns off moves nothing after",
+        state().x === left && env.device.zoom.value === "0",
+        `${state().x} against ${left}`);
 }
 
 process.exit(failures ? 1 : 0);
