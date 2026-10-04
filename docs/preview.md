@@ -237,6 +237,9 @@ fills the whole panel it sits on, and the reader frame is hidden.
   page.
 - Click the page, then use + and − to change the zoom, the arrow keys to move
   one pixel (Shift and an arrow for ten), and Esc to turn zoom off.
+- Hold Z to let the zoomed page fill the whole browser window, and let go to
+  see the controls again. This works straight after moving a slider, so you
+  can change a setting and look at the result without clicking anything.
 
 The zoom and the place you are looking at stay put when you change a setting,
 so you can watch the same letters as the page redraws.

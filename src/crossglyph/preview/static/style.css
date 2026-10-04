@@ -843,6 +843,11 @@
      canvas is placed against and #stage, positioned above, takes over. The
      surface keeps its size, which is what holds the island's. */
   #device-surface.zoomed { cursor: grab; position: static; }
+  /* Z held while zoomed: the island takes the whole window until it is let
+     go, over everything else on the page. */
+  #stage.peek {
+    position: fixed; inset: 0; z-index: 100; min-width: 0; border-radius: 0;
+  }
   .device-tones {
     display: grid; gap: .25rem;
     border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;

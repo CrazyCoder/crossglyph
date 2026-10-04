@@ -808,9 +808,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // view to whole screen pixels has something to do. Its border is drawn a
   // whole number of screen pixels wide, 0.67 of a CSS pixel at 1.5, while
   // clientLeft and clientWidth round it back to 1, as Chrome's do.
-  const stage = {clientWidth: 640, clientHeight: 1030, clientLeft: 1, clientTop: 1,
-                 getBoundingClientRect: () => ({left: 10.3, top: 20.6,
-                                                width: 640 + 4 / 3, height: 1030 + 4 / 3})};
+  // Held Z gives it the whole window, 1200 by 900, for as long as the class
+  // that does it is on.
+  const stage = Object.assign(makeElement(), {
+    clientWidth: 640, clientHeight: 1030, clientLeft: 1, clientTop: 1,
+    getBoundingClientRect: () => (stage.classList.contains("peek")
+      ? {left: 0, top: 0, width: 1200, height: 900}
+      : {left: 10.3, top: 20.6, width: 640 + 4 / 3, height: 1030 + 4 / 3}),
+  });
   const STAGE_PADDING = "13.6px", STAGE_BORDER = "0.666667px";
   //: The sheet gesture: press and hold on the device surface shows the page
   //: untuned.
@@ -1033,7 +1038,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const cancelled = new Set();
   const prompts = [];
   let answer = true;
-  const keys = [], keyups = [], returns = [], resizes = [];
+  const keys = [], keyups = [], returns = [], resizes = [], blurs = [];
   let reloads = 0;
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
@@ -1065,6 +1070,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
                               borderTopWidth: STAGE_BORDER, borderBottomWidth: STAGE_BORDER}),
     addEventListener(kind, fn) {
       if (kind === "resize") resizes.push(fn);
+      if (kind === "blur") blurs.push(fn);
     },
     document: {
       getElementById: id => stubs[id],
@@ -1411,7 +1417,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              root.twoColumnWidth = twoColumnWidth;
              for (const fn of resizes) fn();
            },
-           revertList, markList, compare: stubs.compare, keys, stepList, family, sample,
+           revertList, markList, compare: stubs.compare, keys, blurs, stepList,
+           family, sample,
            faces: stubs.faces, badges: stubs.styles, exportForm, presetList,
            builds: buildButtons, built: stubs.built,
            warn: stubs["build-warn"],
@@ -7161,6 +7168,52 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a drag still held when zoom turns off moves nothing after",
         state().x === left && env.device.zoom.value === "0",
         `${state().x} against ${left}`);
+}
+
+// Peek: Z held while zoomed gives the view the whole window, and letting go
+// gives the island back, from wherever the focus is short of a text field.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  await settle();
+  const {canvas, stage} = env.device;
+  const peeking = () => stage.classList.contains("peek");
+  const key = (kind, extra = {}) => {
+    const event = {code: "KeyZ", key: "z", target: {tagName: "INPUT", type: "range"},
+                   preventDefault() { this.prevented = true; }, ...extra};
+    for (const fn of kind === "down" ? env.keys : env.keyups) fn(event);
+    return event;
+  };
+
+  key("down");
+  check("unzoomed, Z does nothing", !peeking());
+  key("up");
+  env.device.zoom.value = "10";
+  env.device.change(env.device.zoom);
+  const island = `${canvas.width}x${canvas.height}`;
+
+  // The window less the island's border and padding, snapped inward.
+  const down = key("down");
+  check("zoomed, holding Z fills the window from a slider just turned",
+        peeking() && `${canvas.width}x${canvas.height}` === "1170x870" && down.prevented,
+        `${canvas.width}x${canvas.height}`);
+  key("down", {repeat: true});
+  check("and holds while the key repeats", peeking());
+  key("up");
+  check("letting go puts the island back",
+        !peeking() && `${canvas.width}x${canvas.height}` === island,
+        `${canvas.width}x${canvas.height}`);
+
+  key("down", {key: "я"});
+  check("the key is the one where Z is, whatever the keyboard layout", peeking());
+  for (const fn of env.blurs) fn();
+  check("leaving the window lets go too", !peeking());
+
+  key("down", {target: {tagName: "TEXTAREA"}});
+  check("not while typing in a text box", !peeking());
+  key("down", {target: {tagName: "INPUT", type: "text"}});
+  check("or a text field", !peeking());
+  key("down", {ctrlKey: true});
+  check("and Ctrl+Z stays undo", !peeking());
 }
 
 process.exit(failures ? 1 : 0);

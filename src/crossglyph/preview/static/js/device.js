@@ -250,6 +250,8 @@ export function layoutDevice() {
   surface.style.width = `${box.width * factor}px`;
   surface.style.height = `${box.height * factor}px`;
   surface.classList.toggle("zoomed", zoomed());
+  // A peek is a zoomed view's, and ends with it.
+  if (!zoomed()) stage.classList.remove("peek");
   // Cleared before anything measures, so it reads the surface where layout
   // put it rather than where the last correction left it.
   surface.style.left = surface.style.top = "";
@@ -869,6 +871,39 @@ function zoomAround(level, point) {
   else setZoom(zoomAt(level, reader, point, currentView()));
 }
 
+// Peek: while Z is held on a zoomed page, the island takes the whole window,
+// and letting go gives it back. Through a class and a fresh layout, since the
+// view already measures itself against the island. By where the key is
+// rather than what it types, so it works in any keyboard layout. A slider
+// just turned keeps the focus and still peeks, since a letter does nothing
+// to it; a field that takes text does not.
+function typing(target) {
+  if (!target) return false;
+  if (target.isContentEditable || target.tagName === "TEXTAREA") return true;
+  return target.tagName === "INPUT" &&
+    /^(text|search|url|email|password|tel)$/.test(target.type);
+}
+
+function peek(on) {
+  if (stage.classList.contains("peek") === on) return;
+  stage.classList.toggle("peek", on);
+  layoutDevice();
+}
+
+function wirePeek() {
+  document.addEventListener("keydown", (event) => {
+    if (event.code !== "KeyZ" || event.ctrlKey || event.metaKey || event.altKey ||
+        typing(event.target) || !zoomed()) return;
+    event.preventDefault();
+    peek(true);
+  });
+  document.addEventListener("keyup", (event) => {
+    if (event.code === "KeyZ") peek(false);
+  });
+  // A key let go in another window never comes back here as a keyup.
+  globalThis.addEventListener?.("blur", () => peek(false));
+}
+
 // Keys on the focused page. Plus works from the whole page too, the rest only
 // while zoomed.
 function zoomKey(event) {
@@ -1109,6 +1144,7 @@ export function wireDevice(scheduleRender, untuned) {
     toggle(event) { zoomAround(zoomed() ? 0 : lastLevel, pointOf(event)); },
     key: zoomKey,
   });
+  wirePeek();
   const toneChanged = () => {
     saveDevice();
     refreshDeviceResets();
