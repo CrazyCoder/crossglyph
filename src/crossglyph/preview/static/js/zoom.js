@@ -6,15 +6,22 @@
 // wide as each other.
 //
 // What follows is arithmetic on plain numbers, so it can be checked without a
-// canvas. A state is {level, x, y}: the level in percent, 0 for off, and the
-// centre of the view in reader pixels.
+// canvas. A state is {level, x, y}: the level is the block, the screen pixels
+// across one reader pixel, 0 for off; the centre of the view is in reader
+// pixels.
+//
+// A level counts screen pixels rather than a percentage of the page so that
+// every step changes the picture. A percentage has to be rounded to whole
+// pixels on the way to the screen, and at a ratio of 1.25, 200% and 250% both
+// round to a block of 3.
 
-//: The levels on offer, in percent of 1:1 pixels.
-export const LEVELS = [200, 400, 800, 1000, 1600, 2400, 3200];
+//: The levels on offer: one pixel apart while a pixel is a large part of a
+//: block, then growing by about a sixth a step.
+export const LEVELS = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
 //: Below this a block is too small for a line to leave the pixel readable.
-export const GRID_FROM = 400;
+export const GRID_FROM = 4;
 //: What a double-click zooms to before any level has been chosen.
-export const FIRST_LEVEL = 1000;
+export const FIRST_LEVEL = 12;
 //: How far a press moves, in CSS pixels, before it is a pan.
 export const DRAG_PX = 3;
 //: How long a press stays still before it is the untuned hold.
@@ -29,12 +36,6 @@ export function stepLevel(level, direction) {
   return at <= 0 ? 0 : LEVELS[at - 1];
 }
 
-// Screen pixels per reader pixel, rounded so every block is the same size.
-// At 1.25x, 1000% asks for 12.5 and gets 13.
-export function blockSize(level, dpr) {
-  return Math.max(1, Math.round(level / 100 * dpr));
-}
-
 // One axis of the view's offset into the zoomed page, in screen pixels. A
 // page smaller than the view is centred; otherwise the view stops at its
 // edges rather than showing past them.
@@ -45,17 +46,17 @@ function offsetOn(centre, extent, panelExtent, block) {
                   full - extent);
 }
 
-export function origin(state, view, panel, block) {
-  return {x: offsetOn(state.x, view.width, panel.width, block),
-          y: offsetOn(state.y, view.height, panel.height, block)};
+export function origin(state, view, panel) {
+  return {x: offsetOn(state.x, view.width, panel.width, state.level),
+          y: offsetOn(state.y, view.height, panel.height, state.level)};
 }
 
 // The centre the view really has once it is kept on the page, so a pan that
 // ran into an edge leaves nothing to pay back before it moves again.
-export function clampCentre(state, view, panel, block) {
-  const at = origin(state, view, panel, block);
-  return {...state, x: (at.x + view.width / 2) / block,
-          y: (at.y + view.height / 2) / block};
+export function clampCentre(state, view, panel) {
+  const at = origin(state, view, panel);
+  return {...state, x: (at.x + view.width / 2) / state.level,
+          y: (at.y + view.height / 2) / state.level};
 }
 
 // The centre kept on the panel, for a state read back from storage or carried
@@ -66,28 +67,27 @@ export function inside(state, panel) {
 }
 
 // A drag moves the page with the pointer, so the centre goes the other way.
-export function panBy(state, dx, dy, block) {
-  return {...state, x: state.x - dx / block, y: state.y - dy / block};
+// The drag is in screen pixels.
+export function panBy(state, dx, dy) {
+  return {...state, x: state.x - dx / state.level, y: state.y - dy / state.level};
 }
 
 // The state at `level` that puts `reader` (a point in reader pixels) under
 // `point` (screen pixels from the view's top left corner).
-export function zoomAt(level, reader, point, view, dpr) {
-  const block = blockSize(level, dpr);
-  return {level, x: reader.x + (view.width / 2 - point.x) / block,
-          y: reader.y + (view.height / 2 - point.y) / block};
+export function zoomAt(level, reader, point, view) {
+  return {level, x: reader.x + (view.width / 2 - point.x) / level,
+          y: reader.y + (view.height / 2 - point.y) / level};
 }
 
 // Where in the page a point of the view falls, in reader pixels. Unzoomed,
 // the view is the whole page.
-export function readerAt(state, point, view, panel, dpr) {
+export function readerAt(state, point, view, panel) {
   if (!state.level) {
     return {x: point.x * panel.width / view.width,
             y: point.y * panel.height / view.height};
   }
-  const block = blockSize(state.level, dpr);
-  const at = origin(state, view, panel, block);
-  return {x: (at.x + point.x) / block, y: (at.y + point.y) / block};
+  const at = origin(state, view, panel);
+  return {x: (at.x + point.x) / state.level, y: (at.y + point.y) / state.level};
 }
 
 // The reader pixels a view touches, whole ones only and none past the page:

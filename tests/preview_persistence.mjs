@@ -6668,21 +6668,19 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const env = await loaded(fakeStorage());
   const z = env.modules.get("zoom.js");
 
-  const ratios = [1, 1.25, 1.5, 2];
-  check("every zoom level is a whole number of screen pixels at every ratio",
-        ratios.every(r => z.LEVELS.every(l => Number.isInteger(z.blockSize(l, r)))));
-  check("1000% is 10 screen pixels at 1x and 13 at 1.25x",
-        z.blockSize(1000, 1) === 10 && z.blockSize(1000, 1.25) === 13,
-        `${z.blockSize(1000, 1)} ${z.blockSize(1000, 1.25)}`);
+  check("every zoom level is a whole number of screen pixels, each above the last",
+        z.LEVELS.every((l, n) => Number.isInteger(l) && l >= 2 && (!n || l > z.LEVELS[n - 1])),
+        JSON.stringify(z.LEVELS));
+  check("the double-click level is one of them", z.LEVELS.includes(z.FIRST_LEVEL));
 
-  check("stepping up from off starts at the first level", z.stepLevel(0, 1) === 200);
-  check("stepping down from the first level turns zoom off", z.stepLevel(200, -1) === 0);
-  check("stepping stops at the top", z.stepLevel(3200, 1) === 3200);
-  check("stepping moves one level", z.stepLevel(1000, 1) === 1600
-        && z.stepLevel(1000, -1) === 800);
+  check("stepping up from off starts at the first level", z.stepLevel(0, 1) === 2);
+  check("stepping down from the first level turns zoom off", z.stepLevel(2, -1) === 0);
+  check("stepping stops at the top", z.stepLevel(64, 1) === 64);
+  check("stepping moves one level", z.stepLevel(10, 1) === 12
+        && z.stepLevel(10, -1) === 8);
 
   const panel = {width: 480, height: 800}, view = {width: 480, height: 800};
-  const at = (x, y) => z.origin({level: 1000, x, y}, view, panel, 10);
+  const at = (x, y) => z.origin({level: 10, x, y}, view, panel);
   check("a view centred past the top left stops at the corner",
         JSON.stringify(at(-50, -50)) === JSON.stringify({x: 0, y: 0}),
         JSON.stringify(at(-50, -50)));
@@ -6692,28 +6690,28 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a view in the middle is centred on its centre",
         JSON.stringify(at(240, 400)) === JSON.stringify({x: 2160, y: 3600}),
         JSON.stringify(at(240, 400)));
-  const tiny = z.origin({level: 200, x: 0, y: 0}, view, {width: 10, height: 10}, 2);
+  const tiny = z.origin({level: 2, x: 0, y: 0}, view, {width: 10, height: 10});
   check("a page smaller than the view is centred in it",
         tiny.x === -230 && tiny.y === -390, JSON.stringify(tiny));
 
-  const held = z.clampCentre({level: 1000, x: -50, y: 9999}, view, panel, 10);
+  const held = z.clampCentre({level: 10, x: -50, y: 9999}, view, panel);
   check("clamping stores the centre the view really has",
-        held.x === 24 && held.y === 760 && held.level === 1000, JSON.stringify(held));
+        held.x === 24 && held.y === 760 && held.level === 10, JSON.stringify(held));
   const kept = z.inside({level: 0, x: 600, y: -3}, {width: 528, height: 792});
   check("a centre is kept on the panel", kept.x === 528 && kept.y === 0,
         JSON.stringify(kept));
-  const panned = z.panBy({level: 1000, x: 100, y: 100}, 20, -30, 10);
+  const panned = z.panBy({level: 10, x: 100, y: 100}, 20, -30);
   check("panning moves the centre against the drag, in reader pixels",
         panned.x === 98 && panned.y === 103, JSON.stringify(panned));
 
   const reader = {x: 100.5, y: 200.5}, point = {x: 30, y: 70};
-  const zoomed = z.zoomAt(1000, reader, point, view, 1);
-  const back = z.readerAt(zoomed, point, view, panel, 1);
+  const zoomed = z.zoomAt(10, reader, point, view);
+  const back = z.readerAt(zoomed, point, view, panel);
   check("zooming keeps the reader pixel under the pointer",
         Math.abs(back.x - reader.x) < 1e-9 && Math.abs(back.y - reader.y) < 1e-9,
         `${JSON.stringify(back)} against ${JSON.stringify(reader)}`);
   const whole = z.readerAt({level: 0, x: 0, y: 0}, {x: 240, y: 400},
-                           {width: 960, height: 1600}, panel, 2);
+                           {width: 960, height: 1600}, panel);
   check("unzoomed, a point maps across the whole page",
         whole.x === 120 && whole.y === 200, JSON.stringify(whole));
 
@@ -6767,7 +6765,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 
   const island = () => `${env.device.surface.style.width} ${env.device.surface.style.height}`;
   const unzoomed = island();
-  env.device.zoom.value = "1000";
+  env.device.zoom.value = "10";
   env.device.change(env.device.zoom);
   const canvas = env.device.canvas;
   check("zooming hides the frame", env.device.frameImage.hidden === true);
@@ -6818,7 +6816,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("every block is one level, edged by the grid", blocksOf(10));
   const saved = JSON.parse(storage.data["crossglyph.device"]);
   check("the zoom is saved with the device settings",
-        saved.zoom === 1000 && saved.x === 240 && saved.y === 400 && saved.grid === true,
+        saved.zoom === 10 && saved.x === 240 && saved.y === 400 && saved.grid === true,
         storage.data["crossglyph.device"]);
 
   env.device.grid.checked = false;
@@ -6832,12 +6830,13 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   await settle();
   await settle();
   check("a new page keeps the zoom and the spot",
-        env.fetches.render > renders && env.device.zoom.value === "1000"
+        env.fetches.render > renders && env.device.zoom.value === "10"
         && JSON.parse(storage.data["crossglyph.device"]).x === 240,
         `${env.fetches.render} renders, ${storage.data["crossglyph.device"]}`);
 
   // Another scale and a fractional ratio, where the page's own box is not a
-  // whole number of screen pixels: the view still is, and so is every block.
+  // whole number of screen pixels: the view still is, and so is every block,
+  // which is the level's own count of screen pixels whatever the ratio.
   env.device.grid.checked = true;
   env.device.edit(env.device.grid);
   check("and back on", JSON.parse(storage.data["crossglyph.device"]).grid === true);
@@ -6845,10 +6844,10 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.scale.value = "device";
   env.device.change(env.device.scale);
   check("at another scale and a 1.25 ratio the view is still on whole pixels",
-        onGrid(1.25) && env.device.zoom.value === "1000",
+        onGrid(1.25) && env.device.zoom.value === "10",
         JSON.stringify({left: canvas.style.left, width: canvas.style.width,
                         canvas: canvas.width}));
-  check("and every block is 13 screen pixels", blocksOf(13));
+  check("and every block is still 10 screen pixels", blocksOf(10));
   env.device.ratio(1);
   env.device.scale.value = "pixels";
   env.device.change(env.device.scale);
@@ -6861,15 +6860,15 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         && canvas.width === 612, `${canvas.width}`);
 
   env.device.zoomSteps[1].press();
-  check("the plus button steps the level up", env.device.zoom.value === "1600");
+  check("the plus button steps the level up", env.device.zoom.value === "12");
   env.device.zoomSteps[0].press();
   env.device.zoomSteps[0].press();
-  check("the minus button steps it down", env.device.zoom.value === "800");
+  check("the minus button steps it down", env.device.zoom.value === "8");
 
   const reloaded = await loaded(storage, undefined, {renderOk: true});
   await settle();
   check("the zoom comes back after a reload",
-        reloaded.device.zoom.value === "800" && reloaded.device.grid.checked === true
+        reloaded.device.zoom.value === "8" && reloaded.device.grid.checked === true
         && reloaded.device.frameImage.hidden === true);
 
   reloaded.device.reset();
@@ -6883,15 +6882,29 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 // A centre saved for one reader is kept on the panel of another.
 {
   const storage = fakeStorage({"crossglyph.device": JSON.stringify({
-    device: "x3", zoom: 1000, x: 9999, y: 800, last: 1000, grid: true,
+    device: "x3", zoom: 10, x: 9999, y: 800, last: 10, grid: true,
   })});
   const env = await loaded(storage, undefined, {renderOk: true});
   await settle();
-  check("a saved zoom for the X3 comes back", env.device.zoom.value === "1000");
+  check("a saved zoom for the X3 comes back", env.device.zoom.value === "10");
   env.device.zoomSteps[1].press();
   const after = JSON.parse(storage.data["crossglyph.device"]);
   check("with its centre brought onto the X3 panel",
         after.x <= 528 && after.y <= 792, storage.data["crossglyph.device"]);
+}
+
+// A saved level that is not one on offer is not taken.
+{
+  const storage = fakeStorage({"crossglyph.device": JSON.stringify({
+    device: "x4", zoom: 1000, x: 240, y: 400, last: 1000, grid: true,
+  })});
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  check("a level not on offer starts unzoomed", env.device.zoom.value === "0");
+  env.device.surface.on.dblclick({clientX: 10, clientY: 10, preventDefault() {}});
+  check("and a double-click goes to the first level",
+        env.device.zoom.value === String(env.modules.get("zoom.js").FIRST_LEVEL),
+        env.device.zoom.value);
 }
 
 // Pixel zoom by hand: a drag pans, a still press shows the page untuned, Alt
@@ -6923,7 +6936,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   }
   surface.on.dblclick(event({clientX: 120, clientY: 200}));
   check("a double-click zooms in at the first level",
-        env.device.zoom.value === "1000", env.device.zoom.value);
+        env.device.zoom.value === "12", env.device.zoom.value);
   check("centred on the pixel clicked",
         Math.abs(state().x - 120) < 1 && Math.abs(state().y - 200) < 1,
         JSON.stringify(state()));
@@ -6936,10 +6949,10 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a press that barely moves is not a pan", state().x === before,
         `${state().x} against ${before}`);
   surface.on.pointerdown(event({clientX: 100, clientY: 100}));
-  surface.on.pointermove(event({clientX: 120, clientY: 100}));
+  surface.on.pointermove(event({clientX: 124, clientY: 100}));
   // Mid-drag, since letting go would put the tuning back either way.
   const during = pressed();
-  surface.on.pointerup(event({clientX: 120, clientY: 100}));
+  surface.on.pointerup(event({clientX: 124, clientY: 100}));
   check("a drag pans by whole reader pixels", state().x === before - 2,
         `${state().x} against ${before}`);
   check("and never shows the page untuned", during === "false");
@@ -6953,12 +6966,12 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const plain = event({deltaY: -100});
   surface.on.wheel(plain);
   check("the wheel alone leaves the zoom alone and the page scrolling",
-        env.device.zoom.value === "1000" && !plain.prevented);
+        env.device.zoom.value === "12" && !plain.prevented);
   const alt = event({deltaY: -100, altKey: true, clientX: 240, clientY: 400});
   surface.on.wheel(alt);
-  check("Alt and the wheel zoom in", env.device.zoom.value === "1600" && alt.prevented);
+  check("Alt and the wheel zoom in", env.device.zoom.value === "14" && alt.prevented);
   surface.on.wheel(event({deltaY: 100, altKey: true, clientX: 240, clientY: 400}));
-  check("and back out", env.device.zoom.value === "1000");
+  check("and back out", env.device.zoom.value === "12");
 
   const x = state().x;
   surface.on.keydown(event({key: "ArrowRight"}));
@@ -6966,9 +6979,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   surface.on.keydown(event({key: "ArrowRight", shiftKey: true}));
   check("Shift and an arrow pan ten", state().x === x + 11, `${state().x} from ${x}`);
   surface.on.keydown(event({key: "+"}));
-  check("plus zooms in", env.device.zoom.value === "1600");
+  check("plus zooms in", env.device.zoom.value === "14");
   surface.on.keydown(event({key: "-"}));
-  check("minus zooms out", env.device.zoom.value === "1000");
+  check("minus zooms out", env.device.zoom.value === "12");
   for (const key of env.keys) key(event({key: "ArrowRight", target: {tagName: "INPUT"}}));
   check("keys anywhere else on the page do not pan", state().x === x + 11);
 
@@ -6989,12 +7002,28 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.edit(env.device.frame);
   check("unzoomed, the file is the page",
         device.imageName() === "crossglyph-x4-page.png", String(device.imageName?.()));
-  env.device.zoom.value = "1000";
+  env.device.zoom.value = "10";
   env.device.change(env.device.zoom);
   check("zoomed, the file says the level",
-        device.imageName() === "crossglyph-x4-page-zoom1000.png", device.imageName());
+        device.imageName() === "crossglyph-x4-page-zoom10x.png", device.imageName());
   check("and the whole page keeps its own name",
         device.imageName(true) === "crossglyph-x4-page.png", device.imageName(true));
+  // The view is 612 by 1002 screen pixels around the middle of the page, so it
+  // touches 62 by 102 reader pixels, each 10 pixels square in the picture.
+  const made = env.sandbox.document.createElement;
+  env.sandbox.document.createElement = (tag) => {
+    const sheet = made(tag);
+    sheet.getContext = () => ({
+      createImageData: (width, height) => ({width, height,
+                                            data: new Uint8ClampedArray(width * height * 4)}),
+      putImageData() {},
+    });
+    return sheet;
+  };
+  const view = await device.deviceImage();
+  env.sandbox.document.createElement = made;
+  check("the zoomed picture is the reader pixels in view at the level's own size",
+        view.width === 620 && view.height === 1020, `${view.width}x${view.height}`);
   check("the button says what it will copy while zoomed",
         /zoomed view/.test(env.device.copy.title) && /Alt/.test(env.device.copy.title),
         env.device.copy.title);
@@ -7097,7 +7126,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 // last reader.
 {
   const storage = fakeStorage({"crossglyph.device": JSON.stringify({
-    device: "x4", frame: false, zoom: 1000, x: 470, y: 400, last: 1000, grid: true,
+    device: "x4", frame: false, zoom: 10, x: 470, y: 400, last: 10, grid: true,
   })});
   const env = await loaded(storage, undefined, {renderOk: true});
   await settle();

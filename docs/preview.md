@@ -222,10 +222,10 @@ browser remembers them.
 ### Zoom in on the pixels
 
 **zoom** enlarges the page so you can see how each of the reader's pixels
-lands. At 1000%, one reader pixel is a block 10 screen pixels wide. Every
-block is the same size on any display, so a stroke two pixels wide always
-looks twice as wide as one. From 400% up, a light grey **grid** marks the
-edges between pixels. Untick **grid** to hide it. While you zoom, the page
+lands. The level counts screen pixels: at 10×, each reader pixel is a block
+10 screen pixels wide. Every block is the same size, so a stroke two pixels
+wide always looks twice as wide as one. From 4× up, a light grey **grid**
+marks the edges between pixels. Untick **grid** to hide it. While you zoom, the page
 fills the whole panel it sits on, and the reader frame is hidden.
 
 - Drag the page to move around it.
@@ -242,7 +242,7 @@ The zoom and the place you are looking at stay put when you change a setting,
 so you can watch the same letters as the page redraws.
 
 While zoomed, the copy button copies what you see at the zoom's own size: at
-1000%, each reader pixel is 10 by 10 pixels in the image, with the grid if it
+10×, each reader pixel is 10 by 10 pixels in the image, with the grid if it
 is showing. Hold Shift to download instead, and Alt to take the whole page.
 
 ## Save font settings

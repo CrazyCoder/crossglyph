@@ -1,6 +1,6 @@
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
-import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, blockSize, clampCentre, inside,
+import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, clampCentre, inside,
         origin, paint, panBy, readerAt, stepLevel, visibleCrop, wireZoom,
         zoomAt} from "./zoom.js";
 
@@ -122,8 +122,8 @@ function variant() {
   return scale.value === "pixels" ? "pixels" : "scaled";
 }
 
-//: The zoom: its level in percent, 0 for off, and the centre of the view in
-//: reader pixels. Kept across renders, so a knob change leaves the same
+//: The zoom: its level in screen pixels per reader pixel, 0 for off, and the
+//: centre of the view in reader pixels. Kept across renders, so a knob change leaves the same
 //: letters in view.
 let zoom = {level: 0, x: 0, y: 0};
 //: What a double-click zooms back to.
@@ -487,21 +487,20 @@ export async function deviceImage(whole = false) {
   return sheet;
 }
 
-// The zoomed view as a picture: the reader pixels the screen shows, each
-// level / 100 pixels square whatever the display, with the grid if it is on.
-// Built from the toned page like the rest of the copy, never from the screen.
+// The zoomed view as a picture: the reader pixels the screen shows, each as
+// many pixels square as it is on screen, with the grid if it is on. Built
+// from the toned page like the rest of the copy, never from the screen.
 function zoomedImage() {
   const view = currentView();
-  const block = blockSize(zoom.level, dpr());
-  const crop = visibleCrop(origin(zoom, view, toned, block), view, toned, block);
-  const scale = zoom.level / 100;
-  const size = {width: crop.width * scale, height: crop.height * scale};
+  const block = zoom.level;
+  const crop = visibleCrop(origin(zoom, view, toned), view, toned, block);
+  const size = {width: crop.width * block, height: crop.height * block};
   const sheet = document.createElement("canvas");
   sheet.width = size.width;
   sheet.height = size.height;
   const context = sheet.getContext("2d");
   const pixels = context.createImageData(size.width, size.height);
-  paint(toned.data, toned, {x: crop.left * scale, y: crop.top * scale}, scale,
+  paint(toned.data, toned, {x: crop.left * block, y: crop.top * block}, block,
         gridShown(zoom.level), size, paperRgb(), pixels.data);
   context.putImageData(pixels, 0, 0);
   return sheet;
@@ -516,7 +515,7 @@ async function deviceBlob(whole) {
 
 export function imageName(whole = false) {
   if (zoomed() && !whole) {
-    return `crossglyph-${model.value}-page-zoom${zoom.level}.png`;
+    return `crossglyph-${model.value}-page-zoom${zoom.level}x.png`;
   }
   return `crossglyph-${model.value}`
          + `${frameShown.checked ? `-${color.value}` : "-page"}.png`;
@@ -823,12 +822,11 @@ function drawDevicePage() {
 // for another reader, which is the moment after switching: the centre is for
 // the page on its way, and clamping it to this one would lose it.
 function zoomView(to) {
-  const block = blockSize(zoom.level, dpr());
   const native = profile().native;
   if (toned.width === native.width && toned.height === native.height) {
-    zoom = clampCentre(zoom, to, toned, block);
+    zoom = clampCentre(zoom, to, toned);
   }
-  return {block, at: origin(zoom, to, toned, block), grid: gridShown(zoom.level)};
+  return {block: zoom.level, at: origin(zoom, to, toned), grid: gridShown(zoom.level)};
 }
 
 // The canvas as last drawn, in screen pixels: the view every gesture works in.
@@ -865,11 +863,10 @@ function pointOf(event) {
 // is about to change size, so there is no spot to hold still and the pixel
 // clicked becomes the centre instead.
 function zoomAround(level, point) {
-  const reader = readerAt(zoom, point, currentView(), toned ?? profile().native,
-                          dpr());
+  const reader = readerAt(zoom, point, currentView(), toned ?? profile().native);
   if (!level) setZoom({...zoom, level: 0});
   else if (!zoomed()) setZoom({level, x: reader.x, y: reader.y});
-  else setZoom(zoomAt(level, reader, point, currentView(), dpr()));
+  else setZoom(zoomAt(level, reader, point, currentView()));
 }
 
 // Keys on the focused page. Plus works from the whole page too, the rest only
@@ -1103,7 +1100,7 @@ export function wireDevice(scheduleRender, untuned) {
     hold: untuned.hold,
     release: untuned.release,
     pan(dx, dy) {
-      moveZoom(panBy(zoom, dx * dpr(), dy * dpr(), blockSize(zoom.level, dpr())));
+      moveZoom(panBy(zoom, dx * dpr(), dy * dpr()));
     },
     settled: saveDevice,
     zoom(direction, event) {
