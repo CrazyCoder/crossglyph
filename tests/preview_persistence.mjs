@@ -6911,7 +6911,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("the grid can be turned off",
         canvas.pixels.some((v, n) => v !== withGrid[n])
         && JSON.parse(storage.data["crossglyph.device"]).grid === false);
-  env.device.zoom.value = String(z.LEVELS.find(l => l < z.GRID_FROM && l >= 4));
+  env.device.zoom.value = String(z.LEVELS.filter(l => l < z.GRID_FROM).at(-1));
   env.device.change(env.device.zoom);
   const offBelow = canvas.pixels;
   env.device.grid.checked = true;

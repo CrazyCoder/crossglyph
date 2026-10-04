@@ -25,7 +25,8 @@ export const LEVELS = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 
 //: it mixes its grey into them, the way a photo editor's pixel grid does.
 //: The mix grows with the level up to GRID_MAX at GRID_FULL: a line's share
 //: of its block shrinks as the block grows, so the page's tone moves about
-//: as much at every level, and the grid never switches on all at once.
+//: as much at every level, and the grid comes in faint rather than at full
+//: strength.
 export const GRID_FROM = 6;
 export const GRID_FULL = 16;
 export const GRID_MAX = 0.35;
@@ -141,7 +142,8 @@ export function paint(source, panel, at, block, grid, view, outside, out) {
         const from = (row * panel.width + column) * 4;
         if (rowLine || (grid && within(across, block) === block - 1)) {
           for (let c = 0; c < 3; ++c) {
-            out[to + c] = Math.round(source[from + c] + (GRID_RGB[c] - source[from + c]) * grid);
+            const own = source[from + c];
+            out[to + c] = Math.round(own + (GRID_RGB[c] - own) * grid);
           }
         } else {
           out[to] = source[from];
