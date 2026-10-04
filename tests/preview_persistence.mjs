@@ -6586,6 +6586,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         all.map(n => els[n].value).join(" "));
   env.fit.toRange.on.click();
 
+  // A search that stops short of its count has not found a size list, so
+  // Apply has nothing whole to write, and the sizes it did find are still
+  // there to look at.
+  opts.fitSteps = fitSteps([12, 13].map(l => [l, l, l + 0.25, [90, 90, 90, 90]]));
+  env.fit.count.value = "3";
+  env.fit.run.on.click();
+  await settle();
+  check("a range the search did not finish keeps the sizes it found",
+        env.fit.table.children.length === 2, String(env.fit.table.children.length));
+  check("and offers nothing to Apply", env.fit.apply.disabled === true);
+
   opts.fitSteps = fitSteps([[14, 14, 13.75, [50, 90, 50, 50]]]);
   env.fit.low.value = "14";
   env.fit.count.value = "1";
