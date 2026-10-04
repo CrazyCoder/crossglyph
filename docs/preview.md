@@ -203,8 +203,9 @@ The controls include:
 
 - **scale** chooses one screen pixel per monitor pixel, a physical-size view or
   a fit-to-column view;
-- **zoom** enlarges the page to show each of the reader's pixels, and **grid**
-  draws lines between them (see below);
+- **zoom** enlarges the page to show each of the reader's pixels, **grid**
+  draws lines between them, and the button beside **+** shows the zoom in a
+  window of its own (see below);
 - **paper** changes the displayed paper brightness;
 - **ink** changes the displayed ink strength;
 - **warm** and **tint** adjust the screen cast;
@@ -233,8 +234,10 @@ whole panel it sits on, and the reader frame is hidden.
 - Drag the page to move around it.
 - Press and hold without moving to see the page untuned, as you can when
   zoom is off.
-- Hold Alt and turn the wheel to zoom in or out around the pointer. The wheel
-  alone scrolls the window as usual.
+- Hold Alt and turn the wheel to zoom in or out around the pointer, one level
+  for each notch. On a trackpad, or with smooth scrolling turned on, a
+  notch's worth of scrolling is one level. The wheel alone scrolls the window
+  as usual.
 - Double-click to zoom in on a spot, and double-click again to see the whole
   page.
 - Click the page, then use + and − to change the zoom, the arrow keys to move

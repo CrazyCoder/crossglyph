@@ -222,14 +222,14 @@ export function paint(source, panel, at, block, grid, view, outside, out) {
   return out;
 }
 
+const never = () => false;
+
 // The gestures on the page. A press waits while zoomed: moving a few pixels
 // makes it a pan, and staying still makes it the hold that shows the page
 // untuned, the same gesture as on an unzoomed page arriving a moment later.
 // The wheel scrolls the window unless Alt is held, or `plainWheel()` says
 // there is nothing to scroll. Ctrl and the wheel stay the browser's, which
 // zooms the whole window with them and with a pinch.
-const never = () => false;
-
 export function wireZoom(surface, hooks, {plainWheel = never} = {}) {
   let press = null;
   // How far the wheel has turned towards the next level, and when it last did.

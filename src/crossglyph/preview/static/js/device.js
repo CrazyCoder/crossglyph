@@ -783,8 +783,9 @@ function resampleByArea(data, from, to, out) {
 
 //: The canvas the rendered page is decoded and read back on, which toning
 //: does once per page or change of tone. A canvas of its own rather than the
-//: one on screen: one asked for frequent reads is kept off the GPU, and the
-//: canvas on screen then took three times as long to show each step of a pan.
+//: one on screen: a canvas asked for frequent reads is kept off the GPU, and
+//: one on screen kept there takes three times as long to show each step of a
+//: pan.
 let toningSheet = null;
 
 // The rendered page with the two tones applied, at the panel's own size.
@@ -853,8 +854,7 @@ function drawView(view, to) {
   view.drawn = {of: toned, width: to.width, height: to.height, zoom: key};
   const context = view.canvas.getContext("2d", {alpha: false});
   // Only when the size moves: setting either one, even to what it already
-  // is, clears the canvas and allocates its pixels again, which is most of
-  // what a step of a pan would otherwise cost.
+  // is, clears the canvas and allocates its pixels again.
   if (view.canvas.width !== to.width) view.canvas.width = to.width;
   if (view.canvas.height !== to.height) view.canvas.height = to.height;
   if (!shown && to.width === toned.width && to.height === toned.height) {

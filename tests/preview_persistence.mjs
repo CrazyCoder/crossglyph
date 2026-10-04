@@ -7140,6 +7140,13 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   surface.on.wheel(event({deltaY: 2, deltaMode: 1, altKey: true, clientX: 240, clientY: 400}));
   check("and a notch counted in lines is one too", env.device.zoom.value === "12",
         env.device.zoom.value);
+  surface.on.wheel(event({deltaY: -60, altKey: true, timeStamp: 10000}));
+  surface.on.wheel(event({deltaY: -60, altKey: true, timeStamp: 11000}));
+  check("half a notch, a rest, and half a notch again is no level",
+        env.device.zoom.value === "12", env.device.zoom.value);
+  surface.on.wheel(event({deltaY: 0, deltaX: 300, altKey: true, timeStamp: 12000}));
+  check("and scrolling sideways zooms neither way", env.device.zoom.value === "12",
+        env.device.zoom.value);
 
   const x = state().x;
   surface.on.keydown(event({key: "ArrowRight"}));
