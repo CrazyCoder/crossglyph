@@ -7129,6 +7129,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("Alt and the wheel zoom in", env.device.zoom.value === "14" && alt.prevented);
   surface.on.wheel(event({deltaY: 100, altKey: true, clientX: 240, clientY: 400}));
   check("and back out", env.device.zoom.value === "12");
+  // A smooth-scrolling driver, or a trackpad, sends one notch as many small
+  // turns. They add up to a step rather than taking one each.
+  for (let n = 0; n < 20; ++n) {
+    surface.on.wheel(event({deltaY: -6, altKey: true, clientX: 240, clientY: 400}));
+  }
+  check("a notch sent as many small turns zooms one level, not one a turn",
+        env.device.zoom.value === "14", env.device.zoom.value);
+  surface.on.wheel(event({deltaY: 1, deltaMode: 1, altKey: true, clientX: 240, clientY: 400}));
+  surface.on.wheel(event({deltaY: 2, deltaMode: 1, altKey: true, clientX: 240, clientY: 400}));
+  check("and a notch counted in lines is one too", env.device.zoom.value === "12",
+        env.device.zoom.value);
 
   const x = state().x;
   surface.on.keydown(event({key: "ArrowRight"}));

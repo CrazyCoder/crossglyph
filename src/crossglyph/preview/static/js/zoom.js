@@ -36,6 +36,14 @@ export const FIRST_LEVEL = 12;
 export const DRAG_PX = 3;
 //: How long a press stays still before it is the untuned hold.
 export const HOLD_MS = 300;
+//: How far the wheel turns for one level, in pixels: a notch of an ordinary
+//: wheel. A smooth-scrolling driver or a trackpad sends a notch as many small
+//: turns, which add up to this rather than taking a level each. Turns in
+//: lines or pages count as many pixels as a browser scrolls for them.
+const WHEEL_STEP = 100;
+const WHEEL_UNIT = [1, 40, 800];
+//: A pause this long, in milliseconds, starts the count again.
+const WHEEL_REST_MS = 300;
 //: What a line mixes towards: a grey between ink and paper, so it shows on
 //: both.
 export const GRID_RGB = [128, 128, 128];
@@ -224,6 +232,8 @@ const never = () => false;
 
 export function wireZoom(surface, hooks, {plainWheel = never} = {}) {
   let press = null;
+  // How far the wheel has turned towards the next level, and when it last did.
+  const wheel = {sum: 0, at: -Infinity};
   const end = () => {
     if (!press) return;
     clearTimeout(press.timer);
@@ -270,7 +280,18 @@ export function wireZoom(surface, hooks, {plainWheel = never} = {}) {
   surface.addEventListener("wheel", (event) => {
     if (!event.altKey && !plainWheel()) return;
     event.preventDefault();
-    hooks.zoom(event.deltaY < 0 ? 1 : -1, event);
+    const turn = event.deltaY * (WHEEL_UNIT[event.deltaMode] ?? 1);
+    const now = event.timeStamp ?? performance.now();
+    // Turning back, or after a rest, counts from nothing: what was left of
+    // the last notch is not owed to this one.
+    if (now - wheel.at > WHEEL_REST_MS || Math.sign(turn) !== Math.sign(wheel.sum)) {
+      wheel.sum = 0;
+    }
+    wheel.at = now;
+    wheel.sum += turn;
+    if (Math.abs(wheel.sum) < WHEEL_STEP) return;
+    wheel.sum -= Math.sign(wheel.sum) * WHEEL_STEP;
+    hooks.zoom(turn < 0 ? 1 : -1, event);
   }, {passive: false});
   surface.addEventListener("dblclick", (event) => {
     event.preventDefault();
