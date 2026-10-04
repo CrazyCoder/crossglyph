@@ -878,14 +878,30 @@ def test_tighter_line_spacing_fits_more_lines(tmp_path):
     assert _drawn(module) > wide
 
 
+def _words_before_each_break(module, **spec):
+    """How many words the paragraph has set by the end of each line. Wider
+    spacing can only lower these, and moves at least one; how many lines it
+    takes in all depends on where the face's last break falls, and DejaVu
+    Sans moves every break yet ends on the same count."""
+    _spec(module, **spec)
+    counts, total = [], 0
+    for line in _lines(module, PARAGRAPH, 400):
+        total += len(line.split())
+        counts.append(total)
+    return counts
+
+
+def _fits_fewer(wide, narrow):
+    return all(w <= n for w, n in zip(wide, narrow)) and wide != narrow
+
+
 @needs_wasm
 @needs_font
 def test_wider_word_spacing_puts_fewer_words_on_a_line(tmp_path):
     module = _loaded(tmp_path, intervals="cyrillic")
-    _spec(module, word_spacing_percent=50)
-    narrow = _lines(module, PARAGRAPH, 400)
-    _spec(module, word_spacing_percent=200)
-    assert len(_lines(module, PARAGRAPH, 400)) > len(narrow)
+    narrow = _words_before_each_break(module, word_spacing_percent=50)
+    wide = _words_before_each_break(module, word_spacing_percent=200)
+    assert _fits_fewer(wide, narrow), (wide, narrow)
 
 
 @needs_wasm
@@ -895,10 +911,9 @@ def test_character_spacing_moves_the_breaks_and_the_ink(tmp_path):
     broke wider but drew at the old spacing would set ragged lines that the
     device never shows."""
     module = _loaded(tmp_path, intervals="cyrillic")
-    _spec(module, character_spacing=0)
-    plain = _lines(module, PARAGRAPH, 400)
-    _spec(module, character_spacing=2)
-    assert len(_lines(module, PARAGRAPH, 400)) > len(plain)
+    plain = _words_before_each_break(module, character_spacing=0)
+    wide = _words_before_each_break(module, character_spacing=2)
+    assert _fits_fewer(wide, plain), (wide, plain)
 
     def ink_width(spacing):
         _spec(module, alignment=LEFT, character_spacing=spacing)
