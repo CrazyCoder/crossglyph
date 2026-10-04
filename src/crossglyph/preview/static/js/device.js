@@ -1,6 +1,6 @@
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
-import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, clampCentre, inside,
+import {FIRST_LEVEL, LEVELS as ZOOM_LEVELS, clampCentre, gridStrength, inside,
         origin, paint, panBy, readerAt, stepLevel, visibleCrop, wireZoom,
         zoomAt} from "./zoom.js";
 
@@ -184,8 +184,9 @@ function frameOn() {
   return frameShown.checked && !zoomed();
 }
 
+// How strongly the grid is drawn at `level`, 0 for not at all.
 function gridShown(level) {
-  return gridBox.checked && level >= GRID_FROM;
+  return gridBox.checked ? gridStrength(level) : 0;
 }
 
 // One device's geometry, with the panel size the two renders share. Takes the

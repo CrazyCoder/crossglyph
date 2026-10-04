@@ -18,17 +18,32 @@
 //: The levels on offer: one pixel apart while a pixel is a large part of a
 //: block, then growing by about a fifth a step.
 export const LEVELS = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 64];
-//: Below this a block is too small for a line to leave the pixel readable.
-export const GRID_FROM = 4;
+//: The grid. A line takes the last row and column of each block, so at a
+//: level of 4 it covers seven of the block's sixteen screen pixels, and a
+//: grey drawn there turns ink lighter and paper darker across the whole page.
+//: So it starts at GRID_FROM, and rather than replacing the pixels it crosses
+//: it mixes its grey into them, the way a photo editor's pixel grid does.
+//: The mix grows with the level up to GRID_MAX at GRID_FULL: a line's share
+//: of its block shrinks as the block grows, so the page's tone moves about
+//: as much at every level, and the grid never switches on all at once.
+export const GRID_FROM = 6;
+export const GRID_FULL = 16;
+export const GRID_MAX = 0.35;
 //: What a double-click zooms to before any level has been chosen.
 export const FIRST_LEVEL = 12;
 //: How far a press moves, in CSS pixels, before it is a pan.
 export const DRAG_PX = 3;
 //: How long a press stays still before it is the untuned hold.
 export const HOLD_MS = 300;
-//: A light grey that none of the reader's four levels lands on once toned at
-//: the default paper and ink.
-export const GRID_RGB = [190, 190, 190];
+//: What a line mixes towards: a grey between ink and paper, so it shows on
+//: both.
+export const GRID_RGB = [128, 128, 128];
+
+// How much of the grid's grey a line mixes into a pixel at `level`.
+export function gridStrength(level) {
+  if (level < GRID_FROM) return 0;
+  return GRID_MAX * Math.min(1, level / GRID_FULL);
+}
 
 export function stepLevel(level, direction) {
   const at = LEVELS.indexOf(level);
@@ -105,7 +120,8 @@ const within = (value, block) => ((value % block) + block) % block;
 // Fill `out`, an RGBA array of `view` size, with the page enlarged by `block`
 // from offset `at`. Nearest neighbour and nothing else: a block is its reader
 // pixel exactly. A grid line takes the last row and column of each block, so
-// it narrows a pixel without hiding one. Past the page is `outside`.
+// it narrows a pixel without hiding one, mixing `grid` of its grey into it: 0
+// draws no grid, 1 a line of the grey itself. Past the page is `outside`.
 export function paint(source, panel, at, block, grid, view, outside, out) {
   for (let y = 0; y < view.height; ++y) {
     const down = at.y + y;
@@ -121,15 +137,17 @@ export function paint(source, panel, at, block, grid, view, outside, out) {
         out[to] = outside[0];
         out[to + 1] = outside[1];
         out[to + 2] = outside[2];
-      } else if (rowLine || (grid && within(across, block) === block - 1)) {
-        out[to] = GRID_RGB[0];
-        out[to + 1] = GRID_RGB[1];
-        out[to + 2] = GRID_RGB[2];
       } else {
         const from = (row * panel.width + column) * 4;
-        out[to] = source[from];
-        out[to + 1] = source[from + 1];
-        out[to + 2] = source[from + 2];
+        if (rowLine || (grid && within(across, block) === block - 1)) {
+          for (let c = 0; c < 3; ++c) {
+            out[to + c] = Math.round(source[from + c] + (GRID_RGB[c] - source[from + c]) * grid);
+          }
+        } else {
+          out[to] = source[from];
+          out[to + 1] = source[from + 1];
+          out[to + 2] = source[from + 2];
+        }
       }
     }
   }

@@ -224,9 +224,11 @@ browser remembers them.
 **zoom** enlarges the page so you can see how each of the reader's pixels
 lands. The level counts screen pixels: at 10×, each reader pixel is a block
 10 screen pixels wide. Every block is the same size, so a stroke two pixels
-wide always looks twice as wide as one. From 4× up, a light grey **grid**
-marks the edges between pixels. Untick **grid** to hide it. While you zoom,
-the page fills the whole panel it sits on, and the reader frame is hidden.
+wide always looks twice as wide as one. From 6× up, a **grid** marks the
+edges between pixels. It tints the pixels it crosses rather than covering
+them, so ink stays dark and paper stays light, and it grows clearer as you
+zoom in. Untick **grid** to hide it. While you zoom, the page fills the
+whole panel it sits on, and the reader frame is hidden.
 
 - Drag the page to move around it.
 - Press and hold without moving to see the page untuned, as you can when

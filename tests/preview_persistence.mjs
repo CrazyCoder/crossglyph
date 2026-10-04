@@ -6779,17 +6779,18 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const greys = [10, 20, 30, 40, 50, 60];
   const source = new Uint8ClampedArray(greys.flatMap(g => [g, g, g, 255]));
   const small = {width: 3, height: 2};
+  // The grid's strength: 0 for none, 1 for a line of the grid's grey.
   const out = (grid, offset = {x: 0, y: 0}) => z.paint(
     source, small, offset, 4, grid, {width: 12, height: 8}, [1, 2, 3],
     new Uint8ClampedArray(12 * 8 * 4));
-  const plain = out(false);
+  const plain = out(0);
   let exact = true;
   for (let y = 0; y < 8; ++y) for (let x = 0; x < 12; ++x) {
     const want = greys[Math.floor(y / 4) * 3 + Math.floor(x / 4)];
     if (plain[(y * 12 + x) * 4] !== want || plain[(y * 12 + x) * 4 + 3] !== 255) exact = false;
   }
   check("every block is exactly its source pixel", exact);
-  const lined = out(true);
+  const lined = out(1);
   let lines = true;
   for (let y = 0; y < 8; ++y) for (let x = 0; x < 12; ++x) {
     const edge = x % 4 === 3 || y % 4 === 3;
@@ -6798,7 +6799,25 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   }
   check("grid lines take the last row and column of each block, and nothing else",
         lines && !greys.includes(z.GRID_RGB[0]));
-  const shifted = out(false, {x: -4, y: 0});
+  const half = out(0.5);
+  let mixed = true;
+  for (let y = 0; y < 8; ++y) for (let x = 0; x < 12; ++x) {
+    const grey = greys[Math.floor(y / 4) * 3 + Math.floor(x / 4)];
+    const edge = x % 4 === 3 || y % 4 === 3;
+    const want = edge ? Math.round(grey + (z.GRID_RGB[0] - grey) * 0.5) : grey;
+    if (half[(y * 12 + x) * 4] !== want) mixed = false;
+  }
+  check("a weaker grid mixes its grey into each pixel it crosses", mixed);
+
+  check("no grid below the level it starts at",
+        z.gridStrength(z.GRID_FROM - 1) === 0 && z.gridStrength(z.LEVELS[0]) === 0);
+  const strengths = z.LEVELS.filter(l => l >= z.GRID_FROM).map(z.gridStrength);
+  check("from there it grows with the level and stops at its full strength",
+        strengths[0] > 0 && strengths.every((s, n) => !n || s >= strengths[n - 1])
+        && z.gridStrength(z.GRID_FULL) === z.GRID_MAX
+        && z.gridStrength(z.LEVELS.at(-1)) === z.GRID_MAX && z.GRID_MAX < 1,
+        JSON.stringify(strengths));
+  const shifted = out(0, {x: -4, y: 0});
   check("past the edge of the page is the colour asked for",
         shifted.slice(0, 3).join() === "1,2,3" && shifted[16] === 10,
         shifted.slice(0, 20).join());
@@ -6846,27 +6865,39 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("on whole screen pixels at its own size", onGrid(1),
         JSON.stringify({left: canvas.style.left, top: canvas.style.top,
                         width: canvas.style.width, height: canvas.style.height}));
-  // Grid lines exactly a block apart across a row and down a column, with one
-  // level between each pair of them.
+  // A grid line mixes into the pixels it crosses, so it has no colour of its
+  // own to look for: the lines are where the view with the grid differs from
+  // the view without it. A column on a line differs in nearly every row, and
+  // one off it only where a row line crosses. The lines must be exactly a
+  // block apart across and down, and without the grid every block between
+  // them is one level.
   const blocksOf = (block) => {
-    const at = (x, y) => canvas.pixels[(y * canvas.width + x) * 4];
-    const line = (count, read) => {
-      const lines = [];
-      for (let n = 0; n < count; ++n) if (read(n) === z.GRID_RGB[0]) lines.push(n);
-      if (lines.length < 3) return false;
-      for (let n = 1; n < lines.length; ++n) {
-        if (lines[n] - lines[n - 1] !== block) return false;
-        for (let m = lines[n - 1] + 1; m < lines[n]; ++m) {
-          if (read(m) !== read(lines[n - 1] + 1)) return false;
-        }
+    const lined = canvas.pixels;
+    env.device.grid.checked = false;
+    env.device.edit(env.device.grid);
+    const plain = canvas.pixels;
+    env.device.grid.checked = true;
+    env.device.edit(env.device.grid);
+    const {width, height} = canvas;
+    const across = new Array(width).fill(0), down = new Array(height).fill(0);
+    for (let n = 0; n < width * height; ++n) {
+      if (lined[n * 4] === plain[n * 4]) continue;
+      across[n % width]++;
+      down[Math.floor(n / width)]++;
+    }
+    const linesOf = (counts, other) =>
+      counts.flatMap((count, n) => (count > other / 2 ? [n] : []));
+    const columns = linesOf(across, height), rows = linesOf(down, width);
+    const spaced = (lines) => lines.length >= 3 &&
+      lines.every((line, n) => !n || line - lines[n - 1] === block);
+    const level = (x, y) => plain[(y * width + x) * 4];
+    const even = columns.slice(1).every((line, n) => {
+      for (let x = columns[n] + 1; x <= line; ++x) {
+        if (level(x, rows[1]) !== level(columns[n] + 1, rows[1])) return false;
       }
       return true;
-    };
-    // A row or column to read along that is not itself a grid line.
-    const span = [...Array(block + 1).keys()];
-    const y = span.find(y => !span.every(x => at(x, y) === z.GRID_RGB[0]));
-    const x = span.find(x => !span.every(y => at(x, y) === z.GRID_RGB[0]));
-    return line(canvas.width, n => at(n, y)) && line(canvas.height, n => at(x, n));
+    });
+    return spaced(columns) && spaced(rows) && even && lined !== plain;
   };
   check("every block is one level, edged by the grid", blocksOf(10));
   const saved = JSON.parse(storage.data["crossglyph.device"]);
@@ -6874,10 +6905,23 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         saved.zoom === 10 && saved.x === 240 && saved.y === 400 && saved.grid === true,
         storage.data["crossglyph.device"]);
 
+  const withGrid = canvas.pixels;
   env.device.grid.checked = false;
   env.device.edit(env.device.grid);
   check("the grid can be turned off",
-        !canvas.pixels.some((v, n) => n % 4 === 0 && v === z.GRID_RGB[0]));
+        canvas.pixels.some((v, n) => v !== withGrid[n])
+        && JSON.parse(storage.data["crossglyph.device"]).grid === false);
+  env.device.zoom.value = String(z.LEVELS.find(l => l < z.GRID_FROM && l >= 4));
+  env.device.change(env.device.zoom);
+  const offBelow = canvas.pixels;
+  env.device.grid.checked = true;
+  env.device.edit(env.device.grid);
+  check("and below the level it starts at, ticking it draws nothing",
+        canvas.pixels.every((v, n) => v === offBelow[n]));
+  env.device.grid.checked = false;
+  env.device.edit(env.device.grid);
+  env.device.zoom.value = "10";
+  env.device.change(env.device.zoom);
 
   const renders = env.fetches.render;
   env.byName.gamma.value = "1.5";
@@ -7305,7 +7349,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         popup.canvas.width === 1816 && popup.canvas.height === 1436
         && popup.canvas.style.width === "908px" && popup.canvas.style.height === "718px",
         `${popup.canvas.width}x${popup.canvas.height} ${popup.canvas.style.width}`);
-  check("in blocks of the level", popup.canvas.pixels?.some(v => v === z.GRID_RGB[0]));
+  check("with the page drawn in it", popup.canvas.pixels?.length === 1816 * 1436 * 4);
   check("and takes the focus, so its keys work", popup.canvas.focused > 0);
 
   const islandPixels = canvas.pixels;
