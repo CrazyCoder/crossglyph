@@ -7028,7 +7028,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
 // search, for a family's sizes from scratch or to put whole sizes back after
 // suggestions were saved.
 {
-  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  const opts = {renderOk: true};
+  const env = await loaded(fakeStorage(), undefined, opts);
   const els = env.exportForm.elements;
   const all = [...FIRST_ROW, ...SECOND_ROW];
   const boxes = () => all.map(n => els[n].value).join(" ");
@@ -7069,6 +7070,27 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.fit.low.on.input();
   check("a range that cannot be tried cannot be filled either",
         env.fit.fill.disabled === true);
+
+  // Fill, search what it filled, Apply: Undo goes back past all of it, to the
+  // sizes there were before Fill boxes, since a search in between keeps it.
+  els.size2.value = "14";
+  env.exportForm.edit("size2");
+  env.fit.low.value = "10";
+  env.fit.count.value = "8";
+  env.fit.count.on.change();
+  env.fit.fill.on.click();
+  opts.fitSteps = fitSteps([10, 11, 12, 13, 14, 15, 16, 17]
+    .map(l => [l, l, l + 0.25, [50, 50, 50, 90]]));
+  env.fit.run.on.click();
+  check("a search keeps Undo for what was written before it",
+        env.fit.undo.hidden === false);
+  await settle();
+  env.fit.apply.on.click();
+  check("Apply writes the suggestions over what Fill boxes wrote",
+        boxes() === "10.25 11.25 12.25 13.25 14.25 15.25 16.25 17.25", boxes());
+  env.fit.undo.on.click();
+  check("and Undo goes back to before Fill boxes",
+        boxes() === before.join(" "), boxes());
 }
 
 // The zoom's loose ends: a drag outliving the zoom, and a page drawn for the

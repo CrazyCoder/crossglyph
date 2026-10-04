@@ -340,7 +340,8 @@ To put the range's sizes in the boxes as they are, with no search, press
 **Fill boxes** beside the list. It writes them in order and empties the boxes
 after them. Use it to fill a family's sizes in one press, or to go back to
 whole sizes after you have saved suggested ones. **Undo** takes it back until
-you save.
+you save, even after you search the filled sizes and apply suggestions to
+them: it goes back to the sizes you had before Fill boxes.
 
 A range is the family's new list of sizes. Each ticked size is kept, including
 one the boxes already hold, so untick a size to leave it out, such as the one

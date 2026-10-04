@@ -1038,8 +1038,9 @@
   /* Numbers centred, as the size boxes set theirs. */
   #export .fit-field input { text-align: center; }
   #export .fit-field select { text-align-last: center; }
-  /* One height for every field and button here, the size boxes' own. */
+  /* At the end of the toggle's row, sized like the toggle's halves. */
   #fit-fill { flex: none; font-size: 12px; padding: 0 .75rem; }
+  /* One height for every field and button here, the size boxes' own. */
   .fit-panel select, .fit-panel input[type=text], #fit-run, .fit-foot button,
   .fit-mode button, #fit-fill {
     height: 24px; padding-top: 0; padding-bottom: 0;

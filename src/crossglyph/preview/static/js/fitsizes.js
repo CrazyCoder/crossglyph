@@ -316,26 +316,11 @@ function fillBoxes() {
   stopFit();
   dropSuggestions();
   applied ??= new Map();
-  let changed = 0;
-  for (const box of BOXES) {
-    const field = exportForm.elements[box];
-    const value = fill.get(box);
-    if (field.value === value) continue;
-    // What the box held before anything Fit to grid wrote there.
-    const earlier = applied.get(box);
-    const was = earlier && earlier.wrote === field.value ? earlier.was : field.value;
-    field.value = value;
-    exportEdited(field);
-    changed++;
-    if (value === was) applied.delete(box);
-    else applied.set(box, {was, wrote: value});
-  }
+  const changed = BOXES.filter(box => writeBox(box, fill.get(box))).length;
   undoButton.hidden = !applied.size;
   syncAll();
   showFitTargets();
-  note.textContent = changed
-    ? `${changed} size box${changed === 1 ? "" : "es"} changed. Save or Build to keep them.`
-    : "Nothing was changed.";
+  note.textContent = boxesChanged(changed);
 }
 
 //: The suggestions and what was said about them, leaving Undo alone.
@@ -358,7 +343,9 @@ async function runFit() {
   const ranged = toRange.getAttribute("aria-pressed") === "true";
   const boxes = ranged ? BOXES.slice(0, Number(count.value)) : BOXES.filter(filled);
   stopFit();
-  clearFit();
+  // Not clearFit: Undo outlives a search, so what was written before it can
+  // still be taken back after the next Apply.
+  dropSuggestions();
   if (ranged && rangeSizes().problem) {
     note.textContent = rangeSizes().problem;
     return;
@@ -446,21 +433,13 @@ function applyFit() {
   let skipped = 0, changed = 0;
   for (const row of rows) {
     if (!offered(row)) continue;
-    const field = exportForm.elements[row.box];
     // A box edited since it was scored is the user's newer word. Said only
     // for a ticked row: an unticked one asks Apply for nothing new.
     if (!ours(row)) {
       if (row.tick.checked) skipped++;
       continue;
     }
-    const value = wanted(row);
-    if (field.value === value) continue;
-    field.value = value;
-    exportEdited(field);
-    changed++;
-    // A box back at what it held needs no undoing.
-    if (value === row.held) applied.delete(row.box);
-    else applied.set(row.box, {was: row.held, wrote: value});
+    if (writeBox(row.box, wanted(row))) changed++;
   }
   syncAll();
   undoButton.hidden = !applied.size;
@@ -479,21 +458,31 @@ function applyRange() {
     return;
   }
   const want = rangeWanted();
-  let changed = 0;
-  for (const box of BOXES) {
-    const field = exportForm.elements[box];
-    const value = want.get(box);
-    if (field.value === value) continue;
-    field.value = value;
-    exportEdited(field);
-    changed++;
-    // A box back at what it held needs no undoing.
-    if (value === range.held.get(box)) applied.delete(box);
-    else applied.set(box, {was: range.held.get(box), wrote: value});
-  }
+  const changed = BOXES.filter(box => writeBox(box, want.get(box))).length;
   syncAll();
   undoButton.hidden = !applied.size;
-  note.textContent = changed
+  note.textContent = boxesChanged(changed);
+}
+
+// Write `value` into a box, keeping what Undo needs: what the box held before
+// Fit to grid first wrote there, carried through any later write, so Undo
+// goes back past Apply, Fill boxes and a search between them. False when the
+// box already held the value.
+function writeBox(box, value) {
+  const field = exportForm.elements[box];
+  if (field.value === value) return false;
+  const earlier = applied.get(box);
+  const was = earlier && earlier.wrote === field.value ? earlier.was : field.value;
+  field.value = value;
+  exportEdited(field);
+  // A box back at what it held needs no undoing.
+  if (value === was) applied.delete(box);
+  else applied.set(box, {was, wrote: value});
+  return true;
+}
+
+function boxesChanged(changed) {
+  return changed
     ? `${changed} size box${changed === 1 ? "" : "es"} changed. Save or Build to keep them.`
     : "Nothing was changed.";
 }
