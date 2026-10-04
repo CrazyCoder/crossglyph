@@ -242,6 +242,7 @@ whole panel it sits on, and the reader frame is hidden.
 - Hold Z to let the zoomed page fill the whole browser window, and let go to
   see the controls again. This works straight after moving a slider, so you
   can change a setting and look at the result without clicking anything.
+  While Z is held, the wheel alone zooms in and out.
 
 The button beside **+** moves the zoom into a window of its own. Put it next
 to the browser or on another screen, and size it as you like: it shows the

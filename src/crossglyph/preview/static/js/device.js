@@ -1004,7 +1004,7 @@ function attachPopout(host, untuned) {
                    height: host.innerHeight - popoutAsked.height};
     popoutAsked = null;
   }
-  wireZoom(view.canvas, zoomHooks(view, untuned), {plainWheel: true});
+  wireZoom(view.canvas, zoomHooks(view, untuned), {plainWheel: () => true});
   host.addEventListener("resize", () => {
     if (popout !== view) return;
     placePopout(view);
@@ -1340,7 +1340,10 @@ export function wireDevice(scheduleRender, untuned) {
     saveDevice();
     drawDevicePage();
   });
-  wireZoom(surface, zoomHooks(island, untuned));
+  // While peeking the view covers the window, so the page behind has nothing
+  // to scroll that anyone could see, and the wheel zooms instead.
+  wireZoom(surface, zoomHooks(island, untuned),
+           {plainWheel: () => stage.classList.contains("peek")});
   wirePopout(untuned);
   wirePeek();
   const toneChanged = () => {

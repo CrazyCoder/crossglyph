@@ -7294,7 +7294,21 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         `${canvas.width}x${canvas.height}`);
   key("down", {repeat: true});
   check("and holds while the key repeats", peeking());
+  const wheel = (deltaY) => {
+    const event = {deltaY, clientX: 300, clientY: 300, altKey: false,
+                   preventDefault() { this.prevented = true; }};
+    env.device.surface.on.wheel(event);
+    return event;
+  };
+  const turned = wheel(-100);
+  check("the wheel alone zooms while peeking, with nothing behind it to scroll",
+        env.device.zoom.value === "12" && turned.prevented, env.device.zoom.value);
+  wheel(100);
+  check("and back out", env.device.zoom.value === "10" && peeking());
   key("up");
+  const after = wheel(-100);
+  check("once let go, the wheel scrolls the page again",
+        env.device.zoom.value === "10" && !after.prevented);
   check("letting go puts the island back",
         !peeking() && `${canvas.width}x${canvas.height}` === island,
         `${canvas.width}x${canvas.height}`);
