@@ -900,6 +900,15 @@ function setZoom(next) {
   showCopyState();
 }
 
+// The level a step in `direction` goes to. Stepping out of the smallest level
+// turns zoom off on the island, where the whole page comes back; with the
+// pop-out open it stops there instead, since off would close the window. Esc
+// and the menu's off still do that.
+function steppedLevel(direction) {
+  const level = stepLevel(zoom.level, direction);
+  return level || !popoutWindow ? level : zoom.level;
+}
+
 // A pan: redrawn at once, saved when it settles.
 function moveZoom(next) {
   zoom = next;
@@ -939,7 +948,7 @@ function zoomHooks(view, untuned) {
     },
     settled: saveDevice,
     zoom(direction, event) {
-      zoomAround(stepLevel(zoom.level, direction), pointOf(event, view), view);
+      zoomAround(steppedLevel(direction), pointOf(event, view), view);
     },
     toggle(event) {
       if (view === island) zoomAround(zoomed() ? 0 : lastLevel, pointOf(event, view), view);
@@ -1106,12 +1115,12 @@ function wirePeek() {
 function zoomKey(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   if (event.key === "+" || event.key === "=") {
-    setZoom({...zoom, level: stepLevel(zoom.level, 1)});
+    setZoom({...zoom, level: steppedLevel(1)});
     return true;
   }
   if (!zoomOn()) return false;
   if (event.key === "-") {
-    setZoom({...zoom, level: stepLevel(zoom.level, -1)});
+    setZoom({...zoom, level: steppedLevel(-1)});
     return true;
   }
   if (event.key === "Escape") {
@@ -1323,7 +1332,7 @@ export function wireDevice(scheduleRender, untuned) {
   });
   for (const button of zoomSteps) {
     button.addEventListener("click", () => {
-      setZoom({...zoom, level: stepLevel(zoom.level, Number(button.dataset.zoomStep))});
+      setZoom({...zoom, level: steppedLevel(Number(button.dataset.zoomStep))});
     });
   }
   gridBox.addEventListener("input", () => {

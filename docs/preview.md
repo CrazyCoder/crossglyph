@@ -246,7 +246,8 @@ to the browser or on another screen, and size it as you like: it shows the
 page as you change settings, and the panel goes back to the whole page.
 
 - In the window, drag to move around, turn the wheel to zoom, and use the
-  same keys as above. Esc turns zoom off and closes the window.
+  same keys as above. Zooming out stops at 2×, and Esc turns zoom off and
+  closes the window.
 - Double-click the whole page in the panel to move the window's view to that
   spot.
 - The copy button copies what the window shows.

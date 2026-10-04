@@ -7356,6 +7356,20 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         picture.width === crop.width * 16 && picture.height === crop.height * 16
         && crop.width > 480 / 16 * 1.5, `${picture.width}x${picture.height} for ${JSON.stringify(crop)}`);
 
+  // Zooming out stops at the smallest level rather than closing the window
+  // from under the pointer, by any of the three ways to step.
+  const level = env.device.zoom.value;
+  env.device.zoom.value = String(z.LEVELS[0]);
+  env.device.change(env.device.zoom);
+  popup.canvas.on.wheel(event({deltaY: 100, clientX: 400, clientY: 300}));
+  popup.canvas.on.keydown(event({key: "-"}));
+  env.device.zoomSteps[0].press();
+  check("zooming out in the window stops at the smallest level",
+        !popup.closed && env.device.zoom.value === String(z.LEVELS[0])
+        && popout.attrs["aria-pressed"] === "true", env.device.zoom.value);
+  env.device.zoom.value = level;
+  env.device.change(env.device.zoom);
+
   popup.innerWidth = 1000;
   popup.fire("resize");
   check("a resized window is filled again",
