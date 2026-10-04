@@ -802,6 +802,18 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     const before = this.on[kind];
     this.on[kind] = before ? (event) => { before(event); fn(event); } : fn;
   };
+  // Taking focus is what lets the page's keys reach it.
+  deviceSurface.focused = 0;
+  deviceSurface.focus = function () { this.focused++; };
+  // The island the page sits on, which a zoomed view fills. Its corner and
+  // padding are fractions of a pixel, as a real one's are, so snapping the
+  // view to whole screen pixels has something to do. Its border is drawn a
+  // whole number of screen pixels wide, 0.67 of a CSS pixel at 1.5, while
+  // clientLeft and clientWidth round it back to 1, as Chrome's do.
+  const stage = {clientWidth: 640, clientHeight: 1030, clientLeft: 1, clientTop: 1,
+                 getBoundingClientRect: () => ({left: 10.3, top: 20.6,
+                                                width: 640 + 4 / 3, height: 1030 + 4 / 3})};
+  const STAGE_PADDING = "13.6px", STAGE_BORDER = "0.666667px";
   //: The sheet gesture: press and hold on the device surface shows the page
   //: untuned.
   const sheet = {
@@ -984,6 +996,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-zoom": deviceZoom,
     "device-grid": deviceGrid,
     "device-zoom-readout": deviceZoomReadout,
+    stage,
     ...tintFuncs,
     "device-ruler": makeElement(),
     "reset-device": deviceReset,
@@ -1047,6 +1060,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // decides whether it shrinks the render or enlarges it. Settable, because
     // the two directions go down different paths.
     devicePixelRatio: 1,
+    getComputedStyle: () => ({paddingLeft: STAGE_PADDING, paddingRight: STAGE_PADDING,
+                              paddingTop: STAGE_PADDING, paddingBottom: STAGE_PADDING,
+                              borderLeftWidth: STAGE_BORDER, borderRightWidth: STAGE_BORDER,
+                              borderTopWidth: STAGE_BORDER, borderBottomWidth: STAGE_BORDER}),
     addEventListener(kind, fn) {
       if (kind === "resize") resizes.push(fn);
     },
@@ -1446,7 +1463,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              tintFuncs,
              copy: deviceCopy, copyIcons, resets: deviceResets,
              zoom: deviceZoom, grid: deviceGrid, readout: deviceZoomReadout,
-             zoomSteps,
+             zoomSteps, stage,
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -6683,24 +6700,57 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("zoom starts off", env.device.zoom.value === "0"
         && env.modules.get("device.js").zoomed() === false);
 
+  const island = () => `${env.device.surface.style.width} ${env.device.surface.style.height}`;
+  const unzoomed = island();
   env.device.zoom.value = "1000";
   env.device.change(env.device.zoom);
   const canvas = env.device.canvas;
   check("zooming hides the frame", env.device.frameImage.hidden === true);
-  check("and keeps the view the size of the page at this scale",
-        canvas.width === 480 && canvas.height === 800,
+  check("and leaves the page's place the size it was, frame and all",
+        island() === unzoomed && env.device.frame.checked, `${unzoomed} then ${island()}`);
+  // The island's content box: its padding edge just inside a border drawn
+  // 0.67 wide, padding 13.6, and a padding box of 640 by 1030, snapped inward
+  // to whole pixels.
+  check("the view fills the island the page sits on",
+        canvas.width === 612 && canvas.height === 1002,
         `${canvas.width}x${canvas.height}`);
-  const pixels = canvas.pixels;
-  const red = (x, y) => pixels[(y * 480 + x) * 4];
-  let blocks = true;
-  for (let by = 0; by < 80; by += 7) for (let bx = 0; bx < 48; bx += 5) {
-    const first = red(bx * 10, by * 10);
-    for (let y = 0; y < 9; ++y) for (let x = 0; x < 9; ++x) {
-      if (red(bx * 10 + x, by * 10 + y) !== first) blocks = false;
-    }
-    if (red(bx * 10 + 9, by * 10) !== z.GRID_RGB[0]) blocks = false;
-  }
-  check("every block is one level, edged by the grid", blocks);
+  // Whole blocks on whole screen pixels, whatever the island's own fractions:
+  // the canvas sits on a whole pixel and is drawn at exactly its own size.
+  // Measured from where the border really ends, not where clientLeft says.
+  const onGrid = (ratio) => {
+    const left = (10.3 + 2 / 3 + parseFloat(canvas.style.left)) * ratio;
+    const top = (20.6 + 2 / 3 + parseFloat(canvas.style.top)) * ratio;
+    const near = (value) => Math.abs(value - Math.round(value)) < 1e-6;
+    return near(left) && near(top)
+      && Math.abs(parseFloat(canvas.style.width) * ratio - canvas.width) < 1e-6
+      && Math.abs(parseFloat(canvas.style.height) * ratio - canvas.height) < 1e-6;
+  };
+  check("on whole screen pixels at its own size", onGrid(1),
+        JSON.stringify({left: canvas.style.left, top: canvas.style.top,
+                        width: canvas.style.width, height: canvas.style.height}));
+  // Grid lines exactly a block apart across a row and down a column, with one
+  // level between each pair of them.
+  const blocksOf = (block) => {
+    const at = (x, y) => canvas.pixels[(y * canvas.width + x) * 4];
+    const line = (count, read) => {
+      const lines = [];
+      for (let n = 0; n < count; ++n) if (read(n) === z.GRID_RGB[0]) lines.push(n);
+      if (lines.length < 3) return false;
+      for (let n = 1; n < lines.length; ++n) {
+        if (lines[n] - lines[n - 1] !== block) return false;
+        for (let m = lines[n - 1] + 1; m < lines[n]; ++m) {
+          if (read(m) !== read(lines[n - 1] + 1)) return false;
+        }
+      }
+      return true;
+    };
+    // A row or column to read along that is not itself a grid line.
+    const span = [...Array(block + 1).keys()];
+    const y = span.find(y => !span.every(x => at(x, y) === z.GRID_RGB[0]));
+    const x = span.find(x => !span.every(y => at(x, y) === z.GRID_RGB[0]));
+    return line(canvas.width, n => at(n, y)) && line(canvas.height, n => at(x, n));
+  };
+  check("every block is one level, edged by the grid", blocksOf(10));
   const saved = JSON.parse(storage.data["crossglyph.device"]);
   check("the zoom is saved with the device settings",
         saved.zoom === 1000 && saved.x === 240 && saved.y === 400 && saved.grid === true,
@@ -6709,8 +6759,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.grid.checked = false;
   env.device.edit(env.device.grid);
   check("the grid can be turned off",
-        canvas.pixels[9 * 4] === canvas.pixels[0],
-        canvas.pixels.slice(0, 48).join());
+        !canvas.pixels.some((v, n) => n % 4 === 0 && v === z.GRID_RGB[0]));
 
   const renders = env.fetches.render;
   env.byName.gamma.value = "1.5";
@@ -6722,11 +6771,20 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         && JSON.parse(storage.data["crossglyph.device"]).x === 240,
         `${env.fetches.render} renders, ${storage.data["crossglyph.device"]}`);
 
+  // Another scale and a fractional ratio, where the page's own box is not a
+  // whole number of screen pixels: the view still is, and so is every block.
+  env.device.grid.checked = true;
+  env.device.edit(env.device.grid);
+  check("and back on", JSON.parse(storage.data["crossglyph.device"]).grid === true);
+  env.device.ratio(1.25);
   env.device.scale.value = "device";
   env.device.change(env.device.scale);
-  check("a smaller view at another scale still holds whole blocks",
-        canvas.width < 480 && Number.isInteger(canvas.width)
-        && env.device.zoom.value === "1000", `${canvas.width}x${canvas.height}`);
+  check("at another scale and a 1.25 ratio the view is still on whole pixels",
+        onGrid(1.25) && env.device.zoom.value === "1000",
+        JSON.stringify({left: canvas.style.left, width: canvas.style.width,
+                        canvas: canvas.width}));
+  check("and every block is 13 screen pixels", blocksOf(13));
+  env.device.ratio(1);
   env.device.scale.value = "pixels";
   env.device.change(env.device.scale);
 
@@ -6734,8 +6792,8 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.device.ink.value = "60";
   env.device.edit(env.device.ink);
   check("a tone change repaints the zoomed view",
-        canvas.pixels !== before && canvas.pixels[0] !== before[0] && canvas.width === 480,
-        `${before[0]} then ${canvas.pixels[0]}`);
+        canvas.pixels !== before && canvas.pixels.some((v, n) => v !== before[n])
+        && canvas.width === 612, `${canvas.width}`);
 
   env.device.zoomSteps[1].press();
   check("the plus button steps the level up", env.device.zoom.value === "1600");
@@ -6746,7 +6804,7 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const reloaded = await loaded(storage, undefined, {renderOk: true});
   await settle();
   check("the zoom comes back after a reload",
-        reloaded.device.zoom.value === "800" && reloaded.device.grid.checked === false
+        reloaded.device.zoom.value === "800" && reloaded.device.grid.checked === true
         && reloaded.device.frameImage.hidden === true);
 
   reloaded.device.reset();
@@ -6786,8 +6844,10 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
                                   ...extra});
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const focused = surface.focused;
   surface.on.pointerdown(event());
   check("unzoomed, a press shows the page untuned at once", pressed() === "true");
+  check("and gives the page focus, so its keys work", surface.focused > focused);
   surface.on.pointerup(event());
   check("and letting go brings the tuning back", pressed() === "false");
 
@@ -6848,8 +6908,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("keys anywhere else on the page do not pan", state().x === x + 11);
 
   surface.on.pointermove(event({clientX: 5, clientY: 5}));
+  const view = {width: env.device.canvas.width, height: env.device.canvas.height};
   const at = z.readerAt({level: 1000, x: state().x, y: state().y}, {x: 5, y: 5},
-                        {width: 480, height: 800}, {width: 480, height: 800}, 1);
+                        view, {width: 480, height: 800}, 1);
   const rx = Math.floor(at.x), ry = Math.floor(at.y);
   const grey = [0, 96, 200, 255][Math.floor((ry * 480 + rx) / 4) % 4];
   check("the readout names the pixel under the pointer and its grey",
@@ -6884,6 +6945,26 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("the button says what it will copy while zoomed",
         /zoomed view/.test(env.device.copy.title) && /Alt/.test(env.device.copy.title),
         env.device.copy.title);
+  // The whole page while zoomed is the whole page as it is unzoomed: in the
+  // frame, when the frame is on. Its size is set before the frame image is
+  // fetched, which this harness cannot do, so the sheet is read as made.
+  env.device.frame.checked = true;
+  env.device.edit(env.device.frame);
+  const sheets = [];
+  const make = env.sandbox.document.createElement;
+  env.sandbox.document.createElement = (tag) => {
+    const sheet = make(tag);
+    sheet.getContext = () => ({drawImage() {}, beginPath() {}, roundRect() {}, clip() {}});
+    sheets.push(sheet);
+    return sheet;
+  };
+  await device.deviceImage(true).catch(() => {});
+  env.sandbox.document.createElement = make;
+  check("Alt while zoomed takes the whole page in its frame",
+        sheets[0]?.width === 612 && sheets[0]?.height === 996,
+        `${sheets[0]?.width}x${sheets[0]?.height}`);
+  check("and names it for the frame", device.imageName(true) === "crossglyph-x4-white.png"
+        || device.imageName(true) === "crossglyph-x4-black.png", device.imageName(true));
   env.device.zoom.value = "0";
   env.device.change(env.device.zoom);
   check("and goes back when zoom is off", !/Alt/.test(env.device.copy.title),

@@ -151,11 +151,12 @@ export function wireZoom(surface, hooks) {
     press = null;
   };
   surface.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !hooks.active()) return;
-    event.preventDefault();
-    // preventDefault on a press also stops the page taking focus, and the
-    // keys below need it.
+    if (event.button !== 0) return;
+    // Every press, zoomed or not, calls preventDefault somewhere, which also
+    // stops the page taking focus, and the keys below need it.
     surface.focus?.({preventScroll: true});
+    if (!hooks.active()) return;
+    event.preventDefault();
     surface.setPointerCapture?.(event.pointerId);
     const started = {x: event.clientX, y: event.clientY, held: false, dragging: false};
     started.timer = setTimeout(() => {

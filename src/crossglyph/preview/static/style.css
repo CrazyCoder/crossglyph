@@ -835,8 +835,11 @@
   .device-zoom { display: flex; align-items: center; gap: .3rem; min-width: 0; }
   #device-zoom { flex: 1; min-width: 0; padding: .18rem .3rem; font-size: 11px; }
   #device-zoom-readout { color: var(--muted); font-size: 11px; white-space: pre; }
-  /* A zoomed page moves with the pointer, and says so. */
-  #device-surface.zoomed { cursor: grab; }
+  /* A zoomed page moves with the pointer, and says so. It also fills the
+     island rather than the page's box, so the surface stops being what the
+     canvas is placed against and #stage, positioned above, takes over. The
+     surface keeps its size, which is what holds the island's. */
+  #device-surface.zoomed { cursor: grab; position: static; }
   .device-tones {
     display: grid; gap: .25rem;
     border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;

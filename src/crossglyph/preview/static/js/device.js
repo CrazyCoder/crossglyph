@@ -29,6 +29,7 @@ const calibrationSlider = document.getElementById("device-calibration-slider");
 const ruler = document.getElementById("device-ruler");
 const reset = document.getElementById("reset-device");
 const copyButton = document.getElementById("device-copy");
+const stage = document.getElementById("stage");
 const zoomSelect = document.getElementById("device-zoom");
 const gridBox = document.getElementById("device-grid");
 const readout = document.getElementById("device-zoom-readout");
@@ -232,33 +233,79 @@ function alignPixelGrid() {
 
 export function layoutDevice() {
   const device = profile();
+  // The surface is sized for the frame whenever the frame is on, zoomed or
+  // not, so turning zoom on or off moves nothing around the page.
+  const sized = frameShown.checked;
   const shown = frameOn();
-  const factor = sourceFactor(device, shown);
-  const box = shown ? device.frame : device.aperture;
+  const factor = sourceFactor(device, sized);
+  const box = sized ? device.frame : device.aperture;
 
   surface.style.width = `${box.width * factor}px`;
   surface.style.height = `${box.height * factor}px`;
-  canvas.style.left = `${shown ? device.aperture.x * factor : 0}px`;
-  canvas.style.top = `${shown ? device.aperture.y * factor : 0}px`;
-  canvas.style.width = `${device.aperture.width * factor}px`;
-  canvas.style.height = `${device.aperture.height * factor}px`;
-  canvas.style.borderRadius = `${device.aperture.radius * factor}px`;
+  surface.classList.toggle("zoomed", zoomed());
+  // Cleared before anything measures, so it reads the surface where layout
+  // put it rather than where the last correction left it.
+  surface.style.left = surface.style.top = "";
+  if (zoomed()) {
+    // The island can change width with the columns, so they are settled
+    // before the view is measured against it.
+    syncPreviewColumns();
+    placeZoomView();
+  } else {
+    canvas.style.left = `${shown ? device.aperture.x * factor : 0}px`;
+    canvas.style.top = `${shown ? device.aperture.y * factor : 0}px`;
+    canvas.style.width = `${device.aperture.width * factor}px`;
+    canvas.style.height = `${device.aperture.height * factor}px`;
+    canvas.style.borderRadius = `${device.aperture.radius * factor}px`;
+  }
   // The canvas holds real pixels of this screen, so a new size is a new
   // picture. Here rather than left to the caller: every route that changes the
   // size comes through here, and one that forgot the redraw would leave the
   // page at the last size, stretched by the browser to fit the new one.
   drawDevicePage();
   frame.hidden = !shown;
-  surface.classList.toggle("zoomed", zoomed());
   frame.src = frameUrl();
   frame.style.width = `${device.frame.width * factor}px`;
   frame.style.height = `${device.frame.height * factor}px`;
-  // Cleared before alignPixelGrid measures, so it reads the surface where
-  // layout put it rather than where the last correction left it.
-  surface.style.left = surface.style.top = "";
   syncFrameTint();
-  alignPixelGrid();
+  if (!zoomed()) alignPixelGrid();
   syncPreviewColumns();
+}
+
+//: The zoomed view's size in screen pixels, measured off the island.
+let zoomBox = null;
+
+// While zoomed the view fills the island the page sits on rather than the
+// page's own box: the island does not change size, and there is more to see.
+// The surface stops being the canvas's container while zoomed (see the CSS),
+// so the canvas is placed against the island, inside its padding, and snapped
+// inward to whole screen pixels. That is what keeps every block the same
+// size at every scale: the canvas is drawn at exactly the size it is shown,
+// from a whole pixel.
+function placeZoomView() {
+  const ratio = dpr();
+  const rect = stage.getBoundingClientRect();
+  const style = globalThis.getComputedStyle?.(stage);
+  const pad = (side) => parseFloat(style?.[`padding${side}`]) || 0;
+  const border = (side) => parseFloat(style?.[`border${side}Width`]) || 0;
+  // The island's padding edge on screen, which an absolute child measures
+  // from. From the border's computed width rather than clientLeft: a border
+  // is drawn a whole number of screen pixels wide, two thirds of a CSS pixel
+  // at a ratio of 1.5, and clientLeft and clientWidth round that back to 1,
+  // which puts the view half a screen pixel off.
+  const edgeX = rect.left + border("Left");
+  const edgeY = rect.top + border("Top");
+  const right = rect.left + rect.width - border("Right") - pad("Right");
+  const bottom = rect.top + rect.height - border("Bottom") - pad("Bottom");
+  const left = Math.ceil((edgeX + pad("Left")) * ratio);
+  const top = Math.ceil((edgeY + pad("Top")) * ratio);
+  zoomBox = {width: Math.max(1, Math.floor(right * ratio) - left),
+             height: Math.max(1, Math.floor(bottom * ratio) - top)};
+  canvas.style.left = `${left / ratio - edgeX}px`;
+  canvas.style.top = `${top / ratio - edgeY}px`;
+  canvas.style.width = `${zoomBox.width / ratio}px`;
+  canvas.style.height = `${zoomBox.height / ratio}px`;
+  canvas.style.borderRadius = "0px";
 }
 
 function tone(value, low, high) {
@@ -412,7 +459,9 @@ export async function deviceImage(whole = false) {
   if (!toned) throw new Error("there is no page to copy yet");
   if (zoomed() && !whole) return zoomedImage();
   const device = profile("pixels");
-  const withFrame = frameOn();
+  // The frame toggle, not whether the frame is showing: a whole page taken
+  // while zoomed is the page as it looks unzoomed.
+  const withFrame = frameShown.checked;
   const sheet = document.createElement("canvas");
   sheet.width = withFrame ? device.frame.width : device.native.width;
   sheet.height = withFrame ? device.frame.height : device.native.height;
@@ -729,7 +778,7 @@ function drawDevicePage() {
   if (!toned || typeof canvas.getContext !== "function") return;
   const device = profile();
   const factor = sourceFactor(device, frameOn()) * dpr();
-  const to = {
+  const to = zoomed() && zoomBox ? zoomBox : {
     width: Math.max(1, Math.round(device.aperture.width * factor)),
     height: Math.max(1, Math.round(device.aperture.height * factor)),
   };
