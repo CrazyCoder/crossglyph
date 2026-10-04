@@ -805,7 +805,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   };
   // Taking focus is what lets the page's keys reach it.
   deviceSurface.focused = 0;
-  deviceSurface.focus = function () { this.focused++; };
+  deviceSurface.focus = function (options) { this.focused++; this.focusOptions = options; };
   // The island the page sits on, which a zoomed view fills. Its corner and
   // padding are fractions of a pixel, as a real one's are, so snapping the
   // view to whole screen pixels has something to do. Its border is drawn a
@@ -6981,6 +6981,10 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   surface.on.pointerdown(event());
   check("unzoomed, a press shows the page untuned at once", pressed() === "true");
   check("and gives the page focus, so its keys work", surface.focused > focused);
+  // A click is not the keyboard, and Chrome draws the ring for a focus given
+  // from a press unless it is told not to.
+  check("without drawing a focus ring around it",
+        surface.focusOptions?.focusVisible === false, JSON.stringify(surface.focusOptions));
   surface.on.pointerup(event());
   check("and letting go brings the tuning back", pressed() === "false");
 

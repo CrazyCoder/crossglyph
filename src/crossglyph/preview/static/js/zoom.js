@@ -154,8 +154,10 @@ export function wireZoom(surface, hooks, {plainWheel = false} = {}) {
   surface.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     // Every press, zoomed or not, calls preventDefault somewhere, which also
-    // stops the page taking focus, and the keys below need it.
-    surface.focus?.({preventScroll: true});
+    // stops the page taking focus, and the keys below need it. Without the
+    // ring a focus from the keyboard draws: Chrome counts a focus given from
+    // a press as visible, and outlines the page on every click.
+    surface.focus?.({preventScroll: true, focusVisible: false});
     if (!hooks.active()) return;
     event.preventDefault();
     surface.setPointerCapture?.(event.pointerId);
