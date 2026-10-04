@@ -6771,4 +6771,98 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         after.x <= 528 && after.y <= 792, storage.data["crossglyph.device"]);
 }
 
+// Pixel zoom by hand: a drag pans, a still press shows the page untuned, Alt
+// and the wheel zoom, a double-click goes in and out, and keys move it.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  const surface = env.device.surface;
+  const pressed = () => env.compare.getAttribute("aria-pressed");
+  const z = env.modules.get("zoom.js");
+  const state = () => JSON.parse(storage.data["crossglyph.device"] ?? "{}");
+  const event = (extra = {}) => ({button: 0, clientX: 0, clientY: 0, deltaY: 0,
+                                  preventDefault() { this.prevented = true; },
+                                  ...extra});
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  surface.on.pointerdown(event());
+  check("unzoomed, a press shows the page untuned at once", pressed() === "true");
+  surface.on.pointerup(event());
+  check("and letting go brings the tuning back", pressed() === "false");
+
+  // A double-click arrives as two presses first, each of them a hold.
+  for (let n = 0; n < 2; ++n) {
+    surface.on.pointerdown(event({clientX: 120, clientY: 200}));
+    surface.on.pointerup(event({clientX: 120, clientY: 200}));
+  }
+  surface.on.dblclick(event({clientX: 120, clientY: 200}));
+  check("a double-click zooms in at the first level",
+        env.device.zoom.value === "1000", env.device.zoom.value);
+  check("centred on the pixel clicked",
+        Math.abs(state().x - 120) < 1 && Math.abs(state().y - 200) < 1,
+        JSON.stringify(state()));
+  check("and leaves no untuned state behind", pressed() === "false");
+
+  const before = state().x;
+  surface.on.pointerdown(event({clientX: 100, clientY: 100}));
+  surface.on.pointermove(event({clientX: 101, clientY: 100}));
+  surface.on.pointerup(event({clientX: 101, clientY: 100}));
+  check("a press that barely moves is not a pan", state().x === before,
+        `${state().x} against ${before}`);
+  surface.on.pointerdown(event({clientX: 100, clientY: 100}));
+  surface.on.pointermove(event({clientX: 120, clientY: 100}));
+  // Mid-drag, since letting go would put the tuning back either way.
+  const during = pressed();
+  surface.on.pointerup(event({clientX: 120, clientY: 100}));
+  check("a drag pans by whole reader pixels", state().x === before - 2,
+        `${state().x} against ${before}`);
+  check("and never shows the page untuned", during === "false");
+
+  surface.on.pointerdown(event({clientX: 100, clientY: 100}));
+  await wait(z.HOLD_MS + 50);
+  check("zoomed, a press held still shows the page untuned", pressed() === "true");
+  surface.on.pointerup(event());
+  check("until it is let go", pressed() === "false");
+
+  const plain = event({deltaY: -100});
+  surface.on.wheel(plain);
+  check("the wheel alone leaves the zoom alone and the page scrolling",
+        env.device.zoom.value === "1000" && !plain.prevented);
+  const alt = event({deltaY: -100, altKey: true, clientX: 240, clientY: 400});
+  surface.on.wheel(alt);
+  check("Alt and the wheel zoom in", env.device.zoom.value === "1600" && alt.prevented);
+  surface.on.wheel(event({deltaY: 100, altKey: true, clientX: 240, clientY: 400}));
+  check("and back out", env.device.zoom.value === "1000");
+
+  const x = state().x;
+  surface.on.keydown(event({key: "ArrowRight"}));
+  check("an arrow pans one reader pixel", state().x === x + 1, `${state().x} from ${x}`);
+  surface.on.keydown(event({key: "ArrowRight", shiftKey: true}));
+  check("Shift and an arrow pan ten", state().x === x + 11, `${state().x} from ${x}`);
+  surface.on.keydown(event({key: "+"}));
+  check("plus zooms in", env.device.zoom.value === "1600");
+  surface.on.keydown(event({key: "-"}));
+  check("minus zooms out", env.device.zoom.value === "1000");
+  for (const key of env.keys) key(event({key: "ArrowRight", target: {tagName: "INPUT"}}));
+  check("keys anywhere else on the page do not pan", state().x === x + 11);
+
+  surface.on.pointermove(event({clientX: 5, clientY: 5}));
+  const at = z.readerAt({level: 1000, x: state().x, y: state().y}, {x: 5, y: 5},
+                        {width: 480, height: 800}, {width: 480, height: 800}, 1);
+  const rx = Math.floor(at.x), ry = Math.floor(at.y);
+  const grey = [0, 96, 200, 255][Math.floor((ry * 480 + rx) / 4) % 4];
+  check("the readout names the pixel under the pointer and its grey",
+        env.device.readout.textContent === `x ${rx}  y ${ry}  grey ${grey}`,
+        `${env.device.readout.textContent} against x ${rx} y ${ry} grey ${grey}`);
+  surface.on.pointerleave(event());
+  check("and empties when the pointer leaves", env.device.readout.textContent === "");
+
+  surface.on.keydown(event({key: "Escape"}));
+  check("Escape turns zoom off", env.device.zoom.value === "0");
+  surface.on.dblclick(event({clientX: 10, clientY: 10}));
+  surface.on.dblclick(event({clientX: 10, clientY: 10}));
+  check("a double-click while zoomed turns it off", env.device.zoom.value === "0");
+}
+
 process.exit(failures ? 1 : 0);

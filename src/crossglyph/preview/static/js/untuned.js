@@ -1,5 +1,5 @@
 import {form} from "./dom.js";
-import {surface} from "./device.js";
+import {surface, zoomed} from "./device.js";
 import {KNOB_KEYS, bypassUntunedKnob, refreshReverts, restoreUntunedKnob} from "./reverts.js";
 import {compareAxes} from "./variable.js";
 
@@ -79,8 +79,9 @@ export function wireUntuned() {
   surface.addEventListener("pointerdown", (event) => {
     // The left button only: a right-click is a menu, and a middle one is the
     // browser's own. An image is draggable and text is selectable, either of
-    // which swallows the release and leaves the page stuck untuned.
-    if (event.button !== 0) return;
+    // which swallows the release and leaves the page stuck untuned. While
+    // zoomed a press may be a pan, so zoom.js decides when it is a hold.
+    if (event.button !== 0 || zoomed()) return;
     event.preventDefault();
     holdUntuned();
   });

@@ -135,3 +135,65 @@ export function paint(source, panel, at, block, grid, view, outside, out) {
   }
   return out;
 }
+
+// The gestures on the page. A press waits while zoomed: moving a few pixels
+// makes it a pan, and staying still makes it the hold that shows the page
+// untuned, the same gesture as on an unzoomed page arriving a moment later.
+// The wheel scrolls the window unless Alt is held. Ctrl and the wheel stay
+// the browser's, which zooms the whole window with them and with a pinch.
+export function wireZoom(surface, hooks) {
+  let press = null;
+  const end = () => {
+    if (!press) return;
+    clearTimeout(press.timer);
+    if (press.held) hooks.release();
+    if (press.dragging) hooks.settled();
+    press = null;
+  };
+  surface.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !hooks.active()) return;
+    event.preventDefault();
+    // preventDefault on a press also stops the page taking focus, and the
+    // keys below need it.
+    surface.focus?.({preventScroll: true});
+    surface.setPointerCapture?.(event.pointerId);
+    const started = {x: event.clientX, y: event.clientY, held: false, dragging: false};
+    started.timer = setTimeout(() => {
+      if (press !== started || started.dragging) return;
+      started.held = true;
+      hooks.hold();
+    }, HOLD_MS);
+    press = started;
+  });
+  surface.addEventListener("pointermove", (event) => {
+    hooks.hover(event);
+    if (!press || press.held) return;
+    const dx = event.clientX - press.x, dy = event.clientY - press.y;
+    if (!press.dragging && Math.hypot(dx, dy) < DRAG_PX) return;
+    if (!press.dragging) {
+      press.dragging = true;
+      clearTimeout(press.timer);
+    }
+    press.x = event.clientX;
+    press.y = event.clientY;
+    hooks.pan(dx, dy);
+  });
+  surface.addEventListener("pointerup", end);
+  surface.addEventListener("pointercancel", end);
+  surface.addEventListener("pointerleave", () => {
+    hooks.hover(null);
+    end();
+  });
+  surface.addEventListener("wheel", (event) => {
+    if (!event.altKey) return;
+    event.preventDefault();
+    hooks.zoom(event.deltaY < 0 ? 1 : -1, event);
+  }, {passive: false});
+  surface.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    hooks.toggle(event);
+  });
+  surface.addEventListener("keydown", (event) => {
+    if (hooks.key(event)) event.preventDefault();
+  });
+}

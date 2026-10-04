@@ -1,7 +1,8 @@
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
 import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, blockSize, clampCentre, inside,
-        origin, paint, stepLevel} from "./zoom.js";
+        origin, paint, panBy, readerAt, stepLevel, wireZoom,
+        zoomAt} from "./zoom.js";
 
 export const DEVICE_STORE = "crossglyph.device";
 
@@ -765,6 +766,60 @@ function moveZoom(next) {
   drawDevicePage();
 }
 
+// A point of an event in the view's own screen pixels.
+function pointOf(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {x: (event.clientX - rect.left) * dpr(),
+          y: (event.clientY - rect.top) * dpr()};
+}
+
+// Zoom to `level` around a point of the view. From the whole page the view
+// is about to change size, so there is no spot to hold still and the pixel
+// clicked becomes the centre instead.
+function zoomAround(level, point) {
+  const reader = readerAt(zoom, point, currentView(), toned ?? profile().native,
+                          dpr());
+  if (!level) setZoom({...zoom, level: 0});
+  else if (!zoomed()) setZoom({level, x: reader.x, y: reader.y});
+  else setZoom(zoomAt(level, reader, point, currentView(), dpr()));
+}
+
+// Keys on the focused page. Plus works from the whole page too, the rest only
+// while zoomed.
+function zoomKey(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  if (event.key === "+" || event.key === "=") {
+    setZoom({...zoom, level: stepLevel(zoom.level, 1)});
+    return true;
+  }
+  if (!zoomed()) return false;
+  if (event.key === "-") {
+    setZoom({...zoom, level: stepLevel(zoom.level, -1)});
+    return true;
+  }
+  if (event.key === "Escape") {
+    setZoom({...zoom, level: 0});
+    return true;
+  }
+  const step = event.shiftKey ? 10 : 1;
+  const move = {ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+                ArrowUp: [0, -step], ArrowDown: [0, step]}[event.key];
+  if (!move) return false;
+  moveZoom({...zoom, x: zoom.x + move[0], y: zoom.y + move[1]});
+  saveDevice();
+  return true;
+}
+
+// The reader pixel under the pointer and the render's own grey for it.
+function showReadout(event) {
+  readout.textContent = "";
+  if (!event || !zoomed() || !levels || !toned) return;
+  const at = readerAt(zoom, pointOf(event), currentView(), toned, dpr());
+  const x = Math.floor(at.x), y = Math.floor(at.y);
+  if (x < 0 || y < 0 || x >= toned.width || y >= toned.height) return;
+  readout.textContent = `x ${x}  y ${y}  grey ${levels[y * toned.width + x]}`;
+}
+
 export function paintDevicePage() {
   toned = tonePage();
   drawDevicePage();
@@ -933,7 +988,9 @@ function resetDevice(scheduleRender) {
   if (changedDevice) scheduleRender();
 }
 
-export function wireDevice(scheduleRender) {
+// `untuned` is the press-and-hold comparison, which a zoomed page starts
+// itself once a press has stayed still long enough not to be a pan.
+export function wireDevice(scheduleRender, untuned) {
   model.addEventListener("change", () => {
     zoom = inside(zoom, profile().native);
     saveDevice();
@@ -965,6 +1022,21 @@ export function wireDevice(scheduleRender) {
   gridBox.addEventListener("input", () => {
     saveDevice();
     drawDevicePage();
+  });
+  wireZoom(surface, {
+    active: zoomed,
+    hold: untuned.hold,
+    release: untuned.release,
+    pan(dx, dy) {
+      moveZoom(panBy(zoom, dx * dpr(), dy * dpr(), blockSize(zoom.level, dpr())));
+    },
+    settled: saveDevice,
+    zoom(direction, event) {
+      zoomAround(stepLevel(zoom.level, direction), pointOf(event));
+    },
+    toggle(event) { zoomAround(zoomed() ? 0 : lastLevel, pointOf(event)); },
+    key: zoomKey,
+    hover: showReadout,
   });
   const toneChanged = () => {
     saveDevice();

@@ -13,7 +13,7 @@ import {refreshReverts} from "./reverts.js";
 import {showTabMarks} from "./save.js";
 import {tabButtons} from "./tabs.js";
 import {fillSamples, loadText, restoreSample, sampleChosen} from "./text.js";
-import {wireUntuned} from "./untuned.js";
+import {holdUntuned, releaseUntuned, wireUntuned} from "./untuned.js";
 import {systemDark, themeButtons} from "./theme.js";
 import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 
@@ -24,7 +24,7 @@ import {fillFamilies, onFamilyChange, refreshFamilies} from "./variable.js";
 // which cannot be.
 wireKnobs();
 wireRender();
-wireDevice(scheduleRender);
+wireDevice(scheduleRender, {hold: holdUntuned, release: releaseUntuned});
 for (const button of themeButtons) {
   button.addEventListener("click", syncDeviceColor);
 }
