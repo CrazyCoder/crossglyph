@@ -863,7 +863,8 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   // its own pixels and not the page's. It comes out a little bigger than the
   // size asked for, 8 by 18, as Chrome's does on Windows. It is opened bare,
   // and the page in it says when it is ready, which `ready` stands for.
-  // Closing it fires pagehide the way a real one does, and `closed` turns true.
+  // Closing it turns `closed` true at once and fires pagehide a moment later,
+  // after the call that closed it has finished, as a browser does.
   const popups = [];
   const openPopup = (url, name, features) => {
     if (opts.blockPopups) return null;
@@ -886,7 +887,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       addEventListener(kind, fn) { (this.on[kind] ||= []).push(fn); },
       fire(kind) { for (const fn of this.on[kind] || []) fn(); },
       document: {getElementById: id => (id === "zoom-page" ? canvas : null)},
-      close() { this.closed = true; this.fire("pagehide"); },
+      close() { this.closed = true; setTimeout(() => this.fire("pagehide"), 0); },
     };
     popups.push(popup);
     return popup;
@@ -7333,6 +7334,23 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   const device = env.modules.get("device.js");
   check("the copy is the window's view",
         device.imageName() === "crossglyph-x4-page-zoom16x.png", device.imageName());
+  // The reader pixels the window touches, not the island's, each 16 square.
+  const view = {width: popup.canvas.width, height: popup.canvas.height};
+  const panel = {width: 480, height: 800};
+  const crop = z.visibleCrop(z.origin({...state(), level: 16}, view, panel), view, panel, 16);
+  const made = env.sandbox.document.createElement;
+  env.sandbox.document.createElement = (tag) => Object.assign(made(tag), {
+    getContext: () => ({
+      createImageData: (width, height) => ({width, height,
+                                            data: new Uint8ClampedArray(width * height * 4)}),
+      putImageData() {},
+    }),
+  });
+  const picture = await device.deviceImage();
+  env.sandbox.document.createElement = made;
+  check("at the size the window shows it",
+        picture.width === crop.width * 16 && picture.height === crop.height * 16
+        && crop.width > 480 / 16 * 1.5, `${picture.width}x${picture.height} for ${JSON.stringify(crop)}`);
 
   popup.innerWidth = 1000;
   popup.fire("resize");
@@ -7375,8 +7393,16 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         && surface.classList.contains("zoomed") && env.device.zoom.value === "10");
 
   popout.press();
+  env.device.ready(popups[3]);
+  env.device.reset();
+  await wait(20);
+  check("Reset closes it and leaves nothing saved, even once the window has gone",
+        popups[3].closed && !("crossglyph.device" in storage.data),
+        storage.data["crossglyph.device"]);
+
+  popout.press();
   env.device.leave();
-  check("leaving the page closes it", popups[3].closed);
+  check("leaving the page closes it", popups[4].closed);
 
   const blocked = await loaded(fakeStorage(), undefined,
                                {renderOk: true, blockPopups: true});

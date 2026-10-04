@@ -124,8 +124,8 @@ function variant() {
 }
 
 //: The zoom: its level in screen pixels per reader pixel, 0 for off, and the
-//: centre of the view in reader pixels. Kept across renders, so a knob change leaves the same
-//: letters in view.
+//: centre of the view in reader pixels. Kept across renders, so a knob change
+//: leaves the same letters in view.
 let zoom = {level: 0, x: 0, y: 0};
 //: What a double-click zooms back to.
 let lastLevel = FIRST_LEVEL;
@@ -1001,7 +1001,12 @@ function attachPopout(host, untuned) {
     drawDevicePage();
     rememberPlace(host);
   });
+  // Only a window still open as the pop-out is remembered here, which is one
+  // closed by hand or reloading. One closed from this page was remembered as
+  // it closed, and its pagehide arrives after whatever closed it is done:
+  // after a reset has cleared what was saved, which saving again would undo.
   host.addEventListener("pagehide", () => {
+    if (popoutWindow !== host) return;
     rememberPlace(host);
     if (popout === view) popout = null;
     watchClosing(host);
@@ -1030,6 +1035,7 @@ function popoutGone() {
 
 function closePopout() {
   const host = popoutWindow;
+  rememberPlace(host);
   popoutGone();
   host.close();
 }
