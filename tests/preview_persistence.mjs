@@ -1123,6 +1123,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
       if (kind === "pagehide") leaving.push(fn);
     },
     open: openPopup,
+    // Screen refreshes, for a test that runs them by hand: each one asked for
+    // is queued on `opts.frames`. Without it there are none, and the page
+    // draws at once.
+    requestAnimationFrame: opts.frames ? (fn) => opts.frames.push(fn) : undefined,
     document: {
       getElementById: id => stubs[id],
       createElement: (tag) => (tag === "canvas" ? pageCanvas() : makeElement()),
@@ -7396,6 +7400,45 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("or a text field", !peeking());
   key("down", {ctrlKey: true});
   check("and Ctrl+Z stays undo", !peeking());
+}
+
+// A burst of moves within one screen refresh paints the view once, with
+// where the last of them left it: only that one could ever be seen.
+{
+  const frames = [];
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true, frames});
+  await settle();
+  frames.splice(0).forEach(fn => fn());
+  const {canvas, surface} = env.device;
+  env.device.zoom.value = "10";
+  env.device.change(env.device.zoom);
+  frames.splice(0).forEach(fn => fn());
+  let puts = 0;
+  const context = canvas.getContext;
+  canvas.getContext = (...args) => {
+    const made = context(...args);
+    const put = made.putImageData;
+    made.putImageData = (pixels) => { puts++; put(pixels); };
+    return made;
+  };
+  const state = () => JSON.parse(storage.data["crossglyph.device"]);
+  const x = state().x;
+  const key = (name) => surface.on.keydown({key: name, preventDefault() {}});
+  for (let n = 0; n < 5; ++n) key("ArrowRight");
+  check("moves inside one refresh paint nothing yet, and ask for one refresh",
+        puts === 0 && frames.length === 1, `${puts} paints, ${frames.length} frames`);
+  frames.splice(0).forEach(fn => fn());
+  check("which paints once, where the last move left the view",
+        puts === 1 && state().x === x + 5, `${puts} paints, x ${state().x} from ${x}`);
+  key("+");
+  key("+");
+  check("a level change waits for the refresh too, and the menu shows it at once",
+        puts === 1 && frames.length === 1 && env.device.zoom.value === "14",
+        `${puts} paints, ${frames.length} frames, ${env.device.zoom.value}`);
+  frames.splice(0).forEach(fn => fn());
+  check("and is painted once", puts === 2, `${puts} paints`);
+  canvas.getContext = context;
 }
 
 // The pop-out: the zoom in a window of its own, drawn and driven from here,

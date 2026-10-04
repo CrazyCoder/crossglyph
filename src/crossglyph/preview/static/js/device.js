@@ -905,9 +905,29 @@ function setZoom(next) {
   zoomSelect.value = String(zoom.level);
   if (!zoom.level && popoutWindow) closePopout();
   else if (was !== zoomed()) layoutDevice();
-  else drawDevicePage();
+  else drawSoon();
   saveDevice();
   showCopyState();
+}
+
+// A redraw at the next screen refresh, for the moves that come in bursts:
+// the wheel, a held key, a mouse that reports faster than the screen shows.
+// Each would paint the whole view and only the last can ever be seen, so a
+// burst is painted once, as it ends up. Straight away where there are no
+// refreshes to wait for.
+let drawPending = false;
+
+function drawSoon() {
+  if (typeof globalThis.requestAnimationFrame !== "function") {
+    drawDevicePage();
+    return;
+  }
+  if (drawPending) return;
+  drawPending = true;
+  globalThis.requestAnimationFrame(() => {
+    drawPending = false;
+    drawDevicePage();
+  });
 }
 
 // The level a step in `direction` goes to. Stepping out of the smallest level
@@ -919,10 +939,10 @@ function steppedLevel(direction) {
   return level || !popoutWindow ? level : zoom.level;
 }
 
-// A pan: redrawn at once, saved when it settles.
+// A pan: redrawn at the next refresh, saved when it settles.
 function moveZoom(next) {
   zoom = next;
-  drawDevicePage();
+  drawSoon();
 }
 
 // A point of an event in the view's own screen pixels.
