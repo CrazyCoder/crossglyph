@@ -1,7 +1,7 @@
 import {numberOf, pairSlider, setNumeric, showSlider, wireStepper} from "./knobs.js";
 import {attempt} from "./remember.js";
 import {FIRST_LEVEL, GRID_FROM, LEVELS as ZOOM_LEVELS, blockSize, clampCentre, inside,
-        origin, paint, panBy, readerAt, stepLevel, wireZoom,
+        origin, paint, panBy, readerAt, stepLevel, visibleCrop, wireZoom,
         zoomAt} from "./zoom.js";
 
 export const DEVICE_STORE = "crossglyph.device";
@@ -402,11 +402,15 @@ function tonedPage() {
 // place it is pasted into decides what shows through, which is the point: a
 // background chosen here would be a rectangle to crop off everywhere else.
 //
+// While zoomed it is the zoomed view instead, unless the whole page is asked
+// for.
+//
 // Exported so it can be measured in a browser. Neither suite can: the JS one
 // runs against a stub DOM with no canvas, and pytest never opens a page, so a
 // composite that came out wrong would pass both.
-export async function deviceImage() {
+export async function deviceImage(whole = false) {
   if (!toned) throw new Error("there is no page to copy yet");
+  if (zoomed() && !whole) return zoomedImage();
   const device = profile("pixels");
   const withFrame = frameOn();
   const sheet = document.createElement("canvas");
@@ -427,14 +431,37 @@ export async function deviceImage() {
   return sheet;
 }
 
-async function deviceBlob() {
-  const sheet = await deviceImage();
+// The zoomed view as a picture: the reader pixels the screen shows, each
+// level / 100 pixels square whatever the display, with the grid if it is on.
+// Built from the toned page like the rest of the copy, never from the screen.
+function zoomedImage() {
+  const view = currentView();
+  const block = blockSize(zoom.level, dpr());
+  const crop = visibleCrop(origin(zoom, view, toned, block), view, toned, block);
+  const scale = zoom.level / 100;
+  const size = {width: crop.width * scale, height: crop.height * scale};
+  const sheet = document.createElement("canvas");
+  sheet.width = size.width;
+  sheet.height = size.height;
+  const context = sheet.getContext("2d");
+  const pixels = context.createImageData(size.width, size.height);
+  paint(toned.data, toned, {x: crop.left * scale, y: crop.top * scale}, scale,
+        gridShown(zoom.level), size, paperRgb(), pixels.data);
+  context.putImageData(pixels, 0, 0);
+  return sheet;
+}
+
+async function deviceBlob(whole) {
+  const sheet = await deviceImage(whole);
   const blob = await new Promise(resolve => sheet.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("the preview could not be encoded");
   return blob;
 }
 
-function imageName() {
+export function imageName(whole = false) {
+  if (zoomed() && !whole) {
+    return `crossglyph-${model.value}-page-zoom${zoom.level}.png`;
+  }
   return `crossglyph-${model.value}`
          + `${frameShown.checked ? `-${color.value}` : "-page"}.png`;
 }
@@ -443,13 +470,19 @@ function imageName() {
 // its own. The copy wording is the markup's, so the two cannot drift.
 const COPY_TITLE = copyButton.title;
 const DOWNLOAD_TITLE = "Download the preview as an image. Let go of Shift to copy.";
+const ZOOM_COPY_TITLE = "Copy the zoomed view as an image. "
+  + "Hold Shift to download, or Alt to take the whole page.";
+const ZOOM_DOWNLOAD_TITLE = "Download the zoomed view as an image. "
+  + "Let go of Shift to copy, or hold Alt to take the whole page.";
 let shiftHeld = false;
 let restoreTitle = null;
 
 function showCopyState() {
   copyButton.querySelector(".as-copy").hidden = shiftHeld;
   copyButton.querySelector(".as-download").hidden = !shiftHeld;
-  copyButton.title = shiftHeld ? DOWNLOAD_TITLE : COPY_TITLE;
+  copyButton.title = zoomed()
+    ? (shiftHeld ? ZOOM_DOWNLOAD_TITLE : ZOOM_COPY_TITLE)
+    : (shiftHeld ? DOWNLOAD_TITLE : COPY_TITLE);
 }
 
 // A clipboard write leaves nothing on screen, so the button says what happened
@@ -483,20 +516,20 @@ function canCopy() {
 
 // The ClipboardItem takes the promise rather than an awaited blob: Safari wants
 // it built in the same turn as the press, and the encode is asynchronous.
-async function copyDeviceImage() {
+async function copyDeviceImage(whole) {
   if (!canCopy()) {
     throw new Error("copying needs https or localhost, so hold Shift to save");
   }
   await navigator.clipboard.write(
-    [new ClipboardItem({"image/png": deviceBlob()})]);
+    [new ClipboardItem({"image/png": deviceBlob(whole)})]);
   said("copied", true);
 }
 
-async function downloadDeviceImage() {
+async function downloadDeviceImage(whole) {
   const link = document.createElement("a");
-  const url = URL.createObjectURL(await deviceBlob());
+  const url = URL.createObjectURL(await deviceBlob(whole));
   link.href = url;
-  link.download = imageName();
+  link.download = imageName(whole);
   link.click();
   // Not straight after the click: the download reads the blob through this URL,
   // and revoking it in the same turn is a race the save can lose.
@@ -758,6 +791,7 @@ function setZoom(next) {
   if (!zoomed()) readout.textContent = "";
   if (was !== zoomed()) layoutDevice(); else drawDevicePage();
   saveDevice();
+  showCopyState();
 }
 
 // A pan: redrawn at once, saved when it settles.
@@ -965,6 +999,7 @@ export function loadDevice() {
     }
   }
   zoomSelect.value = String(zoom.level);
+  showCopyState();
   if (!fixedColor) color.value = themeColor();
   syncNumericControls();
   layoutDevice();
@@ -981,6 +1016,7 @@ function resetDevice(scheduleRender) {
   zoom = {level: 0, x: native.width / 2, y: native.height / 2};
   lastLevel = FIRST_LEVEL;
   readout.textContent = "";
+  showCopyState();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
   toned = tonePage();
@@ -1062,9 +1098,11 @@ export function wireDevice(scheduleRender, untuned) {
   // Called inside the press rather than after an await, so the gesture is still
   // the browser's reason for allowing a clipboard write. Both are async, so a
   // throw either side of the first await arrives here as a rejection and the
-  // button says it, instead of going nowhere.
+  // button says it, instead of going nowhere. While zoomed, Alt takes the
+  // whole page rather than the zoomed view.
   copyButton.addEventListener("click", (event) => {
-    (event.shiftKey ? downloadDeviceImage() : copyDeviceImage()).catch(failed);
+    (event.shiftKey ? downloadDeviceImage(event.altKey)
+                    : copyDeviceImage(event.altKey)).catch(failed);
   });
   // Say what the press will do for as long as the key is held, the same way
   // Build says Rebuild.

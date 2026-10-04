@@ -6865,4 +6865,29 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("a double-click while zoomed turns it off", env.device.zoom.value === "0");
 }
 
+// Copying while zoomed: the zoomed view is the picture, the whole page is a
+// modifier away, and the file says which it is.
+{
+  const env = await loaded(fakeStorage(), undefined, {renderOk: true});
+  await settle();
+  const device = env.modules.get("device.js");
+  env.device.frame.checked = false;
+  env.device.edit(env.device.frame);
+  check("unzoomed, the file is the page",
+        device.imageName() === "crossglyph-x4-page.png", String(device.imageName?.()));
+  env.device.zoom.value = "1000";
+  env.device.change(env.device.zoom);
+  check("zoomed, the file says the level",
+        device.imageName() === "crossglyph-x4-page-zoom1000.png", device.imageName());
+  check("and the whole page keeps its own name",
+        device.imageName(true) === "crossglyph-x4-page.png", device.imageName(true));
+  check("the button says what it will copy while zoomed",
+        /zoomed view/.test(env.device.copy.title) && /Alt/.test(env.device.copy.title),
+        env.device.copy.title);
+  env.device.zoom.value = "0";
+  env.device.change(env.device.zoom);
+  check("and goes back when zoom is off", !/Alt/.test(env.device.copy.title),
+        env.device.copy.title);
+}
+
 process.exit(failures ? 1 : 0);
