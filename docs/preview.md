@@ -203,6 +203,8 @@ The controls include:
 
 - **scale** chooses one screen pixel per monitor pixel, a physical-size view or
   a fit-to-column view;
+- **zoom** enlarges the page to show each of the reader's pixels, and **grid**
+  draws lines between them (see below);
 - **paper** changes the displayed paper brightness;
 - **ink** changes the displayed ink strength;
 - **warm** and **tint** adjust the screen cast;
@@ -216,6 +218,35 @@ browser remembers them.
   <a href="images/preview-text.png"><img src="images/preview-text.png" width="65%"
      alt="The Device preview and Text settings open"></a>
 </p>
+
+### Zoom in on the pixels
+
+**zoom** enlarges the page so you can see how each of the reader's pixels
+lands. At 1000%, one reader pixel is a block 10 screen pixels wide. Every
+block is the same size on any display, so a stroke two pixels wide always
+looks twice as wide as one. From 400% up, a light grey **grid** marks the
+edges between pixels. Untick **grid** to hide it. The reader frame is hidden
+while you zoom.
+
+- Drag the page to move around it.
+- Press and hold without moving to see the page untuned, as you can when
+  zoom is off.
+- Hold Alt and turn the wheel to zoom in or out around the pointer. The wheel
+  alone scrolls the window as usual.
+- Double-click to zoom in on a spot, and double-click again to see the whole
+  page.
+- Click the page, then use + and − to change the zoom, the arrow keys to move
+  one pixel (Shift and an arrow for ten), and Esc to turn zoom off.
+
+The line beside **grid** names the pixel under the pointer and its grey, from
+0 for black to 255 for white, as the reader draws it before paper and ink.
+
+The zoom and the place you are looking at stay put when you change a setting,
+so you can watch the same letters as the page redraws.
+
+While zoomed, the copy button copies what you see at the zoom's own size: at
+1000%, each reader pixel is 10 by 10 pixels in the image, with the grid if it
+is showing. Hold Shift to download instead, and Alt to take the whole page.
 
 ## Save font settings
 
