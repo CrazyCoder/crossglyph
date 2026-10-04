@@ -744,6 +744,9 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const deviceGrid = deviceControl(makeControl({
     name: "device-grid", type: "checkbox", checked: true,
   }));
+  const devicePopout = Object.assign(makeElement(), {
+    press() { this.on.click({}); },
+  });
   const zoomSteps = [-1, 1].map(direction => ({
     dataset: {zoomStep: String(direction)},
     on: {},
@@ -856,6 +859,38 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     // join here already expect.
     putImageData(pixels) { deviceCanvas.pixels = pixels.data.slice(); },
   });
+  // The zoom's window of its own, at a ratio of 2, so its view is measured in
+  // its own pixels and not the page's. It comes out a little bigger than the
+  // size asked for, 8 by 18, as Chrome's does on Windows. It is opened bare,
+  // and the page in it says when it is ready, which `ready` stands for.
+  // Closing it fires pagehide the way a real one does, and `closed` turns true.
+  const popups = [];
+  const openPopup = (url, name, features) => {
+    if (opts.blockPopups) return null;
+    const asked = (key) => Number(features.match(new RegExp(`${key}=(\\d+)`))?.[1]);
+    const canvas = makeElement();
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0});
+    canvas.addEventListener = deviceSurface.addEventListener;
+    canvas.focused = 0;
+    canvas.focus = function () { this.focused++; };
+    canvas.getContext = () => ({
+      createImageData: (width, height) => (
+        {width, height, data: new Uint8ClampedArray(width * height * 4)}),
+      putImageData(pixels) { canvas.pixels = pixels.data.slice(); },
+    });
+    const popup = {
+      url, name, features, canvas, closed: false,
+      devicePixelRatio: 2, innerWidth: asked("width") + 8, innerHeight: asked("height") + 18,
+      screenX: 50, screenY: 60,
+      on: {},
+      addEventListener(kind, fn) { (this.on[kind] ||= []).push(fn); },
+      fire(kind) { for (const fn of this.on[kind] || []) fn(); },
+      document: {getElementById: id => (id === "zoom-page" ? canvas : null)},
+      close() { this.closed = true; this.fire("pagehide"); },
+    };
+    popups.push(popup);
+    return popup;
+  };
   const deviceFrameImage = makeElement();
   const deviceReset = button("reset-device");
   // Everything carrying data-device-setting in the markup, which is what the
@@ -1000,6 +1035,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     "device-tint-slider": deviceTintSlider,
     "device-zoom": deviceZoom,
     "device-grid": deviceGrid,
+    "device-popout": devicePopout,
     stage,
     ...tintFuncs,
     "device-ruler": makeElement(),
@@ -1039,6 +1075,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
   const prompts = [];
   let answer = true;
   const keys = [], keyups = [], returns = [], resizes = [], blurs = [];
+  const messages = [], leaving = [];
   let reloads = 0;
   const posted = (options) => {
     try { fetches.bodies.push(JSON.parse(options.body)); } catch { /* none */ }
@@ -1071,7 +1108,10 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     addEventListener(kind, fn) {
       if (kind === "resize") resizes.push(fn);
       if (kind === "blur") blurs.push(fn);
+      if (kind === "message") messages.push(fn);
+      if (kind === "pagehide") leaving.push(fn);
     },
+    open: openPopup,
     document: {
       getElementById: id => stubs[id],
       createElement: makeElement,
@@ -1114,7 +1154,7 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
     window: {
       addEventListener(kind, fn) { if (kind === "focus") returns.push(fn); },
     },
-    location: { reload() { reloads++; } },
+    location: { origin: "http://127.0.0.1:8001", reload() { reloads++; } },
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     createElement: () => ({ dataset: {}, style: {}, textContent: "", title: "" }),
     // The family-switch guard. Answering yes by default keeps every older
@@ -1469,7 +1509,14 @@ function makeEnv(storage, defaults = DEFAULTS, opts = {}) {
              tintFuncs,
              copy: deviceCopy, copyIcons, resets: deviceResets,
              zoom: deviceZoom, grid: deviceGrid,
-             zoomSteps, stage,
+             zoomSteps, stage, popout: devicePopout, popups,
+             // The page in a pop-out saying it is ready, as zoom.html does.
+             ready(popup, origin = "http://127.0.0.1:8001") {
+               for (const fn of messages) {
+                 fn({data: "crossglyph-zoom", source: popup, origin});
+               }
+             },
+             leave() { for (const fn of leaving) fn(); },
              calibrationBox: stubs["device-calibration"],
              ruler: stubs["device-ruler"],
              edit(control) { control.on.input(); },
@@ -7214,6 +7261,132 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("or a text field", !peeking());
   key("down", {ctrlKey: true});
   check("and Ctrl+Z stays undo", !peeking());
+}
+
+// The pop-out: the zoom in a window of its own, drawn and driven from here,
+// with the island back on the whole page beside it.
+{
+  const storage = fakeStorage();
+  const env = await loaded(storage, undefined, {renderOk: true});
+  await settle();
+  const {canvas, surface, popout, popups} = env.device;
+  const z = env.modules.get("zoom.js");
+  const state = () => JSON.parse(storage.data["crossglyph.device"] ?? "{}");
+  const event = (extra = {}) => ({button: 0, clientX: 0, clientY: 0, deltaY: 0,
+                                  preventDefault() { this.prevented = true; },
+                                  ...extra});
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const pressed = () => env.compare.getAttribute("aria-pressed");
+  const whole = `${canvas.width}x${canvas.height}`;
+
+  popout.press();
+  const popup = popups[0];
+  check("the button opens zoom.html in a window of its own",
+        popups.length === 1 && popup.url === "zoom.html" && /popup/.test(popup.features),
+        popup?.features);
+  check("at the first level when zoom was off",
+        env.device.zoom.value === String(z.FIRST_LEVEL), env.device.zoom.value);
+  check("and says it is open", popout.attrs["aria-pressed"] === "true");
+  check("the island keeps the whole page in its frame",
+        `${canvas.width}x${canvas.height}` === whole && env.device.frameImage.hidden === false
+        && !surface.classList.contains("zoomed"), `${canvas.width}x${canvas.height}`);
+  check("nothing is drawn there before its page is ready", !popup.canvas.pixels);
+
+  env.device.ready(popup, "http://elsewhere.example");
+  check("a message from another origin is not its page", !popup.canvas.pixels);
+  env.device.ready(popup);
+  env.device.ready(popup);
+  check("once ready the window is filled at its own pixel ratio",
+        popup.canvas.width === 1816 && popup.canvas.height === 1436
+        && popup.canvas.style.width === "908px" && popup.canvas.style.height === "718px",
+        `${popup.canvas.width}x${popup.canvas.height} ${popup.canvas.style.width}`);
+  check("in blocks of the level", popup.canvas.pixels?.some(v => v === z.GRID_RGB[0]));
+  check("and takes the focus, so its keys work", popup.canvas.focused > 0);
+
+  const islandPixels = canvas.pixels;
+  env.device.zoomSteps[1].press();
+  check("a new level redraws the window and leaves the island alone",
+        canvas.pixels === islandPixels && env.device.zoom.value === "14");
+
+  const x = state().x;
+  popup.canvas.on.pointerdown(event({clientX: 100, clientY: 100}));
+  popup.canvas.on.pointermove(event({clientX: 128, clientY: 100}));
+  popup.canvas.on.pointerup(event({clientX: 128, clientY: 100}));
+  check("a drag in the window pans in its own pixels",
+        Math.abs(state().x - (x - 4)) < 1e-9, `${state().x} from ${x}`);
+  const wheel = event({deltaY: -100, clientX: 400, clientY: 300});
+  popup.canvas.on.wheel(wheel);
+  check("the wheel alone zooms there, with nothing to scroll",
+        env.device.zoom.value === "16" && wheel.prevented, env.device.zoom.value);
+  popup.canvas.on.dblclick(event({clientX: 10, clientY: 10}));
+  check("a double-click there leaves the window open",
+        !popup.closed && env.device.zoom.value === "16");
+
+  surface.on.pointerdown(event());
+  check("a press on the island shows the page untuned at once", pressed() === "true");
+  surface.on.pointerup(event());
+  surface.on.dblclick(event({clientX: 120, clientY: 200}));
+  check("a double-click on the island points the window there",
+        Math.abs(state().x - 120) < 1 && Math.abs(state().y - 200) < 1 && !popup.closed,
+        JSON.stringify(state()));
+
+  const device = env.modules.get("device.js");
+  check("the copy is the window's view",
+        device.imageName() === "crossglyph-x4-page-zoom16x.png", device.imageName());
+
+  popup.innerWidth = 1000;
+  popup.fire("resize");
+  check("a resized window is filled again",
+        popup.canvas.width === 2000, String(popup.canvas.width));
+
+  popup.canvas.on.keydown(event({key: "Escape"}));
+  check("Escape there turns zoom off and closes the window",
+        popup.closed && env.device.zoom.value === "0" && popout.attrs["aria-pressed"] === "false");
+  // As the size to ask for next time, which is what the window was less what
+  // it added to the size asked for the first time.
+  check("and its place is remembered",
+        JSON.stringify(state().window) ===
+          JSON.stringify({left: 50, top: 60, width: 992, height: 700}),
+        JSON.stringify(state().window));
+
+  env.device.zoom.value = "10";
+  env.device.change(env.device.zoom);
+  popout.press();
+  const second = popups[1];
+  check("the next one opens where the last one was, at the level chosen",
+        /left=50/.test(second.features) && /top=60/.test(second.features)
+        && env.device.zoom.value === "10", second.features);
+  check("and the size it was, rather than a little bigger each time",
+        second.innerWidth === 1000 && second.innerHeight === 718,
+        `${second.innerWidth}x${second.innerHeight} from ${second.features}`);
+  env.device.ready(second);
+  second.closed = true;
+  second.fire("pagehide");
+  await wait(250);
+  check("closing it by hand brings the zoom back to the island",
+        surface.classList.contains("zoomed") && canvas.width === 612
+        && popout.attrs["aria-pressed"] === "false", `${canvas.width}`);
+
+  popout.press();
+  const third = popups[2];
+  env.device.ready(third);
+  popout.press();
+  check("pressing the button again closes it", third.closed
+        && surface.classList.contains("zoomed") && env.device.zoom.value === "10");
+
+  popout.press();
+  env.device.leave();
+  check("leaving the page closes it", popups[3].closed);
+
+  const blocked = await loaded(fakeStorage(), undefined,
+                               {renderOk: true, blockPopups: true});
+  await settle();
+  blocked.device.popout.press();
+  check("a blocked window says so and changes nothing",
+        /blocked/.test(blocked.device.popout.title)
+        && blocked.device.zoom.value === "0"
+        && blocked.device.popout.attrs["aria-pressed"] !== "true",
+        blocked.device.popout.title);
 }
 
 process.exit(failures ? 1 : 0);

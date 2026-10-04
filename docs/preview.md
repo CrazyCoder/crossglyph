@@ -241,6 +241,20 @@ fills the whole panel it sits on, and the reader frame is hidden.
   see the controls again. This works straight after moving a slider, so you
   can change a setting and look at the result without clicking anything.
 
+The button beside **+** moves the zoom into a window of its own. Put it next
+to the browser or on another screen, and size it as you like: it shows the
+page as you change settings, and the panel goes back to the whole page.
+
+- In the window, drag to move around, turn the wheel to zoom, and use the
+  same keys as above. Esc turns zoom off and closes the window.
+- Double-click the whole page in the panel to move the window's view to that
+  spot.
+- The copy button copies what the window shows.
+- Press the button again, or close the window, to bring the zoom back to the
+  panel. The next window opens where the last one was.
+- If nothing opens, the browser blocked the window: allow pop-ups for the
+  preview's address.
+
 The zoom and the place you are looking at stay put when you change a setting,
 so you can watch the same letters as the page redraws.
 

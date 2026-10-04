@@ -1932,6 +1932,13 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html", headers=NO_STORE)
 
 
+#: The window a zoomed page can be moved into. It holds one canvas, and the
+#: page that opened it draws there.
+@app.get("/zoom.html")
+def zoom_window() -> FileResponse:
+    return FileResponse(STATIC / "zoom.html", headers=NO_STORE)
+
+
 #: What the page is allowed to ask for beside itself. A whitelist of suffixes
 #: rather than a static mount: this serves one directory of hand-written files,
 #: and a path that escapes it is a bug worth a 404 rather than a file.

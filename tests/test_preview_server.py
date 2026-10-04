@@ -763,7 +763,7 @@ def test_the_page_and_its_modules_are_never_cached(client):
     modules serves them after the edit meant to fix them: the page runs the old
     code, the change reads as having done nothing, and the search moves to the
     wrong question. It costs nothing to say no here."""
-    for path in ("/", "/js/app.js", "/style.css"):
+    for path in ("/", "/zoom.html", "/js/app.js", "/style.css"):
         response = client.get(path)
         assert response.status_code == 200, path
         assert response.headers["cache-control"] == "no-store", path

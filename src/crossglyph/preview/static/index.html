@@ -669,7 +669,8 @@
           percentage to that size. Fit is for narrow windows. Zoom enlarges
           the page in whole screen pixels with a grid between the reader's
           pixels: drag to move it, hold still to see it untuned, use Alt
-          with the wheel to zoom, and hold Z to fill the window. Paper and ink
+          with the wheel to zoom, and hold Z to fill the window. The button
+          beside + moves the zoom into a window of its own. Paper and ink
           remap the four display levels without rerendering the font. Warm and
           tint shade the result to match your own display: warm is how far red
           sits above blue, tint how far green sits above their mean, and zero
@@ -759,6 +760,16 @@
             </select>
             <button type="button" class="step mono" data-zoom-step="1"
                     aria-label="zoom in">+</button>
+            <button type="button" id="device-popout" class="device-copy"
+                    aria-pressed="false"
+                    title="Show the zoomed page in a window of its own"
+                    aria-label="show the zoomed page in a window of its own">
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <rect x="2.6" y="5.4" width="10" height="10" rx="1.4"/>
+                <path d="M8.4 9.6 15.4 2.6"/>
+                <path d="M10.6 2.6h4.8v4.8"/>
+              </svg>
+            </button>
             <label class="device-grid" for="device-grid">grid
               <input id="device-grid" type="checkbox" data-device-setting checked></label>
           </span>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CrossGlyph zoom</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- The zoomed page in a window of its own. Everything here is drawn and
+     driven by the page that opened it, so it holds a canvas and nothing
+     else, and says when it is ready. The canvas sits on the corner of the
+     window, a whole screen pixel, and is drawn at exactly its own size. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: rgb(160 161 165); }
+  #zoom-page {
+    position: fixed; left: 0; top: 0; display: block; cursor: grab;
+    image-rendering: pixelated; outline: none; touch-action: none;
+    user-select: none; -webkit-user-drag: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="zoom-page" tabindex="0"></canvas>
+<script>opener?.postMessage("crossglyph-zoom", location.origin);</script>
+</body>
+</html>

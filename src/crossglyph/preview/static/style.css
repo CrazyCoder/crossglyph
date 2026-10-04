@@ -830,7 +830,11 @@
   #device-scale {
     width: 100%; min-width: 0; padding: .18rem .3rem; font-size: 11px;
   }
-  /* The zoom, its steppers and the grid switch on one line. */
+  /* While the zoom has a window of its own, its button stays lit. */
+  #device-popout[aria-pressed="true"] {
+    color: var(--panel); background: var(--knob); border-color: var(--knob);
+  }
+  /* The zoom, its steppers, the pop-out and the grid switch on one line. */
   .device-zoom { display: flex; align-items: center; gap: .3rem; min-width: 0; }
   #device-zoom { flex: 1; min-width: 0; padding: .18rem .3rem; font-size: 11px; }
   .device-grid {
@@ -848,6 +852,10 @@
   #stage.peek {
     position: fixed; inset: 0; z-index: 100; min-width: 0; border-radius: 0;
   }
+  /* The column it sits in is sticky, which makes it a stacking context of its
+     own, so the island's number only counts inside it. The column is raised
+     with it, or the panels beside it draw over the peek. */
+  #middle:has(#stage.peek) { z-index: 100; }
   .device-tones {
     display: grid; gap: .25rem;
     border-top: 1px solid var(--rule); padding: .4rem 0 .1rem;

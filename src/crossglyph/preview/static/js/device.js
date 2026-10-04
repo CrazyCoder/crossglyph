@@ -33,6 +33,7 @@ const stage = document.getElementById("stage");
 const zoomSelect = document.getElementById("device-zoom");
 const gridBox = document.getElementById("device-grid");
 const zoomSteps = [...document.querySelectorAll("[data-zoom-step]")];
+const popoutButton = document.getElementById("device-popout");
 
 const root = document.documentElement;
 
@@ -129,8 +130,44 @@ let zoom = {level: 0, x: 0, y: 0};
 //: What a double-click zooms back to.
 let lastLevel = FIRST_LEVEL;
 
-export function zoomed() {
+//: A place the page is drawn: the canvas, the window it is in, what was last
+//: drawn there and the pixels that drew it, and while it shows the zoom the
+//: size of that view in screen pixels. Each view keeps its own, so redrawing
+//: one leaves the other alone, and reads its own window's pixel ratio, since
+//: the two can sit on different screens.
+const island = {canvas, host: globalThis, drawn: null, pixels: null, box: null};
+//: The pop-out window from the moment it is opened, and its view once the
+//: page in it has said it is ready.
+let popoutWindow = null;
+let popout = null;
+//: Where the pop-out was last, as what to ask for to open the next one there.
+let popoutPlace = null;
+//: The size the open pop-out was asked for, until its page is ready, and what
+//: the window added to it. A browser opens a window a little bigger than
+//: asked, by its own measure of the frame: Chrome on Windows adds 8 by 18 at
+//: a ratio of 1.5. Remembering the size the window came out at and asking for
+//: that would grow it by as much every time it opened.
+let popoutAsked = null;
+let popoutSlack = {width: 0, height: 0};
+
+// Whether a zoom is chosen, wherever it is shown.
+function zoomOn() {
   return zoom.level > 0;
+}
+
+// Whether the island shows the zoom. With the pop-out open the window has it,
+// and the island goes back to the whole page beside it.
+export function zoomed() {
+  return zoomOn() && !popoutWindow;
+}
+
+function showsZoom(view) {
+  return view === island ? zoomed() : true;
+}
+
+// The view the zoom is in, which a copy of it takes.
+function zoomTarget() {
+  return popout ?? island;
 }
 
 // Off, centred on the reader's page, with a double-click going to the first
@@ -158,8 +195,8 @@ function profile(which = variant()) {
   return {native: device.native, ...device[which]};
 }
 
-function dpr() {
-  return Number(globalThis.devicePixelRatio) || 1;
+function dpr(host = globalThis) {
+  return Number(host.devicePixelRatio) || 1;
 }
 
 function frameUrl(which = variant()) {
@@ -281,9 +318,6 @@ export function layoutDevice() {
   syncPreviewColumns();
 }
 
-//: The zoomed view's size in screen pixels, measured off the island.
-let zoomBox = null;
-
 // While zoomed the view fills the island the page sits on rather than the
 // page's own box: the island does not change size, and there is more to see.
 // The surface stops being the canvas's container while zoomed (see the CSS),
@@ -308,13 +342,24 @@ function placeZoomView() {
   const bottom = rect.top + rect.height - border("Bottom") - pad("Bottom");
   const left = Math.ceil((edgeX + pad("Left")) * ratio);
   const top = Math.ceil((edgeY + pad("Top")) * ratio);
-  zoomBox = {width: Math.max(1, Math.floor(right * ratio) - left),
-             height: Math.max(1, Math.floor(bottom * ratio) - top)};
+  const box = {width: Math.max(1, Math.floor(right * ratio) - left),
+               height: Math.max(1, Math.floor(bottom * ratio) - top)};
+  island.box = box;
   canvas.style.left = `${left / ratio - edgeX}px`;
   canvas.style.top = `${top / ratio - edgeY}px`;
-  canvas.style.width = `${zoomBox.width / ratio}px`;
-  canvas.style.height = `${zoomBox.height / ratio}px`;
+  canvas.style.width = `${box.width / ratio}px`;
+  canvas.style.height = `${box.height / ratio}px`;
   canvas.style.borderRadius = "0px";
+}
+
+// The pop-out's view fills its window. Its canvas sits on the window's
+// corner, a whole screen pixel already, so only the size needs whole pixels.
+function placePopout(view) {
+  const ratio = dpr(view.host);
+  view.box = {width: Math.max(1, Math.floor(view.host.innerWidth * ratio)),
+              height: Math.max(1, Math.floor(view.host.innerHeight * ratio))};
+  view.canvas.style.width = `${view.box.width / ratio}px`;
+  view.canvas.style.height = `${view.box.height / ratio}px`;
 }
 
 function tone(value, low, high) {
@@ -466,7 +511,7 @@ function tonedPage() {
 // composite that came out wrong would pass both.
 export async function deviceImage(whole = false) {
   if (!toned) throw new Error("there is no page to copy yet");
-  if (zoomed() && !whole) return zoomedImage();
+  if (zoomOn() && !whole) return zoomedImage();
   const device = profile("pixels");
   // The frame toggle, not whether the frame is showing: a whole page taken
   // while zoomed is the page as it looks unzoomed.
@@ -493,7 +538,7 @@ export async function deviceImage(whole = false) {
 // many pixels square as it is on screen, with the grid if it is on. Built
 // from the toned page like the rest of the copy, never from the screen.
 function zoomedImage() {
-  const view = currentView();
+  const view = currentView(zoomTarget());
   const block = zoom.level;
   const crop = visibleCrop(origin(zoom, view, toned), view, toned, block);
   const size = {width: crop.width * block, height: crop.height * block};
@@ -516,7 +561,7 @@ async function deviceBlob(whole) {
 }
 
 export function imageName(whole = false) {
-  if (zoomed() && !whole) {
+  if (zoomOn() && !whole) {
     return `crossglyph-${model.value}-page-zoom${zoom.level}x.png`;
   }
   return `crossglyph-${model.value}`
@@ -537,7 +582,7 @@ let restoreTitle = null;
 function showCopyState() {
   copyButton.querySelector(".as-copy").hidden = shiftHeld;
   copyButton.querySelector(".as-download").hidden = !shiftHeld;
-  copyButton.title = zoomed()
+  copyButton.title = zoomOn()
     ? (shiftHeld ? ZOOM_DOWNLOAD_TITLE : ZOOM_COPY_TITLE)
     : (shiftHeld ? DOWNLOAD_TITLE : COPY_TITLE);
 }
@@ -635,15 +680,11 @@ function contributions(from, to) {
   return {starts, counts, weights: Float32Array.from(weights)};
 }
 
-//: Scratch for the pass between the two, and the picture the second one fills.
-//: Both are kept: dragging a window edge resamples on every frame, and handing
-//: back several megabytes each time to ask for them again is most of what that
-//: costs. Grown when a bigger size comes along and never shrunk.
+//: Scratch for the pass between the two. Kept, as each view keeps the picture
+//: the second pass fills: dragging a window edge resamples on every frame, and
+//: handing back several megabytes each time to ask for them again is most of
+//: what that costs. Grown when a bigger size comes along and never shrunk.
 let between = null;
-let resampled = null;
-//: The page and the size the canvas is holding now, so a layout that changed
-//: neither can leave it alone.
-let drawn = null;
 
 function scratch(size) {
   if (!between || between.length < size) between = new Float32Array(size);
@@ -777,13 +818,19 @@ function tonePage() {
 // panel-sized one and letting it scale, is what puts the choice of filter in
 // this file instead of in the browser's.
 function drawDevicePage() {
-  if (!toned || typeof canvas.getContext !== "function") return;
+  if (!toned) return;
   const device = profile();
   const factor = sourceFactor(device, frameOn()) * dpr();
-  const to = zoomed() && zoomBox ? zoomBox : {
+  drawView(island, zoomed() && island.box ? island.box : {
     width: Math.max(1, Math.round(device.aperture.width * factor)),
     height: Math.max(1, Math.round(device.aperture.height * factor)),
-  };
+  });
+  if (popout?.box) drawView(popout, popout.box);
+}
+
+// One view of the page, `to` screen pixels in size.
+function drawView(view, to) {
+  if (typeof view.canvas.getContext !== "function") return;
   // Every layout comes through here, and most of them leave this alone: the
   // box does not follow the colour, and outside the fitted scale it does not
   // follow the frame either, so picking either would otherwise resample the
@@ -791,32 +838,33 @@ function drawDevicePage() {
   // because toning always builds a new picture rather than writing into the
   // old one. The zoom joins it: a pan changes the picture without changing
   // the page or its size.
-  const view = zoomed() ? zoomView(to) : null;
-  const key = view ? `${view.at.x},${view.at.y},${view.block},${view.grid}` : "";
+  const shown = showsZoom(view) ? zoomView(to) : null;
+  const key = shown ? `${shown.at.x},${shown.at.y},${shown.block},${shown.grid}` : "";
+  const drawn = view.drawn;
   if (drawn && drawn.of === toned && drawn.width === to.width &&
       drawn.height === to.height && drawn.zoom === key) return;
-  drawn = {of: toned, width: to.width, height: to.height, zoom: key};
-  const context = canvas.getContext("2d", {alpha: false, willReadFrequently: true});
-  canvas.width = to.width;
-  canvas.height = to.height;
-  if (!view && to.width === toned.width && to.height === toned.height) {
+  view.drawn = {of: toned, width: to.width, height: to.height, zoom: key};
+  const context = view.canvas.getContext("2d", {alpha: false, willReadFrequently: true});
+  view.canvas.width = to.width;
+  view.canvas.height = to.height;
+  if (!shown && to.width === toned.width && to.height === toned.height) {
     // The page is at its own size, where resampling is an identity that costs a
     // pass over every pixel and risks not being one.
     context.putImageData(toned, 0, 0);
   } else {
-    if (!resampled || resampled.width !== to.width ||
-        resampled.height !== to.height) {
-      resampled = context.createImageData(to.width, to.height);
+    if (!view.pixels || view.pixels.width !== to.width ||
+        view.pixels.height !== to.height) {
+      view.pixels = context.createImageData(to.width, to.height);
     }
-    if (view) {
-      paint(toned.data, toned, view.at, view.block, view.grid, to, paperRgb(),
-            resampled.data);
+    if (shown) {
+      paint(toned.data, toned, shown.at, shown.block, shown.grid, to, paperRgb(),
+            view.pixels.data);
     } else {
-      resampleByArea(toned.data, toned, to, resampled.data);
+      resampleByArea(toned.data, toned, to, view.pixels.data);
     }
-    context.putImageData(resampled, 0, 0);
+    context.putImageData(view.pixels, 0, 0);
   }
-  canvas.classList.add("shown");
+  view.canvas.classList.add("shown");
 }
 
 // The zoomed view's block and offset for a view of `to` screen pixels, with
@@ -831,19 +879,23 @@ function zoomView(to) {
   return {block: zoom.level, at: origin(zoom, to, toned), grid: gridShown(zoom.level)};
 }
 
-// The canvas as last drawn, in screen pixels: the view every gesture works in.
-function currentView() {
-  return {width: canvas.width, height: canvas.height};
+// A view's canvas as last drawn, in screen pixels: what every gesture on it
+// works in.
+function currentView(view) {
+  return {width: view.canvas.width, height: view.canvas.height};
 }
 
 // A new zoom state from a control, a key or a gesture. Turning zoom on or off
 // moves the frame, so that lays the page out again; a new level only redraws.
+// Off closes the pop-out, which has nothing else to show.
 function setZoom(next) {
   const was = zoomed();
   zoom = next;
   if (zoom.level) lastLevel = zoom.level;
   zoomSelect.value = String(zoom.level);
-  if (was !== zoomed()) layoutDevice(); else drawDevicePage();
+  if (!zoom.level && popoutWindow) closePopout();
+  else if (was !== zoomed()) layoutDevice();
+  else drawDevicePage();
   saveDevice();
   showCopyState();
 }
@@ -855,20 +907,159 @@ function moveZoom(next) {
 }
 
 // A point of an event in the view's own screen pixels.
-function pointOf(event) {
-  const rect = canvas.getBoundingClientRect();
-  return {x: (event.clientX - rect.left) * dpr(),
-          y: (event.clientY - rect.top) * dpr()};
+function pointOf(event, view) {
+  const rect = view.canvas.getBoundingClientRect();
+  const ratio = dpr(view.host);
+  return {x: (event.clientX - rect.left) * ratio, y: (event.clientY - rect.top) * ratio};
 }
 
-// Zoom to `level` around a point of the view. From the whole page the view
-// is about to change size, so there is no spot to hold still and the pixel
-// clicked becomes the centre instead.
-function zoomAround(level, point) {
-  const reader = readerAt(zoom, point, currentView(), toned ?? profile().native);
+// Zoom to `level` around a point of a view. From a view of the whole page,
+// there is no spot to hold still, since the view is about to change size or
+// the zoom is in the pop-out, so the pixel clicked becomes the centre instead.
+function zoomAround(level, point, view) {
+  const shows = showsZoom(view);
+  const reader = readerAt(shows ? zoom : {...zoom, level: 0}, point, currentView(view),
+                          toned ?? profile().native);
   if (!level) setZoom({...zoom, level: 0});
-  else if (!zoomed()) setZoom({level, x: reader.x, y: reader.y});
-  else setZoom(zoomAt(level, reader, point, currentView()));
+  else if (!shows) setZoom({level, x: reader.x, y: reader.y});
+  else setZoom(zoomAt(level, reader, point, currentView(view)));
+}
+
+// The gestures of one view, which zoom.js turns presses, the wheel and keys
+// into. A double-click in the pop-out does nothing: the whole page is the
+// island's to show, and the window would have nothing left in it.
+function zoomHooks(view, untuned) {
+  return {
+    active: () => showsZoom(view),
+    hold: untuned.hold,
+    release: untuned.release,
+    pan(dx, dy) {
+      const ratio = dpr(view.host);
+      moveZoom(panBy(zoom, dx * ratio, dy * ratio));
+    },
+    settled: saveDevice,
+    zoom(direction, event) {
+      zoomAround(stepLevel(zoom.level, direction), pointOf(event, view), view);
+    },
+    toggle(event) {
+      if (view === island) zoomAround(zoomed() ? 0 : lastLevel, pointOf(event, view), view);
+    },
+    key: zoomKey,
+  };
+}
+
+// --- the pop-out -------------------------------------------------------------
+// The zoom in a window of its own, beside the controls or on another screen.
+// The page in it holds a canvas and nothing else: this module draws into that
+// canvas and listens to it, the same way it does the island's, which a window
+// opened from this one allows. The window is opened at once, and its view is
+// attached when its page says it is ready, which it also says again after a
+// reload of its own.
+const POPOUT_PAGE = "zoom.html";
+const POPOUT_NAME = "crossglyph-zoom";
+const POPOUT_READY = "crossglyph-zoom";
+const POPOUT_SIZE = {width: 900, height: 700};
+const POPOUT_TITLE = popoutButton.title;
+
+function openPopout() {
+  const place = popoutPlace ?? POPOUT_SIZE;
+  const features = ["popup", `width=${place.width}`, `height=${place.height}`];
+  if (popoutPlace) features.push(`left=${place.left}`, `top=${place.top}`);
+  const opened = globalThis.open?.(POPOUT_PAGE, POPOUT_NAME, features.join(","));
+  if (!opened) {
+    popoutButton.title = "The browser blocked the window. Allow pop-ups for this page to use it.";
+    return;
+  }
+  popoutButton.title = POPOUT_TITLE;
+  popoutWindow = opened;
+  popoutAsked = {width: place.width, height: place.height};
+  popoutButton.setAttribute("aria-pressed", "true");
+  if (!zoom.level) zoom = {...zoom, level: lastLevel};
+  zoomSelect.value = String(zoom.level);
+  layoutDevice();
+  saveDevice();
+  showCopyState();
+}
+
+function attachPopout(host, untuned) {
+  // Once per page in the window: a second listener on one canvas would move
+  // the zoom twice for every gesture.
+  const page = host.document.getElementById("zoom-page");
+  if (!page || popout?.canvas === page) return;
+  const view = {canvas: page, host, drawn: null, pixels: null, box: null};
+  // Measured once, when the window first has a page in it: a reload of its
+  // own keeps whatever size it was dragged to.
+  if (popoutAsked) {
+    popoutSlack = {width: host.innerWidth - popoutAsked.width,
+                   height: host.innerHeight - popoutAsked.height};
+    popoutAsked = null;
+  }
+  wireZoom(view.canvas, zoomHooks(view, untuned), {plainWheel: true});
+  host.addEventListener("resize", () => {
+    if (popout !== view) return;
+    placePopout(view);
+    drawDevicePage();
+    rememberPlace(host);
+  });
+  host.addEventListener("pagehide", () => {
+    rememberPlace(host);
+    if (popout === view) popout = null;
+    watchClosing(host);
+  });
+  popout = view;
+  placePopout(view);
+  drawDevicePage();
+  view.canvas.focus?.({preventScroll: true});
+}
+
+// A pagehide is a close or a reload, and only the window can say which, a
+// moment later. A reload says it is ready again.
+function watchClosing(host, tries = 20) {
+  if (popoutWindow !== host) return;
+  if (host.closed) popoutGone();
+  else if (tries) setTimeout(() => watchClosing(host, tries - 1), 100);
+}
+
+function popoutGone() {
+  popoutWindow = null;
+  popout = null;
+  popoutButton.setAttribute("aria-pressed", "false");
+  layoutDevice();
+  showCopyState();
+}
+
+function closePopout() {
+  const host = popoutWindow;
+  popoutGone();
+  host.close();
+}
+
+function rememberPlace(host) {
+  const place = {left: host.screenX, top: host.screenY,
+                 width: host.innerWidth - popoutSlack.width,
+                 height: host.innerHeight - popoutSlack.height};
+  if (Object.values(place).every(Number.isFinite)) popoutPlace = place;
+  saveDevice();
+}
+
+// A remembered place, if it is one: four numbers, and room for a view.
+function validPlace(place) {
+  return place && typeof place === "object" &&
+    ["left", "top", "width", "height"].every(key => Number.isFinite(place[key])) &&
+    place.width >= 100 && place.height >= 100;
+}
+
+function wirePopout(untuned) {
+  popoutButton.addEventListener("click", () => {
+    if (popoutWindow) closePopout(); else openPopout();
+  });
+  globalThis.addEventListener?.("message", (event) => {
+    if (event.data !== POPOUT_READY || !popoutWindow || event.source !== popoutWindow ||
+        event.origin !== globalThis.location?.origin) return;
+    attachPopout(popoutWindow, untuned);
+  });
+  // A window left behind would go on showing a page nothing draws any more.
+  globalThis.addEventListener?.("pagehide", () => popoutWindow?.close());
 }
 
 // Peek: while Z is held on a zoomed page, the island takes the whole window,
@@ -912,7 +1103,7 @@ function zoomKey(event) {
     setZoom({...zoom, level: stepLevel(zoom.level, 1)});
     return true;
   }
-  if (!zoomed()) return false;
+  if (!zoomOn()) return false;
   if (event.key === "-") {
     setZoom({...zoom, level: stepLevel(zoom.level, -1)});
     return true;
@@ -1001,7 +1192,7 @@ function values() {
     paper: paper.value, ink: ink.value, calibration: calibrationRange.value,
     warm: warm.value, tint: tint.value,
     zoom: zoom.level, x: zoom.x, y: zoom.y, last: lastLevel,
-    grid: gridBox.checked,
+    grid: gridBox.checked, window: popoutPlace,
   };
   if (fixedColor) state.color = color.value;
   return state;
@@ -1070,6 +1261,7 @@ export function loadDevice() {
         zoom = inside({...zoom, x: saved.x, y: saved.y}, profile().native);
       }
       if (typeof saved.grid === "boolean") gridBox.checked = saved.grid;
+      if (validPlace(saved.window)) popoutPlace = saved.window;
     }
   }
   zoomSelect.value = String(zoom.level);
@@ -1086,7 +1278,9 @@ function resetDevice(scheduleRender) {
   }
   fixedColor = false;
   color.value = themeColor();
+  if (popoutWindow) closePopout();
   resetZoom();
+  popoutPlace = null;
   showCopyState();
   attempt(() => localStorage.removeItem(DEVICE_STORE));
   syncNumericControls();
@@ -1130,20 +1324,8 @@ export function wireDevice(scheduleRender, untuned) {
     saveDevice();
     drawDevicePage();
   });
-  wireZoom(surface, {
-    active: zoomed,
-    hold: untuned.hold,
-    release: untuned.release,
-    pan(dx, dy) {
-      moveZoom(panBy(zoom, dx * dpr(), dy * dpr()));
-    },
-    settled: saveDevice,
-    zoom(direction, event) {
-      zoomAround(stepLevel(zoom.level, direction), pointOf(event));
-    },
-    toggle(event) { zoomAround(zoomed() ? 0 : lastLevel, pointOf(event)); },
-    key: zoomKey,
-  });
+  wireZoom(surface, zoomHooks(island, untuned));
+  wirePopout(untuned);
   wirePeek();
   const toneChanged = () => {
     saveDevice();
