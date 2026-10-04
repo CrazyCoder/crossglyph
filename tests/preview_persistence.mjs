@@ -6568,6 +6568,24 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   els.size3.value = "16";
   env.exportForm.edit("size3");
 
+  // The rows a range found answer the range. Switching to My sizes drops
+  // them rather than show them under the other mode's rules, and leaves Undo
+  // for anything already written.
+  env.fit.apply.on.click();
+  env.fit.toRange.on.click();
+  check("pressing the mode already chosen keeps the rows",
+        env.fit.table.children.length === 6);
+  env.fit.toMine.on.click();
+  check("switching to My sizes drops the range's rows",
+        env.fit.table.children.length === 0 && env.fit.apply.disabled === true
+        && env.fit.builds.textContent === "", String(env.fit.table.children.length));
+  check("and keeps Undo for what was written", env.fit.undo.hidden === false);
+  env.fit.undo.on.click();
+  check("which still puts every box back",
+        all.map(n => els[n].value).join(" ") === before.join(" "),
+        all.map(n => els[n].value).join(" "));
+  env.fit.toRange.on.click();
+
   opts.fitSteps = fitSteps([[14, 14, 13.75, [50, 90, 50, 50]]]);
   env.fit.low.value = "14";
   env.fit.count.value = "1";

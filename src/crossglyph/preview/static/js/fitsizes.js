@@ -489,6 +489,18 @@ export function familyMoved() {
 // what it does, so Find sizes keeps its column. The fields keep what was
 // typed in them across switches.
 function setMode(ranged) {
+  // Suggestions answer the mode that found them, and the two read a tick
+  // differently, so a switch drops them. Undo stays, for what Apply already
+  // wrote.
+  if (ranged !== (toRange.getAttribute("aria-pressed") === "true")) {
+    stopFit();
+    rows = [];
+    range = null;
+    table.replaceChildren();
+    note.textContent = "";
+    builds.textContent = "";
+    syncAll();
+  }
   toMine.setAttribute("aria-pressed", String(!ranged));
   toRange.setAttribute("aria-pressed", String(ranged));
   mineSays.hidden = ranged;

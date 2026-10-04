@@ -348,7 +348,9 @@ boxes: nothing is built until you press **Build**. With the **suffix** filled
 in, the second row is a second family instead.
 
 Fit to grid does not change the suffix. Choosing another family drops the
-suggestions, since they were found for the last one.
+suggestions, since they were found for the last one. Switching between **My
+sizes** and **Range** drops them too, and **Undo** stays for anything Apply has
+already written.
 
 ## Build
 
