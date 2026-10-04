@@ -243,6 +243,7 @@ export function layoutDevice() {
   surface.style.width = `${box.width * factor}px`;
   surface.style.height = `${box.height * factor}px`;
   surface.classList.toggle("zoomed", zoomed());
+  readout.hidden = !zoomed();
   // Cleared before anything measures, so it reads the surface where layout
   // put it rather than where the last correction left it.
   surface.style.left = surface.style.top = "";

@@ -830,11 +830,21 @@
   #device-scale {
     width: 100%; min-width: 0; padding: .18rem .3rem; font-size: 11px;
   }
-  /* The zoom and its steppers on one line, and the grid switch with the
-     pixel under the pointer beside it. */
+  /* The zoom, its steppers and the grid switch on one line. Under them, the
+     pixel under the pointer: a line that is there for as long as zoom is on,
+     empty or not, so the pointer coming and going moves nothing below it. */
   .device-zoom { display: flex; align-items: center; gap: .3rem; min-width: 0; }
   #device-zoom { flex: 1; min-width: 0; padding: .18rem .3rem; font-size: 11px; }
-  #device-zoom-readout { color: var(--muted); font-size: 11px; white-space: pre; }
+  .device-grid {
+    display: flex; align-items: center; gap: .3rem; margin-left: .3rem;
+    color: var(--muted); font-size: 10px; text-transform: uppercase;
+    letter-spacing: .08em; white-space: nowrap;
+  }
+  #device-zoom-readout {
+    grid-column: 2; min-height: 1lh; color: var(--muted); font-size: 11px;
+    white-space: pre;
+  }
+  #device-zoom-readout[hidden] { display: none; }
   /* A zoomed page moves with the pointer, and says so. It also fills the
      island rather than the page's box, so the surface stops being what the
      canvas is placed against and #stage, positioned above, takes over. The

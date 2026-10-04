@@ -6917,10 +6917,12 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
         env.device.readout.textContent === `x ${rx}  y ${ry}  grey ${grey}`,
         `${env.device.readout.textContent} against x ${rx} y ${ry} grey ${grey}`);
   surface.on.pointerleave(event());
-  check("and empties when the pointer leaves", env.device.readout.textContent === "");
+  check("and empties when the pointer leaves, keeping its line",
+        env.device.readout.textContent === "" && env.device.readout.hidden === false);
 
   surface.on.keydown(event({key: "Escape"}));
-  check("Escape turns zoom off", env.device.zoom.value === "0");
+  check("Escape turns zoom off, and the readout's line goes with it",
+        env.device.zoom.value === "0" && env.device.readout.hidden === true);
   surface.on.dblclick(event({clientX: 10, clientY: 10}));
   surface.on.dblclick(event({clientX: 10, clientY: 10}));
   check("a double-click while zoomed turns it off", env.device.zoom.value === "0");
