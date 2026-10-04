@@ -6490,8 +6490,9 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("and leaves the suffix as it was", els.mod_suffix.value === "");
 }
 
-// 99d. A range is the family's new size list. Boxes past its count are
-//      emptied, shown as removed before Apply, and Undo brings them back.
+// 99d. A range is the family's new size list. Each row is a size the family
+//      keeps while it is ticked, a size already in the boxes included, and
+//      Apply writes the ticked ones in order and empties the rest.
 {
   const opts = {renderOk: true};
   const env = await loaded(fakeStorage(), undefined, opts);
@@ -6515,14 +6516,17 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   check("any count up to the boxes is asked for", env.fetches.fits.at(-1).count === 6,
         JSON.stringify(env.fetches.fits.at(-1)));
   const rows = env.fit.table.children;
-  check("boxes past the count are listed as removed from the start",
-        rows.length === 8 && rows[6].children[1].textContent === "removed"
-        && rows[7].children[0].textContent === "22" && rows[7].children.at(-1).checked === true,
-        rows.map(r => r.children[1].textContent).join(" "));
+  check("a range has a row for each of its sizes and no more",
+        rows.length === 6, rows.map(r => r.children[1].textContent).join(" "));
   await settle();
-  check("and the footer counts what is left",
+  check("and the footer counts what Apply leaves",
         env.fit.builds.textContent === "After Apply: one family of 6 sizes.",
         env.fit.builds.textContent);
+  const inUse = rows[0].children.at(-1);
+  check("a size the box already holds can still be left out",
+        rows[0].children[1].textContent === "12" && inUse.checked === true
+        && inUse.disabled === false && inUse.hidden === false,
+        JSON.stringify({checked: inUse.checked, disabled: inUse.disabled}));
   env.fit.apply.on.click();
   check("Apply writes the range and empties the rest",
         all.map(n => els[n].value).join(" ") === "12 13 14 15 16 17  ",
@@ -6530,6 +6534,39 @@ const SECOND_ROW = ["mod1", "mod2", "mod3", "mod4"];
   env.fit.undo.on.click();
   check("Undo brings every box back", all.map(n => els[n].value).join(" ") === before.join(" "),
         all.map(n => els[n].value).join(" "));
+
+  // Leaving sizes out: the rest close up, so the family has no gap in it.
+  const drop = (n) => { rows[n].children.at(-1).checked = false; rows[n].children.at(-1).on.change(); };
+  drop(0);
+  drop(2);
+  check("leaving sizes out lowers the count Apply leaves",
+        env.fit.builds.textContent === "After Apply: Alto with 4 sizes."
+        && env.fit.apply.disabled === false, env.fit.builds.textContent);
+  env.fit.apply.on.click();
+  check("Apply writes the sizes kept, closed up, and empties the rest",
+        all.map(n => els[n].value).join(" ") === "13 15 16 17    ",
+        all.map(n => els[n].value).join(" "));
+  check("and has nothing left to do", env.fit.apply.disabled === true);
+  rows[0].children.at(-1).checked = true;
+  rows[0].children.at(-1).on.change();
+  check("ticking a size back offers to put it in again", env.fit.apply.disabled === false);
+  env.fit.apply.on.click();
+  check("in its place in the list",
+        all.map(n => els[n].value).join(" ") === "12 13 15 16 17   ",
+        all.map(n => els[n].value).join(" "));
+  env.fit.undo.on.click();
+  check("and Undo still brings every box back",
+        all.map(n => els[n].value).join(" ") === before.join(" "),
+        all.map(n => els[n].value).join(" "));
+  els.size3.value = "15.5";
+  env.exportForm.edit("size3");
+  env.fit.apply.on.click();
+  check("a box edited since the search stops Apply rather than being written over",
+        els.size3.value === "15.5" && els.size1.value === "12"
+        && /changed since the search/.test(env.fit.note.textContent),
+        `${all.map(n => els[n].value).join(" ")} | ${env.fit.note.textContent}`);
+  els.size3.value = "16";
+  env.exportForm.edit("size3");
 
   opts.fitSteps = fitSteps([[14, 14, 13.75, [50, 90, 50, 50]]]);
   env.fit.low.value = "14";

@@ -336,10 +336,14 @@ The sizes it will try are listed beside **Range**, such as "Tries 12, 14, 16,
 Press **Find sizes**. The sizes fill the boxes in order, the first row then the
 second.
 
-A range is the family's new list of sizes. Boxes past the count are listed as
-**removed**, and **Apply** empties them. **Undo** brings them back. When a
-range changes how many sizes the family has, the section says what Apply would
-leave, such as "After Apply: one family of 6 sizes". Apply only changes the
+A range is the family's new list of sizes. Each ticked size is kept, including
+one the boxes already hold, so untick a size to leave it out, such as the one
+with the worst score. **Apply** writes the ticked sizes in order, with no gaps,
+and empties the boxes after them. **Undo** brings every box back. If you type
+in a size box after the search, Apply writes nothing and asks you to search
+again. When a range changes how many sizes the family has, the section says
+what Apply would leave, such as "After Apply: one family of 6 sizes". Apply
+only changes the
 boxes: nothing is built until you press **Build**. With the **suffix** filled
 in, the second row is a second family instead.
 

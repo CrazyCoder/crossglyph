@@ -40,9 +40,15 @@ const WORTH = 3;
 //: What My sizes says when the boxes hold none.
 const NO_SIZES = "There are no sizes in the boxes yet. Choose Range instead.";
 
+const BOXES = [...FIRST_ROW, ...SECOND_ROW];
+
 //: One per suggestion: the box it would fill, what the box held when it was
 //: scored, and the two values offered.
 let rows = [];
+//: For suggestions found from a range, which is the family's new size list:
+//: what every box held at the search, and whether the search reached every
+//: size. Null for My sizes, whose rows each stand for their own box.
+let range = null;
 //: What Apply wrote, box by box, and what each box held before it.
 let applied = null;
 //: The family the suggestions were found for.
@@ -66,11 +72,19 @@ function round(fit) {
 // What Apply would leave the sizes as, said only when that changes how many
 // there are. Apply only fills the boxes; nothing is built until Build.
 function showBuilds() {
-  const listed = new Map(rows.map(row => [row.box, row]));
-  // A box with a row ends up holding a size unless the row removes it.
-  const kept = (box) => (listed.has(box) ? !listed.get(box).removed : filled(box));
-  const first = FIRST_ROW.filter(kept).length + spilled(SPILL.first);
-  const second = SECOND_ROW.filter(kept).length + spilled(SPILL.second);
+  let first, second;
+  if (range) {
+    // The sizes kept, closed up from the first box. A row still waiting for
+    // its result counts as kept, which is what it will be.
+    const kept = rows.filter(row => !row.filled || row.tick.checked).length;
+    first = Math.min(kept, FIRST_ROW.length);
+    second = Math.max(0, kept - FIRST_ROW.length);
+  } else {
+    first = FIRST_ROW.filter(filled).length;
+    second = SECOND_ROW.filter(filled).length;
+  }
+  first += spilled(SPILL.first);
+  second += spilled(SPILL.second);
   const [nowFirst, nowSecond] = rowCounts();
   builds.textContent = first === nowFirst && second === nowSecond ? ""
     : `After Apply: ${familiesPhrase(first, second)}.`;
@@ -135,22 +149,26 @@ function addRow(box, now) {
   rows.push(entry);
 }
 
-// A box past a range's count. A range is the family's new size list, so
-// Apply empties it; the row says so before anything is written.
-function addRemovedRow(box) {
-  addRow(box, Number(snapSize(exportForm.elements[box].value)));
-  const entry = rows.at(-1);
-  entry.removed = true;
-  entry.value = "";
-  entry.pick.textContent = "removed";
-  entry.score.textContent = "";
-  entry.tick.hidden = false;
-  entry.tick.checked = true;
-  entry.tick.setAttribute("aria-label", `Remove size ${entry.now.dataset.size}`);
-}
-
 //: Whether a row is Apply's to take: a change it can make, not one in use.
 const offered = (row) => !row.tick.hidden && !row.tick.disabled;
+
+//: What a range leaves in every box: the ticked sizes in order, closed up
+//: from the first box, and the boxes after them empty.
+function rangeWanted() {
+  const kept = rows.filter(row => offered(row) && row.tick.checked)
+    .map(row => String(row.value));
+  return new Map(BOXES.map((box, at) => [box, kept[at] ?? ""]));
+}
+
+//: Whether every box still holds what it did at the search or what Apply
+//: wrote there since. A range moves sizes between boxes, so one typed into
+//: in between cannot be stepped around the way a single box can.
+function rangeUntouched() {
+  return BOXES.every(box => {
+    const now = exportForm.elements[box].value;
+    return now === range.held.get(box) || now === applied?.get(box)?.wrote;
+  });
+}
 
 //: What Apply leaves a row's box holding: the suggestion when it is ticked,
 //: and what the box held when it was scored when it is not.
@@ -171,11 +189,21 @@ function syncAll() {
   allBox.disabled = !offers.length;
   allBox.checked = offers.length > 0 && ticked === offers.length;
   allBox.indeterminate = ticked > 0 && ticked < offers.length;
-  // Apply has work while a box it may set differs from its row's tick, which
-  // ticking, unticking and Undo can each bring about. Not during a search,
-  // whose rows are still arriving.
-  applyButton.disabled = controller !== null || !offers.some(row =>
-    ours(row) && exportForm.elements[row.box].value !== wanted(row));
+  // Apply has work while a box it may set differs from what the ticks say,
+  // which ticking, unticking and Undo can each bring about. Not during a
+  // search, whose rows are still arriving, nor for a range the search did not
+  // finish, which is not a whole size list.
+  if (controller !== null) {
+    applyButton.disabled = true;
+  } else if (range) {
+    const want = rangeWanted();
+    applyButton.disabled = !range.complete || !rows.length
+      || BOXES.every(box => exportForm.elements[box].value === want.get(box));
+  } else {
+    applyButton.disabled = !offers.some(row =>
+      ours(row) && exportForm.elements[row.box].value !== wanted(row));
+  }
+  if (rows.length) showBuilds();
 }
 
 function fillRow(entry, now, pick, fits, ranged) {
@@ -193,16 +221,24 @@ function fillRow(entry, now, pick, fits, ranged) {
   if (pick !== null && pick !== now) {
     entry.score.title = `${round(nowFit)} now, ${round(pickFit)} suggested`;
   }
-  entry.tick.setAttribute("aria-label", `Use ${pick} instead of ${now}`);
-  // Something to change is a suggestion the box does not already hold. A
-  // range starts from labels the boxes may not hold at all, so all of it is
-  // the user's to take; for their own sizes only a real gain is ticked.
-  // A suggestion the box already holds is shown ticked and greyed: in use,
-  // with nothing for Apply to do, which a blank cell does not say.
-  const changes = pick !== null && String(pick) !== snapSize(entry.held);
   entry.tick.hidden = pick === null;
+  if (ranged) {
+    // A range is the new size list, so a tick is whether the family keeps
+    // this size, and every size starts kept. One the boxes already hold can
+    // be left out like any other.
+    entry.tick.setAttribute("aria-label", `Keep ${pick}`);
+    entry.tick.checked = true;
+    syncAll();
+    return;
+  }
+  entry.tick.setAttribute("aria-label", `Use ${pick} instead of ${now}`);
+  // Something to change is a suggestion the box does not already hold, and
+  // only a real gain is ticked. A suggestion the box already holds is shown
+  // ticked and greyed: in use, with nothing for Apply to do, which a blank
+  // cell does not say.
+  const changes = pick !== null && String(pick) !== snapSize(entry.held);
   entry.tick.disabled = !changes;
-  entry.tick.checked = !changes || ranged || pickFit - nowFit >= WORTH;
+  entry.tick.checked = !changes || pickFit - nowFit >= WORTH;
   entry.tick.title = changes ? "" : "Already in the boxes";
   syncAll();
 }
@@ -260,14 +296,13 @@ function clearFit() {
   builds.textContent = "";
   undoButton.hidden = true;
   applied = null;
+  range = null;
   syncAll();
 }
 
 async function runFit() {
   const ranged = toRange.getAttribute("aria-pressed") === "true";
-  const boxes = ranged
-    ? [...FIRST_ROW, ...SECOND_ROW].slice(0, Number(count.value))
-    : [...FIRST_ROW, ...SECOND_ROW].filter(filled);
+  const boxes = ranged ? BOXES.slice(0, Number(count.value)) : BOXES.filter(filled);
   stopFit();
   clearFit();
   if (ranged && rangeSizes().problem) {
@@ -284,13 +319,12 @@ async function runFit() {
   const mine = ++runs;
   controller = new AbortController();
   foundFor = familyPicker.value;
+  if (ranged) {
+    range = {held: new Map(BOXES.map(box => [box, exportForm.elements[box].value])),
+             complete: false};
+  }
   for (const box of boxes) {
     addRow(box, ranged ? null : Number(snapSize(exportForm.elements[box].value)));
-  }
-  if (ranged) {
-    for (const box of [...FIRST_ROW, ...SECOND_ROW].slice(boxes.length).filter(filled)) {
-      addRemovedRow(box);
-    }
   }
   showBuilds();
   // A count on the button rather than a bar or a line of its own: the export
@@ -328,14 +362,14 @@ async function runFit() {
   } finally {
     if (mine === runs) {
       // A run that ended early leaves rows it never reached. They go, rather
-      // than sit there waiting for an answer that is not coming, and so do
-      // the removals, which only stand with the whole range beside them.
-      const complete = index === boxes.length;
-      rows = rows.filter(row => (row.removed ? complete : row.filled));
+      // than sit there waiting for an answer that is not coming, and a range
+      // missing some of its sizes is not a size list Apply can write.
+      if (range) range.complete = index === boxes.length;
+      rows = rows.filter(row => row.filled);
       table.replaceChildren(...rows.map(entry => entry.now.parentElement));
       controller = null;
       syncAll();
-      if (rows.length) showBuilds(); else builds.textContent = "";
+      if (!rows.length) builds.textContent = "";
       syncFitMarks();
       ready();
     }
@@ -351,6 +385,10 @@ function applyFit() {
   // Added to rather than replaced, so Undo after a second Apply puts back
   // everything the two of them wrote.
   applied ??= new Map();
+  if (range) {
+    applyRange();
+    return;
+  }
   let skipped = 0, changed = 0;
   for (const row of rows) {
     if (!offered(row)) continue;
@@ -377,6 +415,35 @@ function applyFit() {
     + "Save or Build to keep them." : "Nothing was changed.")
     + (skipped ? ` ${skipped} box${skipped === 1 ? " was" : "es were"} changed since `
       + "the search and left as typed." : "");
+}
+
+// A range writes the whole list at once: the sizes kept, closed up, and the
+// boxes after them emptied. All or nothing, since sizes move between boxes.
+function applyRange() {
+  if (!rangeUntouched()) {
+    note.textContent = "A size box was changed since the search, so nothing "
+      + "was written. Press Find sizes again.";
+    return;
+  }
+  const want = rangeWanted();
+  let changed = 0;
+  for (const box of BOXES) {
+    const field = exportForm.elements[box];
+    const value = want.get(box);
+    if (field.value === value) continue;
+    field.value = value;
+    exportEdited(field);
+    changed++;
+    // A box back at what it held needs no undoing.
+    if (value === range.held.get(box)) applied.delete(box);
+    else applied.set(box, {was: range.held.get(box), wrote: value});
+  }
+  syncAll();
+  undoButton.hidden = !applied.size;
+  showBuilds();
+  note.textContent = changed
+    ? `${changed} size box${changed === 1 ? "" : "es"} changed. Save or Build to keep them.`
+    : "Nothing was changed.";
 }
 
 function undoFit() {
