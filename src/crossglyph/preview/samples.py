@@ -162,6 +162,12 @@ SAMPLES: dict[str, Sample] = {
         "direitos. Dotados de _razão e de consciência_, devem agir uns para "
         "com os outros em *espírito de fraternidade*.")),
 
+  "ro": Sample("Română", _preset(
+        "Muzicologă în bej vând whisky și tequila, preț fix.",
+        "Toate ființele umane se nasc libere și egale în demnitate și în drepturi."
+        "Ele sînt înzestrate cu _rațiune și conștiință_ și trebuie să se comporte"
+        "unele față de altele în *spiritul fraternității*.")),
+
     "ru": Sample("Русский", "\n".join([
         "Съешь ещё этих мягких французских булок, да выпей же чаю.",
         "Цифры в прозе: 11 января 1918 года, 101-й полк, 1710 рублей 15 "
